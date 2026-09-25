@@ -403,7 +403,7 @@ A GOALIE deployment includes its **User's Manual**. A deployment without one isn
 - **Owned and inspected.** The GOALIE owner keeps it current and reviews it with each quarterly inspection. A change to configuration or reviews is finished once the manual reflects it.
 - **The onboarding path** for new owners, human or agent.
 
-An implementation ships a **User's Manual template** that follows this structure.
+An implementation ships a **User's Manual template** that follows this structure. The reference template is [USERS_MANUAL.md](USERS_MANUAL.md).
 
 ---
 

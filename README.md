@@ -16,7 +16,8 @@ It has been built and run at several companies. This repo formalizes it so it do
   - the required User's Manual;
   - configuration points;
   - requirements for an implementation.
+- **[USERS_MANUAL.md](USERS_MANUAL.md)**: the User's Manual template (v0.1). An adopting organization copies it and fills it in. People and agents both work from it, and SPEC §11 requires one for every deployment.
 
 ## Status
 
-The spec is a draft. A self-contained implementation may follow in this repo.
+The spec and manual are drafts. GOALIE will be built here as a self-contained product. Its first deployment is at Excaliwire.
