@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/icon.svg" width="120" alt="GOALIE icon"></p>
+
 # GOALIE
 
 GOALIE is a mechanism for setting, relating, and inspecting goals across an organization. It has two parts: a store that holds goals and makes them visible, and recurring reviews that make inspecting them routine.
@@ -21,3 +23,7 @@ It has been built and run at several companies. This repo formalizes it so it do
 ## Status
 
 The spec and manual are drafts. GOALIE will be built here as a self-contained product. Its first deployment is at Excaliwire.
+
+## Brand assets
+
+`assets/` holds the icon (`icon.svg`, `icon-512.png`, `icon-32.png`) and the featured image (`social-preview.svg`, `social-preview.png`, 1280×640). The featured image's SVG embeds Inter (SIL Open Font License).
