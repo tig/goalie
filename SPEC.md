@@ -185,7 +185,11 @@ An org unit's **ranked list of current priorities** for a plan period. It is usu
 | `cut_line` | Boolean or rank | Optional. Marks where funded priorities end. Items below it are knowingly starved. |
 | `status` | `Current` · `Retired` | Retiring an entry or changing its rank is logged with a reason, like any other change. |
 
-The list's owner is the org unit's owner. Re-ranking is a normal, logged decision. It is typically made in the quarterly review, and priorities are expected to stay steady between reviews.
+The list's owner is the org unit's owner. Re-ranking is a normal, logged decision. Priorities aren't set in stone: they are reviewed on cadence (typically quarterly) and expected to stay steady between reviews.
+
+**Keep the list short.** A long list of "priorities" is peanut butter: resources and energy spread thin across everything. Lints:
+- More than 4 current entries above the cut line is flagged as a red flag **(configurable threshold)**.
+- An entry with no goals mapped to it for a full review cycle is flagged. A priority that is consistently starved probably isn't one.
 
 ### 6.4 Actor
 
@@ -325,7 +329,7 @@ These are derived from the event log, not entered by hand:
 - Regressions (Ambition → Fantasy), and goals completed without a prior commitment.
 - Status theater: GREEN → RED with little or no time in YELLOW.
 - Goal-type mix per unit (metric vs milestone; input vs output).
-- **Priority alignment and starvation:** goals and linked work (and, where known, effort) per priority rank. The expected pattern is concentration at the top and thin coverage lower down. Flags: goals under starved or retired priorities that are drawing effort, Company/Program goals with no priority, and priorities with no goals.
+- **Priority alignment and starvation:** goals and linked work (and, where known, effort) per priority rank. The expected pattern is concentration at the top and thin coverage lower down. An even spread across ranks is the peanut-butter signal. Flags: goals under starved or retired priorities that are drawing effort, Company/Program goals with no priority, and priorities with no goals.
 - Hygiene: stale health, missing parts, expired Promotion Milestones, missing reasons.
 
 These are also **GOALIE's own fitness functions**: the GOALIE owner inspects them to tell whether the mechanism is getting better on its own.
@@ -412,7 +416,7 @@ These are expected to vary between organizations. The User's Manual records the 
 | Level names and depth of the org tree | Company / Program or Function / Team / Individual |
 | Goal types | The five types in §6.1 |
 | Severity scale | sev1–sev3 |
-| Priority lists | Which org levels keep a ranked list (default: Company, Program, Function), and whether a cut line is used |
+| Priority lists | Which org levels keep a ranked list (default: Company, Program, Function), whether a cut line is used, and the list-length red flag (default: more than 4) |
 | Fiscal calendar (period ends, default dates) | Calendar quarters, yearly plan period |
 | Review set and cadence | §9 |
 | "Promotions due" window | 2 weeks |
@@ -453,6 +457,8 @@ GOALIE has been built and run at several companies. This spec formalizes it inde
 - *Path To Green* (2020): https://blog.kindel.com/2020/02/16/path-to-green/
 - *Have a Plan (With Dates)* (2019): https://blog.kindel.com/2019/04/18/have-a-plan-with-dates/
 - *Tig's Toolbox for Product Management* (2026), background on the 5Ps and related plan formats: https://blog.kindel.com/2026/08/13/tigs-toolbox-for-product-management/
-- *The 5Ps: Achieving Focus in Any Endeavor* (2011): https://blog.kindel.com/2011/06/14/the-5-ps-achieving-focus-in-any-endeavor/
+- *No Starving Children? The Shocking Truth About Prioritization* (2024): https://blog.kindel.com/2024/06/06/no-starving-children-the-shocking-truth-about-prioritization/
+- *How To: Write a Working Backwards Doc* (2024): https://blog.kindel.com/2024/07/23/how-to-write-a-working-backwards-doc/
+- *The 5Ps: Achieving Focus in Any Endeavor* (2011), Purpose, Principles, Priorities, People, Plan: https://blog.kindel.com/2011/06/14/the-5-ps-achieving-focus-in-any-endeavor/
 - *Taxonomy and Lexicon* (2019): https://blog.kindel.com/2019/07/03/taxonomy-and-lexicon/
 - *Leading by Fitness Functions* (2025): https://blog.kindel.com/2025/11/01/leading-by-fitness-function/
