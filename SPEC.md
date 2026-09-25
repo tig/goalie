@@ -212,30 +212,44 @@ Committing to *pursue* a goal is a separate decision from committing to its *dat
 
 ### 7.1 Date lifecycle
 
-```
-                 promote by Promotion Milestone date          promote by Promotion Milestone date
-                 (new Promotion Milestone attached)           (Plan at Pencil; records
-                                                               Original Committed Date)
-  ┌──────────┐  ─────────────────────────────►  ┌──────────┐  ─────────────────────────────►  ┌───────────┐
-  │ FANTASY  │                                  │ AMBITION │                                  │ COMMITTED │
-  └──────────┘  ◄─────────────────────────────  └──────────┘                                  └───────────┘
-       │            demote (reason; counted            │                                            │ not demotable;
-       │            as regression)                     │                                            │ slip → changed_due_date
-       ▼                                               ▼                                            ▼
-  Promotion Milestone date passes unmet ──► missed COMMITTED date ──► RED + PTG + root cause
+```mermaid
+stateDiagram-v2
+    direction LR
+    state "Promotion Milestone missed" as Missed
+    [*] --> Fantasy
+    [*] --> Ambition
+    [*] --> Committed
+    Fantasy --> Ambition: promote by Promotion Milestone date<br/>(new Promotion Milestone attached)
+    Ambition --> Committed: promote by Promotion Milestone date<br/>(Plan at Pencil, records Original Committed Date)
+    Ambition --> Fantasy: demote (reason, counted as regression)
+    Committed --> Committed: slip (changed_due_date + reason)<br/>not demotable
+
+    Fantasy --> Missed: milestone date passes unmet
+    Ambition --> Missed: milestone date passes unmet
+    Missed: counts as a missed Committed date<br/>RED + PTG + root cause
 ```
 
 Invariant: **at any moment, a goal whose date is not Committed has a Promotion Milestone with a Committed date.**
 
 ### 7.2 State lifecycle
 
-```
-            ┌──────────► Deleted
-            │
-Backlog ──► In Progress ──► Completed         (met on or before original_committed_date)
-                        ├──► Completed Late    (met after original_committed_date)
-                        ├──► Did Not Meet      (typically set at the period reset)
-                        └──► Deleted
+```mermaid
+stateDiagram-v2
+    direction LR
+    state "In Progress" as InProgress
+    state "Completed Late" as CompletedLate
+    state "Did Not Meet" as DidNotMeet
+    [*] --> Backlog
+    Backlog --> InProgress: pursue
+    Backlog --> Deleted
+    InProgress --> Completed: met on/before original_committed_date
+    InProgress --> CompletedLate: met after original_committed_date
+    InProgress --> DidNotMeet: typically at period reset
+    InProgress --> Deleted
+    Completed --> [*]
+    CompletedLate --> [*]
+    DidNotMeet --> [*]
+    Deleted --> [*]
 ```
 
 | State | Date Types | Notes |
