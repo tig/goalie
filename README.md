@@ -20,7 +20,3 @@ It has been built and run at several companies. This repo formalizes it so it do
 ## Status
 
 The spec is a draft. A self-contained implementation may follow in this repo.
-
-## License
-
-[Apache 2.0](LICENSE)
