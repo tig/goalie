@@ -77,6 +77,11 @@ Items marked **(configurable)** are expected to differ between organizations. Se
     - A goal that goes GREEN → RED in one update is *status theater*, and it is the most important diagnostic event of the quarter.
 11. **Multi-step goals should have intermediate milestones**, each with its own owner and date (norm).
 12. **Goals are scoped to a plan period** (default: the year). At the period reset, each goal is closed out. Continuing work is re-created as a new goal marked Carryover or Repeating, not carried forward silently.
+13. **Severity is not priority.**
+    - *Severity* says how much a goal matters on its own terms: critical, important, or nice to have.
+    - *Prioritization* means deciding to focus energy and resources on the few things at the top of a ranked list, and to **starve** the things lower down.
+    - **Starvation is the point.** Putting more resources into higher priorities means, by definition, that lower ones get less. A priority list that starves nothing hasn't made a decision.
+    - GOALIE keeps the two apart: `severity` is a field on each goal, and **Priorities** are a separate ranked list per org unit that goals map to (§6.3).
 
 ---
 
@@ -91,6 +96,9 @@ The User's Manual (§11) repeats these definitions, so terms mean the same thing
 | **Project** | A short-term effort to deliver something specific by a date. |
 | **Product** | What customers experience as a whole. Programs produce Products, via Projects. |
 | **Goal** | Something an org unit sets out to do, with an owner, a date, and criteria. |
+| **Severity** | How critical a goal is on its own terms: `sev1` critical / urgent / blocking · `sev2` important · `sev3` nice to have. It isn't a ranking. |
+| **Priority** | An entry in an org unit's **ranked** list of current priorities for the period, e.g. the Priorities of its 5Ps or operating plan. Rank decides where energy and resources go. |
+| **Starvation** | The deliberate lack of attention and resources for items lower on the priority list. It is the intended effect of prioritizing, not a failure. |
 | **Date Type** | How firm a goal's date is: Committed, Ambition, or Fantasy (§5). |
 | **Promotion Milestone** | A goal with a committed date, by which another goal's uncommitted date moves up one Date Type (§5). |
 | **Plan** | The document describing how a goal will be achieved. Its maturity is Watercolor, Crayon, or Pencil. |
@@ -128,7 +136,7 @@ Not every date is the same kind of date, and treating them as the same is a majo
 
 ## 6. Data model
 
-The model has seven entities. Field names are illustrative; implementations can rename them, as long as the User's Manual maps them to these terms.
+The model has seven entities: Goal, Org Unit, Priority, Actor, Doc, Event, and an optional Work Item. Field names are illustrative; implementations can rename them, as long as the User's Manual maps them to these terms.
 
 ### 6.1 Goal
 
@@ -144,12 +152,13 @@ The model has seven entities. Field names are illustrative; implementations can 
 | `due_date` | Date | yes | The date the goal will be met. If the exact day is unknown, use the end of the relevant period, e.g. the end of the fiscal quarter **(configurable calendar)**. What the date means depends on `date_type`. |
 | `date_type` | `Committed` · `Ambition` · `Fantasy` | yes | See §5 (invariant). |
 | `promotion_milestone` | → Goal | if `date_type` ≠ Committed | The linked goal has `type = Milestone (Commit)`, `date_type = Committed`, a due date before this goal's, and a human owner (invariant). Empty when Committed. |
-| `plan` | → Doc (hosted Markdown) or external link | when Committed; recommended before | The plan behind the goal, in whatever form it takes: a hosted Markdown plan, a 5Ps doc, a PR/FAQ, a Working Backwards doc, etc. Hosted plans are versioned, so the plan can be viewed as it stood at commit time. |
+| `plan` | → Doc (hosted Markdown) or external link | when Committed; recommended before | The plan behind the goal, in whatever form it takes: a hosted Markdown plan, a 5Ps doc, a PR/FAQ, a Working Backwards doc, etc. (see *Tig's Toolbox for Product Management* in §14). Hosted plans are versioned, so the plan can be viewed as it stood at commit time. |
 | `plan_maturity` | `Watercolor` · `Crayon` · `Pencil` | yes | Committed needs Pencil (invariant). If a team asks for a committed date on a Crayon plan, push back on the plan, not the date. |
 | `work_product` | List of typed links | optional | Repo / PR / milestone, doc folder, deployed URL, metric dashboard or query. Agents follow these to gather evidence for health. Lint: missing on an in-progress `Milestone (Launch)`. |
 | `original_committed_date` | Date, set by the system | auto | Recorded when `date_type` first becomes Committed. Not editable afterwards (invariant). A deployment can let the GOALIE owner, and no one else, correct a genuine data-entry error, with a logged reason. |
 | `changed_due_date` | Date | optional; only when Committed | The current expected date after a slip. Each change has a reason (invariant) and is logged. No silent re-baselines. |
-| `priority` | Enum **(configurable)** | yes | Default `P0` Critical · `P1` Important · `P2` Nice to have. Relative within a level or org unit. |
+| `severity` | Enum **(configurable)** | yes | Default `sev1` critical / urgent / blocking · `sev2` important · `sev3` nice to have. Says how critical the goal is, not where it ranks (see `priority`). |
+| `priority` | → Priority | optional; usually only for Company, Program, or Function goals | The current priority this goal serves. It links to an entry in an org unit's ranked Priority list (§6.3), typically the goal's own unit or an ancestor's. Goals under a starved priority, or with no priority, are expected to get less. Reviews and rollups make that visible, so the starvation is deliberate rather than accidental. |
 | `state` | Enum (§7.2) | yes | `Backlog` · `In Progress` · `Completed` · `Completed Late` · `Did Not Meet` · `Deleted`. Each change has a reason (invariant). |
 | `health` | `GREEN` · `YELLOW` · `RED` | while In Progress | **GREEN:** on track; risks understood and mitigated; the owner believes the date will be hit. **YELLOW:** real unknowns or blockers, but there's still a credible path to the date. This is the status that demands action while there is time. **RED:** the date isn't credible without intervention, or there's no path to green. Health is judged against the committed date. For an uncommitted goal, that means its Promotion Milestone's date. |
 | `path_to_green` | Structured: steps + criteria + trigger | when YELLOW or RED (invariant) | A good PTG has: (1) steps, each with a **named human owner** and (2) a **date** (a date for a date is OK); (3) **criteria for returning to GREEN** that can be tested without debate; (4) for YELLOW, the **trigger that turns it RED**, and what happens then. Lint: any part missing. Archived into history on return to GREEN. |
@@ -161,23 +170,40 @@ The model has seven entities. Field names are illustrative; implementations can 
 
 `id`, `name`, `level`, `parent` (→ Org Unit), `owner` (human, invariant). The org tree is stored as data, not as a text field on each goal.
 
-### 6.3 Actor
+### 6.3 Priority
+
+An org unit's **ranked list of current priorities** for a plan period. It is usually taken from the unit's 5Ps or operating plan.
+
+| Field | Type | Rules / meaning |
+|---|---|---|
+| `id` | Stable key | Linkable. |
+| `org_unit` | → Org Unit | Whose list this is. Typically Company, Program, or Function. |
+| `period` | Plan period | Which period the list covers. |
+| `rank` | Integer | 1 is the top. **No two current entries in the same list share a rank** (invariant). A stack rank forces the decision that tied ranks avoid. |
+| `title` | Short text | E.g. "Win the SMB segment." |
+| `description` | Markdown | What the priority means, and what it explicitly starves. |
+| `cut_line` | Boolean or rank | Optional. Marks where funded priorities end. Items below it are knowingly starved. |
+| `status` | `Current` · `Retired` | Retiring an entry or changing its rank is logged with a reason, like any other change. |
+
+The list's owner is the org unit's owner. Re-ranking is a normal, logged decision. It is typically made in the quarterly review, and priorities are expected to stay steady between reviews.
+
+### 6.4 Actor
 
 `id`, `kind` (`human` | `agent`), `display_name`. For agents, also `operator`, the human responsible for that agent. Only humans can own goals or org units.
 
-### 6.4 Doc
+### 6.5 Doc
 
 Hosted Markdown documents: **Plans** and the **User's Manual** (§11). Fields: `id`, `kind`, `title`, `body` (Markdown), version history, links to the goals that use it. External docs are linked by URL rather than hosted.
 
-### 6.5 Event (history)
+### 6.6 Event (history)
 
 An append-only log with one entry per change: `timestamp`, `actor`, `goal`/`entity`, `field`, `old`, `new`, `reason`. It also records comments. Rollups (§8.2) are computed from it.
 
-### 6.6 Work Item (optional extension)
+### 6.7 Work Item (optional extension)
 
 A lighter record for the work under a goal: `id`, `title`, `owner` (an actor, and it can be an agent), `status`, `due_date`, links. It is linked to a goal. This extension doesn't copy the goal schema. Agents can use the state of linked work items as evidence for a goal's health.
 
-### 6.7 Example record
+### 6.8 Example record
 
 ```yaml
 id: GOAL-42
@@ -195,7 +221,8 @@ work_product:
   - repo: github.com/example/onboarding
 state: In Progress
 health: GREEN                      # judged against GOAL-57's committed date
-priority: P1
+severity: sev2
+priority: PRI-3                   # Growth program priority #3: "Cut time-to-value"
 origination: New
 parent: GOAL-7                     # Company: Double activated accounts
 ```
@@ -282,12 +309,12 @@ Where the implementation can do these natively it does. Otherwise an agent does 
 
 ### 8.2 Views
 
-A view is a saved slice of goals by level, org unit, owner, type, priority, date type, health, and period.
+A view is a saved slice of goals by level, org unit, owner, type, severity, priority, date type, health, and period.
 
 - **Default columns:** Summary, State, Health, due date (changed if set, otherwise original), **Date Type**, Promotion Milestone and its date (if not Committed), Owner, PTG. Plan and Work Product are one click away.
 - **Default sort:** RED, YELLOW, GREEN.
 - **Default date presentation:** the Date Type is shown next to the date, so an uncommitted date doesn't read as a promise. Custom views can drop the column.
-- **Standard views:** organization overview; one per org unit; *My goals*; *Promotions due* (Promotion Milestones due soon, default 2 weeks); *Hygiene*; period-end scorecard.
+- **Standard views:** organization overview; one per org unit; *My goals*; *Promotions due* (Promotion Milestones due soon, default 2 weeks); *Priorities* (an org unit's ranked list, with the goals mapped to each entry and the cut line shown); *Hygiene*; period-end scorecard.
 
 ### 8.3 Rollups and fitness functions
 
@@ -298,6 +325,7 @@ These are derived from the event log, not entered by hand:
 - Regressions (Ambition → Fantasy), and goals completed without a prior commitment.
 - Status theater: GREEN → RED with little or no time in YELLOW.
 - Goal-type mix per unit (metric vs milestone; input vs output).
+- **Priority alignment and starvation:** goals and linked work (and, where known, effort) per priority rank. The expected pattern is concentration at the top and thin coverage lower down. Flags: goals under starved or retired priorities that are drawing effort, Company/Program goals with no priority, and priorities with no goals.
 - Hygiene: stale health, missing parts, expired Promotion Milestones, missing reasons.
 
 These are also **GOALIE's own fitness functions**: the GOALIE owner inspects them to tell whether the mechanism is getting better on its own.
@@ -321,6 +349,7 @@ GOALIE runs inside the organization's review cadence **(configurable)**. Typical
 - The view is read line by line: owner, date, date type, health, PTG (norm).
 - Habitual questions: **"By when?"**, **"Committed, ambition, or fantasy?"**, **"Watercolor, crayon, or pencil?"**
 - Promotion Milestones due since the last review are checked. Each was either promoted or missed.
+- At org/program level, the *Priorities* view is checked as well: is effort going to the top of the list, and is the starvation below the line deliberate? Re-ranking happens here, with a reason, not ad hoc between reviews (norm).
 - The review holds people accountable for surprises and poor hygiene. The first missed date of a period is the cheap one: analyze it rigorously, without punishing anyone.
 - Action items leave with an owner and a date, or a date for a date (norm).
 - A review that repeatedly changes nothing is a signal to fix the review.
@@ -331,14 +360,14 @@ GOALIE runs inside the organization's review cadence **(configurable)**. Typical
 
 | Activity | Humans | Agents |
 |---|---|---|
-| Set goals, targets, priority | Own and decide | Draft proposals; check them against FAST and the schema |
+| Set goals, targets, severity; rank priorities | Own and decide | Draft proposals; check them against FAST and the schema |
 | Own a goal | Yes | No |
 | Do the work behind a goal | Yes | Yes |
 | Health / PTG | Approve | Draft from evidence (work product, linked work items, metrics); flag drift |
 | Set / promote Date Type | Decide. A commitment is a human promise. | Create a draft Promotion Milestone when a goal gets an uncommitted date; remind owners when promotions are due; check Plan Maturity before a promotion |
 | Enforce rules | Hold the bar in reviews | Validate, run time-based triggers, flag status theater |
 | Hygiene | Hold the bar in reviews | Detect, nag, and fix automatically where safe |
-| Review prep | Read, decide | Build the RED/YELLOW pre-read and the slip analysis |
+| Review prep | Read, decide | Build the RED/YELLOW pre-read, the slip analysis, and the starvation/alignment report |
 | Change the mechanism | GOALIE owner decides | Propose changes from what inspection shows; draft updates to the User's Manual |
 
 ---
@@ -382,7 +411,8 @@ These are expected to vary between organizations. The User's Manual records the 
 |---|---|
 | Level names and depth of the org tree | Company / Program or Function / Team / Individual |
 | Goal types | The five types in §6.1 |
-| Priority scale | P0–P2 |
+| Severity scale | sev1–sev3 |
+| Priority lists | Which org levels keep a ranked list (default: Company, Program, Function), and whether a cut line is used |
 | Fiscal calendar (period ends, default dates) | Calendar quarters, yearly plan period |
 | Review set and cadence | §9 |
 | "Promotions due" window | 2 weeks |
@@ -398,7 +428,7 @@ The invariants in §2 aren't configuration. A deployment that turns them off isn
 
 Whether GOALIE is built as a product or set up in an existing tool, the implementation provides the following. Each can be met natively, or by an agent working through the API.
 
-1. **Data model:** the entities in §6, with typed links: goal → promotion milestone, goal → parent, goal → plan, goal → work product, goal → work items, goal → org unit.
+1. **Data model:** the entities in §6, with typed links: goal → promotion milestone, goal → parent, goal → priority, goal → plan, goal → work product, goal → work items, goal → org unit. Priority lists are ranked, with unique ranks.
 2. **Validation:** fields that are required only in some cases, and checks across records (§8.1).
 3. **Time-based triggers** (§8.1).
 4. **Fields set by the system that can't be edited** (`original_committed_date`), or an audit trail good enough to detect and undo an edit.
@@ -411,7 +441,7 @@ Whether GOALIE is built as a product or set up in an existing tool, the implemen
 11. **Full export** of goals, docs, and the event log. The organization owns its memory.
 12. **Configuration** per §12.
 
-Optional: the work-item extension (§6.6); computed rollups built in (otherwise agents compute and publish them); integrations with code hosts and document suites.
+Optional: the work-item extension (§6.7); computed rollups built in (otherwise agents compute and publish them); integrations with code hosts and document suites.
 
 ---
 
@@ -422,6 +452,7 @@ GOALIE has been built and run at several companies. This spec formalizes it inde
 - *Make the Routine, Routine – Blow up Dunbar's Number* (2023): https://blog.kindel.com/2023/04/02/make-the-routine-routine-blow-up-dunbars-number/
 - *Path To Green* (2020): https://blog.kindel.com/2020/02/16/path-to-green/
 - *Have a Plan (With Dates)* (2019): https://blog.kindel.com/2019/04/18/have-a-plan-with-dates/
+- *Tig's Toolbox for Product Management* (2026), background on the 5Ps and related plan formats: https://blog.kindel.com/2026/08/13/tigs-toolbox-for-product-management/
 - *The 5Ps: Achieving Focus in Any Endeavor* (2011): https://blog.kindel.com/2011/06/14/the-5-ps-achieving-focus-in-any-endeavor/
 - *Taxonomy and Lexicon* (2019): https://blog.kindel.com/2019/07/03/taxonomy-and-lexicon/
 - *Leading by Fitness Functions* (2025): https://blog.kindel.com/2025/11/01/leading-by-fitness-function/
