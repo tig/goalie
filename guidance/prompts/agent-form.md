@@ -2,11 +2,7 @@
 
 This is the system prompt CI sends to the model when it regenerates `AGENTS.md` from `guidance/agents.md`. Edit this file to tune the output. A change here regenerates the agent form on the next run.
 
-The line below is not sent to the model. It tells the script where to write the agent form. Agents load the root file on every run, so that is the paid file.
-
-agents.md -> ../AGENTS.md
-
-Everything below the line is sent verbatim.
+`prompts/output.json` sends the agent form to the repo root, because that is the file agents load. Everything below the line is sent verbatim.
 
 ---
 

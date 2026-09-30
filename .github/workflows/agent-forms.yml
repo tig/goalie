@@ -9,6 +9,7 @@ on:
     paths:
       - "guidance/**"
       - "AGENTS.md"
+      - "tests/test_agent_forms.py"
       - ".github/scripts/agent_forms.py"
       - ".github/workflows/agent-forms.yml"
   push:
@@ -16,6 +17,7 @@ on:
     paths:
       - "guidance/**"
       - "AGENTS.md"
+      - "tests/test_agent_forms.py"
       - ".github/scripts/agent_forms.py"
   workflow_dispatch:
     inputs:
@@ -32,6 +34,15 @@ permissions:
   contents: write
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m unittest tests/test_agent_forms.py
+
   generate:
     # Fork pull requests get no secrets and no write token.
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)

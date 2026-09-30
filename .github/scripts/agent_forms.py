@@ -6,14 +6,11 @@ The system prompt lives in <dir>/prompts/agent-form.md so it can be tuned
 without touching code. <dir>/agent-forms.lock.json records, per source file,
 the hashes of the inputs (source, prompt, model) and of the generated output.
 
-By default the agent form is <dir>/<name>.agent.md. A line in the prompt
-header, above the first horizontal rule, sends a source somewhere else:
-
-    agents.md -> ../AGENTS.md
-
-Only the text below that rule is sent to the model. The header line is how
-this repo writes the paid file at the root. Agents load AGENTS.md, not a
-sibling they will never open.
+By default the agent form is <dir>/<name>.agent.md. An optional
+<dir>/prompts/output.json maps a source file name to a repo-root relative
+path. With no map, the output path and the input hash match a collection
+that has never had one, so this file can be copied into excaliwire/operations
+without regenerating its forms. A mapped path is part of the input hash.
 
   generate          Regenerate every agent form whose inputs changed.
                     Needs `cursor-agent` on PATH and CURSOR_API_KEY set.
@@ -27,7 +24,6 @@ import hashlib
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -36,7 +32,6 @@ ROOT = Path(__file__).resolve().parents[2]
 # Empty means the Cursor account default. Set AGENT_FORMS_MODEL to pin a model.
 MODEL = os.environ.get("AGENT_FORMS_MODEL", "")
 PROMPT_MARKER = "\n---\n"
-OUTPUT_LINE = re.compile(r"^(\S+\.md) -> (\S+)$")
 
 
 def sha(text: str) -> str:
@@ -51,17 +46,25 @@ def sources(collection: Path) -> list[Path]:
     return sorted(p for p in collection.glob("*.md") if not p.name.endswith(".agent.md"))
 
 
-def prompt_header(collection: Path) -> str:
-    text = (collection / "prompts" / "agent-form.md").read_text(encoding="utf-8")
-    return text.split(PROMPT_MARKER, 1)[0]
+def output_map(collection: Path) -> dict[str, str]:
+    path = collection / "prompts" / "output.json"
+    if not path.exists():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict) or any(not isinstance(k, str) or not isinstance(v, str) for k, v in data.items()):
+        sys.exit(f"{path}: output map must be an object of strings")
+    return data
 
 
 def agent_path(source: Path) -> Path:
-    for line in prompt_header(source.parent).splitlines():
-        match = OUTPUT_LINE.match(line.strip())
-        if match and match.group(1) == source.name:
-            return (source.parent / match.group(2)).resolve()
-    return source.with_name(source.stem + ".agent.md")
+    rel = output_map(source.parent).get(source.name)
+    if not rel:
+        return source.with_name(source.stem + ".agent.md")
+    root = ROOT.resolve()
+    dest = (root / rel).resolve()
+    if Path(os.path.commonpath([dest, root])) != root:
+        sys.exit(f"{source.name}: output path escapes the repo: {rel}")
+    return dest
 
 
 def lock_path(collection: Path) -> Path:
@@ -75,7 +78,11 @@ def system_prompt(collection: Path) -> str:
 
 
 def input_hash(source: Path) -> str:
-    return sha(f"{MODEL}\n{system_prompt(source.parent)}\n{source.read_text(encoding='utf-8')}")
+    body = f"{MODEL}\n{system_prompt(source.parent)}\n{source.read_text(encoding='utf-8')}"
+    rel = output_map(source.parent).get(source.name)
+    if rel:
+        body = f"{rel}\n{body}"
+    return sha(body)
 
 
 def load_lock(collection: Path) -> dict:
@@ -97,54 +104,25 @@ def stale(source: Path, lock: dict) -> str | None:
     return None
 
 
-def cursor_agent_argv(prompt: str) -> list[str]:
-    """Build the cursor-agent invocation.
-
-    On Linux, `cursor-agent` is a binary and the prompt is an argument.
-    On Windows the PATH entry is a .cmd that relaunches through cmd.exe,
-    which cannot carry a prompt of this size. Resolve that wrapper to the
-    versioned node binary and pass the prompt to it directly.
-    """
-    found = shutil.which("cursor-agent")
-    if not found:
-        sys.exit("cursor-agent not on PATH")
-    # ask: return text. The default print mode has write tools and will go
-    # read the repo instead of compressing the text it was given.
-    flags = ["--print", "--trust", "--mode", "ask", "--output-format", "text"]
-    if MODEL:
-        flags += ["--model", MODEL]
-    if os.name != "nt" or not found.lower().endswith((".cmd", ".bat", ".ps1")):
-        return [found, *flags, prompt]
-    root = Path(found).resolve().parent
-    versions = sorted(
-        (p for p in (root / "versions").iterdir() if (p / "node.exe").is_file() and (p / "index.js").is_file()),
-        reverse=True,
-    )
-    if not versions:
-        sys.exit(f"no cursor-agent version under {root / 'versions'}")
-    version = versions[0]
-    return [str(version / "node.exe"), str(version / "index.js"), *flags, prompt]
-
-
 def generate(source: Path) -> str:
     target = agent_path(source)
-    prompt = f"{system_prompt(source.parent)}\n\n<name>{source.stem}</name>\n<full_text>\n{source.read_text(encoding='utf-8')}\n</full_text>"
+    prompt = (
+        f"{system_prompt(source.parent)}\n\n<name>{source.stem}</name>\n"
+        f"<full_text>\n{source.read_text(encoding='utf-8')}\n</full_text>"
+    )
     if target.exists():
         prompt += f"\n<current_agent_form>\n{target.read_text(encoding='utf-8')}\n</current_agent_form>"
 
-    result = subprocess.run(
-        cursor_agent_argv(prompt),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        timeout=600,
-    )
+    cmd = ["cursor-agent", "--print", "--trust", "--output-format", "text"]
+    if MODEL:
+        cmd += ["--model", MODEL]
+    result = subprocess.run(cmd + [prompt], capture_output=True, text=True, encoding="utf-8", timeout=600)
     if result.returncode != 0:
         sys.exit(f"{source.name}: cursor-agent exited {result.returncode}\n{result.stderr}")
     match = re.search(r"<agent_form>\s*(.*?)\s*</agent_form>", result.stdout, re.S)
     if not match:
         sys.exit(f"{source.name}: no <agent_form> block in model output\n{result.stdout}")
-    return match.group(1).strip() + "\n"
+    return match.group(1) + "\n"
 
 
 def main() -> int:
