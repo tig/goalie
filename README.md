@@ -19,6 +19,7 @@ It has been built and run at several companies. This repo formalizes it so it do
   - configuration points;
   - requirements for an implementation.
 - **[USERS_MANUAL.md](USERS_MANUAL.md)**: the User's Manual template (v0.1). An adopting organization copies it and fills it in. People and agents both work from it, and SPEC §11 requires one for every deployment.
+- **[AGENTS.md](AGENTS.md)**: guidance for coding agents. Generated from [`guidance/agents.md`](guidance/agents.md). Edit the full text, not the generated file.
 
 ## Status
 
