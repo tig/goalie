@@ -143,7 +143,9 @@ class GenerateCommand(unittest.TestCase):
             self.assertNotIn("node.exe", " ".join(argv))
             self.assertIn("<full_text>", argv[-1])
             self.assertIn("full text", argv[-1])
-            return CompletedProcess(argv, 0, stdout="<agent_form>\nshort\n</agent_form>\n", stderr="")
+            return CompletedProcess(
+                argv, 0, stdout="<agent_form>\nshort\n</agent_form>\n", stderr=""
+            )
 
         with patch.object(agent_forms.subprocess, "run", fake_run):
             output = agent_forms.generate(source)
@@ -163,6 +165,10 @@ class ThisRepo(unittest.TestCase):
     def test_check_command_passes(self) -> None:
         stdout = io.StringIO()
         stderr = io.StringIO()
-        with redirect_stdout(stdout), redirect_stderr(stderr), patch("sys.argv", ["agent_forms.py", "check"]):
+        with (
+            redirect_stdout(stdout),
+            redirect_stderr(stderr),
+            patch("sys.argv", ["agent_forms.py", "check"]),
+        ):
             code = agent_forms.main()
         self.assertEqual(code, 0, stdout.getvalue() + stderr.getvalue())

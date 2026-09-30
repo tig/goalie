@@ -51,7 +51,9 @@ def output_map(collection: Path) -> dict[str, str]:
     if not path.exists():
         return {}
     data = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(data, dict) or any(not isinstance(k, str) or not isinstance(v, str) for k, v in data.items()):
+    if not isinstance(data, dict) or any(
+        not isinstance(k, str) or not isinstance(v, str) for k, v in data.items()
+    ):
         sys.exit(f"{path}: output map must be an object of strings")
     return data
 
@@ -111,12 +113,19 @@ def generate(source: Path) -> str:
         f"<full_text>\n{source.read_text(encoding='utf-8')}\n</full_text>"
     )
     if target.exists():
-        prompt += f"\n<current_agent_form>\n{target.read_text(encoding='utf-8')}\n</current_agent_form>"
+        current = target.read_text(encoding="utf-8")
+        prompt += f"\n<current_agent_form>\n{current}\n</current_agent_form>"
 
     cmd = ["cursor-agent", "--print", "--trust", "--output-format", "text"]
     if MODEL:
         cmd += ["--model", MODEL]
-    result = subprocess.run(cmd + [prompt], capture_output=True, text=True, encoding="utf-8", timeout=600)
+    result = subprocess.run(
+        cmd + [prompt],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=600,
+    )
     if result.returncode != 0:
         sys.exit(f"{source.name}: cursor-agent exited {result.returncode}\n{result.stderr}")
     match = re.search(r"<agent_form>\s*(.*?)\s*</agent_form>", result.stdout, re.S)
@@ -145,10 +154,16 @@ def main() -> int:
             print(f"{source.relative_to(ROOT)}: regenerating ({reason})")
             output = generate(source)
             agent_path(source).write_text(output, encoding="utf-8", newline="\n")
-            lock[source.name] = {"model": MODEL or "cursor-default", "input": input_hash(source), "output": sha(output)}
+            lock[source.name] = {
+                "model": MODEL or "cursor-default",
+                "input": input_hash(source),
+                "output": sha(output),
+            }
 
         lock = {k: lock[k] for k in sorted(lock) if (collection / k).exists()}
-        lock_path(collection).write_text(json.dumps(lock, indent=2) + "\n", encoding="utf-8", newline="\n")
+        lock_path(collection).write_text(
+            json.dumps(lock, indent=2) + "\n", encoding="utf-8", newline="\n"
+        )
 
     for source, reason in problems:
         print(f"::error file={source.relative_to(ROOT)}::agent form is stale: {reason}")
