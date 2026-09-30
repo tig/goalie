@@ -31,6 +31,7 @@ If you only read one section, read **§4 Rules**.
 | **Date Type** | **Committed:** a promise; plan around it. **Ambition:** a stretch; don't plan around it yet. **Fantasy:** a wish; a starting point only. |
 | **Promotion Milestone** | A small goal with a *committed* date, by which an Ambition or Fantasy date moves up one step. |
 | **Plan / Plan Maturity** | The doc behind a goal (5Ps, PR/FAQ, Working Backwards, or a Markdown plan in GOALIE). Maturity: **Watercolor** (broad strokes) → **Crayon** (shapes clear, details soft) → **Pencil** (precise, ready to execute). |
+| **Doc** | A page you open and write, such as a plan or this manual. It is not only a file stored behind the goal. |
 | **Work Product** | Links to where the output lives: repo, PR, docs, deployed URL, metric dashboard. |
 | **Severity** | `sev1` critical / urgent / blocking · `sev2` important · `sev3` nice to have. How much the goal matters on its own terms. |
 | **Priority** | An entry in an org unit's short, **ranked** list of current priorities. Goals map to one. Lower entries are starved on purpose. |
@@ -172,6 +173,14 @@ The GOALIE owner inspects these each quarter and changes the configuration, revi
 1. Close out every open goal.
 2. Re-create any continuing work as new goals marked Carryover or Repeating, each with an honest date type.
 3. Set up the new period's priority lists.
+
+**Work between reviews**
+1. Open *My goals* or your org unit's view.
+2. Open a goal. Read the fields. Change what is no longer true.
+3. Write the linked plan when the goal has one.
+4. Comment when you need a note that is not a field change.
+5. File a work item when your deployment uses that list. The list is optional.
+6. Open the goal's history to see who changed what, and why. The current fields are not the whole record.
 
 **Approve or reject a Draft**
 1. Open the goal. The Draft is already visible.

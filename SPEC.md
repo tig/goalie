@@ -38,6 +38,19 @@ GOALIE is designed for organizations where **AI agents work alongside humans**. 
 
 GOALIE also works for organizations with no agents. In that case the rules that §10 assigns to agents are carried out by the tool's own automation or by people.
 
+### 1.2 How a human spends time
+
+Reviews are not the only time a human is in GOALIE (invariant). Between reviews, a human opens a view, opens a goal, and keeps it true. *My goals* and the view for each org unit are where that work starts (§8.2). The same humans share those views, the goals, the Docs, and the work items.
+
+A human must be able to do the following with no agent present (invariant):
+- Open *My goals* or an org unit's view, then open a goal and read its fields.
+- Edit those fields. Structured fields follow §6. The description and the linked plan follow §6.5.
+- Write the linked plan. That plan is a Doc, and the Doc is a page the human writes (§6.5).
+- Comment on the goal. A comment is an Event on that goal (§6.6).
+- File a work item under the goal when that extension is on (§6.7).
+
+Two humans must be able to have the same goal open and change it during the same period (invariant). They share the goal's fields, its comments, its linked plan, and its work items when that extension is on. Each sees the other's committed change within the live-update time, and sees the other's Presence (§8.2). A conflict on a structured field is prevented: the stale write is rejected and the current state is returned (§6). An edit to Markdown text must not be lost (§6.5). Work a person did must not disappear without an Event.
+
 ---
 
 ## 2. Reading this spec
@@ -102,6 +115,7 @@ The User's Manual (§11) repeats these definitions, so terms mean the same thing
 | **Date Type** | How firm a goal's date is: Committed, Ambition, or Fantasy (§5). |
 | **Promotion Milestone** | A goal with a committed date, by which another goal's uncommitted date moves up one Date Type (§5). |
 | **Plan** | The document describing how a goal will be achieved. Its maturity is Watercolor, Crayon, or Pencil. |
+| **Doc** | A page a human opens and writes: a plan or the User's Manual (§6.5, §11). It is not only a stored body. |
 | **Plan Maturity** | **Watercolor:** broad strokes, soft edges. **Crayon:** main parts clear, lines thick, details flexible. **Pencil:** precise and ready to execute; two readers would picture the same thing. |
 | **Work Product** | Where the output of the work lives (repo, PR, doc folder, deployed URL, metric dashboard). |
 | **Health** | GREEN / YELLOW / RED (§6.1). |
@@ -206,17 +220,19 @@ The list's owner is the org unit's owner. Re-ranking is a normal, logged decisio
 
 ### 6.5 Doc
 
-Hosted Markdown documents: **Plans** and the **User's Manual** (§11). Fields: `id`, `kind`, `title`, `body` (Markdown), `version`, version history, links to the goals that use it. External docs are linked by URL rather than hosted.
+Hosted Markdown documents: **Plans** and the **User's Manual** (§11). Fields: `id`, `kind`, `title`, `body` (Markdown), `version`, version history, links to the goals that use it. External docs are linked by URL rather than hosted. A Doc is a page a human opens and writes, not only a stored body (invariant). A human can write that page with no agent (invariant).
 
 More than one actor may edit a Doc body, or a goal's description, at the same time (invariant). An edit must not be lost (invariant). A saved Doc version is taken from that text (invariant). Non-text fields do not follow this rule (§6).
 
 ### 6.6 Event (history)
 
-An append-only log with one entry per change: `sequence`, `timestamp`, `actor`, `goal`/`entity`, `field`, `old`, `new`, `reason`. Every Event has a sequence number that only increases (invariant). The Event log is the change stream that views and agents subscribe to (invariant). Agents subscribe to the same change stream that views use. A client that reconnects resumes from the last sequence number it received (invariant). It receives every Event with a greater sequence, so it misses nothing (invariant). The log also records comments. Approving or rejecting a Draft is its own Event, with an actor and a reason (invariant). Rollups (§8.3) are computed from it.
+An append-only log with one entry per change: `sequence`, `timestamp`, `actor`, `goal`/`entity`, `field`, `old`, `new`, `reason`. Every Event has a sequence number that only increases (invariant). The Event log is the change stream that views and agents subscribe to (invariant). Agents subscribe to the same change stream that views use. A client that reconnects resumes from the last sequence number it received (invariant). It receives every Event with a greater sequence, so it misses nothing (invariant). The log also records comments. A comment is an Event: its new value is the text, its old value is empty unless that text was edited, and its reason is the text when the writer does not supply a separate one. Approving or rejecting a Draft is its own Event, with an actor and a reason (invariant). Rollups (§8.3) are computed from it.
+
+Every change to a goal, a Doc, a work item, or a priority, and every comment, is an Event (invariant). The Event records who (`actor`), when (`timestamp`), the old value, the new value, and the reason. A human reads those Events on the goal, Doc, work item, or priority they belong to (invariant). A human can follow one goal's Events across a plan period (invariant). Export of the log (§13) is not the only way to read the history (invariant). The current fields are not a substitute for the trail (invariant).
 
 ### 6.7 Work Item (optional extension)
 
-A lighter record for the work under a goal: `id`, `title`, `owner` (an actor, and it can be an agent), `status`, `due_date`, links. It is linked to a goal. This extension doesn't copy the goal schema. Agents can use the state of linked work items as evidence for a goal's health.
+A lighter record for the work under a goal: `id`, `title`, `owner` (an actor, and it can be an agent), `status`, `due_date`, links. It is linked to a goal. This extension doesn't copy the goal schema. Agents can use the state of linked work items as evidence for a goal's health. When the extension is on, work items are the group's list of work under a goal (invariant for a deployment that enables the extension). A human can file a work item with no agent (invariant for a deployment that enables the extension). The extension stays optional (§13).
 
 ### 6.8 Example record
 
@@ -329,6 +345,7 @@ Where the implementation can do these natively it does. Otherwise an agent does 
 - **Time-based triggers:** when a committed date, including a Promotion Milestone's, passes without being met, that goal turns RED. When a Promotion Milestone turns RED, its parent goal turns RED too.
 - **Status-theater flag:** a GREEN → RED change in one step is flagged for the next review.
 - **Invalid records stay visible.** A goal that breaks an invariant is flagged in a hygiene view, not hidden. Hiding it would take it out of inspection.
+- **Deleted records stay findable.** A goal whose state is Deleted remains reachable, and its Events remain readable (invariant).
 - **Lints:** the norms in §3 and §6.1 are flagged, not blocked.
 
 ### 8.2 Views
@@ -339,6 +356,7 @@ A view is a saved slice of goals by level, org unit, owner, type, severity, prio
 - **Default sort:** RED, YELLOW, GREEN.
 - **Default date presentation:** the Date Type is shown next to the date, so an uncommitted date doesn't read as a promise. Custom views can drop the column.
 - **Standard views:** organization overview; one per org unit; *My goals*; *Promotions due* (Promotion Milestones due soon, default 2 weeks); *Priorities* (an org unit's ranked list, with the goals mapped to each entry and the cut line shown); *Hygiene*; period-end scorecard.
+- **Between reviews:** *My goals* and the view for each org unit are where a human works between reviews, not only during a review (invariant).
 - **Live updates:** A committed change appears in every open view that shows it within the configured time (invariant). The default is 1 s (§12).
 - **Resume:** A client that reconnects resumes from the last sequence number it received (invariant, §6.6). It receives every Event with a greater sequence, so it misses nothing (invariant).
 - **Presence:** A view shows the Presence of every actor viewing or editing an entity it shows, human or agent (invariant).
@@ -412,7 +430,7 @@ A GOALIE deployment includes its **User's Manual**. A deployment without one isn
 | Owner | The named GOALIE owner, and how to reach them. |
 | Lexicon | The §4 terms, plus any local renames or configuration (§12). |
 | Participants & their jobs | Goal owners, org-unit owners, review owners, agents. |
-| Procedures | Create a goal; set and promote a date type; commit a date; report YELLOW/RED and write a PTG; record a slip; close a goal; do the period reset; approve or reject a Draft. |
+| Procedures | Create a goal; set and promote a date type; commit a date; report YELLOW/RED and write a PTG; record a slip; close a goal; do the period reset; approve or reject a Draft; open a view and a goal between reviews; read a goal's history; write the linked plan; comment; file a work item when that extension is on. |
 | Rules | The invariants, defaults, and norms in effect, including what is enforced automatically. |
 | Cadence & reviews | The review calendar, plus a one-page manual per review (owner, participants, view, agenda, outputs, local adaptations). |
 | Outputs | Dashboards, pre-reads, the period-end scorecard. |
@@ -479,6 +497,10 @@ Whether GOALIE is built as a product or set up in an existing tool, the implemen
 20. **Presence.** A view must show the Presence of every actor viewing or editing an entity, human or agent.
 21. **Same stream.** An agent must subscribe to the same change stream that views use.
 22. **Drafts.** An agent's Draft must appear live on the goal. It must not take effect until a human approves it. Approving or rejecting a Draft must be its own Event, with an actor and a reason.
+23. **Ordinary session.** A human must be able to open *My goals* or an org-unit view, open a goal, read and edit its fields, write the linked plan, and comment, with no agent required. A human must be able to file a work item when that extension is on.
+24. **History on the record.** Every change to a goal, a Doc, a work item, or a priority, and every comment, must be an Event with an actor, a time, an old value, a new value, and a reason. A human must be able to read that history on the record it belongs to and follow one goal across a plan period. Export must not be the only way to read it. The current fields must not be a substitute for the trail. A deleted goal must stay findable, and its history must stay readable.
+25. **Two humans, one goal.** Two humans must be able to have the same goal open and change it during the same period. They must share the fields, the comments, the linked plan, and the work items when that extension is on. Each must see the other's committed change within the live-update time. A stale write of a structured field must be rejected. A Markdown edit must not be lost. Work a person did must not disappear without an Event.
+26. **Page and list.** A Doc must be a page a human opens and writes, not only a stored body. When work items are enabled, they must be the group's list of work under a goal. The work-item extension must not be required.
 
 Optional: the work-item extension (§6.7); computed rollups built in (otherwise agents compute and publish them); integrations with code hosts and document suites.
 
