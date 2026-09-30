@@ -1,5 +1,7 @@
 # Lint only. Do not enable format.
+# E501 is ignored because this repo does not hard-wrap.
 line-length = 100
 
 [lint]
 select = ["E", "F"]
+ignore = ["E501"]
