@@ -39,6 +39,7 @@ If you only read one section, read **§4 Rules**.
 | **Path to Green (PTG)** | The written recovery plan for a YELLOW or RED goal. |
 | **Draft** | A change an agent proposes. It shows on the goal immediately. It does nothing until a human approves it. |
 | **Presence** | Who is viewing or editing a goal right now. A human or an agent. |
+| **Comment** | Prose you attach to any record. In this version a comment does not reply to another comment. |
 | **Version** | The version of a record a save was based on. The save names it. Docs keep older versions. |
 | ‹local terms› | ‹any renames or additions› |
 
@@ -71,6 +72,7 @@ If you only read one section, read **§4 Rules**.
 12. An agent's **Draft** does not change the goal until a human approves it. Approving or rejecting it is recorded with a name and a reason.
 13. A view shows **Presence**: who is viewing or editing the goal right now, human or agent.
 14. When several people edit a goal's description or a Doc at the same time, no edit is lost.
+15. You can comment on any record. In this version a comment does not reply to another comment.
 
 **Happens automatically**
 - A committed date that passes without being met turns the goal **RED**. For a Promotion Milestone, its parent turns RED too.
@@ -82,6 +84,8 @@ If you only read one section, read **§4 Rules**.
 - Goals are scoped to the plan period: ‹e.g. calendar year›.
 - A committed change appears in every open view within 1 s.
 - ‹other local defaults›
+
+**Your settings.** You can change your own favorite views and your appearance (light or dark). You can't change another person's settings, and you can't change the GOALIE owner's configuration. The default appearance is light.
 
 **Norms.** These are inspected in reviews. Agents flag them; nothing blocks you.
 - Summaries are short and contain a verb.
@@ -178,7 +182,7 @@ The GOALIE owner inspects these each quarter and changes the configuration, revi
 1. Open *My goals* or your org unit's view.
 2. Open a goal. Read the fields. Change what is no longer true.
 3. Write the linked plan when the goal has one.
-4. Comment when you need a note that is not a field change.
+4. Comment when you need a note that is not a field change. A comment can sit on any record. In this version it does not reply to another comment.
 5. File a work item when your deployment uses that list. The list is optional.
 6. Open the goal's history to see who changed what, and why. The current fields are not the whole record.
 

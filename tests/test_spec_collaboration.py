@@ -20,11 +20,11 @@ class CollaborationSpec(unittest.TestCase):
         )
         self.assertIn("Automatic merging must not apply to them (invariant).", self.spec)
         self.assertIn(
-            "One actor sets the plan to Crayon while another promotes the goal to Committed, which breaks §5.",
+            "One actor sets the plan to Crayon while another promotes the goal to Committed, which breaks [§5 (Date types)](#s5).",
             self.spec,
         )
         self.assertIn(
-            "An automatic merge would also leave no single actor and no single reason, which breaks §3.9 and §6.6.",
+            "An automatic merge would also leave no single actor and no single reason, which breaks [§3.9 (Principle 9)](#s3-9) and [§6.6 (Events)](#s6-6).",
             self.spec,
         )
         self.assertIn("must not merge them automatically.", self.spec)
@@ -70,7 +70,7 @@ class CollaborationSpec(unittest.TestCase):
 
     def test_claim_5_live_views_within_configured_time(self) -> None:
         self.assertIn(
-            "A committed change appears in every open view that shows it within the configured time (invariant). The default is 1 s (§12).",
+            "A committed change appears in every open view that shows it within the configured time (invariant). The default is 1 s ([§12 (Configuration)](#s12)).",
             self.spec,
         )
         self.assertIn(
