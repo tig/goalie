@@ -107,6 +107,9 @@ The User's Manual (§11) repeats these definitions, so terms mean the same thing
 | **Health** | GREEN / YELLOW / RED (§6.1). |
 | **Path to Green (PTG)** | The written recovery plan for a YELLOW or RED goal (§6.1). |
 | **Actor** | A human or an agent that reads or changes GOALIE data. Every change is attributed to an actor. |
+| **Draft** | An agent's proposed change to an entity. It is visible on that entity as soon as the agent creates it. It must not take effect until a human approves it (§6.9). Approving or rejecting a Draft is its own Event, with an actor and a reason. |
+| **Presence** | Which actors are viewing or editing an entity right now. An actor is a human or an agent. Views show Presence (§8.2). Presence is not an Event. |
+| **Version** | The version of an entity a write read. A committed write advances the version. A write names the version it read (§6). A Doc keeps a version history (§6.5). |
 
 ---
 
@@ -127,7 +130,7 @@ Not every date is the same kind of date, and treating them as the same is a majo
   - The owner **promotes** the parent goal's Date Type one step and completes the milestone.
   - Or the milestone is **missed**. That is a missed committed date: RED, a PTG, and a root-cause look.
 - **Promoting Fantasy → Ambition** comes with a new Promotion Milestone for Ambition → Committed.
-- **Promoting Ambition → Committed** needs a Plan at Pencil maturity, records the **Original Committed Date** (§6), and removes the Promotion Milestone link. The completed milestone stays in the history.
+- **Promoting Ambition → Committed** needs a Plan at Pencil maturity, records the **Original Committed Date** (§6), pins the plan's Doc version (`committed_plan_version`, §6.1), and removes the Promotion Milestone link. The completed milestone stays in the history.
 - The promoted date can differ from the old ambition or fantasy date. Negotiating the date is part of promotion. The difference is recorded and reported (§8.2).
 - **A Committed date can't be demoted** (invariant). If it can't be hit, that is a slip (§6).
 - **Ambition → Fantasy** is allowed, with a reason, and is counted as a regression.
@@ -136,15 +139,20 @@ Not every date is the same kind of date, and treating them as the same is a majo
 
 ## 6. Data model
 
-The model has seven entities: Goal, Org Unit, Priority, Actor, Doc, Event, and an optional Work Item. Field names are illustrative; implementations can rename them, as long as the User's Manual maps them to these terms.
+The model has eight entities: Goal, Org Unit, Priority, Actor, Doc, Event, Draft, and an optional Work Item. Field names are illustrative; implementations can rename them, as long as the User's Manual maps them to these terms.
+
+Every writable entity has a version (invariant). A write names the version of the entity it read (invariant). A write against a stale version is rejected, and the rejection returns the current state (invariant). A committed write advances the version.
+
+Structured fields are state, date type, health, PTG, rank, and every other field that is not Markdown text. They change only through validated writes (invariant). Automatic merging must not apply to them (invariant). Two changes can each be valid and still break an invariant together. One actor sets the plan to Crayon while another promotes the goal to Committed, which breaks §5. An automatic merge would also leave no single actor and no single reason, which breaks §3.9 and §6.6.
 
 ### 6.1 Goal
 
 | Field | Type | Required | Rules / meaning |
 |---|---|---|---|
 | `id` | Stable, human-readable key (e.g. `GOAL-123`) | auto | Never reused. Linkable by people, agents, and other systems. |
+| `version` | Integer | auto | The version of this goal (§6). A committed write advances it. |
 | `summary` | Short text | yes | Pithy and self-describing, with a verb (Increase, Launch, Reduce…). Lint: 5 words or more, or no verb. |
-| `description` | Long text (Markdown) | yes | Should cover: (a) key results; (b) the metrics used to track it and how often they are reviewed; (c) why it matters and what it contributes to (e.g. a theme in the operating plan); (d) who shares responsibility for delivering it (joint owners, not dependencies). Notes are added over time. Lint: any of (a)–(d) missing. |
+| `description` | Long text (Markdown) | yes | Should cover: (a) key results; (b) the metrics used to track it and how often they are reviewed; (c) why it matters and what it contributes to (e.g. a theme in the operating plan); (d) who shares responsibility for delivering it (joint owners, not dependencies). Notes are added over time. Lint: any of (a)–(d) missing. Concurrent editing follows §6.5. |
 | `owner` | Actor (human) | yes | Exactly one human (invariant). |
 | `org_unit` | → Org Unit | yes | The unit the goal belongs to. |
 | `level` | Enum **(configurable)** | yes | Default: `Company` · `Program or Function` · `Team` · `Individual`. Agrees with the org unit's level. |
@@ -152,7 +160,8 @@ The model has seven entities: Goal, Org Unit, Priority, Actor, Doc, Event, and a
 | `due_date` | Date | yes | The date the goal will be met. If the exact day is unknown, use the end of the relevant period, e.g. the end of the fiscal quarter **(configurable calendar)**. What the date means depends on `date_type`. |
 | `date_type` | `Committed` · `Ambition` · `Fantasy` | yes | See §5 (invariant). |
 | `promotion_milestone` | → Goal | if `date_type` ≠ Committed | The linked goal has `type = Milestone (Commit)`, `date_type = Committed`, a due date before this goal's, and a human owner (invariant). Empty when Committed. |
-| `plan` | → Doc (hosted Markdown) or external link | when Committed; recommended before | The plan behind the goal, in whatever form it takes: a hosted Markdown plan, a 5Ps doc, a PR/FAQ, a Working Backwards doc, etc. (see *Tig's Toolbox for Product Management* in §14). Hosted plans are versioned, so the plan can be viewed as it stood at commit time. |
+| `plan` | → Doc (hosted Markdown) or external link | when Committed; recommended before | The plan behind the goal, in whatever form it takes: a hosted Markdown plan, a 5Ps doc, a PR/FAQ, a Working Backwards doc, etc. (see *Tig's Toolbox for Product Management* in §14). Hosted plans are versioned, so the plan can be viewed as it stood at commit time. The pinned version is `committed_plan_version`. |
+| `committed_plan_version` | Doc version | auto, when first Committed | Set when `date_type` first becomes Committed (invariant). It is the plan's Doc version at that moment. Later edits to the Doc must not change it. |
 | `plan_maturity` | `Watercolor` · `Crayon` · `Pencil` | yes | Committed needs Pencil (invariant). If a team asks for a committed date on a Crayon plan, push back on the plan, not the date. |
 | `work_product` | List of typed links | optional | Repo / PR / milestone, doc folder, deployed URL, metric dashboard or query. Agents follow these to gather evidence for health. Lint: missing on an in-progress `Milestone (Launch)`. |
 | `original_committed_date` | Date, set by the system | auto | Recorded when `date_type` first becomes Committed. Not editable afterwards (invariant). A deployment can let the GOALIE owner, and no one else, correct a genuine data-entry error, with a logged reason. |
@@ -197,11 +206,13 @@ The list's owner is the org unit's owner. Re-ranking is a normal, logged decisio
 
 ### 6.5 Doc
 
-Hosted Markdown documents: **Plans** and the **User's Manual** (§11). Fields: `id`, `kind`, `title`, `body` (Markdown), version history, links to the goals that use it. External docs are linked by URL rather than hosted.
+Hosted Markdown documents: **Plans** and the **User's Manual** (§11). Fields: `id`, `kind`, `title`, `body` (Markdown), `version`, version history, links to the goals that use it. External docs are linked by URL rather than hosted.
+
+More than one actor may edit a Doc body, or a goal's description, at the same time (invariant). An edit must not be lost (invariant). A saved Doc version is taken from that text (invariant). Non-text fields do not follow this rule (§6).
 
 ### 6.6 Event (history)
 
-An append-only log with one entry per change: `timestamp`, `actor`, `goal`/`entity`, `field`, `old`, `new`, `reason`. It also records comments. Rollups (§8.2) are computed from it.
+An append-only log with one entry per change: `sequence`, `timestamp`, `actor`, `goal`/`entity`, `field`, `old`, `new`, `reason`. Every Event has a sequence number that only increases (invariant). The Event log is the change stream that views and agents subscribe to (invariant). Agents subscribe to the same change stream that views use. A client that reconnects resumes from the last sequence number it received (invariant). It receives every Event with a greater sequence, so it misses nothing (invariant). The log also records comments. Approving or rejecting a Draft is its own Event, with an actor and a reason (invariant). Rollups (§8.3) are computed from it.
 
 ### 6.7 Work Item (optional extension)
 
@@ -230,6 +241,12 @@ priority: PRI-3                   # Growth program priority #3: "Cut time-to-val
 origination: New
 parent: GOAL-7                     # Company: Double activated accounts
 ```
+
+### 6.9 Draft
+
+An agent's proposed change that waits for a human. Fields: `id`, `entity`, `actor` (an agent), `base_version` (the version the agent read), `change`, `reason`. There is no status field. The Draft is waiting until an approval or rejection Event exists.
+
+An agent's Draft must appear live on the goal. It must not take effect until a human approves it (invariant). Approving or rejecting a Draft is its own Event, with an actor and a reason (invariant). Approval is a write against `base_version` (invariant). If that version is stale, the approval is rejected and the rejection returns the current state (§6).
 
 ---
 
@@ -305,7 +322,10 @@ At the end of the plan period (default: yearly), each open goal is closed out as
 
 Where the implementation can do these natively it does. Otherwise an agent does them through the API.
 
-- **Validation:** reject a save, or open a draft fix for the owner, when it would break an invariant (a missing date type, an uncommitted date with no Promotion Milestone, Committed without a Pencil plan, a date or state change without a reason, YELLOW/RED without a PTG).
+- **Validation:** reject a save, or open a Draft for the owner, when it would break an invariant (a missing date type, an uncommitted date with no Promotion Milestone, Committed without a Pencil plan, a date or state change without a reason, YELLOW/RED without a PTG).
+- **Structured fields:** state, date type, health, PTG, rank, and every other field that is not Markdown text change only through validated writes (invariant, §6). Automatic merging must not apply to them (invariant).
+- **Stale writes:** a write names the version it read (invariant, §6). A write against a stale version is rejected, and the rejection returns the current state (invariant).
+- **Commit check:** Invariants are checked on the committed result, on the server, in one transaction (invariant). A failed check must not become visible.
 - **Time-based triggers:** when a committed date, including a Promotion Milestone's, passes without being met, that goal turns RED. When a Promotion Milestone turns RED, its parent goal turns RED too.
 - **Status-theater flag:** a GREEN → RED change in one step is flagged for the next review.
 - **Invalid records stay visible.** A goal that breaks an invariant is flagged in a hygiene view, not hidden. Hiding it would take it out of inspection.
@@ -319,6 +339,9 @@ A view is a saved slice of goals by level, org unit, owner, type, severity, prio
 - **Default sort:** RED, YELLOW, GREEN.
 - **Default date presentation:** the Date Type is shown next to the date, so an uncommitted date doesn't read as a promise. Custom views can drop the column.
 - **Standard views:** organization overview; one per org unit; *My goals*; *Promotions due* (Promotion Milestones due soon, default 2 weeks); *Priorities* (an org unit's ranked list, with the goals mapped to each entry and the cut line shown); *Hygiene*; period-end scorecard.
+- **Live updates:** A committed change appears in every open view that shows it within the configured time (invariant). The default is 1 s (§12).
+- **Resume:** A client that reconnects resumes from the last sequence number it received (invariant, §6.6). It receives every Event with a greater sequence, so it misses nothing (invariant).
+- **Presence:** A view shows the Presence of every actor viewing or editing an entity it shows, human or agent (invariant).
 
 ### 8.3 Rollups and fitness functions
 
@@ -364,15 +387,16 @@ GOALIE runs inside the organization's review cadence **(configurable)**. Typical
 
 | Activity | Humans | Agents |
 |---|---|---|
-| Set goals, targets, severity; rank priorities | Own and decide | Draft proposals; check them against FAST and the schema |
+| Set goals, targets, severity; rank priorities | Own and decide | Create Drafts; check them against FAST and the schema |
 | Own a goal | Yes | No |
 | Do the work behind a goal | Yes | Yes |
-| Health / PTG | Approve | Draft from evidence (work product, linked work items, metrics); flag drift |
-| Set / promote Date Type | Decide. A commitment is a human promise. | Create a draft Promotion Milestone when a goal gets an uncommitted date; remind owners when promotions are due; check Plan Maturity before a promotion |
+| Health / PTG | Approve | Create a Draft from evidence (work product, linked work items, metrics); flag drift |
+| Approve or reject a Draft | Approve or reject it. The Draft takes effect only then. | Create the Draft. It appears live on the goal. It must not take effect until a human approves it. Subscribe to the same change stream that views use. |
+| Set / promote Date Type | Decide. A commitment is a human promise. | Create a Draft Promotion Milestone when a goal gets an uncommitted date; remind owners when promotions are due; check Plan Maturity before a promotion |
 | Enforce rules | Hold the bar in reviews | Validate, run time-based triggers, flag status theater |
 | Hygiene | Hold the bar in reviews | Detect, nag, and fix automatically where safe |
 | Review prep | Read, decide | Build the RED/YELLOW pre-read, the slip analysis, and the starvation/alignment report |
-| Change the mechanism | GOALIE owner decides | Propose changes from what inspection shows; draft updates to the User's Manual |
+| Change the mechanism | GOALIE owner decides | Propose changes from what inspection shows; create Drafts of updates to the User's Manual |
 
 ---
 
@@ -388,7 +412,7 @@ A GOALIE deployment includes its **User's Manual**. A deployment without one isn
 | Owner | The named GOALIE owner, and how to reach them. |
 | Lexicon | The §4 terms, plus any local renames or configuration (§12). |
 | Participants & their jobs | Goal owners, org-unit owners, review owners, agents. |
-| Procedures | Create a goal; set and promote a date type; commit a date; report YELLOW/RED and write a PTG; record a slip; close a goal; do the period reset. |
+| Procedures | Create a goal; set and promote a date type; commit a date; report YELLOW/RED and write a PTG; record a slip; close a goal; do the period reset; approve or reject a Draft. |
 | Rules | The invariants, defaults, and norms in effect, including what is enforced automatically. |
 | Cadence & reviews | The review calendar, plus a one-page manual per review (owner, participants, view, agenda, outputs, local adaptations). |
 | Outputs | Dashboards, pre-reads, the period-end scorecard. |
@@ -423,6 +447,7 @@ These are expected to vary between organizations. The User's Manual records the 
 | Visibility policy | Organization-wide; logged exceptions |
 | Who can correct an Original Committed Date | GOALIE owner only, with reason (or no one) |
 | Lints enabled | All in §6.1 |
+| Time for a committed change to reach every open view | 1 s |
 
 The invariants in §2 aren't configuration. A deployment that turns them off isn't running GOALIE.
 
@@ -444,6 +469,16 @@ Whether GOALIE is built as a product or set up in an existing tool, the implemen
 10. **Actor identity** that tells humans and agents apart.
 11. **Full export** of goals, docs, and the event log. The organization owns its memory.
 12. **Configuration** per §12.
+13. **Structured fields.** State, date type, health, PTG, rank, and every other field that is not Markdown text must change only through validated writes. An implementation must not merge them automatically.
+14. **Versions.** Every write must name the version of the entity it read. A write against a stale version must be rejected, and the rejection must return the current state.
+15. **Commit check.** Invariants must be checked on the committed result, on the server, in one transaction. A failed check must not become visible.
+16. **Sequence.** Every Event must have a sequence number that only increases. The Event log must be the change stream that views and agents subscribe to.
+17. **Live views.** A committed change must appear in every open view that shows it within the configured time. That time must be configurable. The default is 1 s.
+18. **Resume.** A client that reconnects must resume from the last sequence number it received. It must receive every Event with a greater sequence, so it must miss nothing.
+19. **Concurrent Markdown.** A goal description and a Doc body must support live concurrent editing. An edit must not be lost. A saved Doc version must be taken from that text. Promotion to Committed must pin the plan's Doc version.
+20. **Presence.** A view must show the Presence of every actor viewing or editing an entity, human or agent.
+21. **Same stream.** An agent must subscribe to the same change stream that views use.
+22. **Drafts.** An agent's Draft must appear live on the goal. It must not take effect until a human approves it. Approving or rejecting a Draft must be its own Event, with an actor and a reason.
 
 Optional: the work-item extension (§6.7); computed rollups built in (otherwise agents compute and publish them); integrations with code hosts and document suites.
 

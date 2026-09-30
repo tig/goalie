@@ -36,6 +36,9 @@ If you only read one section, read **§4 Rules**.
 | **Priority** | An entry in an org unit's short, **ranked** list of current priorities. Goals map to one. Lower entries are starved on purpose. |
 | **Health** | **GREEN:** on track. **YELLOW:** at risk, but there's still a credible path to the date. **RED:** the date isn't credible without intervention. |
 | **Path to Green (PTG)** | The written recovery plan for a YELLOW or RED goal. |
+| **Draft** | A change an agent proposes. It shows on the goal immediately. It does nothing until a human approves it. |
+| **Presence** | Who is viewing or editing a goal right now. A human or an agent. |
+| **Version** | The version of a record a save was based on. The save names it. Docs keep older versions. |
 | ‹local terms› | ‹any renames or additions› |
 
 ## 3. Who does what
@@ -62,6 +65,11 @@ If you only read one section, read **§4 Rules**.
 7. Changing a **date, date type, or state** needs a written **reason**.
 8. **YELLOW or RED** needs a **PTG**.
 9. A priority list has **no ties**.
+10. Structured fields (state, date type, health, PTG, rank, and every other field that is not Markdown text) change one write at a time. GOALIE must not merge them. Each change has one actor and one reason.
+11. A save names the **version** you read. If that version is stale, the save is rejected and you see the current record.
+12. An agent's **Draft** does not change the goal until a human approves it. Approving or rejecting it is recorded with a name and a reason.
+13. A view shows **Presence**: who is viewing or editing the goal right now, human or agent.
+14. When several people edit a goal's description or a Doc at the same time, no edit is lost.
 
 **Happens automatically**
 - A committed date that passes without being met turns the goal **RED**. For a Promotion Milestone, its parent turns RED too.
@@ -71,6 +79,7 @@ If you only read one section, read **§4 Rules**.
 **Defaults you can change for your scope (the change is visible)**
 - Default views sort RED → YELLOW → GREEN and show the date type next to every date.
 - Goals are scoped to the plan period: ‹e.g. calendar year›.
+- A committed change appears in every open view within 1 s.
 - ‹other local defaults›
 
 **Norms.** These are inspected in reviews. Agents flag them; nothing blocks you.
@@ -139,7 +148,7 @@ The GOALIE owner inspects these each quarter and changes the configuration, revi
 
 **Promote a date**
 - **Fantasy → Ambition:** on or before the milestone date, change the date type, complete the milestone, and add the next milestone (the one for Ambition → Committed).
-- **Ambition → Committed:** get the plan to Pencil, then change the date type. The committed date is recorded as the Original Committed Date.
+- **Ambition → Committed:** get the plan to Pencil, then change the date type. The committed date is recorded as the Original Committed Date. GOALIE pins the plan's version at that moment.
 
 **Report trouble**
 1. Set the goal to YELLOW as soon as there is real risk. Don't wait for RED.
@@ -163,6 +172,12 @@ The GOALIE owner inspects these each quarter and changes the configuration, revi
 1. Close out every open goal.
 2. Re-create any continuing work as new goals marked Carryover or Repeating, each with an honest date type.
 3. Set up the new period's priority lists.
+
+**Approve or reject a Draft**
+1. Open the goal. The Draft is already visible.
+2. Read the change and the reason.
+3. Approve it or reject it, and write a reason. The decision is recorded under your name.
+4. If the goal changed after the Draft was written, the approval is rejected and the current goal is shown. Decide again from that state.
 
 ## Appendix B: Review page template
 
