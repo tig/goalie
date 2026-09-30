@@ -1,6 +1,6 @@
 # Architecture decision records
 
-These records are the decisions for [issue #21](https://github.com/tig/goalie/issues/21), under [issue #2](https://github.com/tig/goalie/issues/2).
+These records are the decisions for [#21 (Stage 0.1: Architecture decision records)](https://github.com/tig/goalie/issues/21), under [#2 (Epic 1: Foundations: architecture, repo, CI)](https://github.com/tig/goalie/issues/2).
 They record the decisions. They do not implement them.
 A later change that reverses a decision must amend that record in the same pull request.
 

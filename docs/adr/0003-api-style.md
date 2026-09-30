@@ -6,8 +6,8 @@
 
 ## Context
 
-[Issue #21](https://github.com/tig/goalie/issues/21) records the API style before any route exists.
-[Issue #1](https://github.com/tig/goalie/issues/1) requires one validation layer, and it builds the API before the UI.
+[#21 (Stage 0.1: Architecture decision records)](https://github.com/tig/goalie/issues/21) records the API style before any route exists.
+[#1 (Build GOALIE)](https://github.com/tig/goalie/issues/1) requires one validation layer, and it builds the API before the UI.
 [SPEC.md](../../SPEC.md) §4 names the concepts, and [SPEC.md](../../SPEC.md) §6 names the entities.
 [SPEC.md](../../SPEC.md) §13 requires an API that agents can use for every read and write.
 Stage 0 exposes no domain route.

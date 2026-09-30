@@ -6,7 +6,7 @@
 
 ## Context
 
-[Issue #21](https://github.com/tig/goalie/issues/21) records storage before a store exists.
+[#21 (Stage 0.1: Architecture decision records)](https://github.com/tig/goalie/issues/21) records storage before a store exists.
 [SPEC.md](../../SPEC.md) §6.6 is the append-only history: one entry per change, attributed to an actor.
 [SPEC.md](../../SPEC.md) §6 is the current state that history tracks.
 [SPEC.md](../../SPEC.md) §13 requires both.

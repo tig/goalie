@@ -6,7 +6,7 @@
 
 ## Context
 
-[Issue #21](https://github.com/tig/goalie/issues/21) requires this record before later Stage 0 work depends on a language.
+[#21 (Stage 0.1: Architecture decision records)](https://github.com/tig/goalie/issues/21) requires this record before later Stage 0 work depends on a language.
 The only code in the repo today is Python: `.github/scripts/agent_forms.py` and `tests/test_agent_forms.py`, exercised by unittest.
 [SPEC.md](../../SPEC.md) does not choose a language.
 
@@ -29,8 +29,8 @@ This record does not add that server.
 `.github/workflows/ci.yml` must lint with Ruff, typecheck the `goalie` package with Mypy, and run `python -m unittest discover -s tests -v`.
 `tests/` holds unittest modules, including the existing `tests/test_agent_forms.py`.
 `tests/conformance/` holds the skipped invariant suite.
-[Issue #23](https://github.com/tig/goalie/issues/23) adds that suite, and [issue #4](https://github.com/tig/goalie/issues/4) fills it in.
+[#23 (Stage 0.3: Test strategy and spec-conformance scaffold)](https://github.com/tig/goalie/issues/23) adds that suite, and [#4 (Epic 3: Rules engine: invariants, lifecycles, promotion rule, lints)](https://github.com/tig/goalie/issues/4) fills it in.
 This record does not add tests.
 The `Dockerfile` must run Python 3.12 or newer.
 Stage 0 must not edit `AGENTS.md` and must not add `CLAUDE.md`.
-[Issue #18](https://github.com/tig/goalie/issues/18) owns the contributor guide.
+[#18 (Stage 0.2: Repo layout and contributor guide)](https://github.com/tig/goalie/issues/18) owns the contributor guide.

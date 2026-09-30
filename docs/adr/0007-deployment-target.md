@@ -6,8 +6,8 @@
 
 ## Context
 
-[Issue #21](https://github.com/tig/goalie/issues/21) records where Stage 0 runs.
-[Issue #1](https://github.com/tig/goalie/issues/1) builds GOALIE as a product an organization runs, not as a service this repo operates for others.
+[#21 (Stage 0.1: Architecture decision records)](https://github.com/tig/goalie/issues/21) records where Stage 0 runs.
+[#1 (Build GOALIE)](https://github.com/tig/goalie/issues/1) builds GOALIE as a product an organization runs, not as a service this repo operates for others.
 This repo names no durable host.
 Stage 0 still needs a deploy check before a host exists.
 
