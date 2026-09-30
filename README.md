@@ -25,6 +25,10 @@ It has been built and run at several companies. This repo formalizes it so it do
 
 The spec and manual are drafts. GOALIE will be built here as a self-contained product. Its first deployment is at Excaliwire.
 
+## Layout
+
+Where code, tests, and ADRs go: [docs/layout.md](docs/layout.md).
+
 ## Brand assets
 
 `assets/` holds the icon (`icon.svg`, `icon-512.png`, `icon-32.png`) and the featured image (`social-preview.svg`, `social-preview.png`, 1280×640). The featured image's SVG embeds Inter (SIL Open Font License).
