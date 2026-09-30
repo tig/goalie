@@ -1,0 +1,60 @@
+name: Deploy
+
+# Build the image, run it, and GET /health from this runner.
+# No host, VM, cloud account, or registry push.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build --tag goalie:ci .
+      - name: Run container
+        run: docker run --detach --name goalie --publish 8080:8080 goalie:ci
+      - name: Health check
+        run: |
+          set -euo pipefail
+          body_file="$(mktemp)"
+          expected="$(mktemp)"
+          printf '%s\n' '{"status":"ok"}' > "$expected"
+          code=""
+          ctype=""
+          for _ in $(seq 1 30); do
+            meta="$(curl --silent --show-error --output "$body_file" --write-out '%{http_code} %{content_type}' http://127.0.0.1:8080/health || true)"
+            code="${meta%% *}"
+            ctype="${meta#* }"
+            if [ "$code" = "200" ]; then
+              break
+            fi
+            sleep 1
+          done
+          fail=0
+          if [ "$code" != "200" ]; then
+            echo "health status is ${code}, want 200"
+            fail=1
+          fi
+          if [ "$ctype" != "application/json" ]; then
+            echo "health content type is [${ctype}], want application/json"
+            fail=1
+          fi
+          if ! cmp -s "$body_file" "$expected"; then
+            echo "health body is not {\"status\":\"ok\"} plus a newline"
+            fail=1
+          fi
+          if [ "$fail" -ne 0 ]; then
+            docker logs goalie || true
+            exit 1
+          fi
+      - name: Stop container
+        if: always()
+        run: docker rm --force goalie || true
