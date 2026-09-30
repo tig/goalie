@@ -89,6 +89,11 @@ class MarkedInvariants(unittest.TestCase):
             "SPEC §6.1 path_to_green: Required when YELLOW or RED"
         )
 
+    def test_6_2_org_unit_owner_is_human(self) -> None:
+        self.skipTest(
+            "SPEC §6.2: Each org unit's owner is a human"
+        )
+
     def test_6_3_unique_rank(self) -> None:
         self.skipTest(
             "SPEC §6.3 rank: No two current entries in the same list share a rank"
