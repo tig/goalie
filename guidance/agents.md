@@ -4,8 +4,6 @@ Guidance for AI coding agents in this repo. This file is canonical. Agents load 
 
 There are no role briefs here. Do not go looking for `agent-harness/briefs/`. Seats and the harness belong to Mike (`tig/mike`), and this repo is not enabled on Mike yet. The state of the work lives in the issues. At session start, read `AGENTS.md` and nothing else. Read `SPEC.md` when the issue touches the product. Read `USERS_MANUAL.md` when the issue touches the manual.
 
-There is no build, no runtime, and no install. Do not invent a setup step.
-
 **Every byte of `AGENTS.md` is paid by every seat on every run.** Behavior and the operating model live there. Everything else lives in the file that governs it, and you load that file when the issue names it: `SPEC.md` is the product contract, and `USERS_MANUAL.md` is the manual template. There is no nested `AGENTS.md`.
 
 **Writing mode:** Technical literature (STE bias). Short sentences, stable terms, **must** / **must not**, no em-dashes. One line per paragraph and per list item. Do not hard-wrap. Never reformat a file you are not changing. This repo has no formatter. When one arrives, use only that, and never point it at a directory.
@@ -51,7 +49,7 @@ Tig holds dozens of workstreams and cannot cache your context.
 - **Never idle.** If a run is going, do offline work while it runs. If you are blocked, say so in one line, then pick a different unblocked item.
 - **Do not stop to ask permission for the obvious.** Make routine calls yourself and tell Tig what you assumed.
 - **Before calling something a judgment call, name the datum that would decide it.** If the repo already holds that datum, make the fix. A goal's date type follows `SPEC.md` section 5. Do not pick a synonym.
-- **Look up the name before you write it.** `SPEC.md` section 4 says what a term means. `SPEC.md` section 6 is the data model. A clearer synonym is still the wrong word.
+- **Look up the name before you write it.** If there is a `/docs/lexicon.md`, use it. Otherwise, `SPEC.md` section 4 says what a term means. `SPEC.md` section 6 is the data model. Do not use synonyms.
 - **Start every issue or pull request comment with `[Name]` and a space, when Tig has named the session.** This repo has no `seat:` labels. Do not invent them.
 - **Open the pull request early, as a draft.**
 - **Learnings go on the issue**, not only in the pull request body. A merged pull request buries them.
@@ -61,7 +59,7 @@ Tig holds dozens of workstreams and cannot cache your context.
 
 - Merging. You open and you recommend; Tig merges.
 - Anything outward-facing or hard to reverse.
-- A new term. If `SPEC.md` does not already name the job, stop. Tig picks the word. It lands in `SPEC.md` in the same change.
+- A new term. If `/docs/lexicon.md` or `SPEC.md` does not already name it, steer Tig to pick the word. It lands in `/docs/lexicon.md` or `SPEC.md` in the same change.
 
 Approval for one thing is not approval for the next one.
 
