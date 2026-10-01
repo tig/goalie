@@ -13,11 +13,14 @@ A saved Doc version is taken from that text.
 [SPEC.md](../../SPEC.md) §6 says structured fields do not follow that rule.
 A stale structured write is rejected, and automatic merging must not apply to structured fields.
 [SPEC.md](../../SPEC.md) §6.6 says every change to a Doc is an Event with an old value and a new value.
+json-joy can also merge a string, and its source is TypeScript.
+The published `json-joy` package is AGPL-3.0-only.
+`yjs` is MIT.
 
 ## Decision
 
 The Doc body and the goal description are a Yjs text CRDT over the Markdown source.
-The browser and the server both use the Yjs library.
+The browser and the server both use the `yjs` package.
 The server stores the CRDT state in the SQLite file ([0002](0002-storage.md)).
 Each accepted update is one transaction: store the new CRDT state, and append an Event whose old and new values are the Markdown snapshots before and after the merge.
 A saved Doc version is that new snapshot.

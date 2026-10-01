@@ -53,8 +53,9 @@ class AdrTests(unittest.TestCase):
 
     def test_markdown_crdt_is_yjs_on_the_server(self) -> None:
         decision = _decision("0008-concurrent-markdown.md")
-        self.assertIn("Yjs", decision)
+        self.assertIn("`yjs`", decision)
         self.assertNotIn("pycrdt", decision)
+        self.assertNotIn("json-joy", decision)
 
 
 def _decision(name: str) -> str:
