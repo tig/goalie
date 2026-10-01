@@ -38,6 +38,29 @@ class AdrTests(unittest.TestCase):
             self.assertNotIn("to be decided", lowered, name)
             self.assertNotIn("does not pick", lowered, name)
 
+    def test_server_language_is_typescript_and_hono(self) -> None:
+        decision = _decision("0001-language-and-runtime.md")
+        self.assertIn("TypeScript", decision)
+        self.assertIn("Hono", decision)
+        self.assertIn("Node.js 24", decision)
+        self.assertNotIn("Starlette", decision)
+        self.assertNotIn("uvicorn", decision)
+
+    def test_store_uses_node_sqlite(self) -> None:
+        decision = _decision("0002-storage.md")
+        self.assertIn("node:sqlite", decision)
+        self.assertNotIn("sqlite3", decision)
+
+    def test_markdown_crdt_is_yjs_on_the_server(self) -> None:
+        decision = _decision("0008-concurrent-markdown.md")
+        self.assertIn("Yjs", decision)
+        self.assertNotIn("pycrdt", decision)
+
+
+def _decision(name: str) -> str:
+    text = (ADR / name).read_text(encoding="utf-8")
+    return text.split("## Decision", 1)[1].split("\n## ", 1)[0]
+
 
 if __name__ == "__main__":
     unittest.main()

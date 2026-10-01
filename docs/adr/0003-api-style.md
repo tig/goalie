@@ -17,7 +17,7 @@ The model is a fixed set of entities, not a graph the client composes.
 
 The API is JSON over HTTP.
 Resource names must use the terms in [SPEC.md](../../SPEC.md) §4 and [SPEC.md](../../SPEC.md) §6.
-Every write goes through one Python validation path and the single-transaction commit check ([0002](0002-storage.md)).
+Every write goes through one TypeScript validation path and the single-transaction commit check ([0002](0002-storage.md)).
 A structured-field write must name the version it read.
 A stale structured-field write is rejected and the response returns the current state.
 Markdown writes follow [0008](0008-concurrent-markdown.md), not that version reject.

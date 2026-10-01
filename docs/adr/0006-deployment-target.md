@@ -14,7 +14,7 @@
 ## Decision
 
 A deployment is one OS process and one SQLite file on a machine the organization controls.
-The process is the Starlette app in [0001](0001-language-and-runtime.md).
+The process is the Node process that serves the Hono app in [0001](0001-language-and-runtime.md).
 The file is the store in [0002](0002-storage.md).
 This repo must not run GOALIE as a service for other organizations.
 The listen address and the database file path are process configuration.

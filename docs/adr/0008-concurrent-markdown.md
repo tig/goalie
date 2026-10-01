@@ -17,8 +17,7 @@ A stale structured write is rejected, and automatic merging must not apply to st
 ## Decision
 
 The Doc body and the goal description are a Yjs text CRDT over the Markdown source.
-The browser uses Yjs.
-The server uses pycrdt, which speaks the same Yrs CRDT.
+The browser and the server both use the Yjs library.
 The server stores the CRDT state in the SQLite file ([0002](0002-storage.md)).
 Each accepted update is one transaction: store the new CRDT state, and append an Event whose old and new values are the Markdown snapshots before and after the merge.
 A saved Doc version is that new snapshot.
@@ -30,5 +29,5 @@ They keep the integer version and the stale-write reject ([0003](0003-api-style.
 Two actors may type in the same Markdown at the same time, and neither actor's characters may be dropped.
 The browser must not save Markdown by sending a whole-string replace.
 A Doc version a human reads is the snapshot, not the CRDT encoding.
-pycrdt and the browser's Yjs build must stay compatible.
+The server and the browser must use the same Yjs library.
 A later change of CRDT library must amend this record.

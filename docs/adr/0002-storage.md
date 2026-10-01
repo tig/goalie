@@ -15,7 +15,7 @@
 
 ## Decision
 
-Each deployment has one SQLite file, opened with the standard-library `sqlite3` module.
+Each deployment has one SQLite file, opened with Node's `node:sqlite` module (`DatabaseSync`).
 The event log is one append-only table.
 Its sequence is an integer primary key that only increases.
 Current-state tables update in the same transaction as the event append.

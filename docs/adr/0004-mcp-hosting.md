@@ -10,13 +10,14 @@
 [SPEC.md](../../SPEC.md) §13 requires an API complete enough for agents, ideally as an MCP server.
 [SPEC.md](../../SPEC.md) §1.1 says agents and humans follow the same rules.
 [SPEC.md](../../SPEC.md) §6.6 says agents subscribe to the same change stream as views.
-The official MCP Python SDK serves Streamable HTTP as a Starlette app, and it can be mounted into an existing ASGI app.
+The official MCP TypeScript SDK speaks Streamable HTTP.
+A Hono route can host that endpoint in the same process as the rest of the API.
 
 ## Decision
 
-The MCP server runs inside the same Starlette process as the API ([0001](0001-language-and-runtime.md)).
+The MCP server runs inside the same Node process as the Hono app ([0001](0001-language-and-runtime.md)).
 Its deployment transport is Streamable HTTP on that process.
-Its tools call the same Python functions the HTTP API calls.
+Its tools call the same TypeScript functions the HTTP API calls.
 It must not be a second process, a second deploy, or a second language.
 Stdio is not the deployment transport.
 
