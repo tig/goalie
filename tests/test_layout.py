@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
-import json
 import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 
 COMMANDS = (
-    "npm ci",
-    "npm run lint",
-    "npm run typecheck",
+    "npm ci --prefix server",
+    "npm run lint --prefix server",
+    "npm run typecheck --prefix server",
+    "python -m unittest server/test_layout.py",
     "python -m unittest discover -s tests -v",
+    "python -m unittest tests/test_agent_forms.py",
+    "python .github/scripts/agent_forms.py check",
 )
 
 SPEC_SYNC = (
@@ -25,17 +27,11 @@ class LayoutTests(unittest.TestCase):
         text = (REPO / "CONTRIBUTING.md").read_text(encoding="utf-8")
         for command in COMMANDS:
             self.assertIn(command, text)
-        self.assertIn("src/", text)
+        self.assertIn("server/", text)
         self.assertIn("tests/", text)
+        self.assertIn("guidance/", text)
         self.assertIn("docs/adr/", text)
         self.assertIn(SPEC_SYNC, text)
-
-    def test_server_defines_create_app_and_listen(self) -> None:
-        server = REPO / "src" / "server.ts"
-        self.assertTrue(server.is_file())
-        text = server.read_text(encoding="utf-8")
-        self.assertIn("function createApp", text)
-        self.assertIn("function listen", text)
 
     def test_language_and_runtime_record_exists(self) -> None:
         path = REPO / "docs" / "adr" / "0001-language-and-runtime.md"
@@ -43,15 +39,6 @@ class LayoutTests(unittest.TestCase):
 
     def test_claude_md_does_not_exist(self) -> None:
         self.assertFalse((REPO / "CLAUDE.md").exists())
-
-    def test_package_json_targets_node_24_and_npm_scripts(self) -> None:
-        package = json.loads((REPO / "package.json").read_text(encoding="utf-8"))
-        self.assertEqual(package["engines"]["node"], ">=24")
-        scripts = package["scripts"]
-        self.assertEqual(scripts["lint"], "eslint src")
-        self.assertEqual(scripts["typecheck"], "tsc --noEmit")
-        self.assertIn("lint", scripts)
-        self.assertIn("typecheck", scripts)
 
 
 if __name__ == "__main__":

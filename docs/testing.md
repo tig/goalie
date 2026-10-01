@@ -17,6 +17,10 @@ One test is not skipped.
 It checks that the scaffold names every marked invariant, and it must pass.
 
 The command is `python -m unittest discover -s tests -v`.
+This suite is the tests component.
+Its workflow is [`.github/workflows/tests.yml`](../.github/workflows/tests.yml).
+A server-only change must not run it.
+`SPEC.md` and `USERS_MANUAL.md` are inputs of this workflow.
 
 ## Who fills what
 

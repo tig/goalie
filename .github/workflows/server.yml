@@ -1,0 +1,49 @@
+name: server
+
+on:
+  pull_request:
+    paths:
+      - "server/**"
+      - ".github/workflows/server.yml"
+  push:
+    branches: [main]
+    paths:
+      - "server/**"
+      - ".github/workflows/server.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci --prefix server
+      - run: npm run lint --prefix server
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci --prefix server
+      - run: npm run typecheck --prefix server
+
+  layout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m unittest server/test_layout.py
