@@ -51,6 +51,14 @@ class AdrTests(unittest.TestCase):
         self.assertIn("node:sqlite", decision)
         self.assertNotIn("sqlite3", decision)
 
+    def test_auth_federates_with_entra(self) -> None:
+        decision = _decision("0005-auth-and-identity.md")
+        self.assertIn("Entra", decision)
+        self.assertIn("oauth2-proxy", decision)
+        self.assertIn("8136e28b-aee3-4d34-ab49-c0da1a468e3a", decision)
+        self.assertNotIn("Argon2id", decision)
+        self.assertNotIn("must not add an external identity provider", decision)
+
     def test_markdown_crdt_is_yjs_on_the_server(self) -> None:
         decision = _decision("0008-concurrent-markdown.md")
         self.assertIn("`yjs`", decision)
