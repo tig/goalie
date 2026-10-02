@@ -22,6 +22,11 @@ Its workflow is [`.github/workflows/tests.yml`](../.github/workflows/tests.yml).
 A server-only change must not run it.
 `SPEC.md` and `USERS_MANUAL.md` are inputs of this workflow.
 
+Server tests sit with the server, in `server/tests/`.
+Their command is `python -m unittest discover -s server/tests -v`.
+Their workflow is [`.github/workflows/server.yml`](../.github/workflows/server.yml).
+A change under `tests/` must not run that workflow.
+
 ## Who fills what
 
 - [#3](https://github.com/tig/goalie/issues/3) Epic 2 stores versions, the sequence, Drafts, comments as Events, and the committed_plan_version column. Those tests do not replace rule, stream, or Markdown tests.

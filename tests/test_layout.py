@@ -11,7 +11,7 @@ COMMANDS = (
     "npm ci --prefix server",
     "npm run lint --prefix server",
     "npm run typecheck --prefix server",
-    "python -m unittest server/test_layout.py",
+    "python -m unittest discover -s server/tests -v",
     "python -m unittest discover -s tests -v",
     "python -m unittest tests/test_agent_forms.py",
     "python .github/scripts/agent_forms.py check",

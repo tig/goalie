@@ -39,7 +39,7 @@ RUNS = {
         "npm ci --prefix server",
         "npm run lint --prefix server",
         "npm run typecheck --prefix server",
-        "python -m unittest server/test_layout.py",
+        "python -m unittest discover -s server/tests -v",
     ],
     "tests": [
         "python -m unittest discover -s tests -v",

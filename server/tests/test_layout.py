@@ -6,7 +6,7 @@ import json
 import unittest
 from pathlib import Path
 
-SERVER = Path(__file__).resolve().parent
+SERVER = Path(__file__).resolve().parents[1]
 
 
 class ServerLayoutTests(unittest.TestCase):
@@ -16,6 +16,12 @@ class ServerLayoutTests(unittest.TestCase):
         text = server.read_text(encoding="utf-8")
         self.assertIn("function createApp", text)
         self.assertIn("function listen", text)
+
+    def test_server_tests_sit_with_the_server(self) -> None:
+        tests = SERVER / "tests"
+        self.assertTrue(tests.is_dir())
+        self.assertTrue(any(tests.glob("test_*.py")))
+        self.assertEqual(list(SERVER.glob("test_*.py")), [])
 
     def test_package_json_targets_node_24_and_npm_scripts(self) -> None:
         package = json.loads((SERVER / "package.json").read_text(encoding="utf-8"))
