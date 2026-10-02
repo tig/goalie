@@ -27,6 +27,11 @@ You must not put a second server language here.
 `PORT` and `HOST` are process configuration.
 The default host is `127.0.0.1`.
 `GET /health` answers `ok`.
+Host configuration lives in excaliwire/operations.
+This repo must not name the machine or the public hostname.
+`.github/scripts/deploy_server.sh` publishes the server when the host secrets are set.
+The publish runs on a push to `main` and on `workflow_dispatch`.
+It must not run on a pull request.
 
 Server tests are Python unittest in `server/tests/`.
 Guidance tests are Python unittest in `guidance/tests/`.

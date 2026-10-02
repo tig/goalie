@@ -16,6 +16,7 @@ COMPONENTS = {
         "server/**",
         ".github/workflows/server.yml",
         ".github/scripts/ci_affected.py",
+        ".github/scripts/deploy_server.sh",
     ],
     "tests": [
         "tests/**",
@@ -27,6 +28,7 @@ COMPONENTS = {
         ".github/workflows/tests.yml",
         ".github/workflows/guidance.yml",
         ".github/scripts/ci_affected.py",
+        ".github/scripts/deploy_server.sh",
     ],
     "guidance": [
         "guidance/**",

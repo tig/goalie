@@ -15,6 +15,7 @@ COMPONENTS = {
         "server/**",
         ".github/workflows/server.yml",
         ".github/scripts/ci_affected.py",
+        ".github/scripts/deploy_server.sh",
     ],
     "tests": [
         "tests/**",
@@ -26,6 +27,7 @@ COMPONENTS = {
         ".github/workflows/tests.yml",
         ".github/workflows/guidance.yml",
         ".github/scripts/ci_affected.py",
+        ".github/scripts/deploy_server.sh",
     ],
     "guidance": [
         "guidance/**",
@@ -160,6 +162,34 @@ class CiTenets(unittest.TestCase):
         self.assertTrue(module.affected("guidance", [".github/scripts/agent_forms.py"]))
         self.assertFalse(module.affected("guidance", ["server/package.json"]))
         self.assertFalse(module.affected("server", []))
+        self.assertTrue(module.affected("server", [".github/scripts/deploy_server.sh"]))
+        self.assertTrue(module.affected("tests", [".github/scripts/deploy_server.sh"]))
+        self.assertFalse(module.affected("guidance", [".github/scripts/deploy_server.sh"]))
+
+    def test_the_publish_names_no_host(self) -> None:
+        server = (WORKFLOWS / "server.yml").read_text(encoding="utf-8")
+        script_path = REPO / ".github" / "scripts" / "deploy_server.sh"
+        self.assertTrue(script_path.is_file())
+        script = script_path.read_text(encoding="utf-8")
+        installer = "/usr/local/sbin/excaliwire-goalie-install"
+        self.assertIn(installer, server)
+        self.assertIn(installer, script)
+        for text in (server, script):
+            self.assertNotIn("goalie.excaliwire.com", text)
+            self.assertNotIn("129.212.164.158", text)
+        deploy = server.split("\n  deploy:", 1)[1]
+        header = deploy.split("\n    steps:", 1)[0]
+        self.assertIn(AFFECTED, header)
+        self.assertIn("github.ref == 'refs/heads/main'", header)
+        self.assertIn("github.event_name == 'push'", header)
+        self.assertIn("github.event_name == 'workflow_dispatch'", header)
+        self.assertNotIn("pull_request", header)
+        changes = server.split("\n  lint:", 1)[0]
+        self.assertLess(changes.index('= "workflow_dispatch"'), changes.index('= "pull_request"'))
+        contributing = (REPO / "CONTRIBUTING.md").read_text(encoding="utf-8")
+        self.assertIn("Host configuration lives in excaliwire/operations.", contributing)
+        self.assertNotIn("goalie.excaliwire.com", contributing)
+        self.assertNotIn("129.212.164.158", contributing)
 
 
 def _if_before_run(text: str, command: str) -> str:
