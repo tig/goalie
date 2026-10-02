@@ -150,6 +150,7 @@ class CiTenets(unittest.TestCase):
         self.assertIn(REPORTS, contributing)
         self.assertIn(COMMANDS_WHEN, contributing)
         self.assertIn(DOCS, contributing)
+        self.assertIn(DOCS.replace("`docs/`", "`/docs`"), (REPO / "guidance" / "agents.md").read_text(encoding="utf-8"))
         for commands in RUNS.values():
             for command in commands:
                 self.assertIn(f"`{command}`", contributing)
