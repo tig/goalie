@@ -7,7 +7,7 @@ They are a design aid, not a contract. [SPEC.md](../../SPEC.md) stays the source
 - **Platform.** One server-rendered web app whose pages also work at phone width, with no native app ([0010](../adr/0010-app-shape.md)). Agents work through the MCP server ([0004](../adr/0004-mcp-hosting.md)). Frames 01–24 are the desktop web app, 25 is phone width, and 26 is an agent session over MCP.
 - **Fidelity.** Grayscale boxes with real labels in GOALIE's lexicon ([SPEC.md §4](../../SPEC.md#s4)). Health is shown as solid black for RED, gray for YELLOW, and outlined for GREEN. The date type badge is solid for Committed, gray for Ambition, and dashed for Fantasy.
 - **Annotations.** Each frame has numbered pins. The column on the right explains each pin, names the product tenet it applies, and asks any open question.
-- **Walkthrough.** [goalie-wireframes.pdf](wireframes/goalie-wireframes.pdf) has every frame in order, with a one-line caption each, after a cover with this index, the tenets, the assumptions, and the open questions.
+- **Walkthrough.** [wireframes/walkthrough.md](wireframes/walkthrough.md) has every frame in order, with a one-line caption each, after the key action list, the tenets, the assumptions, and the open questions.
 
 ## Frames and sources
 
@@ -82,7 +82,7 @@ Each of these is marked *assumed* on its frame.
 
 ## Regenerate
 
-The generator is [`wireframes/src/`](wireframes/src/). [`kit.py`](wireframes/src/kit.py) holds the shared styles and components. `frames1.py` through `frames7.py` each add frames in order. [`build.py`](wireframes/src/build.py) renders every frame to a PNG at 1280 px wide with headless Chromium, then prints the walkthrough PDF.
+The generator is [`wireframes/src/`](wireframes/src/). [`kit.py`](wireframes/src/kit.py) holds the shared styles and components. `frames1.py` through `frames7.py` each add frames in order. [`build.py`](wireframes/src/build.py) renders every frame to a PNG at 1280 px wide with headless Chromium, then writes the walkthrough.
 
 ```sh
 pip install playwright
@@ -90,4 +90,4 @@ python -m playwright install chromium
 python docs/specs/wireframes/src/build.py
 ```
 
-Set `CHROME_PATH` to use an installed Chrome or Chromium instead of Playwright's bundled browser. The build replaces `wireframes/png/` and `wireframes/goalie-wireframes.pdf`. Commit the regenerated PNGs and PDF in the same pull request as the source change.
+Set `CHROME_PATH` to use an installed Chrome or Chromium instead of Playwright's bundled browser. The build replaces `wireframes/png/` and `wireframes/walkthrough.md`. Commit the regenerated PNGs and walkthrough in the same pull request as the source change.

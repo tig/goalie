@@ -1,4 +1,4 @@
-"""Build the GOALIE wireframes: one PNG per frame, plus a walkthrough PDF.
+"""Build the GOALIE wireframes: one PNG per frame, plus a walkthrough in Markdown.
 
 Usage (from the repository root):
     python docs/specs/wireframes/src/build.py
@@ -7,11 +7,10 @@ Needs Python 3.10+ and Playwright (`pip install playwright`, then
 `python -m playwright install chromium`). Set CHROME_PATH to use an installed
 Chrome or Chromium instead of Playwright's bundled browser.
 Outputs go to docs/specs/wireframes/png/ and
-docs/specs/wireframes/goalie-wireframes.pdf.
+docs/specs/wireframes/walkthrough.md.
 """
 from __future__ import annotations
 
-import base64
 import html
 import os
 import re
@@ -27,7 +26,7 @@ from playwright.sync_api import sync_playwright  # noqa: E402
 
 OUT = SRC.parent
 PNG = OUT / "png"
-PDF = OUT / "goalie-wireframes.pdf"
+WALKTHROUGH = OUT / "walkthrough.md"
 
 
 def slug(title: str) -> str:
@@ -62,36 +61,47 @@ CAP={
 25:"Phone width: the same web app for triage. Approve Drafts and comment from a phone browser.",
 26:"Agent surface: an agent creates goals and Drafts over MCP, errors name the broken rule, and the Draft shows live in the app.",
 }
-def img(p: Path) -> str:
-    return "data:image/png;base64," + base64.b64encode(p.read_bytes()).decode()
-ASSUME="""<li>Platform per ADR 0010: one server-rendered web app, the same pages at phone width, no native app. The agent surface is MCP (ADR 0004).</li>
-<li>Sign-in is federated Entra ID behind oauth2-proxy (ADR 0005), so there's no GOALIE sign-in, sign-up, or password screen. Frame 01's first-run checklist <i>shape</i> is assumed. The repo requires the steps, not the screen.</li>
-<li>Sample data (GOAL ids, Factory/Product/Operations units, Pat as a second human, agent names) is illustrative. ADR 0005's first deployment has one human actor (Tig).</li>
-<li>Specific UI choices marked <i>assumed</i> in frame annotations: worst-child health rollup (03), derived Completed vs Completed Late (13), enforced owner and date on action items (18), pre-filled period-reset reasons (20), the ⓘ marker when the date-type column is hidden (21).</li>
-<li>Left nav order and the favorites/reviews sections are a design choice. The views themselves are the SPEC §8.2 standard views.</li>"""
-TEN="""<li><b>Delight Is Low Friction / remove steps before adding features:</b> one-screen create (05), inline Promotion Milestone, combined slip+health+PTG (08), bulk period reset (20), no Save on Docs (11), Drafts approved in place (02/04/10).</li>
-<li><b>Self Service Or Nothing</b> (proposed tenet, operations#56): no GOALIE accounts, invites, or demo. Defaults first (01). Agents handle the bookkeeping over MCP (26).</li>
-<li><b>Design For Failure:</b> stale-write recovery (07), SSE resume by sequence, plain-language rejections that name the rule (26).</li>
-<li><b>Customers Own Their Data:</b> one-click full export (19). The history is readable on every record (12).</li>"""
+ASSUME = [
+    "Platform per ADR 0010: one server-rendered web app, the same pages at phone width, no native app. The agent surface is MCP (ADR 0004).",
+    "Sign-in is federated Entra ID behind oauth2-proxy (ADR 0005), so there's no GOALIE sign-in, sign-up, or password screen. Frame 01's first-run checklist *shape* is assumed. The repo requires the steps, not the screen.",
+    "Sample data (GOAL ids, Factory/Product/Operations units, Pat as a second human, agent names) is illustrative. ADR 0005's first deployment has one human actor (Tig).",
+    "Specific UI choices marked *assumed* in frame annotations: worst-child health rollup (03), derived Completed vs Completed Late (13), enforced owner and date on action items (18), pre-filled period-reset reasons (20), the ⓘ marker when the date-type column is hidden (21).",
+    "Left nav order and the favorites/reviews sections are a design choice. The views themselves are the SPEC §8.2 standard views.",
+]
+TEN = [
+    "**Delight Is Low Friction / remove steps before adding features:** one-screen create (05), inline Promotion Milestone, combined slip+health+PTG (08), bulk period reset (20), no Save on Docs (11), Drafts approved in place (02/04/10).",
+    "**Self Service Or Nothing** (proposed tenet, operations#56): no GOALIE accounts, invites, or demo. Defaults first (01). Agents handle the bookkeeping over MCP (26).",
+    "**Design For Failure:** stale-write recovery (07), SSE resume by sequence, plain-language rejections that name the rule (26).",
+    "**Customers Own Their Data:** one-click full export (19). The history is readable on every record (12).",
+]
 
-def index_html(meta: list[dict]) -> str:
-    rows="".join(f"<tr><td>{m['n']:02d}</td><td>{html.escape(m['title'])}{' <b>(assumed)</b>' if m['assumed'] else ''}</td><td>{m['tag']}</td><td class='s'>{m['src']}</td></tr>" for m in meta)
-    qs="".join(f"<li><b>{m['n']:02d} {html.escape(m['title'])}:</b> {m['q']}</li>" for m in meta if m.get('q'))
-    frames="".join(f"""<section class="pg"><div class="cap"><b>{m['n']:02d} · {html.escape(m['title'])}</b>: {CAP[m['n']]}</div><img src="{img(PNG / f"{m['name']}.png")}"></section>""" for m in meta)
-    doc=f"""<!doctype html><html><head><meta charset="utf-8"><title>GOALIE wireframes</title><style>
-    body{{font-family:Inter,Helvetica,Arial,sans-serif;color:#222;margin:0}}
-    .pg{{page-break-after:always;padding:24px 28px;box-sizing:border-box}}
-    h1{{margin:0 0 4px}} h2{{margin:18px 0 6px;font-size:16px}}
-    table{{border-collapse:collapse;width:100%;font-size:10.5px}} td,th{{border-bottom:1px solid #ddd;padding:2px 6px;text-align:left;vertical-align:top}} th{{background:#eee}}
-    td.s{{color:#555;font-size:9.5px}} li{{margin-bottom:4px;font-size:12px}}
-    .cap{{font-size:14px;margin-bottom:10px}} img{{max-width:100%;max-height:720px;display:block;margin:0 auto;border:1px solid #ccc}}
-    </style></head><body>
-    <section class="pg"><h1>GOALIE: low-fidelity wireframes for key user actions</h1>
-    <div style="color:#555">Draft · based on tig/goalie @ main (SPEC Draft 0.2, USERS_MANUAL v0.1, ADRs 0001–0011, issues #1–#36). Grayscale, low fidelity. Labels use GOALIE's own lexicon.</div>
-    <h2>Key actions, in order</h2><table><tr><th>#</th><th>Action / screen</th><th>Surface</th><th>Source in repo</th></tr>{rows}</table></section>
-    <section class="pg"><h2>Excaliwire tenets applied</h2><ul>{TEN}</ul><h2>Assumptions</h2><ul>{ASSUME}</ul><h2>Open product questions</h2><ol style="columns:2;column-gap:28px">{qs}</ol></section>
-    {frames}</body></html>"""
-    return doc
+
+def walkthrough_md(meta: list[dict]) -> str:
+    """The walkthrough: cover, tenets, assumptions, questions, then each frame with its caption."""
+    out = [
+        "# GOALIE: low-fidelity wireframes for key user actions",
+        "",
+        "Draft · based on tig/goalie @ main (SPEC Draft 0.2, USERS_MANUAL v0.1, ADRs 0001–0011, issues #1–#36). Grayscale, low fidelity. Labels use GOALIE's own lexicon.",
+        "",
+        "## Key actions, in order",
+        "",
+        "| # | Action / screen | Surface | Source in repo |",
+        "|---|---|---|---|",
+    ]
+    for m in meta:
+        title = m["title"] + (" **(assumed)**" if m["assumed"] else "")
+        out.append(f"| {m['n']:02d} | {title} | {m['tag']} | {html.unescape(m['src'])} |")
+    out += ["", "## Excaliwire tenets applied", ""] + [f"- {t}" for t in TEN]
+    out += ["", "## Assumptions", ""] + [f"- {a}" for a in ASSUME]
+    out += ["", "## Open product questions", ""]
+    qs = [m for m in meta if m.get("q")]
+    for k, m in enumerate(qs, 1):
+        q = re.sub(r"</?i>", "*", m["q"])
+        out.append(f"{k}. **{m['n']:02d} {m['title']}:** {html.unescape(q)}")
+    for m in meta:
+        out += ["", f"**{m['n']:02d} · {m['title']}**: {CAP[m['n']]}", "",
+                f"![{m['n']:02d} · {m['title']}](png/{m['name']}.png)"]
+    return "\n".join(out) + "\n"
 
 
 def main() -> None:
@@ -115,12 +125,9 @@ def main() -> None:
             for m in meta:
                 pg.goto((tmpdir / f"{m['name']}.html").as_uri())
                 pg.locator(".frame").screenshot(path=str(PNG / f"{m['name']}.png"))
-            (tmpdir / "index.html").write_text(index_html(meta), encoding="utf-8")
-            pg.goto((tmpdir / "index.html").as_uri())
-            pg.pdf(path=str(PDF), width="1280px", height="820px", print_background=True,
-                   margin={"top": "0", "bottom": "0", "left": "0", "right": "0"})
             browser.close()
-    print(f"{len(meta)} frames -> {PNG}; walkthrough -> {PDF}")
+    WALKTHROUGH.write_text(walkthrough_md(meta), encoding="utf-8")
+    print(f"{len(meta)} frames -> {PNG}; walkthrough -> {WALKTHROUGH}")
 
 
 if __name__ == "__main__":
