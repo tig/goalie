@@ -4,6 +4,8 @@ Guidance for AI coding agents in this repo. This file is canonical. Agents load 
 
 There are no role briefs here. Do not go looking for `agent-harness/briefs/`. Seats and the harness belong to Mike (`tig/mike`), and this repo is not enabled on Mike yet. The state of the work lives in the issues. At session start, read `AGENTS.md` and nothing else. Read `SPEC.md` when the issue touches the product. Read `USERS_MANUAL.md` when the issue touches the manual.
 
+The folder is the component. `server/`, `tests/`, and `guidance/` each have a workflow of that name. A change in one component must not run another component's CI. A component's tests sit with its code. Root `tests/` is only for shared tests and shared test infrastructure. Commands are in CONTRIBUTING.md. Do not invent a different setup step.
+
 **Every byte of `AGENTS.md` is paid by every seat on every run.** Behavior and the operating model live there. Everything else lives in the file that governs it, and you load that file when the issue names it: `SPEC.md` is the product contract, and `USERS_MANUAL.md` is the manual template. There is no nested `AGENTS.md`.
 
 **Writing mode:** Technical literature (STE bias). Short sentences, stable terms, **must** / **must not**, no em-dashes. One line per paragraph and per list item. Do not hard-wrap. Never reformat a file you are not changing. This repo has no formatter. When one arrives, use only that, and never point it at a directory.
@@ -72,7 +74,7 @@ Approval for one thing is not approval for the next one.
 
 Before you change automatable behavior, you must have a test that fails on the current code. You must run that test and see it fail. Then you change the code. The same test must pass on the new code. A bug is not fixed until both are true: fail with the old code, pass with the new.
 
-This repo has no test runner yet. The rule still holds when code arrives. Until then, a spec or manual change must have a deterministic reading: the old text fails the claim, and the new text passes it.
+The test command is `python -m unittest discover -s tests -v`. A spec or manual change must have a deterministic reading: the old text fails the claim, and the new text passes it.
 
 Documentation, contract, and operations findings must have a deterministic reproduction with the same fail-then-pass bar. They do not need a unit test when a unit test cannot state the miss.
 

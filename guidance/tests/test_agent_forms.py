@@ -18,7 +18,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 SCRIPT = REPO / ".github" / "scripts" / "agent_forms.py"
 spec = importlib.util.spec_from_file_location("agent_forms", SCRIPT)
 agent_forms = importlib.util.module_from_spec(spec)
