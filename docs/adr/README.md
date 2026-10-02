@@ -4,7 +4,9 @@ These records are the choices for [#21 (Stage 0.1: Architecture decision records
 Each one records a technology choice or an architecture decision.
 None of them implements that choice.
 A later change that reverses a choice must amend that record in the same pull request.
-A change under `docs/` is pure documentation. It runs no CI commands.
+A change under `docs/` is pure documentation, except `docs/specs/SPEC.md`.
+`docs/specs/SPEC.md` stays an input of the shared tests.
+Every other file under `docs/` runs no CI commands.
 
 - [0001. Language and runtime](0001-language-and-runtime.md). Accepted 2026-10-01.
 - [0002. Storage](0002-storage.md). Accepted 2026-10-01.

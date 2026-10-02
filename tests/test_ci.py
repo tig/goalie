@@ -19,7 +19,7 @@ COMPONENTS = {
     ],
     "tests": [
         "tests/**",
-        "SPEC.md",
+        "docs/specs/SPEC.md",
         "USERS_MANUAL.md",
         "CONTRIBUTING.md",
         ".github/workflows/server.yml",
@@ -64,9 +64,9 @@ RULES = [
     "develop runs the same workflows and does not require them to merge.",
     "The server publishes only from main.",
     "Test-first does not apply to documentation or to configuration.",
-    "README.md and everything under docs/ are pure docs.",
+    "README.md and docs/ are pure docs, except docs/specs/SPEC.md.",
     "They run no CI commands and need no test.",
-    "SPEC.md and USERS_MANUAL.md stay inputs of the shared tests.",
+    "docs/specs/SPEC.md and USERS_MANUAL.md stay inputs of the shared tests.",
 ]
 AFFECTED = "needs.changes.outputs.affected == 'true'"
 # A skipped required job reports success. Run the check when detection fails.
@@ -181,10 +181,30 @@ class CiTenets(unittest.TestCase):
         self.assertEqual(module.COMPONENTS, COMPONENTS)
         self.assertTrue(module.affected("server", ["server/src/server.ts"]))
         self.assertFalse(module.affected("server", ["tests/test_ci.py"]))
-        self.assertTrue(module.affected("tests", ["SPEC.md"]))
+        self.assertTrue(module.affected("tests", ["docs/specs/SPEC.md"]))
+        self.assertFalse(module.affected("tests", ["SPEC.md"]))
+        self.assertFalse(module.affected("server", ["docs/specs/SPEC.md"]))
+        self.assertFalse(module.affected("guidance", ["docs/specs/SPEC.md"]))
+        docs_patterns = [
+            pattern
+            for patterns in COMPONENTS.values()
+            for pattern in patterns
+            if pattern.startswith("docs/")
+        ]
+        self.assertEqual(docs_patterns, ["docs/specs/SPEC.md"])
         for component, patterns in COMPONENTS.items():
-            self.assertFalse(any(pattern == "README.md" or pattern.startswith("docs/") for pattern in patterns))
-            for path in ("README.md", "docs/adr/0006-deployment-target.md", "docs/testing.md"):
+            self.assertFalse(
+                any(
+                    pattern == "README.md" or (pattern.startswith("docs/") and pattern != "docs/specs/SPEC.md")
+                    for pattern in patterns
+                )
+            )
+            for path in (
+                "README.md",
+                "docs/adr/0006-deployment-target.md",
+                "docs/testing.md",
+                "docs/specs/README.md",
+            ):
                 self.assertFalse(module.affected(component, [path]), f"{component} {path}")
         self.assertFalse(module.affected("tests", ["server/src/server.ts"]))
         self.assertTrue(module.affected("guidance", [".github/scripts/agent_forms.py"]))

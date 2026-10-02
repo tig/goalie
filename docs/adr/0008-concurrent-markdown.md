@@ -7,12 +7,12 @@
 ## Context
 
 [#21 (Stage 0.1: Architecture decision records)](https://github.com/tig/goalie/issues/21) requires concurrent Markdown so an edit is not lost.
-[SPEC.md](../../SPEC.md) §6.5 says more than one actor may edit a Doc body, or a goal description, at the same time.
+[SPEC.md](../specs/SPEC.md) §6.5 says more than one actor may edit a Doc body, or a goal description, at the same time.
 An edit must not be lost.
 A saved Doc version is taken from that text.
-[SPEC.md](../../SPEC.md) §6 says structured fields do not follow that rule.
+[SPEC.md](../specs/SPEC.md) §6 says structured fields do not follow that rule.
 A stale structured write is rejected, and automatic merging must not apply to structured fields.
-[SPEC.md](../../SPEC.md) §6.6 says every change to a Doc is an Event with an old value and a new value.
+[SPEC.md](../specs/SPEC.md) §6.6 says every change to a Doc is an Event with an old value and a new value.
 json-joy can also merge a string, and its source is TypeScript.
 The published `json-joy` package is AGPL-3.0-only.
 `yjs` is MIT.

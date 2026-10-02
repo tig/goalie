@@ -18,13 +18,13 @@ A pull request for in-development work targets develop.
 A release is a pull request from develop into main.
 develop runs the same workflows and does not require them to merge.
 The server publishes only from main.
-README.md and everything under docs/ are pure docs.
+README.md and docs/ are pure docs, except docs/specs/SPEC.md.
 They run no CI commands and need no test.
 Test-first does not apply to documentation or to configuration.
-SPEC.md and USERS_MANUAL.md stay inputs of the shared tests.
+docs/specs/SPEC.md and USERS_MANUAL.md stay inputs of the shared tests.
 
 - `server/` runs [`.github/workflows/server.yml`](.github/workflows/server.yml). Commands: `npm ci --prefix server`, `npm run lint --prefix server`, `npm run typecheck --prefix server`, and `python -m unittest discover -s server/tests -v`.
-- `tests/` runs [`.github/workflows/tests.yml`](.github/workflows/tests.yml). Command: `python -m unittest discover -s tests -v`. This suite is shared tests and shared test infrastructure. `SPEC.md` and `USERS_MANUAL.md` are inputs.
+- `tests/` runs [`.github/workflows/tests.yml`](.github/workflows/tests.yml). Command: `python -m unittest discover -s tests -v`. This suite is shared tests and shared test infrastructure. `docs/specs/SPEC.md` and `USERS_MANUAL.md` are inputs.
 - `guidance/` runs [`.github/workflows/guidance.yml`](.github/workflows/guidance.yml). Commands: `python -m unittest discover -s guidance/tests -v` and `python .github/scripts/agent_forms.py check`. `AGENTS.md` and `.github/scripts/agent_forms.py` are inputs.
 
 Server code is TypeScript in `server/src/`, on Node.js 24 or newer.
@@ -58,7 +58,7 @@ A reversal amends that same record in the reversing pull request.
 A behavior change and the SPEC.md change must land in the same pull request.
 The same rule is in [`guidance/agents.md`](guidance/agents.md).
 
-The product contract is [`SPEC.md`](SPEC.md).
+The product contract is [`docs/specs/SPEC.md`](docs/specs/SPEC.md).
 How to run the tests is [`docs/testing.md`](docs/testing.md).
 The record index is [`docs/adr/README.md`](docs/adr/README.md).
 

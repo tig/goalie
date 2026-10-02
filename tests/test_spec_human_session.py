@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class HumanSessionSpec(unittest.TestCase):
     def setUp(self) -> None:
-        self.spec = (ROOT / "SPEC.md").read_text(encoding="utf-8")
+        self.spec = (ROOT / "docs" / "specs" / "SPEC.md").read_text(encoding="utf-8")
         self.manual = (ROOT / "USERS_MANUAL.md").read_text(encoding="utf-8")
 
     def test_ordinary_session_needs_no_agent(self) -> None:

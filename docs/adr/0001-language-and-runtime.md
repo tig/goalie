@@ -7,13 +7,13 @@
 ## Context
 
 [#21 (Stage 0.1: Architecture decision records)](https://github.com/tig/goalie/issues/21) requires a language before the store, the API, or the app can be built.
-[SPEC.md](../../SPEC.md) is implementation-neutral and names no language.
+[SPEC.md](../specs/SPEC.md) is implementation-neutral and names no language.
 The app already uses browser JavaScript for live updates, the Markdown CRDT, and Presence ([0010](0010-app-shape.md)).
 The Markdown CRDT is Yjs ([0008](0008-concurrent-markdown.md)).
 A TypeScript server runs that same library.
 Python stays the language of `.github/scripts/agent_forms.py` and `tests/`.
 That tooling is not the GOALIE server.
-[SPEC.md](../../SPEC.md) §8.1 requires validation once, on the server, in one transaction.
+[SPEC.md](../specs/SPEC.md) §8.1 requires validation once, on the server, in one transaction.
 
 ## Decision
 

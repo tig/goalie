@@ -4,7 +4,7 @@ A unit test checks one repo rule or one module.
 The existing files [tests/test_adrs.py](../tests/test_adrs.py), [tests/test_spec_collaboration.py](../tests/test_spec_collaboration.py), and [tests/test_spec_human_session.py](../tests/test_spec_human_session.py) are unit tests.
 They are not this suite.
 
-A conformance test is one skipped test per marked invariant in [SPEC.md](../SPEC.md) Draft 0.2.
+A conformance test is one skipped test per marked invariant in [SPEC.md](specs/SPEC.md) Draft 0.2.
 A restatement in another section is the same test.
 The test name is the invariant.
 The skip message names the epic issue that fills it.
@@ -23,7 +23,7 @@ This suite is the tests component.
 Its workflow is [`.github/workflows/tests.yml`](../.github/workflows/tests.yml).
 A server-only change must not run this suite.
 A guidance-only change must not run this suite.
-`SPEC.md` and `USERS_MANUAL.md` are inputs of this workflow.
+`docs/specs/SPEC.md` and `USERS_MANUAL.md` are inputs of this workflow.
 
 Server tests sit with the server, in `server/tests/`.
 Their command is `python -m unittest discover -s server/tests -v`.

@@ -7,9 +7,9 @@
 ## Context
 
 [#21 (Stage 0.1: Architecture decision records)](https://github.com/tig/goalie/issues/21) says the deployment target is self-hosted first.
-[SPEC.md](../../SPEC.md) §1 says one named human owns a deployment.
-[SPEC.md](../../SPEC.md) §13 says the organization owns its memory, including a full export.
-[SPEC.md](../../SPEC.md) names no vendor and no host.
+[SPEC.md](../specs/SPEC.md) §1 says one named human owns a deployment.
+[SPEC.md](../specs/SPEC.md) §13 says the organization owns its memory, including a full export.
+[SPEC.md](../specs/SPEC.md) names no vendor and no host.
 
 ## Decision
 
