@@ -58,6 +58,9 @@ TENET = "A change in one component must not run another component's CI."
 REPORTS = "The workflow starts on every pull request so its check can report."
 COMMANDS_WHEN = "The component's commands run only when its inputs changed."
 AFFECTED = "needs.changes.outputs.affected == 'true'"
+# A skipped required job reports success. Run the check when detection fails.
+DETECTOR = "always() && (needs.changes.result != 'success' || needs.changes.outputs.affected == 'true')"
+REQUIRED_DETECTORS = {"server": 3, "tests": 1, "guidance": 1}
 
 
 def _paths(text: str) -> dict[str, list[str] | None]:
@@ -101,12 +104,18 @@ class CiTenets(unittest.TestCase):
             self.assertIsNone(events["pull_request"], name)
             self.assertIsNone(events["push"], name)
             self.assertIn("python .github/scripts/ci_affected.py ${{ github.workflow }}\n", text)
-            self.assertIn(f"if: {AFFECTED}\n", text)
+            self.assertIn("git diff --name-only --no-renames ", text)
+            self.assertEqual(text.count(f"if: {DETECTOR}\n"), REQUIRED_DETECTORS[name])
+            self.assertEqual(text.count("run: exit 1\n"), REQUIRED_DETECTORS[name])
+            self.assertIn("if: needs.changes.result != 'success'\n", text)
             for path in expected:
                 if path.endswith("/**"):
                     self.assertTrue((REPO / path[:-3]).is_dir(), path)
             for command in RUNS[name]:
-                self.assertIn(AFFECTED, _if_before_run(text, command), command)
+                gate = _if_before_run(text, command)
+                self.assertIn(AFFECTED, gate, command)
+                if command != "python .github/scripts/agent_forms.py check":
+                    self.assertIn(DETECTOR, gate, command)
 
     def test_a_component_does_not_list_another_components_folder(self) -> None:
         server = set(COMPONENTS["server"])
@@ -180,6 +189,7 @@ class CiTenets(unittest.TestCase):
         deploy = server.split("\n  deploy:", 1)[1]
         header = deploy.split("\n    steps:", 1)[0]
         self.assertIn(AFFECTED, header)
+        self.assertNotIn("always()", header)
         self.assertIn("github.ref == 'refs/heads/main'", header)
         self.assertIn("github.event_name == 'push'", header)
         self.assertIn("github.event_name == 'workflow_dispatch'", header)
@@ -205,16 +215,16 @@ class CiTenets(unittest.TestCase):
 
 
 def _if_before_run(text: str, command: str) -> str:
+    """The job-level if for the first step that runs command. Step ifs are deeper."""
     lines = text.splitlines()
     target = f"run: {command}"
     index = next(i for i, line in enumerate(lines) if line.strip() in (target, f"- {target}"))
     found = ""
     for line in reversed(lines[:index]):
-        stripped = line.strip()
-        if stripped.endswith(":") and line.startswith("  ") and not line.startswith("    "):
+        if re.match(r"^    if:", line):
+            found = line.strip()
             break
-        if stripped.startswith("if:"):
-            found = stripped
+        if line.startswith("  ") and not line.startswith("    ") and line.strip().endswith(":"):
             break
     return found
 

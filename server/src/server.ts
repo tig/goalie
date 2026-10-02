@@ -13,7 +13,7 @@ export function createApp(): Hono {
 export function listen(
   app: Hono,
   port: number,
-  hostname = "127.0.0.1",
+  hostname: string | undefined = "127.0.0.1",
 ): ReturnType<typeof serve> {
   return serve({ fetch: app.fetch, hostname, port });
 }
@@ -33,5 +33,5 @@ function startedAsMain(): boolean {
 }
 
 if (startedAsMain()) {
-  listen(createApp(), configuredPort(), process.env.HOST ?? "127.0.0.1");
+  listen(createApp(), configuredPort(), process.env.HOST);
 }
