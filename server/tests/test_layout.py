@@ -29,6 +29,7 @@ class ServerLayoutTests(unittest.TestCase):
         scripts = package["scripts"]
         self.assertEqual(scripts["lint"], "eslint src")
         self.assertEqual(scripts["typecheck"], "tsc --noEmit")
+        self.assertEqual(scripts["start"], "node src/server.ts")
 
 
 if __name__ == "__main__":
