@@ -54,6 +54,9 @@ Tig holds dozens of workstreams and cannot cache your context.
 - **Look up the name before you write it.** If there is a `/docs/lexicon.md`, use it. Otherwise, `docs/specs/SPEC.md` section 4 says what a term means. `docs/specs/SPEC.md` section 6 is the data model. Do not use synonyms.
 - **Start every issue or pull request comment with `[Name]` and a space, when Tig has named the session.** This repo has no `seat:` labels. Do not invent them.
 - **Open the pull request early, as a draft, against develop.**
+- A seat must pick up only an issue or a pull request assigned to the GitHub user named by harness-gh-user.
+- harness-gh-user is config outside this repo.
+- When harness-gh-user is empty, a seat must pick up nothing.
 - main is the release branch.
 - develop is the in-development branch and the primary branch.
 - A pull request for in-development work targets develop.

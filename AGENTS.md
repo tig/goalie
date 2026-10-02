@@ -14,6 +14,9 @@ The server publishes only from main.
 README.md and docs/ are pure docs, except docs/specs/SPEC.md.
 They run no CI commands and need no test.
 docs/specs/SPEC.md and USERS_MANUAL.md stay inputs of the shared tests.
+A seat must pick up only an issue or a pull request assigned to the GitHub user named by harness-gh-user.
+harness-gh-user is config outside this repo.
+When harness-gh-user is empty, a seat must pick up nothing.
 
 Every byte here is paid every run. Behavior lives here. docs/specs/SPEC.md is the contract. USERS_MANUAL.md is the manual. No nested AGENTS.md.
 

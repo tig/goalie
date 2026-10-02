@@ -22,6 +22,9 @@ README.md and docs/ are pure docs, except docs/specs/SPEC.md.
 They run no CI commands and need no test.
 Test-first does not apply to documentation or to configuration.
 docs/specs/SPEC.md and USERS_MANUAL.md stay inputs of the shared tests.
+A seat must pick up only an issue or a pull request assigned to the GitHub user named by harness-gh-user.
+harness-gh-user is config outside this repo.
+When harness-gh-user is empty, a seat must pick up nothing.
 
 - `server/` runs [`.github/workflows/server.yml`](.github/workflows/server.yml). Commands: `npm ci --prefix server`, `npm run lint --prefix server`, `npm run typecheck --prefix server`, and `python -m unittest discover -s server/tests -v`.
 - `tests/` runs [`.github/workflows/tests.yml`](.github/workflows/tests.yml). Command: `python -m unittest discover -s tests -v`. This suite is shared tests and shared test infrastructure. `docs/specs/SPEC.md` and `USERS_MANUAL.md` are inputs.

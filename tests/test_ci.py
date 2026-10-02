@@ -67,6 +67,9 @@ RULES = [
     "README.md and docs/ are pure docs, except docs/specs/SPEC.md.",
     "They run no CI commands and need no test.",
     "docs/specs/SPEC.md and USERS_MANUAL.md stay inputs of the shared tests.",
+    "A seat must pick up only an issue or a pull request assigned to the GitHub user named by harness-gh-user.",
+    "harness-gh-user is config outside this repo.",
+    "When harness-gh-user is empty, a seat must pick up nothing.",
 ]
 AFFECTED = "needs.changes.outputs.affected == 'true'"
 # A skipped required job reports success. Run the check when detection fails.
