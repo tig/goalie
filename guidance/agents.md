@@ -53,7 +53,13 @@ Tig holds dozens of workstreams and cannot cache your context.
 - **Before calling something a judgment call, name the datum that would decide it.** If the repo already holds that datum, make the fix. A goal's date type follows `SPEC.md` section 5. Do not pick a synonym.
 - **Look up the name before you write it.** If there is a `/docs/lexicon.md`, use it. Otherwise, `SPEC.md` section 4 says what a term means. `SPEC.md` section 6 is the data model. Do not use synonyms.
 - **Start every issue or pull request comment with `[Name]` and a space, when Tig has named the session.** This repo has no `seat:` labels. Do not invent them.
-- **Open the pull request early, as a draft.**
+- **Open the pull request early, as a draft, against develop.**
+- main is the release branch.
+- develop is the in-development branch and the primary branch.
+- A pull request for in-development work targets develop.
+- A release is a pull request from develop into main.
+- develop runs the same workflows and does not require them to merge.
+- The server publishes only from main.
 - **Learnings go on the issue**, not only in the pull request body. A merged pull request buries them.
 - **Merge, never rebase, on a shared branch.** Another session may have branched from it.
 
@@ -72,13 +78,19 @@ Approval for one thing is not approval for the next one.
 
 ### Test-first
 
-Before you change automatable behavior, you must have a test that fails on the current code. You must run that test and see it fail. Then you change the code. The same test must pass on the new code. A bug is not fixed until both are true: fail with the old code, pass with the new.
+Test-first applies to code that changes automatable behavior.
+Before you change that code, you must have a test that fails on the current code.
+You must run that test and see it fail.
+Then you change the code.
+The same test must pass on the new code.
+A bug is not fixed until both are true: fail with the old code, pass with the new.
 
-The test command is `python -m unittest discover -s tests -v`. A spec or manual change must have a deterministic reading: the old text fails the claim, and the new text passes it.
-
-Documentation, contract, and operations findings must have a deterministic reproduction with the same fail-then-pass bar. They do not need a unit test when a unit test cannot state the miss.
-
-A change only under `/docs` is not code. It runs no CI commands and needs no test first.
+Test-first does not apply to documentation or to configuration.
+README.md and everything under docs/ are pure docs.
+They run no CI commands and need no test.
+SPEC.md and USERS_MANUAL.md stay inputs of the shared tests.
+A change to either still runs that suite.
+The shared test command is `python -m unittest discover -s tests -v`.
 
 ## Being wrong
 

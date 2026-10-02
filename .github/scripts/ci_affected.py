@@ -11,6 +11,7 @@ import os
 import sys
 
 # Paths outside the component folder are inputs. Keep this list in order.
+# README.md and docs/** are pure docs. They must not appear in these lists.
 COMPONENTS = {
     "server": [
         "server/**",

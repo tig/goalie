@@ -56,7 +56,18 @@ RUNS = {
 TENET = "A change in one component must not run another component's CI."
 REPORTS = "The workflow starts on every pull request so its check can report."
 COMMANDS_WHEN = "The component's commands run only when its inputs changed."
-DOCS = "A change only under `docs/` is not code. It runs no CI commands and needs no test first."
+RULES = [
+    "main is the release branch.",
+    "develop is the in-development branch and the primary branch.",
+    "A pull request for in-development work targets develop.",
+    "A release is a pull request from develop into main.",
+    "develop runs the same workflows and does not require them to merge.",
+    "The server publishes only from main.",
+    "Test-first does not apply to documentation or to configuration.",
+    "README.md and everything under docs/ are pure docs.",
+    "They run no CI commands and need no test.",
+    "SPEC.md and USERS_MANUAL.md stay inputs of the shared tests.",
+]
 AFFECTED = "needs.changes.outputs.affected == 'true'"
 # A skipped required job reports success. Run the check when detection fails.
 DETECTOR = "always() && (needs.changes.result != 'success' || needs.changes.outputs.affected == 'true')"
@@ -103,6 +114,7 @@ class CiTenets(unittest.TestCase):
             events = _paths(text)
             self.assertIsNone(events["pull_request"], name)
             self.assertIsNone(events["push"], name)
+            self.assertIn("branches: [main, develop]\n", text)
             self.assertIn("python .github/scripts/ci_affected.py ${{ github.workflow }}\n", text)
             self.assertIn("git diff --name-only --no-renames ", text)
             self.assertEqual(text.count(f"if: {DETECTOR}\n"), REQUIRED_DETECTORS[name])
@@ -140,17 +152,19 @@ class CiTenets(unittest.TestCase):
         self.assertNotIn("discover -s tests", guidance)
 
     def test_the_guides_state_the_tenet(self) -> None:
-        for path in (
+        guides = [
             REPO / "CONTRIBUTING.md",
             REPO / "AGENTS.md",
             REPO / "guidance" / "agents.md",
-        ):
-            self.assertIn(TENET, path.read_text(encoding="utf-8"), path.name)
-        contributing = (REPO / "CONTRIBUTING.md").read_text(encoding="utf-8")
+        ]
+        contributing = guides[0].read_text(encoding="utf-8")
         self.assertIn(REPORTS, contributing)
         self.assertIn(COMMANDS_WHEN, contributing)
-        self.assertIn(DOCS, contributing)
-        self.assertIn(DOCS.replace("`docs/`", "`/docs`"), (REPO / "guidance" / "agents.md").read_text(encoding="utf-8"))
+        for guide in guides:
+            text = guide.read_text(encoding="utf-8")
+            self.assertIn(TENET, text, guide.name)
+            for rule in RULES:
+                self.assertIn(rule, text, guide.name)
         for commands in RUNS.values():
             for command in commands:
                 self.assertIn(f"`{command}`", contributing)
@@ -168,8 +182,10 @@ class CiTenets(unittest.TestCase):
         self.assertTrue(module.affected("server", ["server/src/server.ts"]))
         self.assertFalse(module.affected("server", ["tests/test_ci.py"]))
         self.assertTrue(module.affected("tests", ["SPEC.md"]))
-        for component in COMPONENTS:
-            self.assertFalse(module.affected(component, ["docs/adr/0006-deployment-target.md"]), component)
+        for component, patterns in COMPONENTS.items():
+            self.assertFalse(any(pattern == "README.md" or pattern.startswith("docs/") for pattern in patterns))
+            for path in ("README.md", "docs/adr/0006-deployment-target.md", "docs/testing.md"):
+                self.assertFalse(module.affected(component, [path]), f"{component} {path}")
         self.assertFalse(module.affected("tests", ["server/src/server.ts"]))
         self.assertTrue(module.affected("guidance", [".github/scripts/agent_forms.py"]))
         self.assertFalse(module.affected("guidance", ["server/package.json"]))
