@@ -28,7 +28,6 @@ COMPONENTS = {
     "guidance": [
         "guidance/**",
         "AGENTS.md",
-        "tests/test_agent_forms.py",
         ".github/scripts/agent_forms.py",
         ".github/workflows/guidance.yml",
     ],
@@ -45,7 +44,7 @@ RUNS = {
         "python -m unittest discover -s tests -v",
     ],
     "guidance": [
-        "python -m unittest tests/test_agent_forms.py",
+        "python -m unittest discover -s guidance/tests -v",
         "python .github/scripts/agent_forms.py check",
     ],
 }
@@ -101,8 +100,7 @@ class CiTenets(unittest.TestCase):
         guidance = set(COMPONENTS["guidance"])
         self.assertFalse(any(path.startswith("tests/") or path.startswith("guidance/") for path in server))
         self.assertFalse(any(path.startswith("server/") or path.startswith("guidance/") for path in tests))
-        self.assertFalse(any(path.startswith("server/") for path in guidance))
-        self.assertIn("tests/test_agent_forms.py", guidance)
+        self.assertFalse(any(path.startswith("tests/") or path.startswith("server/") for path in guidance))
         self.assertNotIn("tests/**", guidance)
 
     def test_each_workflow_runs_only_its_commands(self) -> None:

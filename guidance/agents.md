@@ -4,7 +4,7 @@ Guidance for AI coding agents in this repo. This file is canonical. Agents load 
 
 There are no role briefs here. Do not go looking for `agent-harness/briefs/`. Seats and the harness belong to Mike (`tig/mike`), and this repo is not enabled on Mike yet. The state of the work lives in the issues. At session start, read `AGENTS.md` and nothing else. Read `SPEC.md` when the issue touches the product. Read `USERS_MANUAL.md` when the issue touches the manual.
 
-The folder is the component. `server/`, `tests/`, and `guidance/` each have a workflow of that name. A change in one component must not run another component's CI. A component's tests sit with its code. Server tests are in `server/tests/`. Commands are in CONTRIBUTING.md. Do not invent a different setup step.
+The folder is the component. `server/`, `tests/`, and `guidance/` each have a workflow of that name. A change in one component must not run another component's CI. A component's tests sit with its code. Root `tests/` is only for shared tests and shared test infrastructure. Commands are in CONTRIBUTING.md. Do not invent a different setup step.
 
 **Every byte of `AGENTS.md` is paid by every seat on every run.** Behavior and the operating model live there. Everything else lives in the file that governs it, and you load that file when the issue names it: `SPEC.md` is the product contract, and `USERS_MANUAL.md` is the manual template. There is no nested `AGENTS.md`.
 

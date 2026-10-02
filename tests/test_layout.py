@@ -13,12 +13,22 @@ COMMANDS = (
     "npm run typecheck --prefix server",
     "python -m unittest discover -s server/tests -v",
     "python -m unittest discover -s tests -v",
-    "python -m unittest tests/test_agent_forms.py",
+    "python -m unittest discover -s guidance/tests -v",
     "python .github/scripts/agent_forms.py check",
 )
 
 SPEC_SYNC = (
     "A behavior change and the SPEC.md change must land in the same pull request."
+)
+
+# Root tests/ is shared tests and shared test infrastructure.
+SHARED_TESTS = (
+    "test_adrs.py",
+    "test_ci.py",
+    "test_conformance.py",
+    "test_layout.py",
+    "test_spec_collaboration.py",
+    "test_spec_human_session.py",
 )
 
 
@@ -32,6 +42,13 @@ class LayoutTests(unittest.TestCase):
         self.assertIn("guidance/", text)
         self.assertIn("docs/adr/", text)
         self.assertIn(SPEC_SYNC, text)
+
+    def test_root_tests_are_shared_or_infrastructure(self) -> None:
+        names = sorted(path.name for path in (REPO / "tests").glob("test_*.py"))
+        self.assertEqual(names, sorted(SHARED_TESTS))
+        guidance = REPO / "guidance" / "tests"
+        self.assertTrue(guidance.is_dir())
+        self.assertTrue(any(guidance.glob("test_*.py")))
 
     def test_language_and_runtime_record_exists(self) -> None:
         path = REPO / "docs" / "adr" / "0001-language-and-runtime.md"

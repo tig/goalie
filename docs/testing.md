@@ -1,7 +1,7 @@
 # Testing
 
 A unit test checks one repo rule or one module.
-The existing files [tests/test_adrs.py](../tests/test_adrs.py), [tests/test_agent_forms.py](../tests/test_agent_forms.py), [tests/test_spec_collaboration.py](../tests/test_spec_collaboration.py), and [tests/test_spec_human_session.py](../tests/test_spec_human_session.py) are unit tests.
+The existing files [tests/test_adrs.py](../tests/test_adrs.py), [tests/test_spec_collaboration.py](../tests/test_spec_collaboration.py), and [tests/test_spec_human_session.py](../tests/test_spec_human_session.py) are unit tests.
 They are not this suite.
 
 A conformance test is one skipped test per marked invariant in [SPEC.md](../SPEC.md) Draft 0.2.
@@ -17,14 +17,22 @@ One test is not skipped.
 It checks that the scaffold names every marked invariant, and it must pass.
 
 The command is `python -m unittest discover -s tests -v`.
+`tests/` holds shared tests and shared test infrastructure.
+A component's own tests must not live there.
 This suite is the tests component.
 Its workflow is [`.github/workflows/tests.yml`](../.github/workflows/tests.yml).
 A server-only change must not run it.
+A guidance-only change must not run it.
 `SPEC.md` and `USERS_MANUAL.md` are inputs of this workflow.
 
 Server tests sit with the server, in `server/tests/`.
 Their command is `python -m unittest discover -s server/tests -v`.
 Their workflow is [`.github/workflows/server.yml`](../.github/workflows/server.yml).
+A change under `tests/` must not run that workflow.
+
+Guidance tests sit with guidance, in `guidance/tests/`.
+Their command is `python -m unittest discover -s guidance/tests -v`.
+Their workflow is [`.github/workflows/guidance.yml`](../.github/workflows/guidance.yml).
 A change under `tests/` must not run that workflow.
 
 ## Who fills what
