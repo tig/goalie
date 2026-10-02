@@ -21,7 +21,6 @@ COMPONENTS = {
         "tests/**",
         "SPEC.md",
         "USERS_MANUAL.md",
-        "docs/**",
         "CONTRIBUTING.md",
         ".github/workflows/server.yml",
         ".github/workflows/tests.yml",
@@ -57,6 +56,7 @@ RUNS = {
 TENET = "A change in one component must not run another component's CI."
 REPORTS = "The workflow starts on every pull request so its check can report."
 COMMANDS_WHEN = "The component's commands run only when its inputs changed."
+DOCS = "A change only under `docs/` is not code. It runs no CI commands and needs no test first."
 AFFECTED = "needs.changes.outputs.affected == 'true'"
 # A skipped required job reports success. Run the check when detection fails.
 DETECTOR = "always() && (needs.changes.result != 'success' || needs.changes.outputs.affected == 'true')"
@@ -149,6 +149,8 @@ class CiTenets(unittest.TestCase):
         contributing = (REPO / "CONTRIBUTING.md").read_text(encoding="utf-8")
         self.assertIn(REPORTS, contributing)
         self.assertIn(COMMANDS_WHEN, contributing)
+        self.assertIn(DOCS, contributing)
+        self.assertIn(DOCS.replace("`docs/`", "`/docs`"), (REPO / "guidance" / "agents.md").read_text(encoding="utf-8"))
         for commands in RUNS.values():
             for command in commands:
                 self.assertIn(f"`{command}`", contributing)
@@ -166,7 +168,8 @@ class CiTenets(unittest.TestCase):
         self.assertTrue(module.affected("server", ["server/src/server.ts"]))
         self.assertFalse(module.affected("server", ["tests/test_ci.py"]))
         self.assertTrue(module.affected("tests", ["SPEC.md"]))
-        self.assertTrue(module.affected("tests", ["docs/adr/0006-deployment-target.md"]))
+        for component in COMPONENTS:
+            self.assertFalse(module.affected(component, ["docs/adr/0006-deployment-target.md"]), component)
         self.assertFalse(module.affected("tests", ["server/src/server.ts"]))
         self.assertTrue(module.affected("guidance", [".github/scripts/agent_forms.py"]))
         self.assertFalse(module.affected("guidance", ["server/package.json"]))

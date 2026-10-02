@@ -78,6 +78,8 @@ The test command is `python -m unittest discover -s tests -v`. A spec or manual 
 
 Documentation, contract, and operations findings must have a deterministic reproduction with the same fail-then-pass bar. They do not need a unit test when a unit test cannot state the miss.
 
+A change only under `/docs` is not code. It runs no CI commands and needs no test first.
+
 ## Being wrong
 
 Correct it in a sentence, say what the correct thing is, and carry on. Consider an automated check so the same error cannot happen again.

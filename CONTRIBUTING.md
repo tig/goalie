@@ -12,9 +12,10 @@ A path outside the folder is an input of that component.
 The workflow starts on every pull request so its check can report.
 The component's commands run only when its inputs changed.
 You must not let one component's commands run on another component's change.
+A change only under `docs/` is not code. It runs no CI commands and needs no test first.
 
 - `server/` runs [`.github/workflows/server.yml`](.github/workflows/server.yml). Commands: `npm ci --prefix server`, `npm run lint --prefix server`, `npm run typecheck --prefix server`, and `python -m unittest discover -s server/tests -v`.
-- `tests/` runs [`.github/workflows/tests.yml`](.github/workflows/tests.yml). Command: `python -m unittest discover -s tests -v`. This suite is shared tests and shared test infrastructure. `SPEC.md`, `USERS_MANUAL.md`, and `docs/` are inputs.
+- `tests/` runs [`.github/workflows/tests.yml`](.github/workflows/tests.yml). Command: `python -m unittest discover -s tests -v`. This suite is shared tests and shared test infrastructure. `SPEC.md` and `USERS_MANUAL.md` are inputs.
 - `guidance/` runs [`.github/workflows/guidance.yml`](.github/workflows/guidance.yml). Commands: `python -m unittest discover -s guidance/tests -v` and `python .github/scripts/agent_forms.py check`. `AGENTS.md` and `.github/scripts/agent_forms.py` are inputs.
 
 Server code is TypeScript in `server/src/`, on Node.js 24 or newer.
@@ -44,7 +45,6 @@ You must not invent another command for a component.
 
 Architecture decision records are [`docs/adr/`](docs/adr/README.md).
 A reversal amends that same record in the reversing pull request.
-A change under `docs/` runs the tests workflow.
 
 A behavior change and the SPEC.md change must land in the same pull request.
 The same rule is in [`guidance/agents.md`](guidance/agents.md).
