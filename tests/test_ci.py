@@ -191,6 +191,18 @@ class CiTenets(unittest.TestCase):
         self.assertNotIn("goalie.excaliwire.com", contributing)
         self.assertNotIn("129.212.164.158", contributing)
 
+    def test_required_checks_have_unique_names(self) -> None:
+        # The ruleset on main requires these contexts. The job name is the check name.
+        expected = {
+            "server": ["server / lint", "server / typecheck", "server / test"],
+            "tests": ["tests / test"],
+            "guidance": ["guidance / test"],
+        }
+        for workflow, names in expected.items():
+            text = (WORKFLOWS / f"{workflow}.yml").read_text(encoding="utf-8")
+            for name in names:
+                self.assertIn(f"name: {name}\n", text, workflow)
+
 
 def _if_before_run(text: str, command: str) -> str:
     lines = text.splitlines()

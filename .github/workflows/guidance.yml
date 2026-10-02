@@ -57,6 +57,7 @@ jobs:
           printf '%s\n' "$files" | python .github/scripts/ci_affected.py ${{ github.workflow }}
 
   test:
+    name: guidance / test
     needs: changes
     if: needs.changes.outputs.affected == 'true'
     runs-on: ubuntu-latest

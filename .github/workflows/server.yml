@@ -44,6 +44,7 @@ jobs:
           printf '%s\n' "$files" | python .github/scripts/ci_affected.py ${{ github.workflow }}
 
   lint:
+    name: server / lint
     needs: changes
     if: needs.changes.outputs.affected == 'true'
     runs-on: ubuntu-latest
@@ -58,6 +59,7 @@ jobs:
       - run: npm run lint --prefix server
 
   typecheck:
+    name: server / typecheck
     needs: changes
     if: needs.changes.outputs.affected == 'true'
     runs-on: ubuntu-latest
@@ -72,6 +74,7 @@ jobs:
       - run: npm run typecheck --prefix server
 
   test:
+    name: server / test
     needs: changes
     if: needs.changes.outputs.affected == 'true'
     runs-on: ubuntu-latest
