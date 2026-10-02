@@ -6,18 +6,8 @@ name: guidance
 
 on:
   pull_request:
-    paths:
-      - "guidance/**"
-      - "AGENTS.md"
-      - ".github/scripts/agent_forms.py"
-      - ".github/workflows/guidance.yml"
   push:
     branches: [main]
-    paths:
-      - "guidance/**"
-      - "AGENTS.md"
-      - ".github/scripts/agent_forms.py"
-      - ".github/workflows/guidance.yml"
   workflow_dispatch:
     inputs:
       force:
@@ -33,7 +23,42 @@ permissions:
   contents: write
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      affected: ${{ steps.affected.outputs.affected }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - id: affected
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "affected=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            range="${{ github.event.pull_request.base.sha }}...HEAD"
+          elif [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
+            echo "affected=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          else
+            range="${{ github.event.before }}...HEAD"
+          fi
+          if ! files="$(git diff --name-only "$range")"; then
+            echo "affected=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          printf '%s\n' "$files" | python .github/scripts/ci_affected.py ${{ github.workflow }}
+
   test:
+    needs: changes
+    if: needs.changes.outputs.affected == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -44,7 +69,8 @@ jobs:
 
   generate:
     # Fork pull requests get no secrets and no write token.
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+    needs: changes
+    if: needs.changes.outputs.affected == 'true' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -78,7 +104,8 @@ jobs:
       - run: python .github/scripts/agent_forms.py check
 
   check:
-    if: github.event_name == 'push'
+    needs: changes
+    if: needs.changes.outputs.affected == 'true' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -21,19 +21,20 @@ The command is `python -m unittest discover -s tests -v`.
 A component's own tests must not live there.
 This suite is the tests component.
 Its workflow is [`.github/workflows/tests.yml`](../.github/workflows/tests.yml).
-A server-only change must not run it.
-A guidance-only change must not run it.
+A server-only change must not run this suite.
+A guidance-only change must not run this suite.
 `SPEC.md` and `USERS_MANUAL.md` are inputs of this workflow.
 
 Server tests sit with the server, in `server/tests/`.
 Their command is `python -m unittest discover -s server/tests -v`.
+The server suite starts the process and reads `GET /health`.
 Their workflow is [`.github/workflows/server.yml`](../.github/workflows/server.yml).
-A change under `tests/` must not run that workflow.
+A change under `tests/` must not run the server commands.
 
 Guidance tests sit with guidance, in `guidance/tests/`.
 Their command is `python -m unittest discover -s guidance/tests -v`.
 Their workflow is [`.github/workflows/guidance.yml`](../.github/workflows/guidance.yml).
-A change under `tests/` must not run that workflow.
+A change under `tests/` must not run the guidance commands.
 
 ## Who fills what
 
