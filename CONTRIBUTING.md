@@ -12,7 +12,16 @@ A path outside the folder is an input of that component.
 The workflow starts on every pull request so its check can report.
 The component's commands run only when its inputs changed.
 You must not let one component's commands run on another component's change.
-A change only under `docs/` is not code. It runs no CI commands and needs no test first.
+main is the release branch.
+develop is the in-development branch and the primary branch.
+A pull request for in-development work targets develop.
+A release is a pull request from develop into main.
+develop runs the same workflows and does not require them to merge.
+The server publishes only from main.
+README.md and everything under docs/ are pure docs.
+They run no CI commands and need no test.
+Test-first does not apply to documentation or to configuration.
+SPEC.md and USERS_MANUAL.md stay inputs of the shared tests.
 
 - `server/` runs [`.github/workflows/server.yml`](.github/workflows/server.yml). Commands: `npm ci --prefix server`, `npm run lint --prefix server`, `npm run typecheck --prefix server`, and `python -m unittest discover -s server/tests -v`.
 - `tests/` runs [`.github/workflows/tests.yml`](.github/workflows/tests.yml). Command: `python -m unittest discover -s tests -v`. This suite is shared tests and shared test infrastructure. `SPEC.md` and `USERS_MANUAL.md` are inputs.
