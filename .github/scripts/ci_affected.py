@@ -22,7 +22,6 @@ COMPONENTS = {
         "tests/**",
         "SPEC.md",
         "USERS_MANUAL.md",
-        "docs/**",
         "CONTRIBUTING.md",
         ".github/workflows/server.yml",
         ".github/workflows/tests.yml",
