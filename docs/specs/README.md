@@ -86,7 +86,7 @@ The generator is [`wireframes/src/`](wireframes/src/). [`kit.py`](wireframes/src
 
 ```sh
 pip install playwright
-playwright install chromium
+python -m playwright install chromium
 python docs/specs/wireframes/src/build.py
 ```
 

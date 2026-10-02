@@ -4,7 +4,7 @@ Usage (from the repository root):
     python docs/specs/wireframes/src/build.py
 
 Needs Python 3.10+ and Playwright (`pip install playwright`, then
-`playwright install chromium`). Set CHROME_PATH to use an installed
+`python -m playwright install chromium`). Set CHROME_PATH to use an installed
 Chrome or Chromium instead of Playwright's bundled browser.
 Outputs go to docs/specs/wireframes/png/ and
 docs/specs/wireframes/goalie-wireframes.pdf.

@@ -33,7 +33,7 @@ body{margin:0;background:#fff;font-family:Inter,Helvetica,Arial,sans-serif;color
 .nav a{display:flex;justify-content:space-between;padding:4px 6px;border-radius:4px;color:#333;text-decoration:none}
 .nav a.on{background:#cfcfcf;font-weight:700}
 .nav a .c{background:#999;color:#fff;border-radius:8px;padding:0 6px;font-size:10px}
-.nav a.sub{padding-left:16px}
+.nav a.child{padding-left:16px}
 .main{flex:1;padding:14px 16px;min-width:0}
 h2{margin:0 0 4px;font-size:17px}
 .sub{color:#666;font-size:12px}
@@ -111,7 +111,7 @@ def nav(active):
         if it[0]=="h": out.append(f'<div class="h">{it[1]}</div>'); continue
         label,key,c=it
         cls="on" if key==active else ""
-        if key.startswith("u-"): cls+=" sub"
+        if key.startswith("u-"): cls+=" child"
         cnt=f'<span class="c">{c}</span>' if c else ""
         out.append(f'<a class="{cls}">{label}{cnt}</a>')
     out.append('</div>')
