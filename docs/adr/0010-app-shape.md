@@ -7,11 +7,11 @@
 ## Context
 
 [#21 (Stage 0.1: Architecture decision records)](https://github.com/tig/goalie/issues/21) requires the shape of the web-and-mobile app.
-[SPEC.md](../../SPEC.md) §1 says the app is available on the web and on mobile devices.
-[SPEC.md](../../SPEC.md) §1.2 says a human can open a view, open a goal, edit it, write the plan, and comment with no agent required.
-[SPEC.md](../../SPEC.md) §8.2 says a view is a screen a human opens, plus a saved definition of goals, columns, and sort.
+[SPEC.md](../specs/SPEC.md) §1 says the app is available on the web and on mobile devices.
+[SPEC.md](../specs/SPEC.md) §1.2 says a human can open a view, open a goal, edit it, write the plan, and comment with no agent required.
+[SPEC.md](../specs/SPEC.md) §8.2 says a view is a screen a human opens, plus a saved definition of goals, columns, and sort.
 A database view alone must not satisfy that requirement.
-The commit check stays on the server ([SPEC.md](../../SPEC.md) §8.1).
+The commit check stays on the server ([SPEC.md](../specs/SPEC.md) §8.1).
 
 ## Decision
 

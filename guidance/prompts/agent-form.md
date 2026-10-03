@@ -19,7 +19,7 @@ Rules for the agent form:
 3. Keep the engineering principles. Keep the exact names, and keep the order. The order carries meaning. Write one line per principle: `Name. Operative rule.`
 4. Keep each talking-to-Tig rule, each how-to-work rule, each approval rule, and each evidence rule. One line each. Do not merge two rules into one.
 5. Start with a `# AGENTS.md` heading. On the next line, state that the full text in `guidance/agents.md` is canonical and that this file must not be edited by hand. Then one line for scope.
-6. Refer to SPEC.md and USERS_MANUAL.md by those paths. Plain text. No Markdown links.
+6. Refer to docs/specs/SPEC.md and USERS_MANUAL.md by those paths. Plain text. No Markdown links.
 7. Plain Markdown text. No bold, no tables, no links, no horizontal rules, no em-dashes. Oxford commas. Active voice. Imperative or declarative, never hedged.
 8. Do not add rules, examples, or interpretation that the full text does not contain.
 9. Aim for about one third of the full text's length or less. Shorter wins when no rule is lost.

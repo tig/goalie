@@ -7,11 +7,11 @@
 ## Context
 
 [#21 (Stage 0.1: Architecture decision records)](https://github.com/tig/goalie/issues/21) requires the live-update transport and how a client resumes.
-[SPEC.md](../../SPEC.md) §6.6 says the event log is the change stream, the sequence only increases, and a client that reconnects resumes from the last sequence it received.
+[SPEC.md](../specs/SPEC.md) §6.6 says the event log is the change stream, the sequence only increases, and a client that reconnects resumes from the last sequence it received.
 It must then receive every later Event, so it misses nothing.
 Views and agents use that same stream.
-[SPEC.md](../../SPEC.md) §8.2 says a committed change appears in every open view within the configured time.
-[SPEC.md](../../SPEC.md) §12 sets that default to 1 second.
+[SPEC.md](../specs/SPEC.md) §8.2 says a committed change appears in every open view within the configured time.
+[SPEC.md](../specs/SPEC.md) §12 sets that default to 1 second.
 Presence is not an Event ([0009](0009-presence.md)).
 
 ## Decision

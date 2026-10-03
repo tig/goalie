@@ -8,7 +8,7 @@ It has been built and run at several companies. This repo formalizes it so it do
 
 ## What's here
 
-- **[SPEC.md](SPEC.md)**: the GOALIE specification (draft 0.1). It covers:
+- **[docs/specs/SPEC.md](docs/specs/SPEC.md)**: the GOALIE specification (draft 0.1). It covers:
   - principles and lexicon;
   - date types (Committed / Ambition / Fantasy) and the promotion rule;
   - severity vs. ranked priorities and starvation;
@@ -20,7 +20,7 @@ It has been built and run at several companies. This repo formalizes it so it do
   - requirements for an implementation.
 - **[USERS_MANUAL.md](USERS_MANUAL.md)**: the User's Manual template (v0.1). An adopting organization copies it and fills it in. People and agents both work from it, and SPEC §11 requires one for every deployment.
 - **[AGENTS.md](AGENTS.md)**: guidance for coding agents. Generated from [`guidance/agents.md`](guidance/agents.md). Edit the full text, not the generated file.
-- **[docs/specs/](docs/specs/README.md)**: low-fidelity UI wireframes for every key user action, in the web app, at phone width, and over MCP. Each frame cites the SPEC sections, ADRs, and issues it comes from. The index also lists the assumptions and open product questions, and says how to regenerate the frames.
+- **[docs/specs/](docs/specs/README.md)**: low-fidelity UI wireframes for every key user action, in the web app, at phone width, and over MCP. They sit beside the product contract. Each frame cites the SPEC sections, ADRs, and issues it comes from. The index also lists the assumptions and open product questions, and says how to regenerate the frames.
 - **[CONTRIBUTING.md](CONTRIBUTING.md)**: where code, tests, and architecture decision records go, and the commands a seat runs.
 
 ## Status

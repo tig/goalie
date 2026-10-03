@@ -2,15 +2,15 @@
 
 Guidance for AI coding agents in this repo. This file is canonical. Agents load the generated form, `AGENTS.md`. Edit this file. Do not edit `AGENTS.md` by hand.
 
-There are no role briefs here. Do not go looking for `agent-harness/briefs/`. Seats and the harness belong to Mike (`tig/mike`), and this repo is not enabled on Mike yet. The state of the work lives in the issues. At session start, read `AGENTS.md` and nothing else. Read `SPEC.md` when the issue touches the product. Read `USERS_MANUAL.md` when the issue touches the manual.
+There are no role briefs here. Do not go looking for `agent-harness/briefs/`. Seats and the harness belong to Mike (`tig/mike`), and this repo is not enabled on Mike yet. The state of the work lives in the issues. At session start, read `AGENTS.md` and nothing else. Read `docs/specs/SPEC.md` when the issue touches the product. Read `USERS_MANUAL.md` when the issue touches the manual.
 
 The folder is the component. `server/`, `tests/`, and `guidance/` each have a workflow of that name. A change in one component must not run another component's CI. Each workflow starts on every pull request so its check can report. Its commands run only when that component's inputs changed. A component's tests sit with its code. Root `tests/` is only for shared tests and shared test infrastructure. Commands are in CONTRIBUTING.md. Do not invent a different setup step.
 
-**Every byte of `AGENTS.md` is paid by every seat on every run.** Behavior and the operating model live there. Everything else lives in the file that governs it, and you load that file when the issue names it: `SPEC.md` is the product contract, and `USERS_MANUAL.md` is the manual template. There is no nested `AGENTS.md`.
+**Every byte of `AGENTS.md` is paid by every seat on every run.** Behavior and the operating model live there. Everything else lives in the file that governs it, and you load that file when the issue names it: `docs/specs/SPEC.md` is the product contract, and `USERS_MANUAL.md` is the manual template. There is no nested `AGENTS.md`.
 
 **Writing mode:** Technical literature (STE bias). Short sentences, stable terms, **must** / **must not**, no em-dashes. One line per paragraph and per list item. Do not hard-wrap. Never reformat a file you are not changing. This repo has no formatter. When one arrives, use only that, and never point it at a directory.
 
-`SPEC.md` is the source of truth. If a change shows the spec is wrong, fix `SPEC.md` in the same change. Do not let the spec and the product drift apart.
+`docs/specs/SPEC.md` is the source of truth. If a change shows the spec is wrong, fix `docs/specs/SPEC.md` in the same change. Do not let the spec and the product drift apart.
 
 # Engineering principles (not a checklist)
 
@@ -43,17 +43,26 @@ Tig holds dozens of workstreams and cannot cache your context.
 - **Lead with the bad news.** If it did not work, say so before the parts that went well. A caveat at the end is a caveat that was not read.
 - **Give a recommendation, not a menu.** Three options with no view is work handed back. If you genuinely cannot choose, say which way you lean and what would settle it.
 - **Say what is waiting on Tig, in order, separated from what is not.** Decisions only Tig can make come first, one line each, with your recommendation. Then merges, in the order they should happen. Then what you will do next without being asked.
-- **Use the words in `SPEC.md` section 4 (Concepts and lexicon) and in `USERS_MANUAL.md`.** Inventing a synonym costs a translation on every future message.
+- **Use the words in `docs/specs/SPEC.md` section 4 (Concepts and lexicon) and in `USERS_MANUAL.md`.** Inventing a synonym costs a translation on every future message.
 - **Do not open by restating Tig's request.** Do not close by asking whether that was helpful.
 
 ## How to work
 
 - **Never idle.** If a run is going, do offline work while it runs. If you are blocked, say so in one line, then pick a different unblocked item.
 - **Do not stop to ask permission for the obvious.** Make routine calls yourself and tell Tig what you assumed.
-- **Before calling something a judgment call, name the datum that would decide it.** If the repo already holds that datum, make the fix. A goal's date type follows `SPEC.md` section 5. Do not pick a synonym.
-- **Look up the name before you write it.** If there is a `/docs/lexicon.md`, use it. Otherwise, `SPEC.md` section 4 says what a term means. `SPEC.md` section 6 is the data model. Do not use synonyms.
+- **Before calling something a judgment call, name the datum that would decide it.** If the repo already holds that datum, make the fix. A goal's date type follows `docs/specs/SPEC.md` section 5. Do not pick a synonym.
+- **Look up the name before you write it.** If there is a `/docs/lexicon.md`, use it. Otherwise, `docs/specs/SPEC.md` section 4 says what a term means. `docs/specs/SPEC.md` section 6 is the data model. Do not use synonyms.
 - **Start every issue or pull request comment with `[Name]` and a space, when Tig has named the session.** This repo has no `seat:` labels. Do not invent them.
-- **Open the pull request early, as a draft.**
+- **Open the pull request early, as a draft, against develop.**
+- A seat must pick up only an issue or a pull request assigned to the GitHub user named by harness-gh-user.
+- harness-gh-user is config outside this repo.
+- When harness-gh-user is empty, a seat must pick up nothing.
+- main is the release branch.
+- develop is the in-development branch and the primary branch.
+- A pull request for in-development work targets develop.
+- A release is a pull request from develop into main.
+- develop runs the same workflows and does not require them to merge.
+- The server publishes only from main.
 - **Learnings go on the issue**, not only in the pull request body. A merged pull request buries them.
 - **Merge, never rebase, on a shared branch.** Another session may have branched from it.
 
@@ -61,7 +70,7 @@ Tig holds dozens of workstreams and cannot cache your context.
 
 - Merging. You open and you recommend; Tig merges.
 - Anything outward-facing or hard to reverse.
-- A new term. If `/docs/lexicon.md` or `SPEC.md` does not already name it, steer Tig to pick the word. It lands in `/docs/lexicon.md` or `SPEC.md` in the same change.
+- A new term. If `/docs/lexicon.md` or `docs/specs/SPEC.md` does not already name it, steer Tig to pick the word. It lands in `/docs/lexicon.md` or `docs/specs/SPEC.md` in the same change.
 
 Approval for one thing is not approval for the next one.
 
@@ -72,11 +81,19 @@ Approval for one thing is not approval for the next one.
 
 ### Test-first
 
-Before you change automatable behavior, you must have a test that fails on the current code. You must run that test and see it fail. Then you change the code. The same test must pass on the new code. A bug is not fixed until both are true: fail with the old code, pass with the new.
+Test-first applies to code that changes automatable behavior.
+Before you change that code, you must have a test that fails on the current code.
+You must run that test and see it fail.
+Then you change the code.
+The same test must pass on the new code.
+A bug is not fixed until both are true: fail with the old code, pass with the new.
 
-The test command is `python -m unittest discover -s tests -v`. A spec or manual change must have a deterministic reading: the old text fails the claim, and the new text passes it.
-
-Documentation, contract, and operations findings must have a deterministic reproduction with the same fail-then-pass bar. They do not need a unit test when a unit test cannot state the miss.
+Test-first does not apply to documentation or to configuration.
+README.md and docs/ are pure docs, except docs/specs/SPEC.md.
+They run no CI commands and need no test.
+docs/specs/SPEC.md and USERS_MANUAL.md stay inputs of the shared tests.
+A change to either still runs that suite.
+The shared test command is `python -m unittest discover -s tests -v`.
 
 ## Being wrong
 

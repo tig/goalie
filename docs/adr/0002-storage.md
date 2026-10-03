@@ -7,10 +7,10 @@
 ## Context
 
 [#21 (Stage 0.1: Architecture decision records)](https://github.com/tig/goalie/issues/21) requires a store for the event log and for current state.
-[SPEC.md](../../SPEC.md) §6.6 is an append-only log with a sequence number that only increases.
-[SPEC.md](../../SPEC.md) §6 gives every writable entity a version, and a stale write is rejected.
-[SPEC.md](../../SPEC.md) §8.1 checks invariants on the committed result, on the server, in one transaction.
-[SPEC.md](../../SPEC.md) §13 requires a full export, because the organization owns its memory.
+[SPEC.md](../specs/SPEC.md) §6.6 is an append-only log with a sequence number that only increases.
+[SPEC.md](../specs/SPEC.md) §6 gives every writable entity a version, and a stale write is rejected.
+[SPEC.md](../specs/SPEC.md) §8.1 checks invariants on the committed result, on the server, in one transaction.
+[SPEC.md](../specs/SPEC.md) §13 requires a full export, because the organization owns its memory.
 [0006](0006-deployment-target.md) is self-hosted and names no hosted database.
 
 ## Decision
