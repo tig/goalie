@@ -40,6 +40,8 @@ You must not put a second server language here.
 `PORT` and `HOST` are process configuration.
 The default host is `127.0.0.1`.
 `GET /health` answers `ok`.
+`GET /` answers the home page as HTML. It is a placeholder that says `Goalie: coming soon`.
+The home page loads the shared Excaliwire chrome from `/_xw/`. Host configuration serves `/_xw/`.
 Host configuration lives in excaliwire/operations.
 This repo must not name the machine or the public hostname.
 `.github/scripts/deploy_server.sh` publishes the server when the host secrets are set.

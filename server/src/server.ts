@@ -1,10 +1,12 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { pathToFileURL } from "node:url";
+import { HOME_PAGE } from "./home.ts";
 
 /** The one Hono application. Domain routes are later issues. */
 export function createApp(): Hono {
   const app = new Hono();
+  app.get("/", (c) => c.html(HOME_PAGE));
   app.get("/health", (c) => c.text("ok"));
   return app;
 }

@@ -27,7 +27,7 @@ A guidance-only change must not run this suite.
 
 Server tests sit with the server, in `server/tests/`.
 Their command is `python -m unittest discover -s server/tests -v`.
-The server suite starts the process and reads `GET /health`.
+The server suite starts the process and reads `GET /health` and `GET /`.
 Their workflow is [`.github/workflows/server.yml`](../.github/workflows/server.yml).
 A change under `tests/` must not run the server commands.
 
