@@ -2,12 +2,12 @@ name: guidance
 
 # Regenerates the agent form from guidance/agents.md with the Cursor CLI when
 # the full text or the prompt changes, and commits it to the pull request
-# branch. On main it only checks. The paid file is AGENTS.md at the repo root.
+# branch. On a push to main or develop it only checks. The paid file is AGENTS.md at the repo root.
 
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, develop]
   workflow_dispatch:
     inputs:
       force:

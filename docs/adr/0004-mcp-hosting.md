@@ -7,9 +7,9 @@
 ## Context
 
 [#21 (Stage 0.1: Architecture decision records)](https://github.com/tig/goalie/issues/21) requires a decision on how the MCP server is hosted.
-[SPEC.md](../../SPEC.md) §13 requires an API complete enough for agents, ideally as an MCP server.
-[SPEC.md](../../SPEC.md) §1.1 says agents and humans follow the same rules.
-[SPEC.md](../../SPEC.md) §6.6 says agents subscribe to the same change stream as views.
+[SPEC.md](../specs/SPEC.md) §13 requires an API complete enough for agents, ideally as an MCP server.
+[SPEC.md](../specs/SPEC.md) §1.1 says agents and humans follow the same rules.
+[SPEC.md](../specs/SPEC.md) §6.6 says agents subscribe to the same change stream as views.
 The official MCP TypeScript SDK speaks Streamable HTTP.
 A Hono route can host that endpoint in the same process as the rest of the API.
 

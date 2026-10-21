@@ -1,11 +1,13 @@
 # Specs: UI wireframes
 
-These are low-fidelity wireframes for every key user action in GOALIE. They show what [SPEC.md](../../SPEC.md), [USERS_MANUAL.md](../../USERS_MANUAL.md), the [architecture decision records](../adr/README.md), and the epics under [#1 (Build GOALIE)](https://github.com/tig/goalie/issues/1) imply for the app's screens and the agent surface.
+The product contract is [SPEC.md](SPEC.md) in this directory.
 
-They are a design aid, not a contract. [SPEC.md](../../SPEC.md) stays the source of truth. Where a frame and the spec disagree, the spec wins. Fix the frame, or change the spec in the same pull request.
+These are low-fidelity wireframes for every key user action in GOALIE. They show what [SPEC.md](SPEC.md), [USERS_MANUAL.md](../../USERS_MANUAL.md), the [architecture decision records](../adr/README.md), and the epics under [#1 (Build GOALIE)](https://github.com/tig/goalie/issues/1) imply for the app's screens and the agent surface.
+
+They are a design aid, not a contract. [SPEC.md](SPEC.md) stays the source of truth. Where a frame and the spec disagree, the spec wins. Fix the frame, or change the spec in the same pull request.
 
 - **Platform.** One server-rendered web app whose pages also work at phone width, with no native app ([0010](../adr/0010-app-shape.md)). Agents work through the MCP server ([0004](../adr/0004-mcp-hosting.md)). Frames 01–24 are the desktop web app, 25 is phone width, and 26 is an agent session over MCP.
-- **Fidelity.** Grayscale boxes with real labels in GOALIE's lexicon ([SPEC.md §4](../../SPEC.md#s4)). Health is shown as solid black for RED, gray for YELLOW, and outlined for GREEN. The date type badge is solid for Committed, gray for Ambition, and dashed for Fantasy.
+- **Fidelity.** Grayscale boxes with real labels in GOALIE's lexicon ([SPEC.md §4](SPEC.md#s4)). Health is shown as solid black for RED, gray for YELLOW, and outlined for GREEN. The date type badge is solid for Committed, gray for Ambition, and dashed for Fantasy.
 - **Annotations.** Each frame has numbered pins. The column on the right explains each pin, names the product tenet it applies, and asks any open question.
 - **Walkthrough.** [wireframes/walkthrough.md](wireframes/walkthrough.md) has every frame in order, with a one-line caption each, after the key action list, the tenets, the assumptions, and the open questions.
 
@@ -240,7 +242,7 @@ Each of these is marked *assumed* on its frame.
 - **Assumed: action items need an owner and a date (18).** The repo calls this a norm. The frame enforces it.
 - **Assumed: pre-filled reasons in period reset (20).** Each close still carries its own editable reason.
 - **Assumed: a marker on dates when a custom view hides the date type column (21).**
-- **Assumed: navigation.** The left nav's order, the favorites list, and the reviews section are a layout choice. The views themselves are the [SPEC.md §8.2](../../SPEC.md#s8-2) standard views.
+- **Assumed: navigation.** The left nav's order, the favorites list, and the reviews section are a layout choice. The views themselves are the [SPEC.md §8.2](SPEC.md#s8-2) standard views.
 - **Assumed: sample data.** Goal ids, org units (Factory, Product, Operations), a second human ("Pat"), and agent names are illustrative. [0005](../adr/0005-auth-and-identity.md) says the first deployment has one human actor.
 
 ## Open product questions

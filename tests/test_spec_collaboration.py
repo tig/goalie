@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class CollaborationSpec(unittest.TestCase):
     def setUp(self) -> None:
-        self.spec = (ROOT / "SPEC.md").read_text(encoding="utf-8")
+        self.spec = (ROOT / "docs" / "specs" / "SPEC.md").read_text(encoding="utf-8")
         self.manual = (ROOT / "USERS_MANUAL.md").read_text(encoding="utf-8")
 
     def test_claim_1_structured_fields_are_not_merged(self) -> None:

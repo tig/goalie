@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-SPEC = Path(__file__).resolve().parents[1] / "SPEC.md"
+SPEC = Path(__file__).resolve().parents[1] / "docs" / "specs" / "SPEC.md"
 
 _MARKS = ("(invariant", "invariant)", "invariant for")
 

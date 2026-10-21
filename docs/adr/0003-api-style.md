@@ -7,16 +7,16 @@
 ## Context
 
 [#21 (Stage 0.1: Architecture decision records)](https://github.com/tig/goalie/issues/21) requires an API style before routes exist.
-[SPEC.md](../../SPEC.md) §13 requires an API that can do every read and write a human can do.
-[SPEC.md](../../SPEC.md) §4 and [SPEC.md](../../SPEC.md) §6 name the entities.
-[SPEC.md](../../SPEC.md) §8.1 requires one validation path and one commit check.
-[SPEC.md](../../SPEC.md) §13 also requires webhooks so an agent can react without holding a connection.
+[SPEC.md](../specs/SPEC.md) §13 requires an API that can do every read and write a human can do.
+[SPEC.md](../specs/SPEC.md) §4 and [SPEC.md](../specs/SPEC.md) §6 name the entities.
+[SPEC.md](../specs/SPEC.md) §8.1 requires one validation path and one commit check.
+[SPEC.md](../specs/SPEC.md) §13 also requires webhooks so an agent can react without holding a connection.
 The model is a fixed set of entities, not a graph the client composes.
 
 ## Decision
 
 The API is JSON over HTTP.
-Resource names must use the terms in [SPEC.md](../../SPEC.md) §4 and [SPEC.md](../../SPEC.md) §6.
+Resource names must use the terms in [SPEC.md](../specs/SPEC.md) §4 and [SPEC.md](../specs/SPEC.md) §6.
 Every write goes through one TypeScript validation path and the single-transaction commit check ([0002](0002-storage.md)).
 A structured-field write must name the version it read.
 A stale structured-field write is rejected and the response returns the current state.

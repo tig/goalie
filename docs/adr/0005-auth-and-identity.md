@@ -7,10 +7,10 @@
 ## Context
 
 [#21 (Stage 0.1: Architecture decision records)](https://github.com/tig/goalie/issues/21) requires auth and identity for human and agent actors.
-[SPEC.md](../../SPEC.md) §6.4 defines an actor as `human` or `agent`, and an agent has an `operator` who is a human.
-Only a human can own a goal or an org unit ([SPEC.md](../../SPEC.md) §3 and [SPEC.md](../../SPEC.md) §6.4).
-Every change is attributed to an actor ([SPEC.md](../../SPEC.md) §6.6).
-[SPEC.md](../../SPEC.md) §13 requires actor identity that tells humans and agents apart.
+[SPEC.md](../specs/SPEC.md) §6.4 defines an actor as `human` or `agent`, and an agent has an `operator` who is a human.
+Only a human can own a goal or an org unit ([SPEC.md](../specs/SPEC.md) §3 and [SPEC.md](../specs/SPEC.md) §6.4).
+Every change is attributed to an actor ([SPEC.md](../specs/SPEC.md) §6.6).
+[SPEC.md](../specs/SPEC.md) §13 requires actor identity that tells humans and agents apart.
 The first deployment is for Excaliwire, Inc.
 That company already signs humans and agents in with Entra ID.
 [#43 (Entra ID sign-in)](https://github.com/excaliwire/operations/issues/43) puts the host behind oauth2-proxy as Caddy `forward_auth`.

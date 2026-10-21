@@ -1,6 +1,6 @@
 # GOALIE User's Manual
 
-> **Template, v0.1.** An organization adopting GOALIE copies this manual, fills in the parts marked `‹…›`, and keeps it current. It is the written definition of GOALIE for that organization. People and agents both work from it. The rules behind it are in [SPEC.md](SPEC.md).
+> **Template, v0.1.** An organization adopting GOALIE copies this manual, fills in the parts marked `‹…›`, and keeps it current. It is the written definition of GOALIE for that organization. People and agents both work from it. The rules behind it are in [SPEC.md](docs/specs/SPEC.md).
 
 | | |
 |---|---|

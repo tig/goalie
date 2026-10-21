@@ -11,6 +11,8 @@ import os
 import sys
 
 # Paths outside the component folder are inputs. Keep this list in order.
+# README.md and docs/ are pure docs, except docs/specs/SPEC.md.
+# No other docs/ path belongs in these lists.
 COMPONENTS = {
     "server": [
         "server/**",
@@ -20,7 +22,7 @@ COMPONENTS = {
     ],
     "tests": [
         "tests/**",
-        "SPEC.md",
+        "docs/specs/SPEC.md",
         "USERS_MANUAL.md",
         "CONTRIBUTING.md",
         ".github/workflows/server.yml",
