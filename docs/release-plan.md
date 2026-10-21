@@ -35,7 +35,7 @@ How GOALIE works is [SPEC.md §3](specs/SPEC.md#s3).
 3. **Prove it at a real organization.** Excaliwire runs on GOALIE. The product and the spec change from what we learn.
 4. **Make it anyone's.** An organization sets GOALIE up from the docs alone, with its own logo, colors, and configured names.
 
-Below the cut line, starved on purpose: scorecards and reports, a separate work tracker, a mobile app, integrations beyond GitHub.
+Below the cut line, starved on purpose: reports beyond the standard views in [SPEC.md §8.2](specs/SPEC.md#s8-2), a separate work tracker, a mobile app, integrations beyond GitHub.
 In v1, work items live on the goal page.
 
 ## 4. People
@@ -92,7 +92,7 @@ The MLP is a prototype built from the [v1 designs](https://claude.ai/artifact/KL
 **Epic 3: Agents draft health.**
 
 - As an agent, I read the GitHub issues behind a goal, for example factory #361 and #172, and propose a health Draft with the evidence ([§6.9](specs/SPEC.md#s6-9), [§10](specs/SPEC.md#s10)).
-- As the owner, I approve or reject the Draft. Nothing changes until I do.
+- As a human, I approve or reject the Draft. Nothing changes until I do.
 - Agents must have read access to the Excaliwire repos.
 
 Not in the MLP: the weekly review inside GOALIE, a separate work tracker, mobile, rollups.
