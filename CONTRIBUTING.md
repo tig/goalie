@@ -44,10 +44,12 @@ Unset means no issuer, so every token is refused.
 The Excaliwire deployment sets `[{"issuer": "https://login.microsoftonline.com/8136e28b-aee3-4d34-ab49-c0da1a468e3a/v2.0", "audience": "<the GOALIE app id>"}]`. Keys come from the issuer's discovery document.
 Tests do not need Entra. `server/tests/sign_token.mjs` signs tokens with a fresh key, and the test sets a test issuer with that key inline in `jwks`.
 Every token is still verified: RS256 signature, issuer, audience, and expiry.
-`node src/cli.ts` is a local tool against the `GOALIE_DB` file: `write --as <actor>`, `read <kind> <id>`, `events [after]`, `seed`, and `whoami`. It is not reachable over HTTP.
+`node src/cli.ts` is a local tool against the `GOALIE_DB` file: `write --as <actor>`, `read <kind> <id>`, `events [after]`, `seed`, `whoami`, and `home`. It is not reachable over HTTP.
 The default host is `127.0.0.1`.
 `GET /health` answers `ok`.
-`GET /` answers the home page as HTML. It is a placeholder that says `Goalie: coming soon`.
+`GET /` answers the Priorities view as HTML for a signed-in actor. Without a verified token it answers 401 with a page that asks to sign in.
+`GOALIE_ORG_UNIT` names the org unit whose Priorities open on Home. The default is `excaliwire`.
+`node src/cli.ts home` prints that page for a local actor, so a design can be checked with no token.
 The home page loads the shared Excaliwire chrome from `/_xw/`. Host configuration serves `/_xw/`.
 Host configuration lives in excaliwire/operations.
 This repo must not name the machine or the public hostname.

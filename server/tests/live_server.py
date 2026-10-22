@@ -41,10 +41,13 @@ def read_stderr(proc: subprocess.Popen[bytes]) -> str:
 
 
 @contextmanager
-def running_server(database: Path | None = None) -> Iterator[tuple[subprocess.Popen[bytes], int]]:
+def running_server(
+    database: Path | None = None, extra_env: dict[str, str] | None = None
+) -> Iterator[tuple[subprocess.Popen[bytes], int]]:
     """Yield the process and its port. Stop the process on exit. The database defaults to a temporary file."""
     port = free_port()
     env = os.environ.copy()
+    env.update(extra_env or {})
     env["PORT"] = str(port)
     env["HOST"] = "127.0.0.1"
     scratch = tempfile.TemporaryDirectory()
@@ -69,7 +72,7 @@ def running_server(database: Path | None = None) -> Iterator[tuple[subprocess.Po
         scratch.cleanup()
 
 
-def get(proc: subprocess.Popen[bytes], port: int, path: str) -> Reply:
+def get(proc: subprocess.Popen[bytes], port: int, path: str, headers: dict[str, str] | None = None) -> Reply:
     """GET path. Retry until the server listens. Raise AssertionError on failure."""
     last_error = ""
     for _ in range(50):
@@ -77,7 +80,8 @@ def get(proc: subprocess.Popen[bytes], port: int, path: str) -> Reply:
             err = read_stderr(proc)
             raise AssertionError(f"process exited {proc.returncode}\n{err}")
         try:
-            with urllib.request.urlopen(f"http://127.0.0.1:{port}{path}", timeout=0.2) as response:
+            request = urllib.request.Request(f"http://127.0.0.1:{port}{path}", headers=headers or {})
+            with urllib.request.urlopen(request, timeout=2) as response:
                 return Reply(response.status, response.headers.get("Content-Type", ""), response.read())
         except urllib.error.HTTPError as error:
             return Reply(error.code, error.headers.get("Content-Type", ""), error.read())

@@ -1,14 +1,22 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
+import type { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
-import { configuredDatabase } from "./config.ts";
-import { HOME_PAGE } from "./home.ts";
+import { configuredIssuers, resolveActor, type Issuer } from "./auth.ts";
+import { configuredDatabase, configuredOrgUnit } from "./config.ts";
+import { homePage, signInPage } from "./home.ts";
+import { prioritiesView } from "./priorities.ts";
 import { openStore } from "./store.ts";
 
-/** The one Hono application. Domain routes are later issues. */
-export function createApp(): Hono {
+/** The one Hono application. GET / is the Priorities view. No request is anonymous (ADR 0005). */
+export function createApp(db: DatabaseSync, issuers: Issuer[]): Hono {
   const app = new Hono();
-  app.get("/", (c) => c.html(HOME_PAGE));
+  app.get("/", async (c) => {
+    const who = await resolveActor(db, c.req.header(), issuers);
+    if (!who.ok) return c.html(signInPage(), 401);
+    const actor = { id: who.actor.id as string, name: who.actor.display_name as string };
+    return c.html(homePage(prioritiesView(db, configuredOrgUnit()), actor));
+  });
   app.get("/health", (c) => c.text("ok"));
   return app;
 }
@@ -37,6 +45,5 @@ function startedAsMain(): boolean {
 }
 
 if (startedAsMain()) {
-  openStore(configuredDatabase());
-  listen(createApp(), configuredPort(), process.env.HOST);
+  listen(createApp(openStore(configuredDatabase()), configuredIssuers()), configuredPort(), process.env.HOST);
 }

@@ -28,6 +28,15 @@ const placeholderPtg = (trigger?: string): Row => ({
 
 const PLACEHOLDER_PLAN = "Placeholder: Tig links the plan";
 
+/** Excaliwire's Priorities for 2026-Q4. Placeholder: the order is the v1 canvas Home board's. Tig ranks them. */
+const priority = (id: string, rank: number, title: string, cutLine = false): Command => ({
+  op: "create",
+  kind: "priority",
+  id,
+  reason: `${REASON}. Placeholder: Tig ranks the Priorities.`,
+  fields: { org_unit: "excaliwire", period: "2026-Q4", rank, title, status: "Current", ...(cutLine ? { cut_line: "true" } : {}) },
+});
+
 const subGoal = (id: string, summary: string, plan: string, state = "Backlog"): Command => ({
   op: "create",
   kind: "goal",
@@ -53,12 +62,16 @@ const COMMANDS: Command[] = [
   { op: "create", kind: "actor", id: "tig", reason: REASON, fields: { kind: "human", display_name: "Tig" } },
   { op: "create", kind: "owner_settings", id: "owner", reason: REASON, fields: { owner: "tig", settings: {} } },
   { op: "create", kind: "org_unit", id: "excaliwire", reason: REASON, fields: { name: "Excaliwire", level: "Company", owner: "tig" } },
+  priority("PRI-1", 1, "Regenerate the E28 canon"),
+  priority("PRI-2", 2, "Grow the XW team"),
+  priority("PRI-3", 3, "Run Excaliwire on GOALIE", true),
   {
     op: "create",
     kind: "goal",
     id: "XW-0001",
     reason: REASON,
     fields: goal({
+      priority: "PRI-1",
       summary: "Regenerate the E28 canon by Oct 1",
       owner: "tig",
       type: "Milestone (Launch)",
@@ -77,6 +90,7 @@ const COMMANDS: Command[] = [
     id: "XW-0002",
     reason: REASON,
     fields: goal({
+      priority: "PRI-2",
       summary: "Add two more humans to XW by Nov 15",
       owner: "tig",
       type: "Milestone (Launch)",
@@ -119,6 +133,7 @@ const COMMANDS: Command[] = [
     id: "XW-0003",
     reason: REASON,
     fields: goal({
+      priority: "PRI-3",
       summary: "Tig, Chelsea, and agents use GOALIE to drive Excaliwire execution",
       owner: "chelsea",
       type: "Milestone (Launch)",

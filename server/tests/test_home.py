@@ -1,4 +1,4 @@
-"""GET / answers an HTML home page that loads the shared chrome."""
+"""GET / answers an HTML page that loads the shared chrome, even before sign-in."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ class HomeTests(unittest.TestCase):
             cls.reply = get(proc, port, "/")
 
     def test_home_is_html_with_a_body(self) -> None:
-        self.assertEqual(self.reply.status, 200)
+        self.assertEqual(self.reply.status, 401)
         self.assertTrue(self.reply.content_type.startswith("text/html"), self.reply.content_type)
         self.assertIn("charset=utf-8", self.reply.content_type.lower())
         self.assertTrue(self.reply.body.startswith(b"<!doctype html>"))
@@ -33,9 +33,9 @@ class HomeTests(unittest.TestCase):
         for tag in CHROME_TAGS:
             self.assertIn(tag, text)
 
-    def test_home_says_coming_soon(self) -> None:
+    def test_home_without_a_token_asks_to_sign_in(self) -> None:
         text = self.reply.body.decode("utf-8")
-        self.assertIn("<h1>Goalie: coming soon</h1>", text)
+        self.assertIn("<h1>Sign in to Goalie</h1>", text)
         self.assertIn("<title>Goalie</title>", text)
 
 

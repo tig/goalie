@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { configuredIssuers, resolveActor } from "./auth.ts";
-import { configuredDatabase } from "./config.ts";
+import { configuredDatabase, configuredOrgUnit } from "./config.ts";
+import { homePage } from "./home.ts";
+import { prioritiesView } from "./priorities.ts";
 import { openStore } from "./store.ts";
 import { seed } from "./seed.ts";
 import { checkStore, isKind, read, readEvents, write, type Command } from "./write.ts";
@@ -14,6 +16,7 @@ import { checkStore, isKind, read, readEvents, write, type Command } from "./wri
  *   seed                 load the Excaliwire seed into an empty store
  *   check                re-run every rule and lint; exit 2 if a rule is broken
  *   whoami               resolve the JSON request headers on stdin to one actor (ADR 0005)
+ *   home [--as <actor>]  print the Home page as {"html"}, drawn for that actor (default chelsea)
  */
 async function main(args: string[]): Promise<number> {
   const db = openStore(configuredDatabase());
@@ -50,6 +53,13 @@ async function main(args: string[]): Promise<number> {
       print(result);
       return result.ok ? 0 : 2;
     }
+    case "home": {
+      const id = rest[0] === "--as" && rest[1] ? rest[1] : "chelsea";
+      const actor = read(db, "actor", id);
+      if (!actor) return usage();
+      print({ html: homePage(prioritiesView(db, configuredOrgUnit()), { id, name: actor.display_name as string }) });
+      return 0;
+    }
     default:
       return usage();
   }
@@ -60,7 +70,7 @@ function print(value: unknown): void {
 }
 
 function usage(): number {
-  process.stderr.write("usage: cli.ts write --as <actor> | read <kind> <id> | events [after] | seed | check | whoami\n");
+  process.stderr.write("usage: cli.ts write --as <actor> | read <kind> <id> | events [after] | seed | check | whoami | home [--as <actor>]\n");
   return 64;
 }
 
