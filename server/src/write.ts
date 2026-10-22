@@ -185,10 +185,17 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
 
   const columns = ["version", ...spec.fields];
   const values = columns.map((c) => encode(kind, c, after[c]));
-  if (before === undefined) {
-    db.prepare(`INSERT INTO ${kind} (id, ${columns.join(", ")}) VALUES (?, ${columns.map(() => "?").join(", ")})`).run(id, ...values);
-  } else {
-    db.prepare(`UPDATE ${kind} SET ${columns.map((c) => `${c} = ?`).join(", ")} WHERE id = ?`).run(...values, id);
+  try {
+    if (before === undefined) {
+      db.prepare(`INSERT INTO ${kind} (id, ${columns.join(", ")}) VALUES (?, ${columns.map(() => "?").join(", ")})`).run(id, ...values);
+    } else {
+      db.prepare(`UPDATE ${kind} SET ${columns.map((c) => `${c} = ?`).join(", ")} WHERE id = ?`).run(...values, id);
+    }
+  } catch (error) {
+    // The schema holds the required fields and the enum values. Its refusal is a named rejection.
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/constraint failed/i.test(message)) throw error;
+    return { ok: false, error: "invalid", violations: [...violations, { rule: "field-value", message }] };
   }
   violations.push(...missingReferences(db, kind));
   violations.push(...checkWrite(lookup(db), kind, read(db, kind, id) as Row));

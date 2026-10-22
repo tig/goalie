@@ -119,7 +119,13 @@ export function checkWrite(store: Lookup, kind: string, row: Row): Violation[] {
     case "org_unit":
       return checkOrgUnit(store, row);
     case "actor":
-      return checkActor(store, row);
+      // A change of kind can break the rules of what the actor owns or operates.
+      return [
+        ...checkActor(store, row),
+        ...store.where("goal", "owner", row.id).flatMap((g) => checkWrite(store, "goal", g)),
+        ...store.where("org_unit", "owner", row.id).flatMap((u) => checkOrgUnit(store, u)),
+        ...store.where("actor", "operator", row.id).flatMap((a) => checkActor(store, a)),
+      ];
     case "priority":
       return checkPriority(store, row);
     default:

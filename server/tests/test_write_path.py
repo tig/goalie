@@ -131,6 +131,20 @@ class WritePathTests(unittest.TestCase):
         self.rejected(create("goal", "GOAL-42", {**EXAMPLE, "owner": "bot"}, "Planned"), "one-human-owner")
         self.rejected(create("org_unit", "team/bots", {"name": "Bots", "level": "Team", "owner": "bot"}), "one-human-owner")
 
+    def test_an_owner_cannot_become_an_agent(self) -> None:
+        self.ok(create("actor", "tig", {"kind": "human", "display_name": "Tig"}))
+        self.rejected(update("actor", JANE, 1, {"kind": "agent", "operator": "tig"}), "one-human-owner")
+        self.assertEqual(self.store.read("actor", JANE)["kind"], "human")
+
+    def test_an_operator_cannot_become_an_agent(self) -> None:
+        self.ok(create("actor", "tig", {"kind": "human", "display_name": "Tig"}))
+        self.ok(create("actor", "bot", {"kind": "agent", "display_name": "Bot", "operator": "tig"}))
+        self.rejected(update("actor", "tig", 1, {"kind": "agent", "operator": JANE}), "agent-operator")
+
+    def test_a_value_the_schema_rejects_is_a_named_rejection(self) -> None:
+        self.rejected(update("goal", "GOAL-57", 1, {"state": "Done"}, "Shipped"), "field-value")
+        self.rejected(create("goal", "GOAL-60", {"owner": JANE}, "Planned"), "field-value")
+
     def test_agent_names_a_human_operator(self) -> None:
         self.rejected(create("actor", "bot", {"kind": "agent", "display_name": "Bot"}), "agent-operator")
 
