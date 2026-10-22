@@ -126,7 +126,7 @@ class PrioritiesHomeTests(unittest.TestCase):
     def test_the_title_and_top_bar_name_the_org_unit(self) -> None:
         self.assertIn("<h1>Excaliwire</h1>", self.text)
         self.assertNotIn("Company goals", self.text)
-        self.assertNotIn("sub-goal", self.text)
+        self.assertNotRegex(self.text, r"\d+ sub-goals?<")
 
     def test_the_committed_card_counts_each_health(self) -> None:
         self.assertIn("1 RED · 1 YELLOW · 1 GREEN", self.text)

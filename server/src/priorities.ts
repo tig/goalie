@@ -1,13 +1,12 @@
 import type { DatabaseSync } from "node:sqlite";
+import { committedDate, currentDate, OPEN_STATES } from "./goal.ts";
+import { read, readAll } from "./read.ts";
 import type { Row } from "./rules.ts";
-import { read } from "./write.ts";
 
 /**
  * The Priorities view (SPEC.md §8.2), drawn as a timeline. Tig made it the default view on 2026-10-14.
  * This module reads the store and returns plain data. home.ts draws it.
  */
-
-const OPEN_STATES = ["Backlog", "In Progress"] as const;
 
 /**
  * The saved definition behind the screen. A stored view table is a later issue (#8, Epic 7).
@@ -117,27 +116,9 @@ function startedAll(db: DatabaseSync): Map<string, string> {
   return new Map(rows.map((r) => [r.entity as string, (r.moved ?? r.first) as string]));
 }
 
-/** Every goal but the Deleted, keyed by id, with JSON fields parsed. One query. */
-function goalsById(db: DatabaseSync): Map<string, Row> {
-  return new Map(
-    all(db, "SELECT * FROM goal WHERE state != 'Deleted' ORDER BY id").map((g) => {
-      if (typeof g.path_to_green === "string") g.path_to_green = JSON.parse(g.path_to_green);
-      return [g.id as string, g];
-    }),
-  );
-}
-
-/** The date health is judged against (SPEC.md §6.1): its own Committed date, else its Promotion Milestone's. */
-function committedDate(goals: Map<string, Row>, goal: Row): { date: string; kind: "Committed" | "Promotion Milestone" } | undefined {
-  if (goal.date_type === "Committed") return { date: (goal.changed_due_date ?? goal.due_date) as string, kind: "Committed" };
-  const milestone = typeof goal.promotion_milestone === "string" ? goals.get(goal.promotion_milestone) : undefined;
-  if (!milestone) return undefined;
-  return { date: (milestone.changed_due_date ?? milestone.due_date) as string, kind: "Promotion Milestone" };
-}
-
 /** A goal's own date and Date Type, to compare a sub-goal with its parent. */
 function ownDate(goal: Row): string {
-  return `${goal.date_type} ${goal.changed_due_date ?? goal.due_date}`;
+  return `${goal.date_type} ${currentDate(goal)}`;
 }
 
 function firstStep(ptg: unknown, names: Map<string, string>): PtgStep | undefined {
@@ -158,17 +139,19 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
   const org = { id: orgUnit, name: (unit?.name as string) ?? orgUnit, level: (unit?.level as string) ?? "" };
   const { select, sort } = PRIORITIES_VIEW;
 
-  const goals = goalsById(db);
+  // Load once and build from memory.
+  const goals = new Map(readAll(db, "goal").map((g) => [g.id as string, g]));
+  const getGoal = (id: string) => goals.get(id);
   const started = startedAll(db);
-  const names = new Map(all(db, "SELECT id, display_name FROM actor").map((a) => [a.id as string, a.display_name as string]));
+  const names = new Map(readAll(db, "actor").map((a) => [a.id as string, a.display_name as string]));
   const shown = (g: Row) => g.org_unit === org.id && g.level === org.level && (select.state as readonly unknown[]).includes(g.state);
   const childrenOf = new Map<string, Row[]>();
   for (const g of goals.values()) {
     if (typeof g.parent === "string" && shown(g)) childrenOf.set(g.parent, [...(childrenOf.get(g.parent) ?? []), g]);
   }
 
-  const priorities = all(db, "SELECT * FROM priority WHERE org_unit = ? AND status = 'Current'", orgUnit)
-    .filter((p) => isCurrentPeriod(p.period as string, todayIso))
+  const priorities = readAll(db, "priority")
+    .filter((p) => p.org_unit === orgUnit && p.status === "Current" && isCurrentPeriod(p.period as string, todayIso))
     .sort((a, b) => (a[sort] as number) - (b[sort] as number));
   const tops = priorities.map((p) =>
     [...goals.values()].filter((g) => g.priority === p.id && shown(g) && !(typeof g.parent === "string" && goals.get(g.parent)?.priority === p.id && shown(goals.get(g.parent) as Row))),
@@ -181,7 +164,7 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
     .flat()
     .flatMap(inView)
     .filter((g) => g.state === "In Progress")
-    .map((g) => committedDate(goals, g))
+    .map((g) => committedDate(g, getGoal))
     .filter((c): c is NonNullable<typeof c> => c !== undefined)
     .map((c) => day(c.date) - 3 * DAY);
   const from = Math.max(Math.min(today - 14 * DAY, ...passed), today - (WEEKS * 7 - AHEAD_DAYS) * DAY);
@@ -193,7 +176,7 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
   const lane = (goal: Row, drawDate: boolean): Lane => {
     const result: Lane = {};
     const begun = day(started.get(goal.id as string) ?? todayIso);
-    const committed = committedDate(goals, goal);
+    const committed = committedDate(goal, getGoal);
     const c = committed ? day(committed.date) : undefined;
     if (goal.state === "In Progress" && goal.health) result.health = { from: pos(begun), to: pos(Math.min(today, c ?? today)) };
     if (c !== undefined && committed) {
@@ -235,7 +218,7 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
     title: p.title as string,
     goals: tops[i].map((g) => goalRow(g, 0)),
   }));
-  const cut = priorities.findIndex((p) => p.cut_line != null && p.cut_line !== "" && p.cut_line !== "false");
+  const cut = priorities.findIndex((p) => p.cut_line === true);
   const funded = cut === -1 ? rows : rows.slice(0, cut + 1);
   const backlog = cut === -1 ? [] : rows.slice(cut + 1);
 
@@ -251,8 +234,8 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
   for (const goal of tops.flat().flatMap(inView)) {
     const milestone = typeof goal.promotion_milestone === "string" ? goals.get(goal.promotion_milestone) : undefined;
     if (!milestone || !(OPEN_STATES as readonly unknown[]).includes(milestone.state)) continue;
-    const date = (milestone.changed_due_date ?? milestone.due_date) as string;
-    if (day(date) < today || (nextPromotion && day(date) >= day(nextPromotion.date))) continue;
+    const date = currentDate(milestone);
+    if (date === undefined || day(date) < today || (nextPromotion && day(date) >= day(nextPromotion.date))) continue;
     nextPromotion = { milestone: milestone.id as string, date, days: Math.round((day(date) - today) / DAY), goal: goal.id as string, summary: goal.summary as string };
   }
 

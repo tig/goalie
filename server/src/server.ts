@@ -13,7 +13,7 @@ export function createApp(db: DatabaseSync, issuers: Issuer[]): Hono {
   const app = new Hono();
   app.get("/", async (c) => {
     const who = await resolveActor(db, c.req.header(), issuers);
-    if (!who.ok) return c.html(signInPage(), 401);
+    if (!who.ok) return c.html(signInPage(who.reason), 401);
     const actor = { id: who.actor.id as string, name: who.actor.display_name as string };
     return c.html(homePage(prioritiesView(db, configuredOrgUnit()), actor));
   });
