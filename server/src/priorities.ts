@@ -20,7 +20,10 @@ export const PRIORITIES_VIEW = {
 } as const;
 
 const DAY = 86_400_000;
-const WEEKS = 13;
+/** The weeks the board draws. The board scrolls sideways through them. */
+const WEEKS = 39;
+/** The weeks the board shows before it scrolls. Today must start inside them. */
+const VISIBLE_WEEKS = 13;
 /** Today stays at least this many days inside the right edge of the window. */
 const AHEAD_DAYS = 28;
 /** One press of Earlier or Later moves the window this many weeks. */
@@ -192,7 +195,7 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
     .map((g) => committedDate(g, getGoal))
     .filter((c): c is NonNullable<typeof c> => c !== undefined)
     .map((c) => day(c.date) - 3 * DAY);
-  const first = isDate(from) ? day(from) : Math.max(Math.min(today - 14 * DAY, ...passed), today - (WEEKS * 7 - AHEAD_DAYS) * DAY);
+  const first = isDate(from) ? day(from) : Math.max(Math.min(today - 14 * DAY, ...passed), today - (VISIBLE_WEEKS * 7 - AHEAD_DAYS) * DAY);
   const start = first - ((new Date(first).getUTCDay() + 6) % 7) * DAY;
   const end = start + WEEKS * 7 * DAY;
   const pos = (t: number) => (100 * (Math.min(Math.max(t, start), end) - start)) / (end - start);

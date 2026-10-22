@@ -78,17 +78,30 @@ function laneHtml(lane: Lane, goal: GoalRow): string {
 
 const CHEVRON = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5"/></svg>';
 
-function goalHtml(view: PrioritiesView, actor: Actor, goal: GoalRow, rank?: number): string {
+/** The x of the tree guide line that joins the goals at one level to their parent. */
+const railX = (level: number) => `${level * 26 + 13}px`;
+
+/**
+ * One goal row, then the goals under it.
+ * `rails` are the levels whose guide line passes this row on its way to a later sibling. `last` is true for the last goal under its parent.
+ * The guides are drawn inside the pinned left column, so they stay in place while the timeline scrolls.
+ */
+function goalHtml(view: PrioritiesView, actor: Actor, goal: GoalRow, rank?: number, rails: number[] = [], last = true): string {
   const filtering = Boolean(view.filter.health || view.filter.q);
   const kids = goal.children.length;
   const mark = goal.depth === 0 && rank !== undefined ? rankBadge(rank, goal.health) : healthDot(goal.health);
   const toggle = kids ? `<span class="chev"><span class="n">${kids}</span>${CHEVRON}</span>` : "";
-  const left = `<div class="left">${mark}<span class="title">${escape(goal.summary)}</span>${avatar({ id: goal.owner, name: goal.ownerName }, goal.owner === actor.id)}${toggle}</div>`;
+  const passing = rails.length
+    ? ` style="background-image:${rails.map(() => "linear-gradient(var(--cut),var(--cut))").join(",")};background-position:${rails.map((l) => `${railX(l)} 0`).join(",")}"`
+    : "";
+  const guide = goal.depth > 0 ? (last ? " tree" : " tree more") : "";
+  const left = `<div class="left${guide}"${passing}>${mark}<span class="title">${escape(goal.summary)}</span>${avatar({ id: goal.owner, name: goal.ownerName }, goal.owner === actor.id)}${toggle}</div>`;
   const when = goal.when.length ? `<div class="when">${goal.when.map(dateMark).join(" · ")}</div>` : "";
   const row = `<div class="row d${Math.min(goal.depth, 2)}${goal.match ? "" : " ctx"}" id="goal-${escape(goal.id)}" data-health="${goal.health ?? ""}" style="--depth:${goal.depth}">${left}${when}<div class="lane">${laneHtml(goal.lane, goal)}</div></div>`;
   if (!kids) return row;
-  const children = goal.children.map((c) => goalHtml(view, actor, c)).join("");
-  return `<details${goal.depth === 0 || filtering ? " open" : ""}><summary>${row}</summary><div class="kids" style="--pd:${goal.depth}">${children}</div></details>`;
+  const childRails = goal.depth > 0 && !last ? [...rails, goal.depth - 1] : rails;
+  const children = goal.children.map((c, i) => goalHtml(view, actor, c, undefined, childRails, i === kids - 1)).join("");
+  return `<details${goal.depth === 0 || filtering ? " open" : ""}><summary>${row}</summary><div class="kids">${children}</div></details>`;
 }
 
 function priorityHtml(view: PrioritiesView, actor: Actor, priority: PriorityRow): string {
@@ -156,12 +169,11 @@ ${item("slip", "Slip")}
 
 export function homePage(view: PrioritiesView, actor: Actor): string {
   const weeks = view.weeks.map((w) => `<span class="wk" style="left:${pct(w.at)}">${escape(w.label)}</span>`).join("");
-  const grid = view.weeks.map((w) => `<span class="gl" style="left:${pct(w.at)}"></span>`).join("");
   const filtering = Boolean(view.filter.health || view.filter.q);
   const backlog = view.backlog.length
     ? view.backlog.map((p) => priorityHtml(view, actor, p)).join("")
     : filtering ? "" : `<p class="empty">No Priorities below the cut line.</p>`;
-  const none = filtering && !view.funded.length && !view.backlog.length ? `<p class="empty none">No goals match.</p>` : "";
+  const none = filtering && !view.funded.length && !view.backlog.length ? `<p class="empty nomatch">No goals match.</p>` : "";
   return layout({
     actor,
     org: view.org.name,
@@ -170,11 +182,9 @@ ${cardsHtml(view)}
 <section class="card board">
 <div class="bhead"><h2>Priorities</h2>${rangeHtml(view)}</div>
 <div class="bsearch">${searchHtml(view)}</div>
-<div class="scroll"><div class="tl">
-<div class="axis"><div></div><div class="ticks"><span class="todaylbl" style="left:${pct(view.todayAt)}">Today</span>${weeks}</div></div>
+<div class="scroll"><div class="tl" style="--weeks:${view.weeks.length};--now:${view.todayAt.toFixed(2)}">
+<div class="axis"><div class="corner"></div><div class="ticks"><span class="todaylbl" style="left:${pct(view.todayAt)}">Today</span>${weeks}</div></div>
 <div class="tlbody">
-<div class="grid" aria-hidden="true">${grid}</div>
-<div class="nowline" aria-hidden="true"><span class="today" style="left:${pct(view.todayAt)}"></span></div>
 ${view.funded.map((p) => priorityHtml(view, actor, p)).join("\n")}${none}
 <div class="cut"><span>✂ Backlog</span></div>
 ${backlog}

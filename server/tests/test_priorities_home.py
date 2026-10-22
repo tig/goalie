@@ -34,7 +34,7 @@ def days_since(iso: str) -> int:
 
 
 def today_at(text: str) -> float:
-    found = re.search(r'class="today" style="left:([\d.]+)%"', text)
+    found = re.search(r'--now:([\d.]+)', text)
     assert found, "no today line"
     return float(found.group(1))
 
@@ -172,7 +172,8 @@ class PrioritiesHomeTests(unittest.TestCase):
         self.assertNotIn("XW-0001", visible)
 
     def test_the_grid_and_today_line_are_drawn_once_for_the_whole_board(self) -> None:
-        self.assertEqual(self.text.count('class="today"'), 1)
+        self.assertEqual(len(re.findall(r"--now:[\d.]+", self.text)), 1)
+        self.assertNotIn('class="gl"', self.text)
 
     def test_each_health_count_links_to_its_filter(self) -> None:
         for health in ("RED", "YELLOW", "GREEN"):
@@ -211,6 +212,12 @@ class PrioritiesHomeTests(unittest.TestCase):
 
     def test_moving_the_timeline_keeps_the_filter(self) -> None:
         self.assertRegex(self.red, r'href="/\?health=RED&amp;from=\d{4}-\d{2}-\d{2}"[^>]*aria-label="Earlier"')
+
+    def test_the_timeline_scrolls_with_the_goal_names_pinned(self) -> None:
+        weeks = re.findall(r'class="wk"', self.text)
+        self.assertGreaterEqual(len(weeks), 26)
+        self.assertRegex(self.text, r'class="tl" style="--weeks:\d+;')
+        self.assertIn(".row>.left,.axis>.corner{position:sticky;left:0", self.text)
 
     def test_the_page_feels_like_an_app(self) -> None:
         self.assertIn("body{cursor:default", self.text.replace(" ", ""))

@@ -40,7 +40,9 @@ The product contract is [SPEC.md](../specs/SPEC.md). The app shape is [ADR 0010]
 
 ## Timeline
 
-20. The board draws one grid and one today line for every row, so they never break between rows.
+20. The board draws one grid and one today line for every row, so they never break between rows. They are drawn as the background of each row, so the pinned column always covers them.
+20a. The timeline scrolls sideways through 39 weeks, about nine months. A week is 84 px. The goal names stay pinned on the left while it scrolls, with a soft shadow on their edge.
+20b. The board opens with today inside the first 13 weeks on screen.
 21. Earlier and Later move the timeline 4 weeks. Today goes back to the default window. They are links (`?from=`), so they need no browser script.
 22. Moving the timeline keeps the filter and the search in force.
 23. A date past the edge of the window is written at that edge with an arrow.
