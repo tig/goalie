@@ -165,7 +165,7 @@ Structured fields are state, date type, health, PTG, rank, and every other field
 
 | Field | Type | Required | Rules / meaning |
 |---|---|---|---|
-| `id` | Stable, human-readable key (e.g. `GOAL-123`) | auto | Never reused. Linkable by people, agents, and other systems. |
+| `id` | Stable, human-readable key (e.g. `GOAL-0123`) | auto | Never reused. Linkable by people, agents, and other systems. The prefix is the owner setting `goal_key_prefix` ([§12 (Configuration points)](#s12)), default `GOAL`. |
 | `version` | Integer | auto | The version of this goal ([§6 (Data model)](#s6)). A committed write advances it. |
 | `summary` | Short text | yes | Pithy and self-describing, with a verb (Increase, Launch, Reduce…). Lint: 5 words or more, or no verb. |
 | `description` | Long text (Markdown) | yes | Should cover: (a) key results; (b) the metrics used to track it and how often they are reviewed; (c) why it matters and what it contributes to (e.g. a theme in the operating plan); (d) who shares responsibility for delivering it (joint owners, not dependencies). Notes are added over time. Lint: any of (a)–(d) missing. Concurrent editing follows [§6.5 (Doc)](#s6-5). |
@@ -469,7 +469,6 @@ Settings are of two kinds. Owner settings belong to the deployment. User setting
 | Review set and cadence | [§9 (Reviews)](#s9) |
 | "Promotions due" window | 2 weeks |
 | Visibility policy | Organization-wide; logged exceptions |
-| Goal key prefix | `GOAL`, so keys read `GOAL-0001` |
 | Who can correct an Original Committed Date | GOALIE owner only, with reason (or no one) |
 | Lints enabled | All in [§6.1 (Goal)](#s6-1) |
 | Time for a committed change to reach every open view | 1 s |
