@@ -18,7 +18,7 @@ Status words: **blocks** stops the merge, **open** is a real problem with a clea
 | open | 0 |
 | decided | 1 |
 | Tig | 4 |
-| fixed | 51 |
+| fixed | 50 |
 
 The one-minute test (release plan §1), User as Tig: Q1 "Are we keeping our commitments?" yes, about 15 s. Q2 "What needs me?" no. Q3 "What is next?" partly, about 20 s, no owner names. The test fails. Round 2 runs it again.
 
