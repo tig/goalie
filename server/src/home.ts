@@ -168,7 +168,8 @@ export function homePage(view: PrioritiesView, actor: Actor): string {
     main: `<h1>${escape(view.org.name)}</h1>
 ${cardsHtml(view)}
 <section class="card board">
-<div class="bhead"><h2>Priorities</h2>${searchHtml(view)}${rangeHtml(view)}</div>
+<div class="bhead"><h2>Priorities</h2>${rangeHtml(view)}</div>
+<div class="bsearch">${searchHtml(view)}</div>
 <div class="scroll"><div class="tl">
 <div class="axis"><div></div><div class="ticks"><span class="todaylbl" style="left:${pct(view.todayAt)}">Today</span>${weeks}</div></div>
 <div class="tlbody">

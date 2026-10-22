@@ -47,8 +47,8 @@ The product contract is [SPEC.md](../specs/SPEC.md). The app shape is [ADR 0010]
 
 ## Filter and search
 
-24. The health counts on the Committed dates card are controls. Pointing at a count rings every goal with that health. Clicking it shows only those goals. Clicking it again, or **Show all**, shows every goal.
-25. The search box matches goal summaries. It is a GET form, so it needs no browser script.
+24. The health counts on the Committed dates card are controls. Pointing at a count rings every goal with that health. The ring must not hide the goal's bar, so a highlight never fills a row with the health color. Clicking it shows only those goals. Clicking it again, or **Show all**, shows every goal.
+25. The search box sits right below the Priorities heading, on its own line. It matches goal summaries. It is a GET form, so it needs no browser script.
 26. A filter keeps the parents of a goal that matches, dimmed, so the goal keeps its place in the tree.
 27. A filter that matches nothing says "No goals match."
 
