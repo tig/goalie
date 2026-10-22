@@ -34,7 +34,7 @@ const priority = (id: string, rank: number, title: string, cutLine = false): Com
   kind: "priority",
   id,
   reason: `${REASON}. Placeholder: Tig ranks the Priorities.`,
-  fields: { org_unit: "excaliwire", period: "2026-Q4", rank, title, status: "Current", ...(cutLine ? { cut_line: "true" } : {}) },
+  fields: { org_unit: "excaliwire", period: "2026-Q4", rank, title, status: "Current", ...(cutLine ? { cut_line: true } : {}) },
 });
 
 const subGoal = (id: string, summary: string, plan: string, state = "Backlog"): Command => ({

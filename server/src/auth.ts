@@ -1,5 +1,6 @@
 import { createPublicKey, verify, type JsonWebKey, type KeyObject } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
+import { readActorByToken } from "./read.ts";
 import type { Row } from "./rules.ts";
 
 /**
@@ -117,10 +118,7 @@ export async function resolveActor(db: DatabaseSync, headers: Record<string, str
   const agent = claims.idtyp === "app";
   const id = agent ? (claims.azp ?? claims.appid) : claims.sub;
   if (typeof id !== "string") return { ok: false, reason: "the token names no subject" };
-  const column = agent ? "app_id" : "subject";
-  const actor = db.prepare(`SELECT * FROM actor WHERE ${column} = ? AND kind = ?`).get(id, agent ? "agent" : "human") as
-    | Row
-    | undefined;
+  const actor = readActorByToken(db, agent ? "agent" : "human", id);
   if (!actor) return { ok: false, reason: `no ${agent ? "agent" : "human"} actor for this token` };
   return { ok: true, actor };
 }

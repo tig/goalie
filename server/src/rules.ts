@@ -3,6 +3,8 @@
  * A rule returns violations. The write path rolls back when there is one.
  */
 
+import { currentDate, DATE_TYPES } from "./goal.ts";
+
 export type Row = Record<string, unknown>;
 
 /** A broken invariant. `rule` is a stable name a caller can match. */
@@ -14,8 +16,6 @@ export interface Lookup {
   where(kind: string, field: string, value: unknown): Row[];
 }
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
-const DATE_TYPES = ["Committed", "Ambition", "Fantasy"];
 
 /** Goal fields whose change needs a reason (SPEC.md §6.1, §8.1). */
 export const REASONED: Record<string, readonly string[]> = {
@@ -32,18 +32,13 @@ function isHuman(store: Lookup, id: unknown): boolean {
   return typeof id === "string" && store.get("actor", id)?.kind === "human";
 }
 
-/** The date a goal is judged against: the changed date after a slip, else the due date. */
-function currentDate(goal: Row): unknown {
-  return goal.changed_due_date ?? goal.due_date;
-}
-
 export function checkGoal(store: Lookup, goal: Row): Violation[] {
   const found: Violation[] = [];
   const add = (rule: string, message: string) => found.push({ rule, message });
   if (!isHuman(store, goal.owner)) {
     add("one-human-owner", `${goal.id}: the owner must be exactly one human actor.`);
   }
-  if (typeof goal.due_date !== "string" || !DATE.test(goal.due_date) || !DATE_TYPES.includes(goal.date_type as string)) {
+  if (typeof goal.due_date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(goal.due_date) || !(DATE_TYPES as readonly unknown[]).includes(goal.date_type)) {
     add("date-and-date-type", `${goal.id}: every goal has a date and a Date Type.`);
   }
   if (goal.date_type === "Committed") {
