@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS priority (
   rank INTEGER NOT NULL,
   title TEXT NOT NULL,
   description TEXT,
-  cut_line TEXT,
+  cut_line INTEGER CHECK (cut_line IN (0, 1)),
   status TEXT NOT NULL CHECK (status IN ('Current', 'Retired'))
 );
 CREATE TABLE IF NOT EXISTS doc (

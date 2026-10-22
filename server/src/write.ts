@@ -1,34 +1,14 @@
-import type { DatabaseSync, SQLInputValue } from "node:sqlite";
-import { checkTransition, checkWrite, REASONED, summaryLint, SYSTEM_FIELDS, type Lookup, type Row, type Violation } from "./rules.ts";
+import type { DatabaseSync } from "node:sqlite";
+import { ENTITIES, encode, isKind, lookup, memoryLookup, read, readAll, readEvents, type EventRow, type Kind } from "./read.ts";
+import { checkTransition, checkWrite, REASONED, summaryLint, SYSTEM_FIELDS, type Row, type Violation } from "./rules.ts";
 
 /**
  * The one write path. The API, the MCP server, the app, and the seed call write(). Nothing else writes.
  * A write appends its Events and updates the current row in one transaction, or does neither (ADR 0002).
  */
 
-/** The writable fields of each entity (SPEC.md §6). `json` fields hold structured values. */
-const ENTITIES = {
-  actor: { prefix: "ACTOR", fields: ["kind", "display_name", "operator", "email", "subject", "app_id"], json: [] },
-  org_unit: { prefix: "OU", fields: ["name", "level", "parent", "owner"], json: [] },
-  priority: { prefix: "PRI", fields: ["org_unit", "period", "rank", "title", "description", "cut_line", "status"], json: [] },
-  doc: { prefix: "DOC", fields: ["kind", "title", "body"], json: [] },
-  goal: {
-    prefix: "GOAL",
-    fields: [
-      "summary", "description", "owner", "org_unit", "level", "type", "due_date", "date_type",
-      "promotion_milestone", "plan", "committed_plan_version", "plan_maturity", "work_product",
-      "original_committed_date", "changed_due_date", "severity", "priority", "state", "health",
-      "path_to_green", "origination", "parent", "visibility",
-    ],
-    json: ["work_product", "path_to_green"],
-  },
-  work_item: { prefix: "WI", fields: ["goal", "title", "owner", "status", "due_date", "links"], json: ["links"] },
-  draft: { prefix: "DRAFT", fields: ["entity", "actor", "base_version", "change", "reason"], json: ["change"] },
-  owner_settings: { prefix: "OWNER", fields: ["owner", "settings"], json: ["settings"] },
-  user_settings: { prefix: "USER", fields: ["favorite_views", "appearance"], json: ["favorite_views"] },
-} as const satisfies Record<string, { prefix: string; fields: readonly string[]; json: readonly string[] }>;
-
-export type Kind = keyof typeof ENTITIES;
+/** Reads moved to read.ts. These names stay exported here until every caller imports read.ts. */
+export { isKind, read, readEvents, type EventRow, type Kind };
 
 /** Values a create fills when the command leaves them out (SPEC.md §6.1, §12). */
 const DEFAULTS: Partial<Record<Kind, Row>> = {
@@ -40,68 +20,11 @@ export type Command =
   | { op: "create"; kind: Kind; id?: string; fields: Row; reason?: string }
   | { op: "update"; kind: Kind; id: string; base_version: number; fields: Row; reason?: string };
 
-export type EventRow = {
-  sequence: number;
-  timestamp: string;
-  actor: string;
-  entity_kind: string;
-  entity: string;
-  field: string;
-  old: unknown;
-  new: unknown;
-  reason: string | null;
-};
-
 export type WriteResult =
   | { ok: true; entity: Row; events: EventRow[] }
   | { ok: false; error: "stale"; current: Row }
   | { ok: false; error: "invalid"; violations: Violation[] }
   | { ok: false; error: "unknown_actor" | "not_found" | "exists" | "bad_command"; message: string };
-
-export function isKind(kind: unknown): kind is Kind {
-  return typeof kind === "string" && Object.hasOwn(ENTITIES, kind);
-}
-
-function decode(kind: Kind, raw: Row | undefined): Row | undefined {
-  if (raw === undefined) return undefined;
-  const row: Row = { ...raw };
-  for (const field of ENTITIES[kind].json) {
-    if (typeof row[field] === "string") row[field] = JSON.parse(row[field] as string);
-  }
-  return row;
-}
-
-function encode(kind: Kind, field: string, value: unknown): SQLInputValue {
-  if (value === undefined || value === null) return null;
-  if ((ENTITIES[kind].json as readonly string[]).includes(field)) return JSON.stringify(value);
-  return value as SQLInputValue;
-}
-
-/** Read one entity's current row. */
-export function read(db: DatabaseSync, kind: Kind, id: string): Row | undefined {
-  return decode(kind, db.prepare(`SELECT * FROM ${kind} WHERE id = ?`).get(id) as Row | undefined);
-}
-
-/** Read Events with a sequence greater than `after`, in sequence order. */
-export function readEvents(db: DatabaseSync, after = 0): EventRow[] {
-  const rows = db.prepare("SELECT * FROM event WHERE sequence > ? ORDER BY sequence").all(after) as Row[];
-  return rows.map((row) => ({
-    ...row,
-    old: row.old == null ? null : JSON.parse(row.old as string),
-    new: row.new == null ? null : JSON.parse(row.new as string),
-  })) as EventRow[];
-}
-
-function lookup(db: DatabaseSync): Lookup {
-  return {
-    get: (kind, id) => (isKind(kind) ? read(db, kind, id) : undefined),
-    where: (kind, field, value) => {
-      if (!isKind(kind) || !(ENTITIES[kind].fields as readonly string[]).includes(field)) return [];
-      const rows = db.prepare(`SELECT * FROM ${kind} WHERE ${field} = ?`).all(value as SQLInputValue) as Row[];
-      return rows.map((row) => decode(kind, row) as Row);
-    },
-  };
-}
 
 function nextId(db: DatabaseSync, kind: Kind): string {
   const { n } = db.prepare(`SELECT COUNT(*) AS n FROM ${kind}`).get() as { n: number };
@@ -234,12 +157,10 @@ function bootstraps(db: DatabaseSync, actor: string, kind: Kind, id: string, fie
 
 /** Re-run every rule and lint over the whole store. Invalid records stay visible (SPEC.md §8.1). */
 export function checkStore(db: DatabaseSync): { goals: number; violations: Violation[]; lints: string[] } {
-  const store = lookup(db);
-  const all = (kind: Kind) => (db.prepare(`SELECT id FROM ${kind} ORDER BY id`).all() as { id: string }[]).map((r) => read(db, kind, r.id) as Row);
-  const goals = all("goal");
-  const violations = (["actor", "org_unit", "priority"] as const).flatMap((kind) => all(kind).flatMap((row) => checkWrite(store, kind, row)));
-  violations.push(...goals.flatMap((goal) => checkWrite(store, "goal", goal)));
+  const rows = { actor: readAll(db, "actor"), org_unit: readAll(db, "org_unit"), priority: readAll(db, "priority"), goal: readAll(db, "goal") };
+  const store = memoryLookup(rows);
+  const violations = (["actor", "org_unit", "priority", "goal"] as const).flatMap((kind) => rows[kind].flatMap((row) => checkWrite(store, kind, row)));
   const unique = [...new Map(violations.map((v) => [`${v.rule} ${v.message}`, v])).values()];
-  const lints = goals.map(summaryLint).filter((l): l is string => l !== undefined);
-  return { goals: goals.length, violations: unique, lints };
+  const lints = rows.goal.map(summaryLint).filter((l): l is string => l !== undefined);
+  return { goals: rows.goal.length, violations: unique, lints };
 }
