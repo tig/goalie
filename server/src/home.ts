@@ -4,11 +4,31 @@ import { shortDate, type GoalRow, type Lane, type PrioritiesView, type PriorityR
 /**
  * Pages built on the server (ADR 0010). No browser script beyond the shared chrome.
  * Each page is a pure function from view data to HTML, built from components.ts.
- * The look is the v1 canvas Home board. Detail that is not needed at a glance sits in a hover card.
+ * The look is the v1 canvas Home board. A goal's detail belongs on its goal page, not on Home.
  */
 
-/** SPEC.md §4. Shown on hover, not on the page. */
-const PROMOTION_MILESTONE = "A goal with a committed date, by which another goal's uncommitted date moves up one Date Type.";
+/** The card help. Words from SPEC.md §4, §5, §6.9. */
+const HELP = {
+  committed:
+    "How the goals on this list stand against their Committed dates. A Committed date is a promise, and health is judged against it. Point at a health to see its goals. Click it to show only those goals.",
+  drafts: "An agent's proposed change to a goal. It shows on the goal as soon as the agent makes it. It takes effect only when a human approves it.",
+  promotions:
+    "The next Promotion Milestone: a goal with a committed date, by which another goal's uncommitted date moves up one Date Type. Ambition moves to Committed, and Fantasy moves to Ambition.",
+};
+
+/** A link to Home that keeps the filter in force. `null` drops a value. */
+function homeUrl(view: PrioritiesView, change: { health?: string | null; q?: string | null; from?: string | null } = {}): string {
+  const values: [string, string | undefined | null][] = [
+    ["health", change.health === undefined ? view.filter.health : change.health],
+    ["q", change.q === undefined ? view.filter.q : change.q],
+    ["from", change.from],
+  ];
+  const query = values
+    .filter((pair): pair is [string, string] => typeof pair[1] === "string" && pair[1] !== "")
+    .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+    .join("&amp;");
+  return query ? `/?${query}` : "/";
+}
 
 const pct = (n: number) => `${n.toFixed(2)}%`;
 
@@ -58,29 +78,17 @@ function laneHtml(lane: Lane, goal: GoalRow): string {
 
 const CHEVRON = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5"/></svg>';
 
-/** The hover card: the goal's key, owner, health, dates, and first PTG step. */
-function goalTip(view: PrioritiesView, goal: GoalRow): string {
-  const lines = [
-    `<span class="tipkey">${escape(goal.id)}</span>`,
-    `<span>${escape(goal.ownerName)}</span>${goal.health ? ` · ${escape(goal.health)}` : ` · ${escape(goal.state)}`}`,
-    ...(goal.when.length ? [goal.when.map(dateMark).join(" · ")] : []),
-    ...(goal.ptg
-      ? [`<b>PTG</b> ${escape(goal.ptg.text)}${goal.ptg.ownerName ? ` · ${escape(goal.ptg.ownerName)}` : ""}${goal.ptg.date ? ` · ${dateMark(shortDate(goal.ptg.date, view.today))}` : ""}`]
-      : []),
-  ];
-  return tip(lines);
-}
-
 function goalHtml(view: PrioritiesView, actor: Actor, goal: GoalRow, rank?: number): string {
+  const filtering = Boolean(view.filter.health || view.filter.q);
   const kids = goal.children.length;
   const mark = goal.depth === 0 && rank !== undefined ? rankBadge(rank, goal.health) : healthDot(goal.health);
   const toggle = kids ? `<span class="chev"><span class="n">${kids}</span>${CHEVRON}</span>` : "";
-  const left = `<div class="left">${mark}<span class="title">${escape(goal.summary)}</span>${avatar({ id: goal.owner, name: goal.ownerName }, goal.owner === actor.id)}${toggle}${goalTip(view, goal)}</div>`;
+  const left = `<div class="left">${mark}<span class="title">${escape(goal.summary)}</span>${avatar({ id: goal.owner, name: goal.ownerName }, goal.owner === actor.id)}${toggle}</div>`;
   const when = goal.when.length ? `<div class="when">${goal.when.map(dateMark).join(" · ")}</div>` : "";
-  const row = `<div class="row d${Math.min(goal.depth, 2)}" id="goal-${escape(goal.id)}" data-health="${goal.health ?? ""}" style="--depth:${goal.depth}" tabindex="0">${left}${when}<div class="lane">${laneHtml(goal.lane, goal)}</div></div>`;
+  const row = `<div class="row d${Math.min(goal.depth, 2)}${goal.match ? "" : " ctx"}" id="goal-${escape(goal.id)}" data-health="${goal.health ?? ""}" style="--depth:${goal.depth}">${left}${when}<div class="lane">${laneHtml(goal.lane, goal)}</div></div>`;
   if (!kids) return row;
   const children = goal.children.map((c) => goalHtml(view, actor, c)).join("");
-  return `<details${goal.depth === 0 ? " open" : ""}><summary>${row}</summary><div class="kids" style="--pd:${goal.depth}">${children}</div></details>`;
+  return `<details${goal.depth === 0 || filtering ? " open" : ""}><summary>${row}</summary><div class="kids" style="--pd:${goal.depth}">${children}</div></details>`;
 }
 
 function priorityHtml(view: PrioritiesView, actor: Actor, priority: PriorityRow): string {
@@ -94,7 +102,10 @@ function cardsHtml(view: PrioritiesView): string {
   const { committed, drafts, nextPromotion } = view.summary;
   const meter = committed.healths.map((h) => `<span style="background:${look(h).bar}"></span>`).join("");
   const counts = (["RED", "YELLOW", "GREEN"] as const)
-    .map((h) => `<span class="count">${healthDot(h)}${committed.counts[h]} ${h}</span>`)
+    .map((h) => {
+      const on = view.filter.health === h;
+      return `<a class="count${on ? " on" : ""}" data-health="${h}" href="${homeUrl(view, { health: on ? null : h })}"${on ? ' aria-current="true"' : ""}>${healthDot(h)}${committed.counts[h]} ${h}</a>`;
+    })
     .join("");
   const slip = committed.slips[0];
   const slipLine = slip
@@ -105,20 +116,30 @@ function cardsHtml(view: PrioritiesView): string {
 <p class="note">${dateMark(shortDate(nextPromotion.date, view.today))} · ${escape(nextPromotion.summary)}</p>`
     : `<p class="note muted">No Promotion Milestone is due.</p>`;
   return `<section class="cards">
-${card("Committed dates", `<p class="counts">${counts}</p><div class="meter">${meter}</div>${slipLine}`)}
-${card("Drafts", `<p class="big">${drafts} <small>waiting on an owner</small></p>`, "An agent's Draft takes effect only when a human approves it.")}
-${card("Promotions due", promo, PROMOTION_MILESTONE)}
+${card("Committed dates", `<p class="counts">${counts}</p><div class="meter">${meter}</div>${slipLine}`, HELP.committed)}
+${card("Drafts", `<p class="big">${drafts} <small>waiting on an owner</small></p>`, HELP.drafts)}
+${card("Promotions due", promo, HELP.promotions)}
 </section>`;
 }
 
 function rangeHtml(view: PrioritiesView): string {
   const { first, last, earlier, later } = view.window;
   return `<nav class="range" aria-label="Timeline">
-<a class="navb" href="/?from=${earlier}" aria-label="Earlier">‹</a>
+<a class="navb" href="${homeUrl(view, { from: earlier })}" aria-label="Earlier">‹</a>
 <span class="rangelbl">${dateMark(shortDate(first, view.today))} – ${dateMark(shortDate(last, view.today))}</span>
-<a class="navb" href="/?from=${later}" aria-label="Later">›</a>
-<a class="btn" href="/">Today</a>
+<a class="navb" href="${homeUrl(view, { from: later })}" aria-label="Later">›</a>
+<a class="btn" href="${homeUrl(view)}">Today</a>
 </nav>`;
+}
+
+/** The search box and the filter in force. A GET form, so it needs no browser script (ADR 0010). */
+function searchHtml(view: PrioritiesView): string {
+  const { health, q } = view.filter;
+  const keep = health ? `<input type="hidden" name="health" value="${health}">` : "";
+  const active = health || q
+    ? `<span class="filter">${health ? `${healthDot(health)}${health}` : ""}${health && q ? " · " : ""}${q ? `“${escape(q)}”` : ""}<a class="clear" href="/">Show all</a></span>`
+    : "";
+  return `<form class="search" method="get" action="/" role="search">${keep}<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg><input type="search" name="q" value="${escape(q ?? "")}" placeholder="Search goals" aria-label="Search goals"></form>${active}`;
 }
 
 function legendHtml(): string {
@@ -136,22 +157,24 @@ ${item("slip", "Slip")}
 export function homePage(view: PrioritiesView, actor: Actor): string {
   const weeks = view.weeks.map((w) => `<span class="wk" style="left:${pct(w.at)}">${escape(w.label)}</span>`).join("");
   const grid = view.weeks.map((w) => `<span class="gl" style="left:${pct(w.at)}"></span>`).join("");
+  const filtering = Boolean(view.filter.health || view.filter.q);
   const backlog = view.backlog.length
     ? view.backlog.map((p) => priorityHtml(view, actor, p)).join("")
-    : `<p class="empty">No Priorities below the cut line.</p>`;
+    : filtering ? "" : `<p class="empty">No Priorities below the cut line.</p>`;
+  const none = filtering && !view.funded.length && !view.backlog.length ? `<p class="empty none">No goals match.</p>` : "";
   return layout({
     actor,
     org: view.org.name,
     main: `<h1>${escape(view.org.name)}</h1>
 ${cardsHtml(view)}
 <section class="card board">
-<div class="bhead"><h2>Priorities</h2>${rangeHtml(view)}</div>
+<div class="bhead"><h2>Priorities</h2>${searchHtml(view)}${rangeHtml(view)}</div>
 <div class="scroll"><div class="tl">
 <div class="axis"><div></div><div class="ticks"><span class="todaylbl" style="left:${pct(view.todayAt)}">Today</span>${weeks}</div></div>
 <div class="tlbody">
 <div class="grid" aria-hidden="true">${grid}</div>
 <div class="nowline" aria-hidden="true"><span class="today" style="left:${pct(view.todayAt)}"></span></div>
-${view.funded.map((p) => priorityHtml(view, actor, p)).join("\n")}
+${view.funded.map((p) => priorityHtml(view, actor, p)).join("\n")}${none}
 <div class="cut"><span>✂ Backlog</span></div>
 ${backlog}
 </div>

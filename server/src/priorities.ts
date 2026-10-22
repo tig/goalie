@@ -61,6 +61,8 @@ export type GoalRow = {
   when: string[];
   lane: Lane;
   ptg?: PtgStep;
+  /** False when a filter is on and this goal is shown only as the parent of one that matches. */
+  match: boolean;
   children: GoalRow[];
 };
 
@@ -79,6 +81,8 @@ export type PrioritiesView = {
   todayAt: number;
   /** The window's first and last day, and where Earlier and Later go. */
   window: { first: string; last: string; earlier: string; later: string };
+  /** The filter in force. Empty when Home shows every goal. */
+  filter: { health?: Exclude<Health, null>; q?: string };
   funded: PriorityRow[];
   backlog: PriorityRow[];
   summary: Summary;
@@ -138,8 +142,22 @@ function firstStep(ptg: unknown, names: Map<string, string>): PtgStep | undefine
   };
 }
 
-/** `from` opens the week that holds that day. A value that is not a real date is ignored. */
-export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = new Date(), from?: string): PrioritiesView {
+/** What a viewer asked Home for. Each value that is not valid is ignored. */
+export type HomeQuery = {
+  /** Open the week that holds this day. */
+  from?: string;
+  /** Show only goals with this health. */
+  health?: string;
+  /** Show only goals whose summary holds this text. */
+  q?: string;
+};
+
+const HEALTHS = ["RED", "YELLOW", "GREEN"] as const;
+
+export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = new Date(), query: HomeQuery = {}): PrioritiesView {
+  const from = query.from;
+  const health = (HEALTHS as readonly string[]).includes(query.health ?? "") ? (query.health as Exclude<Health, null>) : undefined;
+  const q = query.q?.trim().slice(0, 100) || undefined;
   const todayIso = now.toISOString().slice(0, 10);
   const today = day(todayIso);
   const unit = read(db, "org_unit", orgUnit);
@@ -201,6 +219,15 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
     return result;
   };
 
+  const needle = q?.toLowerCase();
+  const matches = (goal: Row) => (!health || goal.health === health) && (!needle || String(goal.summary).toLowerCase().includes(needle));
+  /** With a filter on, keep a goal that matches, or that holds one that does. */
+  const prune = (row: GoalRow): GoalRow | undefined => {
+    const children = row.children.map(prune).filter((c): c is GoalRow => c !== undefined);
+    return row.match || children.length ? { ...row, children } : undefined;
+  };
+  const filtering = Boolean(health || needle);
+
   const goalRow = (goal: Row, depth: number, parent?: Row): GoalRow => {
     const l = lane(goal, !parent || ownDate(goal) !== ownDate(parent));
     const health = (goal.health as Health) ?? null;
@@ -215,6 +242,7 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
       lane: l,
       when: [l.tick?.label, l.end?.label].filter((w): w is string => Boolean(w)),
       ...(health === "RED" || health === "YELLOW" ? { ptg: firstStep(goal.path_to_green, names) } : {}),
+      match: matches(goal),
       children: (childrenOf.get(goal.id as string) ?? []).map((child) => goalRow(child, depth + 1, goal)),
     };
   };
@@ -223,13 +251,15 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
     id: p.id as string,
     rank: p.rank as number,
     title: p.title as string,
-    goals: tops[i].map((g) => goalRow(g, 0)),
+    goals: tops[i].map((g) => goalRow(g, 0)).flatMap((g) => (filtering ? (prune(g) ?? []) : [g])),
   }));
   const cut = priorities.findIndex((p) => p.cut_line === true);
-  const funded = cut === -1 ? rows : rows.slice(0, cut + 1);
-  const backlog = cut === -1 ? [] : rows.slice(cut + 1);
+  const shownRows = (list: PriorityRow[]) => list.filter((p) => !filtering || p.goals.length > 0);
+  const funded = shownRows(cut === -1 ? rows : rows.slice(0, cut + 1));
+  const backlog = shownRows(cut === -1 ? [] : rows.slice(cut + 1));
 
-  const top = funded.flatMap((p) => p.goals).filter((g) => g.state === "In Progress");
+  const fundedTops = (cut === -1 ? tops : tops.slice(0, cut + 1)).flat().map((g) => goalRow(g, 0));
+  const top = fundedTops.filter((g) => g.state === "In Progress");
   const slips = top
     .filter((g) => g.lane.slip)
     .map((g) => ({ id: g.id, summary: g.summary, date: g.lane.tick?.label ?? "", days: g.lane.slip?.days ?? 0 }));
@@ -255,6 +285,7 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
     today: todayIso,
     weeks,
     todayAt: pos(today),
+    filter: { health, q },
     window: { first: iso(start), last: iso(end - DAY), earlier: iso(start - STEP_WEEKS * 7 * DAY), later: iso(start + STEP_WEEKS * 7 * DAY) },
     funded,
     backlog,

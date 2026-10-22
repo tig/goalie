@@ -62,6 +62,10 @@ class PrioritiesHomeTests(unittest.TestCase):
             cls.anonymous = get(proc, port, "/")
             cls.later = get(proc, port, "/?from=2026-12-09", auth).body.decode("utf-8")
             cls.bad_from = get(proc, port, "/?from=2026-13-45", auth)
+            cls.red = get(proc, port, "/?health=RED", auth).body.decode("utf-8")
+            cls.spine = get(proc, port, "/?q=SPINE", auth).body.decode("utf-8")
+            cls.nothing = get(proc, port, "/?q=zzzz-no-such-goal", auth).body.decode("utf-8")
+            cls.bad_health = get(proc, port, "/?health=PURPLE", auth).body.decode("utf-8")
         cls.text = cls.home.body.decode("utf-8")
         code, cls.printed = cls.store.run("home")
 
@@ -132,16 +136,11 @@ class PrioritiesHomeTests(unittest.TestCase):
         self.assertNotRegex(self.text, r"\d+ sub-goals?<")
 
     def test_the_committed_card_counts_each_health(self) -> None:
-        counts = re.findall(r'class="count">.*?</span>(\d+ [A-Z]+)</span>', self.text)
+        counts = re.findall(r'class="count[^"]*"[^>]*>.*?</span>(\d+ [A-Z]+)</a>', self.text)
         self.assertEqual(counts, ["1 RED", "1 YELLOW", "1 GREEN"])
 
-    def test_red_and_yellow_rows_show_the_first_ptg_step(self) -> None:
-        for goal in ("XW-0001", "XW-0002"):
-            self.assertIn("Placeholder: Tig writes the Path to Green", row(self.text, goal), goal)
-        self.assertNotIn("Path to Green", row(self.text, "XW-0003"))
-
     def test_owners_are_named(self) -> None:
-        self.assertIn(">Tig<", row(self.text, "XW-0001"))
+        self.assertIn('title="Tig"', row(self.text, "XW-0001"))
 
     def test_the_signed_in_actor_avatar_is_outlined_on_their_rows(self) -> None:
         self.assertIn("av mine", row(self.text, "XW-0003"))
@@ -167,14 +166,60 @@ class PrioritiesHomeTests(unittest.TestCase):
         self.assertEqual(self.bad_from.status, 200)
         self.assertEqual(re.findall(r'class="wk"[^>]*>([^<]+)<', self.bad_from.body.decode("utf-8"))[0], re.findall(r'class="wk"[^>]*>([^<]+)<', self.text)[0])
 
-    def test_goal_keys_show_only_on_hover(self) -> None:
-        visible = re.sub(r'<div class="tip".*?</div>', "", row(self.text, "XW-0001"), flags=re.S)
-        visible = visible.replace('id="goal-XW-0001"', "")
+    def test_goal_rows_have_no_hover_card(self) -> None:
+        self.assertNotIn('class="tip"', row(self.text, "XW-0001"))
+        visible = row(self.text, "XW-0001").replace('id="goal-XW-0001"', "")
         self.assertNotIn("XW-0001", visible)
-        self.assertIn("XW-0001", row(self.text, "XW-0001"))
 
     def test_the_grid_and_today_line_are_drawn_once_for_the_whole_board(self) -> None:
         self.assertEqual(self.text.count('class="today"'), 1)
+
+    def test_each_health_count_links_to_its_filter(self) -> None:
+        for health in ("RED", "YELLOW", "GREEN"):
+            self.assertIn(f'href="/?health={health}"', self.text)
+
+    def test_hovering_a_health_count_highlights_its_goals(self) -> None:
+        self.assertIn(':has(.count[data-health="RED"]:hover) .row[data-health="RED"]', self.text)
+
+    def test_the_health_filter_keeps_only_that_health(self) -> None:
+        self.assertIn('id="goal-XW-0001"', self.red)
+        self.assertNotIn('id="goal-XW-0002"', self.red)
+        self.assertNotIn('id="goal-XW-0003"', self.red)
+
+    def test_the_active_filter_links_back_to_all_goals(self) -> None:
+        active = self.red[self.red.index('data-health="RED"', self.red.index('class="counts"')) - 200:]
+        self.assertIn('aria-current="true"', self.red)
+        self.assertIn('class="clear" href="/"', self.red)
+
+    def test_a_bad_health_filter_is_ignored(self) -> None:
+        self.assertIn('id="goal-XW-0002"', self.bad_health)
+
+    def test_home_has_a_search_box(self) -> None:
+        self.assertRegex(self.text, r'<form[^>]*method="get"[^>]*role="search"')
+        self.assertIn('name="q"', self.text)
+
+    def test_search_matches_goal_summaries_and_keeps_their_parents(self) -> None:
+        self.assertIn('id="goal-XW-0005"', self.spine)
+        self.assertIn('id="goal-XW-0004"', self.spine)
+        self.assertIn('id="goal-XW-0003"', self.spine)
+        self.assertNotIn('id="goal-XW-0001"', self.spine)
+        self.assertNotIn('id="goal-XW-0006"', self.spine)
+        self.assertIn('value="SPINE"', self.spine)
+
+    def test_search_with_no_match_says_so(self) -> None:
+        self.assertIn("No goals match", self.nothing)
+
+    def test_moving_the_timeline_keeps_the_filter(self) -> None:
+        self.assertRegex(self.red, r'href="/\?health=RED&amp;from=\d{4}-\d{2}-\d{2}"[^>]*aria-label="Earlier"')
+
+    def test_the_page_feels_like_an_app(self) -> None:
+        self.assertIn("body{cursor:default", self.text.replace(" ", ""))
+        self.assertIn("user-select:none", self.text)
+
+    def test_every_card_has_help(self) -> None:
+        cards = self.text[self.text.index('class="cards"'):self.text.index('class="card board"')]
+        self.assertEqual(cards.count('class="q"'), 3)
+        self.assertEqual(cards.count('class="tip"'), 3)
 
     def test_the_sign_in_page_gives_the_reason(self) -> None:
         self.assertIn("no token", self.anonymous.body.decode("utf-8"))
