@@ -24,7 +24,7 @@ const STYLE = `<style>
 --radius:18px;--font:"Figtree",system-ui,sans-serif}
 body{margin:0;background:var(--ground);color:var(--ink);font:14px/1.4 var(--font)}
 a{color:#1e6b45}
-.top{display:flex;align-items:center;gap:14px;padding:14px 32px;background:var(--card);border-bottom:1px solid var(--line)}
+.top{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:14px;padding:14px 32px;background:var(--card);border-bottom:1px solid var(--line)}
 .logo{width:34px;height:34px;border-radius:11px;background:var(--brand);color:var(--brand-ink);display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:16px}
 .brand{font-weight:800;font-size:18px}.org{color:var(--mute)}
 .tab{height:34px;padding:0 16px;border-radius:999px;background:var(--brand);color:var(--brand-ink);font-weight:700;display:inline-flex;align-items:center;margin-left:16px}
