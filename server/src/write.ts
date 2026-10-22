@@ -1,5 +1,5 @@
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
-import { checkTransition, checkWrite, REASONED, SYSTEM_FIELDS, type Lookup, type Row, type Violation } from "./rules.ts";
+import { checkTransition, checkWrite, REASONED, summaryLint, SYSTEM_FIELDS, type Lookup, type Row, type Violation } from "./rules.ts";
 
 /**
  * The one write path. The API, the MCP server, the app, and the seed call write(). Nothing else writes.
@@ -230,4 +230,16 @@ function missingReferences(db: DatabaseSync, kind: Kind): Violation[] {
 function bootstraps(db: DatabaseSync, actor: string, kind: Kind, id: string, fields: Row): boolean {
   const { n } = db.prepare("SELECT COUNT(*) AS n FROM actor").get() as { n: number };
   return n === 0 && kind === "actor" && id === actor && fields.kind === "human";
+}
+
+/** Re-run every rule and lint over the whole store. Invalid records stay visible (SPEC.md §8.1). */
+export function checkStore(db: DatabaseSync): { goals: number; violations: Violation[]; lints: string[] } {
+  const store = lookup(db);
+  const all = (kind: Kind) => (db.prepare(`SELECT id FROM ${kind} ORDER BY id`).all() as { id: string }[]).map((r) => read(db, kind, r.id) as Row);
+  const goals = all("goal");
+  const violations = (["actor", "org_unit", "priority"] as const).flatMap((kind) => all(kind).flatMap((row) => checkWrite(store, kind, row)));
+  violations.push(...goals.flatMap((goal) => checkWrite(store, "goal", goal)));
+  const unique = [...new Map(violations.map((v) => [`${v.rule} ${v.message}`, v])).values()];
+  const lints = goals.map(summaryLint).filter((l): l is string => l !== undefined);
+  return { goals: goals.length, violations: unique, lints };
 }

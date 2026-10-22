@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 import { configuredIssuers, resolveActor } from "./auth.ts";
 import { configuredDatabase } from "./config.ts";
 import { openStore } from "./store.ts";
-import { isKind, read, readEvents, write, type Command } from "./write.ts";
+import { seed } from "./seed.ts";
+import { checkStore, isKind, read, readEvents, write, type Command } from "./write.ts";
 
 /**
  * A local tool against the GOALIE_DB file. It is not reachable over HTTP.
@@ -10,6 +11,8 @@ import { isKind, read, readEvents, write, type Command } from "./write.ts";
  *   write --as <actor>   apply the JSON command on stdin through the write path
  *   read <kind> <id>     print one entity's current row
  *   events [after]       print the Events with a greater sequence
+ *   seed                 load the Excaliwire seed into an empty store
+ *   check                re-run every rule and lint; exit 2 if a rule is broken
  *   whoami               resolve the JSON request headers on stdin to one actor (ADR 0005)
  */
 async function main(args: string[]): Promise<number> {
@@ -31,6 +34,16 @@ async function main(args: string[]): Promise<number> {
     case "events":
       print(readEvents(db, Number(rest[0] ?? 0)));
       return 0;
+    case "seed": {
+      const result = seed(db);
+      print(result);
+      return result.ok ? 0 : 2;
+    }
+    case "check": {
+      const report = checkStore(db);
+      print(report);
+      return report.violations.length === 0 ? 0 : 2;
+    }
     case "whoami": {
       const headers = JSON.parse(readFileSync(0, "utf-8")) as Record<string, string>;
       const result = await resolveActor(db, headers, configuredIssuers());
@@ -47,7 +60,7 @@ function print(value: unknown): void {
 }
 
 function usage(): number {
-  process.stderr.write("usage: cli.ts write --as <actor> | read <kind> <id> | events [after] | whoami\n");
+  process.stderr.write("usage: cli.ts write --as <actor> | read <kind> <id> | events [after] | seed | check | whoami\n");
   return 64;
 }
 
