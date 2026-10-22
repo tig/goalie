@@ -39,6 +39,12 @@ You must not put a second server language here.
 `npm start --prefix server` starts the process.
 `PORT`, `HOST`, and `GOALIE_DB` are process configuration.
 `GOALIE_DB` is the path of the SQLite file ([ADR 0006](docs/adr/0006-deployment-target.md)). The default is `goalie.db` in the working directory.
+`GOALIE_ISSUERS` is the issuer list ([ADR 0005](docs/adr/0005-auth-and-identity.md)). It is a JSON list of `{"issuer", "audience"}`, with optional `jwks_uri` or inline `jwks`.
+Unset means no issuer, so every token is refused.
+The Excaliwire deployment sets `[{"issuer": "https://login.microsoftonline.com/8136e28b-aee3-4d34-ab49-c0da1a468e3a/v2.0", "audience": "<the GOALIE app id>"}]`. Keys come from the issuer's discovery document.
+Tests do not need Entra. `server/tests/sign_token.mjs` signs tokens with a fresh key, and the test sets a test issuer with that key inline in `jwks`.
+Every token is still verified: RS256 signature, issuer, audience, and expiry.
+`node src/cli.ts` is a local tool against the `GOALIE_DB` file: `write --as <actor>`, `read <kind> <id>`, `events [after]`, `seed`, and `whoami`. It is not reachable over HTTP.
 The default host is `127.0.0.1`.
 `GET /health` answers `ok`.
 `GET /` answers the home page as HTML. It is a placeholder that says `Goalie: coming soon`.

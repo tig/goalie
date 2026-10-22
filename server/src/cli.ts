@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { configuredIssuers, resolveActor } from "./auth.ts";
 import { configuredDatabase } from "./config.ts";
 import { openStore } from "./store.ts";
 import { isKind, read, readEvents, write, type Command } from "./write.ts";
@@ -9,8 +10,9 @@ import { isKind, read, readEvents, write, type Command } from "./write.ts";
  *   write --as <actor>   apply the JSON command on stdin through the write path
  *   read <kind> <id>     print one entity's current row
  *   events [after]       print the Events with a greater sequence
+ *   whoami               resolve the JSON request headers on stdin to one actor (ADR 0005)
  */
-function main(args: string[]): number {
+async function main(args: string[]): Promise<number> {
   const db = openStore(configuredDatabase());
   const [command, ...rest] = args;
   switch (command) {
@@ -29,6 +31,12 @@ function main(args: string[]): number {
     case "events":
       print(readEvents(db, Number(rest[0] ?? 0)));
       return 0;
+    case "whoami": {
+      const headers = JSON.parse(readFileSync(0, "utf-8")) as Record<string, string>;
+      const result = await resolveActor(db, headers, configuredIssuers());
+      print(result);
+      return result.ok ? 0 : 2;
+    }
     default:
       return usage();
   }
@@ -39,8 +47,8 @@ function print(value: unknown): void {
 }
 
 function usage(): number {
-  process.stderr.write("usage: cli.ts write --as <actor> | read <kind> <id> | events [after]\n");
+  process.stderr.write("usage: cli.ts write --as <actor> | read <kind> <id> | events [after] | whoami\n");
   return 64;
 }
 
-process.exitCode = main(process.argv.slice(2));
+process.exitCode = await main(process.argv.slice(2));
