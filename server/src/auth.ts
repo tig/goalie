@@ -27,20 +27,49 @@ export function configuredIssuers(): Issuer[] {
   return list;
 }
 
-const keyCache = new Map<string, JsonWebKey[]>();
+/** An issuer's keys may be refetched for an unknown key id at most this often, so a caller cannot make every request a fetch. */
+const REFETCH_MS = 5 * 60_000;
 
-async function issuerKeys(issuer: Issuer): Promise<JsonWebKey[]> {
-  if (issuer.jwks) return issuer.jwks.keys;
-  const cached = keyCache.get(issuer.issuer);
-  if (cached) return cached;
-  let uri = issuer.jwks_uri;
-  if (!uri) {
-    const discovery = await fetch(`${issuer.issuer.replace(/\/$/, "")}/.well-known/openid-configuration`);
-    uri = ((await discovery.json()) as { jwks_uri: string }).jwks_uri;
+/** A key fetch that takes longer than this fails, and the token is refused. */
+const FETCH_TIMEOUT_MS = 5_000;
+
+type CachedKeys = { keys: JsonWebKey[]; refetched?: number };
+const keyCache = new Map<string, CachedKeys>();
+
+/** Fetch an issuer's keys from `jwks_uri`, else from its discovery document. Undefined when the fetch fails. */
+async function fetchKeys(issuer: Issuer): Promise<JsonWebKey[] | undefined> {
+  try {
+    let uri = issuer.jwks_uri;
+    if (!uri) {
+      const discovery = await fetch(`${issuer.issuer.replace(/\/$/, "")}/.well-known/openid-configuration`, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+      uri = ((await discovery.json()) as { jwks_uri: string }).jwks_uri;
+    }
+    const keys = ((await (await fetch(uri, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })).json()) as { keys?: unknown }).keys;
+    return Array.isArray(keys) ? (keys as JsonWebKey[]) : undefined;
+  } catch {
+    return undefined;
   }
-  const keys = ((await (await fetch(uri)).json()) as { keys: JsonWebKey[] }).keys;
-  keyCache.set(issuer.issuer, keys);
-  return keys;
+}
+
+/** Find the key a token names. Fetch the issuer's keys once, and once more per REFETCH_MS for a key id not seen. */
+async function issuerKey(issuer: Issuer, kid: unknown): Promise<JsonWebKey | undefined | "unreachable"> {
+  const byKid = (keys: JsonWebKey[]) => keys.find((k) => (k as { kid?: string }).kid === kid);
+  if (issuer.jwks) return byKid(issuer.jwks.keys);
+  let cached = keyCache.get(issuer.issuer);
+  if (!cached) {
+    const keys = await fetchKeys(issuer);
+    if (!keys) return "unreachable";
+    cached = { keys };
+    keyCache.set(issuer.issuer, cached);
+  }
+  const found = byKid(cached.keys);
+  if (found || (cached.refetched !== undefined && Date.now() - cached.refetched < REFETCH_MS)) return found;
+  // The issuer may have rotated its keys. Fetch them once more.
+  cached.refetched = Date.now();
+  const keys = await fetchKeys(issuer);
+  if (!keys) return "unreachable";
+  cached.keys = keys;
+  return byKid(keys);
 }
 
 function header(headers: Record<string, string>, name: string): string | undefined {
@@ -71,13 +100,8 @@ export async function verifyToken(
   const issuer = issuers.find((i) => i.issuer === claims.iss);
   if (!issuer) return { ok: false, reason: "the token's issuer is not configured" };
 
-  const byKid = (keys: JsonWebKey[]) => keys.find((k) => (k as { kid?: string }).kid === head.kid);
-  let jwk = byKid(await issuerKeys(issuer));
-  if (!jwk && !issuer.jwks) {
-    // The issuer may have rotated its keys. Fetch them once more.
-    keyCache.delete(issuer.issuer);
-    jwk = byKid(await issuerKeys(issuer));
-  }
+  const jwk = await issuerKey(issuer, head.kid);
+  if (jwk === "unreachable") return { ok: false, reason: "the issuer's keys could not be fetched" };
   if (!jwk) return { ok: false, reason: "the token's key is not the issuer's" };
   let key: KeyObject;
   try {
