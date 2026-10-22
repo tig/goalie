@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import { committedDate, currentDate, OPEN_STATES } from "./goal.ts";
+import { committedDate, currentDate, isOpen, OPEN_STATES } from "./goal.ts";
 import { read, readAll } from "./read.ts";
 import type { Row } from "./rules.ts";
 
@@ -233,7 +233,7 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
   let nextPromotion: Summary["nextPromotion"];
   for (const goal of tops.flat().flatMap(inView)) {
     const milestone = typeof goal.promotion_milestone === "string" ? goals.get(goal.promotion_milestone) : undefined;
-    if (!milestone || !(OPEN_STATES as readonly unknown[]).includes(milestone.state)) continue;
+    if (!milestone || !isOpen(milestone)) continue;
     const date = currentDate(milestone);
     if (date === undefined || day(date) < today || (nextPromotion && day(date) >= day(nextPromotion.date))) continue;
     nextPromotion = { milestone: milestone.id as string, date, days: Math.round((day(date) - today) / DAY), goal: goal.id as string, summary: goal.summary as string };
