@@ -7,20 +7,33 @@ import { read } from "./write.ts";
  * This module reads the store and returns plain data. home.ts draws it.
  */
 
-/** The saved definition behind the screen. A stored view table is a later issue (#8, Epic 7). */
+const OPEN_STATES = ["Backlog", "In Progress"] as const;
+
+/**
+ * The saved definition behind the screen. A stored view table is a later issue (#8, Epic 7).
+ * The view opens on one org unit. It selects that unit's goals at that unit's level.
+ */
 export const PRIORITIES_VIEW = {
   name: "Priorities",
-  select: { level: "Company", state: ["Backlog", "In Progress"] },
+  select: { state: OPEN_STATES, period: "current" },
   sort: "rank",
   columns: ["Summary", "Owner", "Health", "Date Type", "Promotion Milestone", "PTG"],
 } as const;
 
 const DAY = 86_400_000;
 const WEEKS = 13;
+/** Today stays at least this many days inside the right edge of the window. */
+const AHEAD_DAYS = 28;
 
 export type Health = "GREEN" | "YELLOW" | "RED" | null;
 
-export type Mark = { at: number; label: string; kind: "Committed" | "Promotion Milestone" | "Ambition" | "Fantasy"; outside: boolean };
+export type Mark = {
+  at: number;
+  label: string;
+  kind: "Committed" | "Promotion Milestone" | "Ambition" | "Fantasy";
+  /** Which edge of the window the date lies past, if any. */
+  outside: "before" | "after" | null;
+};
 
 export type Lane = {
   /** Percent positions across the window. */
@@ -32,6 +45,9 @@ export type Lane = {
   end?: Mark;
 };
 
+/** The first step of a Path to Green. */
+export type PtgStep = { text: string; ownerName?: string; date?: string };
+
 export type GoalRow = {
   id: string;
   summary: string;
@@ -40,22 +56,23 @@ export type GoalRow = {
   state: string;
   health: Health;
   depth: number;
-  /** The row's dates as text, for a screen too narrow for the lane. */
-  when: string;
+  /** The row's dates, for a screen too narrow for the lane. Empty when a sub-goal has its parent's date. */
+  when: string[];
   lane: Lane;
+  ptg?: PtgStep;
   children: GoalRow[];
 };
 
 export type PriorityRow = { id: string; rank: number; title: string; goals: GoalRow[] };
 
 export type Summary = {
-  committed: { green: number; total: number; healths: Health[]; slips: { id: string; summary: string; date: string; days: number }[] };
+  committed: { counts: { RED: number; YELLOW: number; GREEN: number }; healths: Health[]; slips: { id: string; summary: string; date: string; days: number }[] };
   drafts: number;
   nextPromotion?: { milestone: string; date: string; days: number; goal: string; summary: string };
 };
 
 export type PrioritiesView = {
-  org: string;
+  org: { id: string; name: string; level: string };
   today: string;
   weeks: { at: number; label: string }[];
   todayAt: number;
@@ -64,68 +81,127 @@ export type PrioritiesView = {
   summary: Summary;
 };
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
 function day(iso: string): number {
   return Date.parse(`${iso.slice(0, 10)}T00:00:00Z`);
 }
 
+const MONTH_DAY = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", timeZone: "UTC" });
+const MONTH_DAY_YEAR = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+
 /** "Oct 1", or "Mar 31, 2027" outside the current year. */
 export function shortDate(iso: string, todayIso: string): string {
-  const d = new Date(day(iso));
-  const label = `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
-  return iso.slice(0, 4) === todayIso.slice(0, 4) ? label : `${label}, ${d.getUTCFullYear()}`;
+  const format = iso.slice(0, 4) === todayIso.slice(0, 4) ? MONTH_DAY : MONTH_DAY_YEAR;
+  return format.format(day(iso));
+}
+
+/** A period is current when it names today's year ("2026") or quarter ("2026-Q4"). Calendar quarters are the default calendar (SPEC.md §12). */
+export function isCurrentPeriod(period: string, todayIso: string): boolean {
+  const year = todayIso.slice(0, 4);
+  const quarter = Math.floor((Number(todayIso.slice(5, 7)) - 1) / 3) + 1;
+  return period === year || period === `${year}-Q${quarter}`;
 }
 
 function all(db: DatabaseSync, sql: string, ...params: string[]): Row[] {
   return db.prepare(sql).all(...params) as Row[];
 }
 
-/** When a goal started: its move to In Progress, else its first Event. */
-function started(db: DatabaseSync, id: string): string | undefined {
-  const moved = db
-    .prepare("SELECT timestamp FROM event WHERE entity_kind = 'goal' AND entity = ? AND field = 'state' AND new = '\"In Progress\"' ORDER BY sequence LIMIT 1")
-    .get(id) as Row | undefined;
-  const first = db.prepare("SELECT timestamp FROM event WHERE entity_kind = 'goal' AND entity = ? ORDER BY sequence LIMIT 1").get(id) as Row | undefined;
-  return (moved?.timestamp ?? first?.timestamp) as string | undefined;
+/** When each goal started: its first move to In Progress, else its first Event. One query. */
+function startedAll(db: DatabaseSync): Map<string, string> {
+  const rows = all(
+    db,
+    `SELECT entity,
+       (SELECT timestamp FROM event m WHERE m.entity_kind = 'goal' AND m.entity = e.entity AND m.field = 'state' AND m.new = '"In Progress"' ORDER BY sequence LIMIT 1) AS moved,
+       MIN(timestamp) AS first
+     FROM event e WHERE entity_kind = 'goal' GROUP BY entity`,
+  );
+  return new Map(rows.map((r) => [r.entity as string, (r.moved ?? r.first) as string]));
+}
+
+/** Every goal but the Deleted, keyed by id, with JSON fields parsed. One query. */
+function goalsById(db: DatabaseSync): Map<string, Row> {
+  return new Map(
+    all(db, "SELECT * FROM goal WHERE state != 'Deleted' ORDER BY id").map((g) => {
+      if (typeof g.path_to_green === "string") g.path_to_green = JSON.parse(g.path_to_green);
+      return [g.id as string, g];
+    }),
+  );
 }
 
 /** The date health is judged against (SPEC.md §6.1): its own Committed date, else its Promotion Milestone's. */
-function committedDate(db: DatabaseSync, goal: Row): { date: string; kind: "Committed" | "Promotion Milestone" } | undefined {
+function committedDate(goals: Map<string, Row>, goal: Row): { date: string; kind: "Committed" | "Promotion Milestone" } | undefined {
   if (goal.date_type === "Committed") return { date: (goal.changed_due_date ?? goal.due_date) as string, kind: "Committed" };
-  const milestone = typeof goal.promotion_milestone === "string" ? read(db, "goal", goal.promotion_milestone) : undefined;
+  const milestone = typeof goal.promotion_milestone === "string" ? goals.get(goal.promotion_milestone) : undefined;
   if (!milestone) return undefined;
   return { date: (milestone.changed_due_date ?? milestone.due_date) as string, kind: "Promotion Milestone" };
+}
+
+/** A goal's own date and Date Type, to compare a sub-goal with its parent. */
+function ownDate(goal: Row): string {
+  return `${goal.date_type} ${goal.changed_due_date ?? goal.due_date}`;
+}
+
+function firstStep(ptg: unknown, names: Map<string, string>): PtgStep | undefined {
+  if (typeof ptg === "string") return ptg ? { text: ptg } : undefined;
+  const step = (ptg as { steps?: { text?: unknown; owner?: unknown; date?: unknown }[] } | null)?.steps?.[0];
+  if (!step || typeof step.text !== "string") return undefined;
+  return {
+    text: step.text,
+    ownerName: typeof step.owner === "string" ? (names.get(step.owner) ?? step.owner) : undefined,
+    date: typeof step.date === "string" ? step.date : undefined,
+  };
 }
 
 export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = new Date()): PrioritiesView {
   const todayIso = now.toISOString().slice(0, 10);
   const today = day(todayIso);
-  // Start two weeks back, or earlier to show a Committed date that has passed. Weeks start on Monday.
-  const passed = all(db, "SELECT * FROM goal WHERE state = 'In Progress'")
-    .map((g) => committedDate(db, g))
+  const unit = read(db, "org_unit", orgUnit);
+  const org = { id: orgUnit, name: (unit?.name as string) ?? orgUnit, level: (unit?.level as string) ?? "" };
+  const { select, sort } = PRIORITIES_VIEW;
+
+  const goals = goalsById(db);
+  const started = startedAll(db);
+  const names = new Map(all(db, "SELECT id, display_name FROM actor").map((a) => [a.id as string, a.display_name as string]));
+  const shown = (g: Row) => g.org_unit === org.id && g.level === org.level && (select.state as readonly unknown[]).includes(g.state);
+  const childrenOf = new Map<string, Row[]>();
+  for (const g of goals.values()) {
+    if (typeof g.parent === "string" && shown(g)) childrenOf.set(g.parent, [...(childrenOf.get(g.parent) ?? []), g]);
+  }
+
+  const priorities = all(db, "SELECT * FROM priority WHERE org_unit = ? AND status = 'Current'", orgUnit)
+    .filter((p) => isCurrentPeriod(p.period as string, todayIso))
+    .sort((a, b) => (a[sort] as number) - (b[sort] as number));
+  const tops = priorities.map((p) =>
+    [...goals.values()].filter((g) => g.priority === p.id && shown(g) && !(typeof g.parent === "string" && goals.get(g.parent)?.priority === p.id && shown(goals.get(g.parent) as Row))),
+  );
+
+  // The window starts two weeks back, or earlier for a passed Committed date of a goal in the view.
+  // Today stays inside it. Weeks start on Monday.
+  const inView = (g: Row): Row[] => [g, ...(childrenOf.get(g.id as string) ?? []).flatMap(inView)];
+  const passed = tops
+    .flat()
+    .flatMap(inView)
+    .filter((g) => g.state === "In Progress")
+    .map((g) => committedDate(goals, g))
     .filter((c): c is NonNullable<typeof c> => c !== undefined)
     .map((c) => day(c.date) - 3 * DAY);
-  const from = Math.min(today - 14 * DAY, ...passed);
+  const from = Math.max(Math.min(today - 14 * DAY, ...passed), today - (WEEKS * 7 - AHEAD_DAYS) * DAY);
   const start = from - ((new Date(from).getUTCDay() + 6) % 7) * DAY;
   const end = start + WEEKS * 7 * DAY;
   const pos = (t: number) => (100 * (Math.min(Math.max(t, start), end) - start)) / (end - start);
-  const outside = (t: number) => t < start || t > end;
+  const outside = (t: number): Mark["outside"] => (t < start ? "before" : t > end ? "after" : null);
 
-  const lane = (goal: Row): Lane => {
+  const lane = (goal: Row, drawDate: boolean): Lane => {
     const result: Lane = {};
-    const open = goal.state === "In Progress" || goal.state === "Backlog";
-    const from = day(started(db, goal.id as string) ?? todayIso);
-    const committed = committedDate(db, goal);
+    const begun = day(started.get(goal.id as string) ?? todayIso);
+    const committed = committedDate(goals, goal);
     const c = committed ? day(committed.date) : undefined;
-    if (goal.state === "In Progress" && goal.health) result.health = { from: pos(from), to: pos(Math.min(today, c ?? today)) };
+    if (goal.state === "In Progress" && goal.health) result.health = { from: pos(begun), to: pos(Math.min(today, c ?? today)) };
     if (c !== undefined && committed) {
-      if (open && c < today) result.slip = { from: pos(c), to: pos(today), days: Math.round((today - c) / DAY) };
-      else if (c > today) result.ahead = { from: pos(Math.max(today, from)), to: pos(c) };
-      const label = `${committed.kind} ${shortDate(committed.date, todayIso)}`;
-      result.tick = { at: pos(c), label, kind: committed.kind, outside: outside(c) };
+      if (c < today) result.slip = { from: pos(c), to: pos(today), days: Math.round((today - c) / DAY) };
+      else if (drawDate) result.ahead = { from: pos(Math.max(today, begun)), to: pos(c) };
+      if (drawDate || result.slip) result.tick = { at: pos(c), label: `${committed.kind} ${shortDate(committed.date, todayIso)}`, kind: committed.kind, outside: outside(c) };
     }
-    if (goal.date_type === "Ambition" || goal.date_type === "Fantasy") {
+    if (drawDate && (goal.date_type === "Ambition" || goal.date_type === "Fantasy")) {
       const kind = goal.date_type;
       const f = day(goal.due_date as string);
       const mark: Mark = { at: pos(f), label: `${kind} ${shortDate(goal.due_date as string, todayIso)}`, kind, outside: outside(f) };
@@ -135,31 +211,31 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
     return result;
   };
 
-  const names = new Map(all(db, "SELECT id, display_name FROM actor").map((a) => [a.id as string, a.display_name as string]));
-  const goalRow = (goal: Row, depth: number): GoalRow => ({
-    id: goal.id as string,
-    summary: goal.summary as string,
-    owner: goal.owner as string,
-    ownerName: names.get(goal.owner as string) ?? (goal.owner as string),
-    state: goal.state as string,
-    health: (goal.health as Health) ?? null,
-    depth,
-    ...((l) => ({ lane: l, when: [l.tick?.label, l.end?.label].filter(Boolean).join(" · ") }))(lane(goal)),
-    children: all(db, "SELECT id FROM goal WHERE parent = ? AND state != 'Deleted' ORDER BY id", goal.id as string)
-      .map((child) => goalRow(read(db, "goal", child.id as string) as Row, depth + 1)),
-  });
+  const goalRow = (goal: Row, depth: number, parent?: Row): GoalRow => {
+    const l = lane(goal, !parent || ownDate(goal) !== ownDate(parent));
+    const health = (goal.health as Health) ?? null;
+    return {
+      id: goal.id as string,
+      summary: goal.summary as string,
+      owner: goal.owner as string,
+      ownerName: names.get(goal.owner as string) ?? (goal.owner as string),
+      state: goal.state as string,
+      health,
+      depth,
+      lane: l,
+      when: [l.tick?.label, l.end?.label].filter((w): w is string => Boolean(w)),
+      ...(health === "RED" || health === "YELLOW" ? { ptg: firstStep(goal.path_to_green, names) } : {}),
+      children: (childrenOf.get(goal.id as string) ?? []).map((child) => goalRow(child, depth + 1, goal)),
+    };
+  };
 
-  const priorities = all(db, "SELECT * FROM priority WHERE org_unit = ? AND status = 'Current' ORDER BY rank", orgUnit);
-  const cut = priorities.findIndex((p) => p.cut_line != null && p.cut_line !== "" && p.cut_line !== "false");
-  const rows: PriorityRow[] = priorities.map((p) => ({
+  const rows: PriorityRow[] = priorities.map((p, i) => ({
     id: p.id as string,
     rank: p.rank as number,
     title: p.title as string,
-    goals: all(db, "SELECT id FROM goal WHERE priority = ? AND state != 'Deleted' ORDER BY id", p.id as string)
-      .map((g) => read(db, "goal", g.id as string) as Row)
-      .filter((g) => g.parent == null || read(db, "goal", g.parent as string)?.priority !== p.id)
-      .map((g) => goalRow(g, 0)),
+    goals: tops[i].map((g) => goalRow(g, 0)),
   }));
+  const cut = priorities.findIndex((p) => p.cut_line != null && p.cut_line !== "" && p.cut_line !== "false");
   const funded = cut === -1 ? rows : rows.slice(0, cut + 1);
   const backlog = cut === -1 ? [] : rows.slice(cut + 1);
 
@@ -167,13 +243,14 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
   const slips = top
     .filter((g) => g.lane.slip)
     .map((g) => ({ id: g.id, summary: g.summary, date: g.lane.tick?.label ?? "", days: g.lane.slip?.days ?? 0 }));
-  const decided = new Set(all(db, "SELECT DISTINCT entity FROM event WHERE entity_kind = 'draft' AND field IN ('approved', 'rejected')").map((e) => e.entity));
-  const drafts = all(db, "SELECT id FROM draft").filter((d) => !decided.has(d.id)).length;
+  const count = (h: Health) => top.filter((g) => g.health === h).length;
+  // Until the Drafts slice, every stored Draft counts as open.
+  const drafts = (db.prepare("SELECT COUNT(*) AS n FROM draft").get() as { n: number }).n;
 
   let nextPromotion: Summary["nextPromotion"];
-  for (const goal of all(db, "SELECT * FROM goal WHERE promotion_milestone IS NOT NULL AND state IN ('Backlog', 'In Progress')")) {
-    const milestone = read(db, "goal", goal.promotion_milestone as string);
-    if (!milestone || !["Backlog", "In Progress"].includes(milestone.state as string)) continue;
+  for (const goal of tops.flat().flatMap(inView)) {
+    const milestone = typeof goal.promotion_milestone === "string" ? goals.get(goal.promotion_milestone) : undefined;
+    if (!milestone || !(OPEN_STATES as readonly unknown[]).includes(milestone.state)) continue;
     const date = (milestone.changed_due_date ?? milestone.due_date) as string;
     if (day(date) < today || (nextPromotion && day(date) >= day(nextPromotion.date))) continue;
     nextPromotion = { milestone: milestone.id as string, date, days: Math.round((day(date) - today) / DAY), goal: goal.id as string, summary: goal.summary as string };
@@ -183,14 +260,17 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
     const t = start + i * 7 * DAY;
     return { at: pos(t), label: shortDate(new Date(t).toISOString().slice(0, 10), todayIso) };
   });
-  const org = read(db, "org_unit", orgUnit);
   return {
-    org: (org?.name as string) ?? orgUnit,
+    org,
     today: todayIso,
     weeks,
     todayAt: pos(today),
     funded,
     backlog,
-    summary: { committed: { green: top.filter((g) => g.health === "GREEN").length, total: top.length, healths: top.map((g) => g.health), slips }, drafts, nextPromotion },
+    summary: {
+      committed: { counts: { RED: count("RED"), YELLOW: count("YELLOW"), GREEN: count("GREEN") }, healths: top.map((g) => g.health), slips },
+      drafts,
+      nextPromotion,
+    },
   };
 }

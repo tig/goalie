@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import datetime
 import json
 import re
 import subprocess
 import time
 import unittest
 
-from goalie_cli import SERVER, Store, update
+from goalie_cli import SERVER, Store, create, update
 from live_server import get, running_server
 
 ISSUER = "https://issuer.test/tenant/v2.0"
@@ -26,6 +27,23 @@ def signed() -> tuple[str, dict[str, str]]:
 
 def positions(text: str, needles: list[str]) -> list[int]:
     return [text.index(needle) for needle in needles]
+
+
+def days_since(iso: str) -> int:
+    return (datetime.datetime.now(datetime.timezone.utc).date() - datetime.date.fromisoformat(iso)).days
+
+
+def today_at(text: str) -> float:
+    found = re.search(r'class="today" style="left:([\d.]+)%"', text)
+    assert found, "no today line"
+    return float(found.group(1))
+
+
+def row(text: str, goal: str) -> str:
+    """The HTML of one goal row, up to the next row."""
+    start = text.index(f'id="goal-{goal}"')
+    end = text.find('class="row', start + 1)
+    return text[start:] if end == -1 else text[start:end]
 
 
 class PrioritiesHomeTests(unittest.TestCase):
@@ -86,6 +104,123 @@ class PrioritiesHomeTests(unittest.TestCase):
 
     def test_the_local_tool_prints_the_same_view(self) -> None:
         self.assertIn('id="goal-XW-0001"', self.printed["html"])
+
+    def test_a_slip_names_its_days_past_the_committed_date(self) -> None:
+        days = days_since("2026-10-01")
+        if days <= 0:
+            self.skipTest("Oct 1 has not passed")
+        self.assertIn(f"slip {days} days", row(self.text, "XW-0001"))
+        self.assertIn(f"slip {days} days</span> past", self.text)
+
+    def test_the_promotion_milestone_due_is_counted_in_days(self) -> None:
+        days = -days_since("2026-11-06")
+        if days < 0:
+            self.skipTest("Nov 6 has passed")
+        self.assertIn(f"{days} days <small", self.text)
+        self.assertIn("XW-0004", self.text[self.text.index("Promotions due"):])
+
+    def test_today_is_inside_the_timeline(self) -> None:
+        self.assertGreater(today_at(self.text), 0)
+        self.assertLess(today_at(self.text), 100)
+
+    def test_the_title_and_top_bar_name_the_org_unit(self) -> None:
+        self.assertIn("<h1>Excaliwire</h1>", self.text)
+        self.assertNotIn("Company goals", self.text)
+        self.assertNotIn("sub-goal", self.text)
+
+    def test_the_committed_card_counts_each_health(self) -> None:
+        self.assertIn("1 RED · 1 YELLOW · 1 GREEN", self.text)
+
+    def test_red_and_yellow_rows_show_the_first_ptg_step(self) -> None:
+        for goal in ("XW-0001", "XW-0002"):
+            self.assertIn("Placeholder: Tig writes the Path to Green", row(self.text, goal), goal)
+        self.assertNotIn("Path to Green", row(self.text, "XW-0003"))
+
+    def test_owners_are_named(self) -> None:
+        self.assertIn(">Tig<", row(self.text, "XW-0001"))
+
+    def test_the_signed_in_actor_avatar_is_outlined_on_their_rows(self) -> None:
+        self.assertIn("av mine", row(self.text, "XW-0003"))
+        self.assertNotIn("av mine", row(self.text, "XW-0001"))
+
+    def test_a_sub_goal_date_is_drawn_only_when_it_differs_from_its_parent(self) -> None:
+        self.assertIn("Committed Nov 6", row(self.text, "XW-0004"))
+        self.assertNotIn("Nov 6", row(self.text, "XW-0005"))
+
+    def test_a_goal_with_no_health_has_no_pill(self) -> None:
+        self.assertNotIn('class="chip"', row(self.text, "XW-0006"))
+
+    def test_the_sign_in_page_gives_the_reason(self) -> None:
+        self.assertIn("no token", self.anonymous.body.decode("utf-8"))
+
+
+class PrioritiesDefinitionTests(unittest.TestCase):
+    """Home draws the saved definition: open goals at the org unit's level, current-period Priorities, and an old date keeps today on screen."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.store = Store()
+        code, result = cls.store.run("seed")
+        assert code == 0, result
+        quarter = (datetime.date.today().month - 1) // 3 + 1
+        period = f"{datetime.date.today().year}-Q{quarter}"
+        writes = [
+            create("org_unit", "xw-team", {"name": "XW Team", "level": "Team", "parent": "excaliwire", "owner": "tig"}, "Test data"),
+            create("priority", "PRI-4", {"org_unit": "excaliwire", "period": period, "rank": 4, "title": "An empty Priority", "status": "Current"}, "Test data"),
+            create("priority", "PRI-OLD", {"org_unit": "excaliwire", "period": "2020-Q1", "rank": 5, "title": "A Priority of an old period", "status": "Current"}, "Test data"),
+            create("goal", "XW-0090", {**OLD_GOAL, "summary": "An old Committed date in the view", "priority": "PRI-1"}, "Test data"),
+            create("goal", "XW-0091", {**OLD_GOAL, "summary": "A Team goal on a company Priority", "priority": "PRI-1", "org_unit": "xw-team", "level": "Team"}, "Test data"),
+            create("goal", "XW-0092", {**OLD_GOAL, "summary": "A Completed goal", "priority": "PRI-2", "state": "Completed", "health": None, "path_to_green": None}, "Test data"),
+            create("draft", "DR-1", {"entity": "XW-0001", "actor": "chelsea", "base_version": 1, "change": {"health": "YELLOW"}, "reason": "test"}, "Test data"),
+        ]
+        for command in writes:
+            result = cls.store.write("chelsea", command)
+            assert result["ok"], (command, result)
+        code, printed = cls.store.run("home")
+        assert code == 0, printed
+        cls.text = printed["html"]
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.store.close()
+
+    def test_an_empty_priority_is_drawn_with_its_rank(self) -> None:
+        self.assertIn("An empty Priority", self.text)
+        self.assertIn('id="priority-PRI-4"', self.text)
+
+    def test_a_priority_of_another_period_is_not_drawn(self) -> None:
+        self.assertNotIn("A Priority of an old period", self.text)
+
+    def test_a_goal_at_another_level_is_not_drawn(self) -> None:
+        self.assertNotIn("XW-0091", self.text)
+
+    def test_a_completed_goal_is_not_drawn(self) -> None:
+        self.assertNotIn("XW-0092", self.text)
+
+    def test_an_old_date_keeps_today_on_the_timeline(self) -> None:
+        self.assertIn('id="goal-XW-0090"', self.text)
+        self.assertLess(today_at(self.text), 90)
+
+    def test_the_drafts_card_counts_drafts(self) -> None:
+        self.assertIn("1 <small", self.text[self.text.index(">Drafts<"):])
+
+
+OLD_GOAL = {
+    "description": "A test goal.",
+    "owner": "tig",
+    "org_unit": "excaliwire",
+    "level": "Company",
+    "type": "Milestone (Launch)",
+    "due_date": "2025-01-15",
+    "date_type": "Committed",
+    "plan": "docs/release-plan.md",
+    "plan_maturity": "Pencil",
+    "severity": "sev2",
+    "state": "In Progress",
+    "health": "RED",
+    "path_to_green": {"steps": [{"owner": "tig", "date": "2026-10-29", "text": "Test step"}]},
+    "origination": "New",
+}
 
 
 if __name__ == "__main__":
