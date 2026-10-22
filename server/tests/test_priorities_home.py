@@ -57,8 +57,11 @@ class PrioritiesHomeTests(unittest.TestCase):
         assert result["ok"], result
         token, env = signed()
         with running_server(cls.store.path, env) as (proc, port):
-            cls.home = get(proc, port, "/", {"Authorization": f"Bearer {token}"})
+            auth = {"Authorization": f"Bearer {token}"}
+            cls.home = get(proc, port, "/", auth)
             cls.anonymous = get(proc, port, "/")
+            cls.later = get(proc, port, "/?from=2026-12-09", auth).body.decode("utf-8")
+            cls.bad_from = get(proc, port, "/?from=2026-13-45", auth)
         cls.text = cls.home.body.decode("utf-8")
         code, cls.printed = cls.store.run("home")
 
@@ -129,7 +132,8 @@ class PrioritiesHomeTests(unittest.TestCase):
         self.assertNotRegex(self.text, r"\d+ sub-goals?<")
 
     def test_the_committed_card_counts_each_health(self) -> None:
-        self.assertIn("1 RED · 1 YELLOW · 1 GREEN", self.text)
+        counts = re.findall(r'class="count">.*?</span>(\d+ [A-Z]+)</span>', self.text)
+        self.assertEqual(counts, ["1 RED", "1 YELLOW", "1 GREEN"])
 
     def test_red_and_yellow_rows_show_the_first_ptg_step(self) -> None:
         for goal in ("XW-0001", "XW-0002"):
@@ -149,6 +153,28 @@ class PrioritiesHomeTests(unittest.TestCase):
 
     def test_a_goal_with_no_health_has_no_pill(self) -> None:
         self.assertNotIn('class="chip"', row(self.text, "XW-0006"))
+
+    def test_the_timeline_moves_earlier_and_later(self) -> None:
+        self.assertRegex(self.text, r'href="/\?from=\d{4}-\d{2}-\d{2}"[^>]*aria-label="Earlier"')
+        self.assertRegex(self.text, r'href="/\?from=\d{4}-\d{2}-\d{2}"[^>]*aria-label="Later"')
+        self.assertIn('href="/"', self.text)
+
+    def test_from_opens_the_week_that_holds_that_day(self) -> None:
+        weeks = re.findall(r'class="wk"[^>]*>([^<]+)<', self.later)
+        self.assertEqual(weeks[0], "Dec 7")
+
+    def test_a_bad_from_falls_back_to_the_default_window(self) -> None:
+        self.assertEqual(self.bad_from.status, 200)
+        self.assertEqual(re.findall(r'class="wk"[^>]*>([^<]+)<', self.bad_from.body.decode("utf-8"))[0], re.findall(r'class="wk"[^>]*>([^<]+)<', self.text)[0])
+
+    def test_goal_keys_show_only_on_hover(self) -> None:
+        visible = re.sub(r'<div class="tip".*?</div>', "", row(self.text, "XW-0001"), flags=re.S)
+        visible = visible.replace('id="goal-XW-0001"', "")
+        self.assertNotIn("XW-0001", visible)
+        self.assertIn("XW-0001", row(self.text, "XW-0001"))
+
+    def test_the_grid_and_today_line_are_drawn_once_for_the_whole_board(self) -> None:
+        self.assertEqual(self.text.count('class="today"'), 1)
 
     def test_the_sign_in_page_gives_the_reason(self) -> None:
         self.assertIn("no token", self.anonymous.body.decode("utf-8"))

@@ -15,7 +15,7 @@ export function createApp(db: DatabaseSync, issuers: Issuer[]): Hono {
     const who = await resolveActor(db, c.req.header(), issuers);
     if (!who.ok) return c.html(signInPage(who.reason), 401);
     const actor = { id: who.actor.id as string, name: who.actor.display_name as string };
-    return c.html(homePage(prioritiesView(db, configuredOrgUnit(db)), actor));
+    return c.html(homePage(prioritiesView(db, configuredOrgUnit(db), new Date(), c.req.query("from")), actor));
   });
   app.get("/health", (c) => c.text("ok"));
   return app;

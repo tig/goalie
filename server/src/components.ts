@@ -78,17 +78,25 @@ export function avatar(actor: Actor, mine = false): string {
   return `<span class="av${mine ? " mine" : ""}" style="background:var(--av-${n}-bg);color:var(--av-${n}-ink)" title="${escape(actor.name)}">${escape(actor.name.slice(0, 1))}</span>`;
 }
 
-/** The health as a word on its color. No pill for a goal with no health. */
-export function healthChip(health: Health): string {
-  if (!health) return "";
+/** Text a screen reader reads and the eye does not see. */
+const hidden = (text: string) => `<span class="vh">${escape(text)}</span>`;
+
+/** The health as a dot of its color. The word is there for a screen reader. No health is a hollow dot. */
+export function healthDot(health: Health): string {
   const l = look(health);
-  return `<span class="chip" style="background:${l.bg};color:${l.ink}">${health}</span>`;
+  return `<span class="hdot${health ? "" : " none"}" style="background:${health ? l.bar : "transparent"}"></span>${hidden(health ?? "no health")}`;
 }
 
+/** The Priority rank on its goal's health color. */
 export function rankBadge(rank: number, health: Health): string {
   const l = look(health);
   const ring = health ? `;box-shadow:inset 0 0 0 1.5px ${l.bar}` : "";
-  return `<span class="rank" style="background:${l.bg};color:${l.ink}${ring}">${rank}</span>`;
+  return `<span class="rank" style="background:${l.bg};color:${l.ink}${ring}">${rank}${health ? hidden(health) : ""}</span>`;
+}
+
+/** A hover card. Each line is HTML. It shows on hover and on keyboard focus of its parent. */
+export function tip(lines: string[]): string {
+  return `<div class="tip" role="tooltip">${lines.map((l) => `<div>${l}</div>`).join("")}</div>`;
 }
 
 /** A date with its Date Type. It does not wrap inside. */
@@ -96,6 +104,8 @@ export function dateMark(label: string): string {
   return `<span class="date">${escape(label)}</span>`;
 }
 
-export function card(label: string, body: string): string {
-  return `<div class="card"><p class="lbl">${escape(label)}</p>${body}</div>`;
+/** A summary card. `help` is a sentence shown on hover of the label. */
+export function card(label: string, body: string, help?: string): string {
+  const heading = help ? `<p class="lbl has-tip" tabindex="0">${escape(label)}<span class="q" aria-hidden="true">?</span>${tip([escape(help)])}</p>` : `<p class="lbl">${escape(label)}</p>`;
+  return `<div class="card">${heading}${body}</div>`;
 }

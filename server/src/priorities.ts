@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import { committedDate, currentDate, isOpen, OPEN_STATES } from "./goal.ts";
+import { committedDate, currentDate, isDate, isOpen, OPEN_STATES } from "./goal.ts";
 import { read, readAll } from "./read.ts";
 import type { Row } from "./rules.ts";
 
@@ -23,6 +23,8 @@ const DAY = 86_400_000;
 const WEEKS = 13;
 /** Today stays at least this many days inside the right edge of the window. */
 const AHEAD_DAYS = 28;
+/** One press of Earlier or Later moves the window this many weeks. */
+const STEP_WEEKS = 4;
 
 export type Health = "GREEN" | "YELLOW" | "RED" | null;
 
@@ -75,6 +77,8 @@ export type PrioritiesView = {
   today: string;
   weeks: { at: number; label: string }[];
   todayAt: number;
+  /** The window's first and last day, and where Earlier and Later go. */
+  window: { first: string; last: string; earlier: string; later: string };
   funded: PriorityRow[];
   backlog: PriorityRow[];
   summary: Summary;
@@ -83,6 +87,8 @@ export type PrioritiesView = {
 function day(iso: string): number {
   return Date.parse(`${iso.slice(0, 10)}T00:00:00Z`);
 }
+
+const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
 
 const MONTH_DAY = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", timeZone: "UTC" });
 const MONTH_DAY_YEAR = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
@@ -132,7 +138,8 @@ function firstStep(ptg: unknown, names: Map<string, string>): PtgStep | undefine
   };
 }
 
-export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = new Date()): PrioritiesView {
+/** `from` opens the week that holds that day. A value that is not a real date is ignored. */
+export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = new Date(), from?: string): PrioritiesView {
   const todayIso = now.toISOString().slice(0, 10);
   const today = day(todayIso);
   const unit = read(db, "org_unit", orgUnit);
@@ -167,8 +174,8 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
     .map((g) => committedDate(g, getGoal))
     .filter((c): c is NonNullable<typeof c> => c !== undefined)
     .map((c) => day(c.date) - 3 * DAY);
-  const from = Math.max(Math.min(today - 14 * DAY, ...passed), today - (WEEKS * 7 - AHEAD_DAYS) * DAY);
-  const start = from - ((new Date(from).getUTCDay() + 6) % 7) * DAY;
+  const first = isDate(from) ? day(from) : Math.max(Math.min(today - 14 * DAY, ...passed), today - (WEEKS * 7 - AHEAD_DAYS) * DAY);
+  const start = first - ((new Date(first).getUTCDay() + 6) % 7) * DAY;
   const end = start + WEEKS * 7 * DAY;
   const pos = (t: number) => (100 * (Math.min(Math.max(t, start), end) - start)) / (end - start);
   const outside = (t: number): Mark["outside"] => (t < start ? "before" : t > end ? "after" : null);
@@ -241,13 +248,14 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
 
   const weeks = Array.from({ length: WEEKS }, (_, i) => {
     const t = start + i * 7 * DAY;
-    return { at: pos(t), label: shortDate(new Date(t).toISOString().slice(0, 10), todayIso) };
+    return { at: pos(t), label: shortDate(iso(t), todayIso) };
   });
   return {
     org,
     today: todayIso,
     weeks,
     todayAt: pos(today),
+    window: { first: iso(start), last: iso(end - DAY), earlier: iso(start - STEP_WEEKS * 7 * DAY), later: iso(start + STEP_WEEKS * 7 * DAY) },
     funded,
     backlog,
     summary: {
