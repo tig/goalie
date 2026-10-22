@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { pathToFileURL } from "node:url";
+import { configuredDatabase } from "./config.ts";
 import { HOME_PAGE } from "./home.ts";
 import { openStore } from "./store.ts";
 
@@ -28,11 +29,6 @@ function configuredPort(): number {
     throw new Error("PORT must be an integer from 1 to 65535");
   }
   return port;
-}
-
-/** GOALIE_DB is the SQLite file path (ADR 0006). The default is goalie.db in the working directory. */
-export function configuredDatabase(): string {
-  return process.env.GOALIE_DB || "goalie.db";
 }
 
 function startedAsMain(): boolean {
