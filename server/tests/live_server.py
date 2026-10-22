@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import socket
 import subprocess
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -40,12 +41,14 @@ def read_stderr(proc: subprocess.Popen[bytes]) -> str:
 
 
 @contextmanager
-def running_server() -> Iterator[tuple[subprocess.Popen[bytes], int]]:
-    """Yield the process and its port. Stop the process on exit."""
+def running_server(database: Path | None = None) -> Iterator[tuple[subprocess.Popen[bytes], int]]:
+    """Yield the process and its port. Stop the process on exit. The database defaults to a temporary file."""
     port = free_port()
     env = os.environ.copy()
     env["PORT"] = str(port)
     env["HOST"] = "127.0.0.1"
+    scratch = tempfile.TemporaryDirectory()
+    env["GOALIE_DB"] = str(database or Path(scratch.name) / "goalie.db")
     proc = subprocess.Popen(
         ["node", "src/server.ts"],
         cwd=SERVER,
@@ -63,6 +66,7 @@ def running_server() -> Iterator[tuple[subprocess.Popen[bytes], int]]:
             proc.stdout.close()
         if proc.stderr:
             proc.stderr.close()
+        scratch.cleanup()
 
 
 def get(proc: subprocess.Popen[bytes], port: int, path: str) -> Reply:

@@ -37,7 +37,8 @@ The app is Hono.
 Domain routes are later issues.
 You must not put a second server language here.
 `npm start --prefix server` starts the process.
-`PORT` and `HOST` are process configuration.
+`PORT`, `HOST`, and `GOALIE_DB` are process configuration.
+`GOALIE_DB` is the path of the SQLite file ([ADR 0006](docs/adr/0006-deployment-target.md)). The default is `goalie.db` in the working directory.
 The default host is `127.0.0.1`.
 `GET /health` answers `ok`.
 `GET /` answers the home page as HTML. It is a placeholder that says `Goalie: coming soon`.

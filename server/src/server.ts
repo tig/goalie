@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { pathToFileURL } from "node:url";
 import { HOME_PAGE } from "./home.ts";
+import { openStore } from "./store.ts";
 
 /** The one Hono application. Domain routes are later issues. */
 export function createApp(): Hono {
@@ -29,11 +30,17 @@ function configuredPort(): number {
   return port;
 }
 
+/** GOALIE_DB is the SQLite file path (ADR 0006). The default is goalie.db in the working directory. */
+export function configuredDatabase(): string {
+  return process.env.GOALIE_DB || "goalie.db";
+}
+
 function startedAsMain(): boolean {
   const entry = process.argv[1];
   return entry !== undefined && import.meta.url === pathToFileURL(entry).href;
 }
 
 if (startedAsMain()) {
+  openStore(configuredDatabase());
   listen(createApp(), configuredPort(), process.env.HOST);
 }
