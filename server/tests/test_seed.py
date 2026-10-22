@@ -93,6 +93,22 @@ class SeedTransactionTests(unittest.TestCase):
         self.assertIsNone(store.read("actor", "tig"))
 
 
+class DefaultsTests(unittest.TestCase):
+    def test_home_opens_on_the_root_org_unit_for_the_goalie_owner(self) -> None:
+        store = Store()
+        self.addCleanup(store.close)
+        for command in [
+            {"op": "create", "kind": "actor", "id": "jane", "fields": {"kind": "human", "display_name": "Jane Roe"}},
+            {"op": "create", "kind": "org_unit", "id": "acme", "fields": {"name": "Acme Widgets", "level": "Company", "owner": "jane"}},
+            {"op": "create", "kind": "owner_settings", "id": "owner", "fields": {"owner": "jane", "settings": {}}},
+        ]:
+            self.assertTrue(store.write("jane", command)["ok"])
+        code, page = store.run("home", env={"GOALIE_ORG_UNIT": ""})
+        self.assertEqual(code, 0, page)
+        self.assertIn("Acme Widgets", page["html"])
+        self.assertIn("Jane Roe", page["html"])
+
+
 class CheckTests(unittest.TestCase):
     def test_check_flags_a_short_summary(self) -> None:
         store = Store()

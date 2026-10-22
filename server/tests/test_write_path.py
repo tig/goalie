@@ -205,6 +205,12 @@ class WritePathTests(unittest.TestCase):
         self.rejected(create("goal", "GOAL-43", {**EXAMPLE, "due_date": "2027-02-29"}, "Planned"), "date-and-date-type")
         self.rejected(update("goal", "GOAL-57", 1, {"changed_due_date": "2026-11-31"}, "Slip"), "field-value")
 
+    def test_a_slip_changes_the_date_and_keeps_the_original_committed_date(self) -> None:
+        self.rejected(update("goal", "GOAL-57", 1, {"changed_due_date": "2026-11-30"}), "reason-required")
+        result = self.ok(update("goal", "GOAL-57", 1, {"changed_due_date": "2026-11-30"}, "Vendor slipped"))
+        self.assertEqual(result["entity"]["original_committed_date"], "2026-11-15")
+        self.assertEqual(result["events"][0]["reason"], "Vendor slipped")
+
     def test_a_goal_cannot_be_its_own_ancestor(self) -> None:
         self.rejected(update("goal", "GOAL-7", 1, {"parent": "GOAL-7"}), "parent-not-cycle")
         self.ok(update("goal", "GOAL-57", 1, {"parent": "GOAL-7"}))
