@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { ENTITIES, encode, isKind, lookup, memoryLookup, read, readAll, readEvents, type EventRow, type Kind } from "./read.ts";
-import { checkTransition, checkWrite, REASONED, summaryLint, SYSTEM_FIELDS, type Row, type Violation } from "./rules.ts";
+import { DEFAULT_VISIBILITY } from "./goal.ts";
+import { checkAuthor, checkTransition, checkWrite, REASONED, summaryLint, SYSTEM_FIELDS, type Row, type Violation } from "./rules.ts";
 
 /**
  * The one write path. The API, the MCP server, the app, and the seed call write(). Nothing else writes.
@@ -12,7 +13,7 @@ export { isKind, read, readEvents, type EventRow, type Kind };
 
 /** Values a create fills when the command leaves them out (SPEC.md §6.1, §12). */
 const DEFAULTS: Partial<Record<Kind, Row>> = {
-  goal: { description: "", visibility: "organization-wide" },
+  goal: { description: "", visibility: DEFAULT_VISIBILITY },
   user_settings: { favorite_views: [], appearance: "light" },
 };
 
@@ -26,12 +27,30 @@ export type WriteResult =
   | { ok: false; error: "invalid"; violations: Violation[] }
   | { ok: false; error: "unknown_actor" | "not_found" | "exists" | "bad_command"; message: string };
 
+/** The default goal key prefix. The GOALIE owner sets their own as `goal_key_prefix` in owner settings (SPEC.md §6.1, §12). */
+const GOAL_KEY_PREFIX = "GOAL";
+
+/** The next unused key. A goal key is the owner's prefix and a 4-digit number, e.g. XW-0012. */
 function nextId(db: DatabaseSync, kind: Kind): string {
+  const settings = kind === "goal" ? (read(db, "owner_settings", "owner")?.settings as Row | undefined) : undefined;
+  const prefix = typeof settings?.goal_key_prefix === "string" ? settings.goal_key_prefix : kind === "goal" ? GOAL_KEY_PREFIX : ENTITIES[kind].prefix;
   const { n } = db.prepare(`SELECT COUNT(*) AS n FROM ${kind}`).get() as { n: number };
   for (let i = n + 1; ; i++) {
-    const id = `${ENTITIES[kind].prefix}-${i}`;
+    const id = `${prefix}-${kind === "goal" ? String(i).padStart(4, "0") : i}`;
     if (read(db, kind, id) === undefined) return id;
   }
+}
+
+/** A field holds text, a number, or null. A `bool` field holds a boolean. A `json` field holds any JSON value. */
+function wrongTypes(kind: Kind, fields: Row): Violation[] {
+  const spec = ENTITIES[kind];
+  return Object.entries(fields)
+    .filter(([field, value]) => {
+      if (value === null || (spec.json as readonly string[]).includes(field)) return false;
+      if ((spec.bool as readonly string[]).includes(field)) return typeof value !== "boolean";
+      return typeof value !== "string" && !(typeof value === "number" && Number.isFinite(value));
+    })
+    .map(([field, value]) => ({ rule: "field-value", message: `${kind}.${field} cannot hold ${JSON.stringify(value)}.` }));
 }
 
 function same(a: unknown, b: unknown): boolean {
@@ -63,14 +82,28 @@ export function write(db: DatabaseSync, actor: string, command: Command): WriteR
     return { ok: false, error: "invalid", violations: system.map((f) => ({ rule: "system-field", message: `${f} is set by the system.` })) };
   }
 
-  db.exec("BEGIN IMMEDIATE");
+  const typed = wrongTypes(kind, fields);
+  if (typed.length > 0) return { ok: false, error: "invalid", violations: typed };
+
+  return inTransaction(db, (result) => result.ok, () => apply(db, actor, kind, command, fields));
+}
+
+/**
+ * Run `body` in one transaction: commit when `keep` says so, else roll back.
+ * Inside an open transaction it is a savepoint, so a caller can group several writes (the seed does).
+ */
+export function inTransaction<T>(db: DatabaseSync, keep: (result: T) => boolean, body: () => T): T {
+  const nested = db.isTransaction;
+  db.exec(nested ? "SAVEPOINT write" : "BEGIN IMMEDIATE");
   db.exec("PRAGMA defer_foreign_keys = ON");
+  const undo = () => db.exec(nested ? "ROLLBACK TO write; RELEASE write" : "ROLLBACK");
   try {
-    const result = apply(db, actor, kind, command, fields);
-    db.exec(result.ok ? "COMMIT" : "ROLLBACK");
+    const result = body();
+    if (keep(result)) db.exec(nested ? "RELEASE write" : "COMMIT");
+    else undo();
     return result;
   } catch (error) {
-    db.exec("ROLLBACK");
+    undo();
     throw error;
   }
 }
@@ -79,7 +112,8 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
   const spec = ENTITIES[kind];
   const id = command.id ?? nextId(db, kind);
   const before = read(db, kind, id);
-  if (read(db, "actor", actor) === undefined && !bootstraps(db, actor, kind, id, fields)) {
+  const author = read(db, "actor", actor);
+  if (author === undefined && !bootstraps(db, actor, kind, id, fields)) {
     return { ok: false, error: "unknown_actor", message: `no actor ${actor}` };
   }
 
@@ -100,7 +134,7 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
   if (before !== undefined && changed.length === 0) return { ok: true, entity: before, events: [] };
 
   const reason = command.reason?.trim() || null;
-  const violations: Violation[] = checkTransition(kind, before, after);
+  const violations: Violation[] = [...(author ? checkAuthor(author, kind, before, after) : []), ...checkTransition(kind, before, after)];
   const needReason = changed.filter((f) => (REASONED[kind] ?? []).includes(f));
   if (needReason.length > 0 && reason === null) {
     violations.push({ rule: "reason-required", message: `a change to ${needReason.join(", ")} needs a reason.` });
@@ -120,7 +154,7 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
     if (!/constraint failed/i.test(message)) throw error;
     return { ok: false, error: "invalid", violations: [...violations, { rule: "field-value", message }] };
   }
-  violations.push(...missingReferences(db, kind));
+  violations.push(...missingReferences(db, kind, id));
   violations.push(...checkWrite(lookup(db), kind, read(db, kind, id) as Row));
   if (violations.length > 0) return { ok: false, error: "invalid", violations };
 
@@ -143,10 +177,13 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
   return { ok: true, entity: read(db, kind, id) as Row, events: readEvents(db, first) };
 }
 
-/** Foreign keys are deferred inside the transaction, so a missing reference becomes a named violation. */
-function missingReferences(db: DatabaseSync, kind: Kind): Violation[] {
-  const rows = db.prepare(`PRAGMA foreign_key_check(${kind})`).all() as { parent: string }[];
-  return rows.map((r) => ({ rule: "reference-exists", message: `${kind} names a ${r.parent} that does not exist.` }));
+/** Foreign keys are deferred inside the transaction, so a missing reference becomes a named violation. Only the written row is checked. */
+function missingReferences(db: DatabaseSync, kind: Kind, id: string): Violation[] {
+  const keys = db.prepare(`PRAGMA foreign_key_list(${kind})`).all() as { table: string; from: string; to: string }[];
+  const row = db.prepare(`SELECT * FROM ${kind} WHERE id = ?`).get(id) as Row;
+  return keys
+    .filter((k) => row[k.from] != null && db.prepare(`SELECT 1 FROM ${k.table} WHERE ${k.to} = ?`).get(row[k.from] as string) === undefined)
+    .map((k) => ({ rule: "reference-exists", message: `${kind} names a ${k.table} that does not exist.` }));
 }
 
 /** The first write to an empty store creates the acting human. It is the only write by an actor that does not exist yet. */

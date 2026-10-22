@@ -1,10 +1,11 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { Row } from "./rules.ts";
-import { write, type Command } from "./write.ts";
+import { inTransaction, write, type Command } from "./write.ts";
 
 /**
  * The Excaliwire seed: the org unit, Tig and Chelsea, and the goal tree on #47 (tig/goalie).
- * Every row goes through the write path, as Chelsea, who runs the load.
+ * Every row goes through the write path, in one transaction, as Chelsea, who runs the load.
+ * Tig writes the owner settings, because only the GOALIE owner may (ADR 0011).
  * Values marked "Placeholder" are not in #47. The pull request for #48 lists them for Tig.
  */
 
@@ -60,7 +61,7 @@ const subGoal = (id: string, summary: string, plan: string, state = "Backlog"): 
 const COMMANDS: Command[] = [
   { op: "create", kind: "actor", id: "chelsea", reason: REASON, fields: { kind: "human", display_name: "Chelsea" } },
   { op: "create", kind: "actor", id: "tig", reason: REASON, fields: { kind: "human", display_name: "Tig" } },
-  { op: "create", kind: "owner_settings", id: "owner", reason: REASON, fields: { owner: "tig", settings: {} } },
+  { op: "create", kind: "owner_settings", id: "owner", reason: REASON, fields: { owner: "tig", settings: { goal_key_prefix: "XW" } } },
   { op: "create", kind: "org_unit", id: "excaliwire", reason: REASON, fields: { name: "Excaliwire", level: "Company", owner: "tig" } },
   priority("PRI-1", 1, "Regenerate the E28 canon"),
   priority("PRI-2", 2, "Grow the XW team"),
@@ -158,15 +159,20 @@ const COMMANDS: Command[] = [
 
 export type SeedResult = { ok: true; events: number } | { ok: false; reason: string; command?: Command; result?: unknown };
 
-/** Load the seed into an empty store. Stop at the first rejected write. */
+/** The actor each seed write is from. */
+const author = (command: Command): string => (command.kind === "owner_settings" ? "tig" : "chelsea");
+
+/** Load the seed into an empty store. Stop at the first rejected write and keep nothing. */
 export function seed(db: DatabaseSync): SeedResult {
   const { n } = db.prepare("SELECT COUNT(*) AS n FROM actor").get() as { n: number };
   if (n > 0) return { ok: false, reason: "the store is not empty" };
-  let events = 0;
-  for (const command of COMMANDS) {
-    const result = write(db, "chelsea", command);
-    if (!result.ok) return { ok: false, reason: "a seed write was rejected", command, result };
-    events += result.events.length;
-  }
-  return { ok: true, events };
+  return inTransaction(db, (result: SeedResult) => result.ok, () => {
+    let events = 0;
+    for (const command of COMMANDS) {
+      const result = write(db, author(command), command);
+      if (!result.ok) return { ok: false, reason: "a seed write was rejected", command, result };
+      events += result.events.length;
+    }
+    return { ok: true, events };
+  });
 }

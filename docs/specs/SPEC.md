@@ -469,6 +469,7 @@ Settings are of two kinds. Owner settings belong to the deployment. User setting
 | Review set and cadence | [§9 (Reviews)](#s9) |
 | "Promotions due" window | 2 weeks |
 | Visibility policy | Organization-wide; logged exceptions |
+| Goal key prefix | `GOAL`, so keys read `GOAL-0001` |
 | Who can correct an Original Committed Date | GOALIE owner only, with reason (or no one) |
 | Lints enabled | All in [§6.1 (Goal)](#s6-1) |
 | Time for a committed change to reach every open view | 1 s |
