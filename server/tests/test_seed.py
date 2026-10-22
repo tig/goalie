@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 import unittest
 
 from goalie_cli import Store
@@ -57,12 +58,55 @@ class SeedTests(unittest.TestCase):
             self.assertIn(event["actor"], ("tig", "chelsea"))
             self.assertTrue(event["reason"])
 
+    def test_tig_writes_the_owner_settings(self) -> None:
+        settings = self.store.read("owner_settings", "owner")
+        self.assertEqual(settings["settings"]["goal_key_prefix"], "XW")
+        actors = {e["actor"] for e in self.store.events() if e["entity_kind"] == "owner_settings"}
+        self.assertEqual(actors, {"tig"})
+
+    def test_a_new_goal_after_the_seed_takes_the_next_xw_key(self) -> None:
+        fields = {**self.store.read("goal", "XW-0005"), "summary": "Ship the next MLP slice to Tig"}
+        fields = {k: v for k, v in fields.items() if k not in ("id", "version", "original_committed_date", "committed_plan_version")}
+        result = self.store.write("chelsea", {"op": "create", "kind": "goal", "fields": fields, "reason": "Planned"})
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["entity"]["id"], "XW-0012")
+
     def test_seed_refuses_a_store_that_is_not_empty(self) -> None:
         count = len(self.store.events())
         code, result = self.store.run("seed")
         self.assertNotEqual(code, 0)
         self.assertFalse(result["ok"])
         self.assertEqual(len(self.store.events()), count)
+
+
+class SeedTransactionTests(unittest.TestCase):
+    def test_a_rejected_seed_write_leaves_the_store_empty(self) -> None:
+        store = Store()
+        self.addCleanup(store.close)
+        store.run("events")
+        # A row the seed will try to create. Foreign keys are off in this connection.
+        with sqlite3.connect(store.path) as db:
+            db.execute("INSERT INTO priority (id, version, org_unit, period, rank, title, status) VALUES ('PRI-2', 1, 'x', '2026-Q4', 9, 'x', 'Retired')")
+        code, result = store.run("seed")
+        self.assertNotEqual(code, 0, result)
+        self.assertEqual(store.events(), [])
+        self.assertIsNone(store.read("actor", "tig"))
+
+
+class DefaultsTests(unittest.TestCase):
+    def test_home_opens_on_the_root_org_unit_for_the_goalie_owner(self) -> None:
+        store = Store()
+        self.addCleanup(store.close)
+        for command in [
+            {"op": "create", "kind": "actor", "id": "jane", "fields": {"kind": "human", "display_name": "Jane Roe"}},
+            {"op": "create", "kind": "org_unit", "id": "acme", "fields": {"name": "Acme Widgets", "level": "Company", "owner": "jane"}},
+            {"op": "create", "kind": "owner_settings", "id": "owner", "fields": {"owner": "jane", "settings": {}}},
+        ]:
+            self.assertTrue(store.write("jane", command)["ok"])
+        code, page = store.run("home", env={"GOALIE_ORG_UNIT": ""})
+        self.assertEqual(code, 0, page)
+        self.assertIn("Acme Widgets", page["html"])
+        self.assertIn("Jane Roe", page["html"])
 
 
 class CheckTests(unittest.TestCase):

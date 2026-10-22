@@ -98,6 +98,16 @@ export function readActorByToken(db: DatabaseSync, kind: "human" | "agent", id: 
   return decode("actor", db.prepare(`SELECT * FROM actor WHERE ${column} = ? AND kind = ?`).get(id, kind) as Row | undefined);
 }
 
+/** The root org unit: the first by id with no parent. */
+export function rootOrgUnit(db: DatabaseSync): string | undefined {
+  return (db.prepare("SELECT id FROM org_unit WHERE parent IS NULL ORDER BY id LIMIT 1").get() as Row | undefined)?.id as string | undefined;
+}
+
+/** The GOALIE owner, named in owner settings (ADR 0011). */
+export function goalieOwner(db: DatabaseSync): string | undefined {
+  return read(db, "owner_settings", "owner")?.owner as string | undefined;
+}
+
 /** The store as the rules see it. */
 export function lookup(db: DatabaseSync): Lookup {
   return {

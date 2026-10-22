@@ -48,8 +48,8 @@ Every token is still verified: RS256 signature, issuer, audience, and expiry.
 The default host is `127.0.0.1`.
 `GET /health` answers `ok`.
 `GET /` answers the Priorities view as HTML for a signed-in actor. Without a verified token it answers 401 with a page that asks to sign in.
-`GOALIE_ORG_UNIT` names the org unit whose Priorities open on Home. The default is `excaliwire`.
-`node src/cli.ts home` prints that page for a local actor, so a design can be checked with no token.
+`GOALIE_ORG_UNIT` names the org unit whose Priorities open on Home. The default is the root org unit.
+`node src/cli.ts home` prints that page for the GOALIE owner, or for `--as <actor>`, so a design can be checked with no token.
 The home page loads the shared Excaliwire chrome from `/_xw/`. Host configuration serves `/_xw/`.
 Host configuration lives in excaliwire/operations.
 This repo must not name the machine or the public hostname.

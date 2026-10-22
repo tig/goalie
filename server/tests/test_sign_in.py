@@ -31,6 +31,7 @@ TOKENS: list[dict[str, Any]] = [
     {"claims": claims(sub="sub-tig"), "header": {"alg": "none"}},
     {"claims": claims(sub="app-bot")},
     {"claims": claims(idtyp="app", azp="sub-tig")},
+    {"claims": claims(sub="sub-tig", nbf=int(time.time()) + 600)},
 ]
 
 
@@ -113,6 +114,13 @@ class SignInTests(unittest.TestCase):
 
     def test_agent_token_is_not_accepted_as_a_human(self) -> None:
         self.assertRefused(self.bearer(8))
+
+    def test_a_token_not_valid_yet_is_refused(self) -> None:
+        self.assertRefused(self.bearer(9))
+
+    def test_a_malformed_token_is_refused(self) -> None:
+        for token in ("abc", "a.b.c", "e30.e30.", f"{self.tokens[0]}x"):
+            self.assertRefused({"authorization": f"Bearer {token}"})
 
     def test_no_issuer_configured_refuses_every_token(self) -> None:
         result = self.store.run("whoami", stdin=self.bearer(0), env={"GOALIE_ISSUERS": ""})[1]

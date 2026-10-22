@@ -19,6 +19,19 @@ export const OPEN_STATES: readonly State[] = ["Backlog", "In Progress"];
 /** States that need a Committed date (SPEC.md §7.2). */
 export const COMPLETED_STATES: readonly State[] = ["Completed", "Completed Late"];
 
+/** The moves the state lifecycle allows (SPEC.md §7.2). A closed state has none. */
+export const STATE_MOVES: Record<State, readonly State[]> = {
+  Backlog: ["In Progress", "Deleted"],
+  "In Progress": ["Completed", "Completed Late", "Did Not Meet", "Deleted"],
+  Completed: [],
+  "Completed Late": [],
+  "Did Not Meet": [],
+  Deleted: [],
+};
+
+/** Visibility of a new goal (SPEC.md §6.1, §12). */
+export const DEFAULT_VISIBILITY = "organization-wide";
+
 export function isOpen(goal: Row): boolean {
   return (OPEN_STATES as readonly unknown[]).includes(goal.state);
 }

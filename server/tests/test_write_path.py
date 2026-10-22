@@ -200,6 +200,82 @@ class WritePathTests(unittest.TestCase):
                 db.execute("DELETE FROM event")
 
 
+    def test_a_date_must_be_a_real_calendar_date(self) -> None:
+        self.rejected(create("goal", "GOAL-42", {**EXAMPLE, "due_date": "2026-13-45"}, "Planned"), "date-and-date-type")
+        self.rejected(create("goal", "GOAL-43", {**EXAMPLE, "due_date": "2027-02-29"}, "Planned"), "date-and-date-type")
+        self.rejected(update("goal", "GOAL-57", 1, {"changed_due_date": "2026-11-31"}, "Slip"), "field-value")
+
+    def test_a_slip_changes_the_date_and_keeps_the_original_committed_date(self) -> None:
+        self.rejected(update("goal", "GOAL-57", 1, {"changed_due_date": "2026-11-30"}), "reason-required")
+        result = self.ok(update("goal", "GOAL-57", 1, {"changed_due_date": "2026-11-30"}, "Vendor slipped"))
+        self.assertEqual(result["entity"]["original_committed_date"], "2026-11-15")
+        self.assertEqual(result["events"][0]["reason"], "Vendor slipped")
+
+    def test_a_goal_cannot_be_its_own_ancestor(self) -> None:
+        self.rejected(update("goal", "GOAL-7", 1, {"parent": "GOAL-7"}), "parent-not-cycle")
+        self.ok(update("goal", "GOAL-57", 1, {"parent": "GOAL-7"}))
+        self.rejected(update("goal", "GOAL-7", 1, {"parent": "GOAL-57"}), "parent-not-cycle")
+
+    def test_fantasy_is_promoted_one_step_at_a_time(self) -> None:
+        self.ok(create("goal", "GOAL-42", {**EXAMPLE, "date_type": "Fantasy"}, "Planned"))
+        committed = {"date_type": "Committed", "promotion_milestone": None, "plan_maturity": "Pencil"}
+        self.rejected(update("goal", "GOAL-42", 1, committed, "Promote"), "date-lifecycle")
+        self.ok(update("goal", "GOAL-42", 1, {"date_type": "Ambition"}, "Promote"))
+        self.ok(update("goal", "GOAL-42", 2, committed, "Promote"))
+
+    def test_only_a_committed_goal_is_completed(self) -> None:
+        self.ok(create("goal", "GOAL-42", {**EXAMPLE, "date_type": "Fantasy"}, "Planned"))
+        self.rejected(update("goal", "GOAL-42", 1, {"state": "Completed", "health": None}, "Done"), "completed-needs-committed")
+
+    def test_state_follows_the_state_lifecycle(self) -> None:
+        self.ok(create("goal", "GOAL-42", {**EXAMPLE, "state": "Backlog", "health": None}, "Planned"))
+        self.rejected(update("goal", "GOAL-42", 1, {"state": "Completed Late"}, "Done"), "state-lifecycle")
+        self.ok(update("goal", "GOAL-57", 1, {"state": "Completed", "health": None}, "Done"))
+        self.rejected(update("goal", "GOAL-57", 2, {"state": "Backlog"}, "Reopen"), "state-lifecycle")
+
+    def test_a_wrong_typed_value_is_a_named_rejection(self) -> None:
+        self.rejected(update("goal", "GOAL-57", 1, {"summary": {"text": "Commit the date"}}), "field-value")
+        self.rejected(update("priority", "PRI-3", 1, {"rank": [2]}, "Re-rank"), "field-value")
+        self.rejected(update("priority", "PRI-3", 1, {"cut_line": "true"}), "field-value")
+
+    def test_an_agent_writes_a_draft_not_a_goal_or_a_priority(self) -> None:
+        self.ok(create("actor", "bot", {"kind": "agent", "display_name": "Bot", "operator": JANE}))
+        result = self.store.write("bot", update("goal", "GOAL-57", 1, {"health": "YELLOW"}, "Evidence"))
+        self.assertEqual(result["error"], "invalid", result)
+        self.assertIn("agent-writes-a-draft", [v["rule"] for v in result["violations"]])
+        result = self.store.write("bot", create("goal", "GOAL-42", EXAMPLE, "Planned"))
+        self.assertIn("agent-writes-a-draft", [v["rule"] for v in result.get("violations", [])], result)
+        result = self.store.write("bot", update("priority", "PRI-3", 1, {"rank": 1}, "Evidence"))
+        self.assertIn("agent-writes-a-draft", [v["rule"] for v in result.get("violations", [])], result)
+        draft = {"entity": "GOAL-57", "actor": "bot", "base_version": 1, "change": {"health": "YELLOW"}, "reason": "Evidence"}
+        result = self.store.write("bot", create("draft", "DRAFT-1", draft))
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(self.store.read("goal", "GOAL-57")["health"], "GREEN")
+
+    def test_only_the_goalie_owner_writes_owner_settings(self) -> None:
+        self.ok(create("actor", "tig", {"kind": "human", "display_name": "Tig"}))
+        result = self.store.write("tig", create("owner_settings", "owner", {"owner": JANE, "settings": {}}))
+        self.assertIn("owner-settings", [v["rule"] for v in result.get("violations", [])], result)
+        self.ok(create("owner_settings", "owner", {"owner": JANE, "settings": {}}))
+        result = self.store.write("tig", update("owner_settings", "owner", 1, {"settings": {"goal_key_prefix": "TIG"}}))
+        self.assertIn("owner-settings", [v["rule"] for v in result.get("violations", [])], result)
+        self.ok(update("owner_settings", "owner", 1, {"settings": {"goal_key_prefix": "EX"}}))
+
+    def test_a_human_writes_only_their_own_user_settings(self) -> None:
+        self.ok(create("actor", "tig", {"kind": "human", "display_name": "Tig"}))
+        self.ok(create("actor", "bot", {"kind": "agent", "display_name": "Bot", "operator": JANE}))
+        self.rejected(create("user_settings", "tig", {"appearance": "dark"}), "user-settings")
+        result = self.store.write("bot", create("user_settings", "bot", {}))
+        self.assertIn("user-settings", [v["rule"] for v in result.get("violations", [])], result)
+        self.ok(create("user_settings", JANE, {"appearance": "dark"}))
+
+    def test_a_new_goal_key_uses_the_owner_settings_prefix(self) -> None:
+        fields = committed_milestone(summary="Commit the enterprise launch date")
+        self.assertEqual(self.ok({"op": "create", "kind": "goal", "fields": fields, "reason": "Planned"})["entity"]["id"], "GOAL-0003")
+        self.ok(create("owner_settings", "owner", {"owner": JANE, "settings": {"goal_key_prefix": "EX"}}))
+        self.assertEqual(self.ok({"op": "create", "kind": "goal", "fields": fields, "reason": "Planned"})["entity"]["id"], "EX-0004")
+
+
 class BootstrapTests(unittest.TestCase):
     def test_first_write_creates_the_acting_human(self) -> None:
         store = Store()

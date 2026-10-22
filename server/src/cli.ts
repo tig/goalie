@@ -3,6 +3,7 @@ import { configuredIssuers, resolveActor } from "./auth.ts";
 import { configuredDatabase, configuredOrgUnit } from "./config.ts";
 import { homePage } from "./home.ts";
 import { prioritiesView } from "./priorities.ts";
+import { goalieOwner } from "./read.ts";
 import { openStore } from "./store.ts";
 import { seed } from "./seed.ts";
 import { checkStore, isKind, read, readEvents, write, type Command } from "./write.ts";
@@ -16,7 +17,7 @@ import { checkStore, isKind, read, readEvents, write, type Command } from "./wri
  *   seed                 load the Excaliwire seed into an empty store
  *   check                re-run every rule and lint; exit 2 if a rule is broken
  *   whoami               resolve the JSON request headers on stdin to one actor (ADR 0005)
- *   home [--as <actor>]  print the Home page as {"html"}, drawn for that actor (default chelsea)
+ *   home [--as <actor>]  print the Home page as {"html"}, drawn for that actor (default the GOALIE owner)
  */
 async function main(args: string[]): Promise<number> {
   const db = openStore(configuredDatabase());
@@ -54,10 +55,10 @@ async function main(args: string[]): Promise<number> {
       return result.ok ? 0 : 2;
     }
     case "home": {
-      const id = rest[0] === "--as" && rest[1] ? rest[1] : "chelsea";
-      const actor = read(db, "actor", id);
-      if (!actor) return usage();
-      print({ html: homePage(prioritiesView(db, configuredOrgUnit()), { id, name: actor.display_name as string }) });
+      const id = rest[0] === "--as" && rest[1] ? rest[1] : goalieOwner(db);
+      const actor = id === undefined ? undefined : read(db, "actor", id);
+      if (!id || !actor) return usage();
+      print({ html: homePage(prioritiesView(db, configuredOrgUnit(db)), { id, name: actor.display_name as string }) });
       return 0;
     }
     default:

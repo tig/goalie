@@ -3,7 +3,7 @@
  * A rule returns violations. The write path rolls back when there is one.
  */
 
-import { currentDate, DATE_TYPES } from "./goal.ts";
+import { COMPLETED_STATES, currentDate, DATE_TYPES, isDate, STATE_MOVES, type State } from "./goal.ts";
 
 export type Row = Record<string, unknown>;
 
@@ -38,7 +38,7 @@ export function checkGoal(store: Lookup, goal: Row): Violation[] {
   if (!isHuman(store, goal.owner)) {
     add("one-human-owner", `${goal.id}: the owner must be exactly one human actor.`);
   }
-  if (typeof goal.due_date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(goal.due_date) || !(DATE_TYPES as readonly unknown[]).includes(goal.date_type)) {
+  if (!isDate(goal.due_date) || !(DATE_TYPES as readonly unknown[]).includes(goal.date_type)) {
     add("date-and-date-type", `${goal.id}: every goal has a date and a Date Type.`);
   }
   if (goal.date_type === "Committed") {
@@ -64,6 +64,15 @@ export function checkGoal(store: Lookup, goal: Row): Violation[] {
       );
     }
   }
+  if (goal.changed_due_date != null && !isDate(goal.changed_due_date)) {
+    add("field-value", `${goal.id}: changed_due_date ${String(goal.changed_due_date)} is not a calendar date.`);
+  }
+  if ((COMPLETED_STATES as readonly unknown[]).includes(goal.state) && goal.date_type !== "Committed") {
+    add("completed-needs-committed", `${goal.id}: a ${goal.state} goal has a Committed date.`);
+  }
+  if (isOwnAncestor(store, goal)) {
+    add("parent-not-cycle", `${goal.id}: a goal cannot be its own ancestor.`);
+  }
   if (goal.state === "In Progress" && goal.health == null) {
     add("health-while-in-progress", `${goal.id}: an In Progress goal has a health.`);
   }
@@ -71,6 +80,15 @@ export function checkGoal(store: Lookup, goal: Row): Violation[] {
     add("ptg-when-yellow-or-red", `${goal.id}: a ${goal.health} goal has a Path to Green.`);
   }
   return found;
+}
+
+function isOwnAncestor(store: Lookup, goal: Row): boolean {
+  const seen = new Set<unknown>();
+  for (let at = goal.parent; typeof at === "string" && !seen.has(at); at = store.get("goal", at)?.parent) {
+    if (at === goal.id) return true;
+    seen.add(at);
+  }
+  return false;
 }
 
 function hasContent(value: unknown): boolean {
@@ -128,10 +146,34 @@ export function checkWrite(store: Lookup, kind: string, row: Row): Violation[] {
   }
 }
 
-/** Transition rules: they compare the row before and after a write. */
+/** Transition rules: they compare the row before and after a write (SPEC.md §5, §7). */
 export function checkTransition(kind: string, before: Row | undefined, after: Row): Violation[] {
-  if (kind === "goal" && before?.date_type === "Committed" && after.date_type !== "Committed") {
-    return [{ rule: "committed-not-demotable", message: `${after.id}: a Committed date can't be demoted. A missed date is a slip.` }];
+  if (kind !== "goal" || before === undefined) return [];
+  const found: Violation[] = [];
+  const from = DATE_TYPES.indexOf(before.date_type as never);
+  const to = DATE_TYPES.indexOf(after.date_type as never);
+  if (before.date_type === "Committed" && after.date_type !== "Committed") {
+    found.push({ rule: "committed-not-demotable", message: `${after.id}: a Committed date can't be demoted. A missed date is a slip.` });
+  } else if (from !== -1 && to - from > 1) {
+    found.push({ rule: "date-lifecycle", message: `${after.id}: a ${before.date_type} date is promoted one step, to ${DATE_TYPES[from + 1]}.` });
+  }
+  const moves = STATE_MOVES[before.state as State];
+  if (before.state !== after.state && moves !== undefined && !(moves as readonly unknown[]).includes(after.state)) {
+    found.push({ rule: "state-lifecycle", message: `${after.id}: a ${before.state} goal cannot move to ${after.state}.` });
+  }
+  return found;
+}
+
+/** Who may write what (SPEC.md §6.9, §10, §12; ADR 0011). `actor` is the writer's row; `before` is the row the write replaces. */
+export function checkAuthor(actor: Row, kind: string, before: Row | undefined, after: Row): Violation[] {
+  if (actor.kind === "agent" && (kind === "goal" || kind === "priority")) {
+    return [{ rule: "agent-writes-a-draft", message: `${actor.id} is an agent. An agent proposes a change to a ${kind} as a Draft.` }];
+  }
+  if (kind === "owner_settings" && actor.id !== (before ?? after).owner) {
+    return [{ rule: "owner-settings", message: `${actor.id}: only the GOALIE owner changes owner settings.` }];
+  }
+  if (kind === "user_settings" && (actor.kind !== "human" || actor.id !== after.id)) {
+    return [{ rule: "user-settings", message: `${actor.id}: a human changes only their own user settings.` }];
   }
   return [];
 }
