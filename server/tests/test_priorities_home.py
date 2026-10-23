@@ -247,6 +247,10 @@ class PrioritiesHomeTests(unittest.TestCase):
         self.assertIn("scroll-initial-target:nearest", self.text)
         self.assertIn('class="opens"', self.text)
 
+    def test_help_on_the_right_opens_leftward_so_it_stays_on_screen(self) -> None:
+        self.assertIn(".cards>.card:last-child .help .tip", self.text)
+        self.assertIn("calc(100vw - 32px)", self.text)
+
     def test_the_help_icons_open_on_click(self) -> None:
         cards = self.text[self.text.index('class="cards"'):self.text.index('class="card board"')]
         self.assertEqual(cards.count('<details class="help">'), 3)

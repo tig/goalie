@@ -120,8 +120,10 @@ summary:hover .chev{background:var(--grid);color:var(--ink)}details>summary::-we
 details>summary:focus-visible{outline:3px solid var(--focus);outline-offset:-3px;border-radius:12px}
 .tip{display:none;position:absolute;left:0;top:calc(100% + 6px);z-index:30;min-width:220px;max-width:360px;padding:10px 12px;border-radius:12px;background:var(--tip-bg);color:var(--tip-ink);font-size:12px;line-height:1.5;box-shadow:0 8px 28px var(--tip-shadow)}
 .tip b{font-weight:800}
+.cards>.card:last-child .help .tip,.cards>.card:nth-child(2) .help .tip{left:auto;right:-8px}
+@media (max-width:760px){.cards>.card .help .tip{left:auto;right:-8px}}
 .tipkey{font-weight:800;letter-spacing:.02em}
-.help .tip{left:-8px;top:calc(100% + 8px);width:300px;max-width:min(300px,80vw);text-transform:none;letter-spacing:0;font-weight:500;white-space:normal;color:var(--tip-ink)}
+.help .tip{left:-8px;top:calc(100% + 8px);width:300px;max-width:min(300px,calc(100vw - 32px));text-transform:none;letter-spacing:0;font-weight:500;white-space:normal;color:var(--tip-ink)}
 .tip>div+div{margin-top:6px}
 .lane{position:relative;height:100%;min-height:40px;
 background-image:linear-gradient(var(--today),var(--today)),repeating-linear-gradient(to right,var(--grid) 0 1px,transparent 1px var(--week));

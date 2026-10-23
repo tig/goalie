@@ -23,7 +23,8 @@ The product contract is [SPEC.md](../specs/SPEC.md). The app shape is [ADR 0010]
 6. A screen shows what a human needs at a glance. Detail belongs on the goal page.
 7. Goal keys (for example XW-0001) must not show on Home.
 8. A goal row must not open a hover card. Help cards are only for the **?** icon by a card label and in the legend.
-9. Every card carries a **?** help icon. A click (or Enter) opens it and a second click closes it. Pointing at it also shows it. Its text uses SPEC.md §4 and §6.1 words: what the card counts, what each word means, and what a click does.
+9. A help card must stay inside the screen. On a card in the right half of the screen it opens toward the left. It is never wider than the screen less 32 px. Check every help card open at 1440 px and 1100 px before a change ships.
+9b. Every card carries a **?** help icon. A click (or Enter) opens it and a second click closes it. Pointing at it also shows it. Its text uses SPEC.md §4 and §6.1 words: what the card counts, what each word means, and what a click does.
 10. Health is a dot of its color on every row. The word stays in the page for a screen reader. No health pills.
 10a. The Priority rank is a plain number in the first column, muted, right-aligned. No badge.
 11. A goal with no health shows a hollow dot.
