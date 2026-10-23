@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import socket
 import subprocess
@@ -15,6 +16,8 @@ from pathlib import Path
 from typing import Iterator
 
 SERVER = Path(__file__).resolve().parents[1]
+ISSUER = "https://issuer.test/tenant/v2.0"
+AUDIENCE = "api://goalie-test"
 
 
 @dataclass(frozen=True)
@@ -90,3 +93,13 @@ def get(proc: subprocess.Popen[bytes], port: int, path: str, headers: dict[str, 
             time.sleep(0.05)
     stderr = read_stderr(proc)
     raise AssertionError(f"{path} did not answer: {last_error}\n{stderr}")
+
+
+def signed(subject: str) -> tuple[str, dict[str, str]]:
+    """A token for subject, and the GOALIE_ISSUERS environment that trusts it."""
+    now = int(time.time())
+    request = {"tokens": [{"claims": {"iss": ISSUER, "aud": AUDIENCE, "sub": subject, "nbf": now - 5, "exp": now + 600}}]}
+    proc = subprocess.run(["node", "tests/sign_token.mjs"], cwd=SERVER, input=json.dumps(request).encode(), capture_output=True, check=True)
+    out = json.loads(proc.stdout)
+    env = {"GOALIE_ISSUERS": json.dumps([{"issuer": ISSUER, "audience": AUDIENCE, "jwks": out["jwks"]}])}
+    return out["tokens"][0], env

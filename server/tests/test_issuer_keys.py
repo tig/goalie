@@ -88,13 +88,13 @@ class IssuerKeyTests(unittest.TestCase):
         self.serve("k1")
         with running_server(self.store.path, self.env) as (proc, port):
             bearer = lambda i: {"authorization": f"Bearer {self.tokens[i]}"}  # noqa: E731
-            self.assertEqual(get(proc, port, "/", bearer(0)).status, 200)
+            self.assertEqual(get(proc, port, "/api/priorities", bearer(0)).status, 200)
             self.assertEqual(self.issuer.key_fetches, 1)
             self.serve("k1", "k2")
-            self.assertEqual(get(proc, port, "/", bearer(1)).status, 200)
+            self.assertEqual(get(proc, port, "/api/priorities", bearer(1)).status, 200)
             self.assertEqual(self.issuer.key_fetches, 2)
             for _ in range(3):
-                self.assertEqual(get(proc, port, "/", bearer(2)).status, 401)
+                self.assertEqual(get(proc, port, "/api/priorities", bearer(2)).status, 401)
             self.assertEqual(self.issuer.key_fetches, 2)
 
     def test_an_issuer_that_cannot_be_reached_refuses_the_token(self) -> None:

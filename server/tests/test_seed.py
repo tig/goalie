@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import unittest
 
 from goalie_cli import Store
+from live_server import get, running_server, signed
 
 
 class SeedTests(unittest.TestCase):
@@ -94,19 +96,22 @@ class SeedTransactionTests(unittest.TestCase):
 
 
 class DefaultsTests(unittest.TestCase):
-    def test_home_opens_on_the_root_org_unit_for_the_goalie_owner(self) -> None:
+    def test_priorities_open_on_the_root_org_unit(self) -> None:
         store = Store()
         self.addCleanup(store.close)
         for command in [
-            {"op": "create", "kind": "actor", "id": "jane", "fields": {"kind": "human", "display_name": "Jane Roe"}},
+            {"op": "create", "kind": "actor", "id": "jane", "fields": {"kind": "human", "display_name": "Jane Roe", "subject": "sub-jane"}},
             {"op": "create", "kind": "org_unit", "id": "acme", "fields": {"name": "Acme Widgets", "level": "Company", "owner": "jane"}},
             {"op": "create", "kind": "owner_settings", "id": "owner", "fields": {"owner": "jane", "settings": {}}},
         ]:
             self.assertTrue(store.write("jane", command)["ok"])
-        code, page = store.run("home", env={"GOALIE_ORG_UNIT": ""})
-        self.assertEqual(code, 0, page)
-        self.assertIn("Acme Widgets", page["html"])
-        self.assertIn("Jane Roe", page["html"])
+        token, env = signed("sub-jane")
+        with running_server(store.path, {**env, "GOALIE_ORG_UNIT": ""}) as (proc, port):
+            reply = get(proc, port, "/api/priorities", {"Authorization": f"Bearer {token}"})
+        self.assertEqual(reply.status, 200, reply.body)
+        body = json.loads(reply.body)
+        self.assertEqual(body["org"]["name"], "Acme Widgets")
+        self.assertEqual(body["me"]["name"], "Jane Roe")
 
 
 class CheckTests(unittest.TestCase):
