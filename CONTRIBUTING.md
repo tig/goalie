@@ -77,6 +77,7 @@ Local preview of the built app:
 Without a token the preview answers the sign-in page.
 `npm run dev --prefix server` serves the app with no server and no token. `/api/priorities` answers `server/web/fixtures/priorities.json`.
 With `GOALIE_API=http://127.0.0.1:3000`, it sends `/api/` to a running server instead.
+That server refuses a request with no verified actor. Set `GOALIE_TOKEN` to a token it accepts, and the dev server sends it as `Authorization: Bearer`.
 `server/tests/sign_token.mjs` signs a test token and prints the inline `jwks` for `GOALIE_ISSUERS`. The actor's `subject` must match the token's `sub`.
 Guidance tests are Python unittest in `guidance/tests/`.
 Shared tests and shared test infrastructure are Python unittest in `tests/`.
