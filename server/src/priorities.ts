@@ -4,8 +4,9 @@ import { read, readAll } from "./read.ts";
 import type { Row } from "./rules.ts";
 
 /**
- * The Priorities view (SPEC.md §8.2), drawn as a timeline. Tig made it the default view on 2026-10-14.
- * This module reads the store and returns plain data. home.ts draws it.
+ * The Priorities view (SPEC.md §8.2). Tig made it the default view on 2026-10-14.
+ * This module reads the store and returns plain data: the selection, the tree, the filter, and the summary.
+ * timeline.ts and calendar.ts lay it out. home.ts draws it.
  */
 
 /**
@@ -19,34 +20,15 @@ export const PRIORITIES_VIEW = {
   columns: ["Summary", "Owner", "Health", "Date Type", "Promotion Milestone", "PTG"],
 } as const;
 
-const DAY = 86_400_000;
-/** The board draws this many weeks before and after the week it opens on, and scrolls sideways through them. */
-const PAST_WEEKS = 26;
-const FUTURE_WEEKS = 39;
-const WEEKS = PAST_WEEKS + FUTURE_WEEKS;
-/** By default the board opens on the week two weeks before today. */
-const LEAD_DAYS = 14;
-/** One press of Earlier or Later moves the window this many weeks. */
-const STEP_WEEKS = 4;
+export const DAY = 86_400_000;
 
 export type Health = "GREEN" | "YELLOW" | "RED" | null;
 
-export type Mark = {
-  at: number;
-  label: string;
+/** One date on a goal, with its Date Type. A Committed or Promotion Milestone date that passed before the goal was met carries its slip. */
+export type GoalDate = {
+  date: string;
   kind: "Committed" | "Promotion Milestone" | "Ambition" | "Fantasy";
-  /** Which edge of the window the date lies past, if any. */
-  outside: "before" | "after" | null;
-};
-
-export type Lane = {
-  /** Percent positions across the window. */
-  health?: { from: number; to: number };
-  ahead?: { from: number; to: number };
-  slip?: { from: number; to: number; days: number };
-  tick?: Mark;
-  line?: { from: number; to: number; kind: "Ambition" | "Fantasy" };
-  end?: Mark;
+  slipDays?: number;
 };
 
 /** The first step of a Path to Green. */
@@ -60,9 +42,10 @@ export type GoalRow = {
   state: string;
   health: Health;
   depth: number;
-  /** The row's dates, for a screen too narrow for the lane. Empty when a sub-goal has its parent's date. */
-  when: string[];
-  lane: Lane;
+  /** When the goal started: its first move to In Progress, else its first Event. */
+  started: string;
+  /** The dates the row draws. Empty when a sub-goal has its parent's date and no slip. */
+  dates: GoalDate[];
   ptg?: PtgStep;
   /** False when a filter is on and this goal is shown only as the parent of one that matches. */
   match: boolean;
@@ -72,7 +55,7 @@ export type GoalRow = {
 export type PriorityRow = { id: string; rank: number; title: string; goals: GoalRow[] };
 
 export type Summary = {
-  committed: { counts: { RED: number; YELLOW: number; GREEN: number }; healths: Health[]; slips: { id: string; summary: string; date: string; days: number }[] };
+  committed: { counts: { RED: number; YELLOW: number; GREEN: number }; healths: Health[]; slips: { id: string; summary: string; date: GoalDate }[] };
   drafts: number;
   nextPromotion?: { milestone: string; date: string; days: number; goal: string; summary: string };
 };
@@ -80,11 +63,6 @@ export type Summary = {
 export type PrioritiesView = {
   org: { id: string; name: string; level: string };
   today: string;
-  /** `open` marks the week the board scrolls to when it loads. */
-  weeks: { at: number; label: string; open: boolean }[];
-  todayAt: number;
-  /** The first and last day on screen when the board opens, and where Earlier and Later go. */
-  window: { first: string; last: string; earlier: string; later: string };
   /** The filter in force. Empty when Home shows every goal. */
   filter: { health?: Exclude<Health, null>; q?: string };
   funded: PriorityRow[];
@@ -92,26 +70,22 @@ export type PrioritiesView = {
   summary: Summary;
 };
 
-function day(iso: string): number {
+export function day(iso: string): number {
   return Date.parse(`${iso.slice(0, 10)}T00:00:00Z`);
 }
 
-const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
-
-const MONTH_DAY = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", timeZone: "UTC" });
-const MONTH_DAY_YEAR = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
-
-/** "Oct 1", or "Mar 31, 2027" outside the current year. */
-export function shortDate(iso: string, todayIso: string): string {
-  const format = iso.slice(0, 4) === todayIso.slice(0, 4) ? MONTH_DAY : MONTH_DAY_YEAR;
-  return format.format(day(iso));
-}
+export const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
 
 /** A period is current when it names today's year ("2026") or quarter ("2026-Q4"). Calendar quarters are the default calendar (SPEC.md §12). */
 export function isCurrentPeriod(period: string, todayIso: string): boolean {
   const year = todayIso.slice(0, 4);
   const quarter = Math.floor((Number(todayIso.slice(5, 7)) - 1) / 3) + 1;
   return period === year || period === `${year}-Q${quarter}`;
+}
+
+/** Every goal in the tree, parents before their children. */
+export function flatten(goals: GoalRow[]): GoalRow[] {
+  return goals.flatMap((g) => [g, ...flatten(g.children)]);
 }
 
 function all(db: DatabaseSync, sql: string, ...params: string[]): Row[] {
@@ -146,22 +120,36 @@ function firstStep(ptg: unknown, names: Map<string, string>): PtgStep | undefine
   };
 }
 
-/** What a viewer asked Home for. Each value that is not valid is ignored. */
+/** The drawings of the Priorities view. The drawing does not change the saved definition (SPEC.md §8.2). */
+export const FORMATS = ["timeline", "list", "calendar"] as const;
+export type Format = (typeof FORMATS)[number];
+
+/** What a viewer asked Home for. A value that is not valid is dropped. */
 export type HomeQuery = {
-  /** Open the week that holds this day. */
+  format: Format;
+  /** Open the week (timeline) or the month (calendar) that holds this day. */
   from?: string;
   /** Show only goals with this health. */
-  health?: string;
+  health?: Exclude<Health, null>;
   /** Show only goals whose summary holds this text. */
   q?: string;
 };
 
 const HEALTHS = ["RED", "YELLOW", "GREEN"] as const;
 
-export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = new Date(), query: HomeQuery = {}): PrioritiesView {
-  const from = query.from;
-  const health = (HEALTHS as readonly string[]).includes(query.health ?? "") ? (query.health as Exclude<Health, null>) : undefined;
-  const q = query.q?.trim().slice(0, 100) || undefined;
+/** The one reader of Home's query string. */
+export function parseHomeQuery(raw: Record<string, string | undefined>): HomeQuery {
+  const pick = <T extends string>(values: readonly T[], value: string | undefined) => (values as readonly string[]).includes(value ?? "") ? (value as T) : undefined;
+  return {
+    format: pick(FORMATS, raw.format) ?? "timeline",
+    from: isDate(raw.from) ? raw.from : undefined,
+    health: pick(HEALTHS, raw.health),
+    q: raw.q?.trim().slice(0, 100) || undefined,
+  };
+}
+
+export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = new Date(), query: Partial<HomeQuery> = {}): PrioritiesView {
+  const { health, q } = query;
   const todayIso = now.toISOString().slice(0, 10);
   const today = day(todayIso);
   const unit = read(db, "org_unit", orgUnit);
@@ -185,44 +173,19 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
   const tops = priorities.map((p) =>
     [...goals.values()].filter((g) => g.priority === p.id && shown(g) && !(typeof g.parent === "string" && goals.get(g.parent)?.priority === p.id && shown(goals.get(g.parent) as Row))),
   );
-
-  // The board opens on one week, two weeks before today unless `from` names another. It reaches 26 weeks back from there. Weeks start on Monday.
   const inView = (g: Row): Row[] => [g, ...(childrenOf.get(g.id as string) ?? []).flatMap(inView)];
-  const monday = (t: number) => t - ((new Date(t).getUTCDay() + 6) % 7) * DAY;
-  // A Committed date that passed in the last 10 weeks opens the board early enough to show it.
-  const passed = tops
-    .flat()
-    .flatMap(inView)
-    .filter((g) => g.state === "In Progress")
-    .map((g) => committedDate(g, getGoal))
-    .filter((c): c is NonNullable<typeof c> => c !== undefined)
-    .map((c) => day(c.date) - 3 * DAY)
-    .filter((t) => t >= today - 10 * 7 * DAY);
-  const open = monday(isDate(from) ? day(from) : Math.min(today - LEAD_DAYS * DAY, ...passed));
-  const start = open - PAST_WEEKS * 7 * DAY;
-  const end = start + WEEKS * 7 * DAY;
-  const pos = (t: number) => (100 * (Math.min(Math.max(t, start), end) - start)) / (end - start);
-  const outside = (t: number): Mark["outside"] => (t < start ? "before" : t > end ? "after" : null);
 
-  const lane = (goal: Row, drawDate: boolean): Lane => {
-    const result: Lane = {};
-    const begun = day(started.get(goal.id as string) ?? todayIso);
+  /** The dates a row draws. A sub-goal draws its own only when they differ from its parent's. A slip is always drawn. */
+  const datesOf = (goal: Row, drawDate: boolean): GoalDate[] => {
+    const dates: GoalDate[] = [];
     const committed = committedDate(goal, getGoal);
-    const c = committed ? day(committed.date) : undefined;
-    if (goal.state === "In Progress" && goal.health) result.health = { from: pos(begun), to: pos(Math.min(today, c ?? today)) };
-    if (c !== undefined && committed) {
-      if (c < today) result.slip = { from: pos(c), to: pos(today), days: Math.round((today - c) / DAY) };
-      else if (drawDate) result.ahead = { from: pos(Math.max(today, begun)), to: pos(c) };
-      if (drawDate || result.slip) result.tick = { at: pos(c), label: `${committed.kind} ${shortDate(committed.date, todayIso)}`, kind: committed.kind, outside: outside(c) };
+    if (committed) {
+      const c = day(committed.date);
+      const slipDays = c < today ? Math.round((today - c) / DAY) : undefined;
+      if (drawDate || slipDays !== undefined) dates.push({ ...committed, ...(slipDays !== undefined ? { slipDays } : {}) });
     }
-    if (drawDate && (goal.date_type === "Ambition" || goal.date_type === "Fantasy")) {
-      const kind = goal.date_type;
-      const f = day(goal.due_date as string);
-      const mark: Mark = { at: pos(f), label: `${kind} ${shortDate(goal.due_date as string, todayIso)}`, kind, outside: outside(f) };
-      result.line = { from: pos(c ?? today), to: mark.at, kind };
-      result.end = mark;
-    }
-    return result;
+    if (drawDate && (goal.date_type === "Ambition" || goal.date_type === "Fantasy")) dates.push({ date: goal.due_date as string, kind: goal.date_type });
+    return dates;
   };
 
   const needle = q?.toLowerCase();
@@ -235,7 +198,6 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
   const filtering = Boolean(health || needle);
 
   const goalRow = (goal: Row, depth: number, parent?: Row): GoalRow => {
-    const l = lane(goal, !parent || ownDate(goal) !== ownDate(parent));
     const health = (goal.health as Health) ?? null;
     return {
       id: goal.id as string,
@@ -245,30 +207,32 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
       state: goal.state as string,
       health,
       depth,
-      lane: l,
-      when: [l.tick?.label, l.end?.label].filter((w): w is string => Boolean(w)),
+      started: started.get(goal.id as string) ?? todayIso,
+      dates: datesOf(goal, !parent || ownDate(goal) !== ownDate(parent)),
       ...(health === "RED" || health === "YELLOW" ? { ptg: firstStep(goal.path_to_green, names) } : {}),
       match: matches(goal),
       children: (childrenOf.get(goal.id as string) ?? []).map((child) => goalRow(child, depth + 1, goal)),
     };
   };
 
+  // Build every row once. The summary counts them all. The filter prunes what is drawn.
+  const built = tops.map((list) => list.map((g) => goalRow(g, 0)));
   const rows: PriorityRow[] = priorities.map((p, i) => ({
     id: p.id as string,
     rank: p.rank as number,
     title: p.title as string,
-    goals: tops[i].map((g) => goalRow(g, 0)).flatMap((g) => (filtering ? (prune(g) ?? []) : [g])),
+    goals: built[i].flatMap((g) => (filtering ? (prune(g) ?? []) : [g])),
   }));
   const cut = priorities.findIndex((p) => p.cut_line === true);
   const shownRows = (list: PriorityRow[]) => list.filter((p) => !filtering || p.goals.length > 0);
   const funded = shownRows(cut === -1 ? rows : rows.slice(0, cut + 1));
   const backlog = shownRows(cut === -1 ? [] : rows.slice(cut + 1));
 
-  const fundedTops = (cut === -1 ? tops : tops.slice(0, cut + 1)).flat().map((g) => goalRow(g, 0));
-  const top = fundedTops.filter((g) => g.state === "In Progress");
-  const slips = top
-    .filter((g) => g.lane.slip)
-    .map((g) => ({ id: g.id, summary: g.summary, date: g.lane.tick?.label ?? "", days: g.lane.slip?.days ?? 0 }));
+  const top = (cut === -1 ? built : built.slice(0, cut + 1)).flat().filter((g) => g.state === "In Progress");
+  const slips = top.flatMap((g) => {
+    const date = g.dates.find((d) => d.slipDays !== undefined);
+    return date ? [{ id: g.id, summary: g.summary, date }] : [];
+  });
   const count = (h: Health) => top.filter((g) => g.health === h).length;
   // Until the Drafts slice, every stored Draft counts as open.
   const drafts = (db.prepare("SELECT COUNT(*) AS n FROM draft").get() as { n: number }).n;
@@ -282,17 +246,10 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
     nextPromotion = { milestone: milestone.id as string, date, days: Math.round((day(date) - today) / DAY), goal: goal.id as string, summary: goal.summary as string };
   }
 
-  const weeks = Array.from({ length: WEEKS }, (_, i) => {
-    const t = start + i * 7 * DAY;
-    return { at: pos(t), label: shortDate(iso(t), todayIso), open: t === open };
-  });
   return {
     org,
     today: todayIso,
-    weeks,
-    todayAt: pos(today),
     filter: { health, q },
-    window: { first: iso(open), last: iso(open + 13 * 7 * DAY - DAY), earlier: iso(open - STEP_WEEKS * 7 * DAY), later: iso(open + STEP_WEEKS * 7 * DAY) },
     funded,
     backlog,
     summary: {

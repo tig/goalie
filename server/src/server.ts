@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 import { configuredIssuers, resolveActor, type Issuer } from "./auth.ts";
 import { configuredDatabase, configuredOrgUnit } from "./config.ts";
 import { homePage, signInPage } from "./home.ts";
-import { prioritiesView } from "./priorities.ts";
+import { parseHomeQuery, prioritiesView } from "./priorities.ts";
 import { openStore } from "./store.ts";
 
 /** The one Hono application. GET / is the Priorities view. No request is anonymous (ADR 0005). */
@@ -15,7 +15,8 @@ export function createApp(db: DatabaseSync, issuers: Issuer[]): Hono {
     const who = await resolveActor(db, c.req.header(), issuers);
     if (!who.ok) return c.html(signInPage(who.reason), 401);
     const actor = { id: who.actor.id as string, name: who.actor.display_name as string };
-    return c.html(homePage(prioritiesView(db, configuredOrgUnit(db), new Date(), { from: c.req.query("from"), health: c.req.query("health"), q: c.req.query("q") }), actor));
+    const query = parseHomeQuery(c.req.query());
+    return c.html(homePage(prioritiesView(db, configuredOrgUnit(db), new Date(), query), actor, query));
   });
   app.get("/health", (c) => c.text("ok"));
   return app;

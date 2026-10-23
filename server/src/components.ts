@@ -1,4 +1,4 @@
-import type { Health } from "./priorities.ts";
+import { day, type GoalDate, type GoalRow, type Health, type PriorityRow } from "./priorities.ts";
 import { AVATAR_COLORS, STYLE } from "./styles.ts";
 
 /**
@@ -97,9 +97,30 @@ export function tip(lines: string[]): string {
   return `<div class="tip" role="note">${lines.map((l) => `<div>${l}</div>`).join("")}</div>`;
 }
 
-/** A date with its Date Type. It does not wrap inside. */
-export function dateMark(label: string): string {
-  return `<span class="date">${escape(label)}</span>`;
+const MONTH_DAY = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", timeZone: "UTC" });
+const MONTH_DAY_YEAR = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+const MONTH_YEAR = new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "UTC" });
+
+/** "Oct 1", or "Mar 31, 2027" outside the current year. */
+export function shortDate(iso: string, todayIso: string): string {
+  const format = iso.slice(0, 4) === todayIso.slice(0, 4) ? MONTH_DAY : MONTH_DAY_YEAR;
+  return format.format(day(iso));
+}
+
+/** "October 2026". */
+export const monthLabel = (iso: string) => MONTH_YEAR.format(day(iso));
+
+/** A goal date as text, with its Date Type: "Committed Oct 1". */
+export const dateLabel = (date: GoalDate, todayIso: string) => `${date.kind} ${shortDate(date.date, todayIso)}`;
+
+/** A goal date with its Date Type. It does not wrap inside. */
+export function dateMark(date: GoalDate, todayIso: string): string {
+  return `<span class="date">${escape(dateLabel(date, todayIso))}</span>`;
+}
+
+/** A day that is not a goal date, such as an edge of the timeline window. It does not wrap inside. */
+export function plainDate(iso: string, todayIso: string): string {
+  return `<span class="date">${escape(shortDate(iso, todayIso))}</span>`;
 }
 
 /** A ? icon that opens its help on click, on Enter, or on hover. A details element, so it needs no browser script. Each line is HTML. */
@@ -111,4 +132,61 @@ export function help(label: string, lines: string[]): string {
 export function card(label: string, body: string, lines?: string[]): string {
   const heading = `<div class="lbl">${escape(label)}${lines ? help(label, lines) : ""}</div>`;
   return `<div class="card">${heading}${body}</div>`;
+}
+
+const CHEVRON = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5"/></svg>';
+
+/** Each tree level indents this much. */
+const INDENT = 26;
+/** The x of the health dot's center at a level: the rank column, the gap, the indent, half the dot. */
+const railX = (level: number) => `${28 + level * INDENT + 5}px`;
+
+/**
+ * The goal column of a row: rank, health, title, count, owner. The List and the Timeline share it.
+ * `rails` are the levels whose guide line passes this row on its way to a later sibling. `last` is true for the last goal under its parent.
+ */
+export function goalCell(goal: GoalRow, actor: Actor, rank?: number, rails: number[] = [], last = true): string {
+  const kids = goal.children.length;
+  const toggle = kids ? `<span class="chev"><span class="n">${kids}</span>${CHEVRON}</span>` : "";
+  const passing = rails.length
+    ? ` style="background-image:${rails.map(() => "linear-gradient(var(--cut),var(--cut))").join(",")};background-position:${rails.map((l) => `${railX(l)} 0`).join(",")}"`
+    : "";
+  const guide = goal.depth > 0 ? (last ? " tree" : " tree more") : "";
+  return `<div class="left${guide}"${passing}>${rankNumber(rank)}${healthDot(goal.health)}<span class="title">${escape(goal.summary)}</span><span class="slot">${toggle}</span>${avatar({ id: goal.owner, name: goal.ownerName }, goal.owner === actor.id)}</div>`;
+}
+
+/** How a drawing fills a goal tree: the cells right of the goal column, and whether rows carry their goal id. A page gives each id to one drawing only. */
+export type TreeDrawing = { actor: Actor; filtering: boolean; ids: boolean; cells: (goal: GoalRow) => string; blank: string };
+
+/** One goal row, then the goals under it. A top-level goal starts open, a deeper one closed. A filter opens every level. */
+export function goalTree(drawing: TreeDrawing, goal: GoalRow, rank?: number, rails: number[] = [], last = true): string {
+  const kids = goal.children.length;
+  const id = drawing.ids ? ` id="goal-${escape(goal.id)}"` : "";
+  const row = `<div class="row d${Math.min(goal.depth, 2)}${goal.match ? "" : " ctx"}"${id} data-health="${goal.health ?? ""}" style="--depth:${goal.depth}">${goalCell(goal, drawing.actor, rank, rails, last)}${drawing.cells(goal)}</div>`;
+  if (!kids) return row;
+  const childRails = goal.depth > 0 && !last ? [...rails, goal.depth - 1] : rails;
+  const children = goal.children.map((c, i) => goalTree(drawing, c, undefined, childRails, i === kids - 1)).join("");
+  return `<details${goal.depth === 0 || drawing.filtering ? " open" : ""}><summary>${row}</summary><div class="kids">${children}</div></details>`;
+}
+
+/** One Priority: its goals as trees, its rank on the first. A Priority with no goals draws its title with its rank. */
+export function priorityGroup(drawing: TreeDrawing, priority: PriorityRow): string {
+  const goals = priority.goals.length
+    ? priority.goals.map((g, i) => goalTree(drawing, g, i === 0 ? priority.rank : undefined)).join("")
+    : `<div class="row d0" style="--depth:0"><div class="left">${rankNumber(priority.rank)}${healthDot(null)}<span class="title muted">${escape(priority.title)}</span><span class="slot"></span></div>${drawing.blank}</div>`;
+  return `<div class="group"${drawing.ids ? ` id="priority-${escape(priority.id)}"` : ""}>${goals}</div>`;
+}
+
+/** A line of text in the goal column, pinned like a goal name. */
+const note = (drawing: TreeDrawing, text: string) => `<div class="row note"><div class="left"><span class="rnum"></span><span class="title muted">${escape(text)}</span></div>${drawing.blank}</div>`;
+
+/** The funded Priorities, the cut line, then the backlog. A filter that matches nothing says so. */
+export function priorityRows(drawing: TreeDrawing, funded: PriorityRow[], backlog: PriorityRow[]): string {
+  const below = backlog.length
+    ? backlog.map((p) => priorityGroup(drawing, p)).join("")
+    : drawing.filtering ? "" : note(drawing, "No Priorities below the cut line.");
+  const none = drawing.filtering && !funded.length && !backlog.length ? note(drawing, "No goals match.") : "";
+  return `${funded.map((p) => priorityGroup(drawing, p)).join("\n")}${none}
+<div class="cut"><span>✂ Backlog</span></div>
+${below}`;
 }
