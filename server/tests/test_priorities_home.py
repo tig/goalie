@@ -81,7 +81,7 @@ class PrioritiesHomeTests(unittest.TestCase):
         ids = ["XW-0001", "XW-0002", "XW-0003"]
         found = positions(self.text, [f'id="goal-{goal}"' for goal in ids])
         self.assertEqual(found, sorted(found))
-        ranks = re.findall(r'class="rank[^"]*"[^>]*>(\d+)<', self.text)
+        ranks = re.findall(r'class="rnum">(\d+)<', self.text)
         self.assertEqual(ranks[:3], ["1", "2", "3"])
 
     def test_every_date_shows_its_date_type(self) -> None:
@@ -159,8 +159,9 @@ class PrioritiesHomeTests(unittest.TestCase):
         self.assertIn('href="/"', self.text)
 
     def test_from_opens_the_week_that_holds_that_day(self) -> None:
-        weeks = re.findall(r'class="wk"[^>]*>([^<]+)<', self.later)
-        self.assertEqual(weeks[0], "Dec 7")
+        opens = re.search(r'>([^<]+)</span><span class="opens"', self.later)
+        self.assertIsNotNone(opens)
+        self.assertEqual(opens.group(1), "Dec 7")
 
     def test_a_bad_from_falls_back_to_the_default_window(self) -> None:
         self.assertEqual(self.bad_from.status, 200)
@@ -180,7 +181,7 @@ class PrioritiesHomeTests(unittest.TestCase):
             self.assertIn(f'href="/?health={health}"', self.text)
 
     def test_hovering_a_health_count_highlights_its_goals(self) -> None:
-        self.assertIn(':has(.count[data-health="RED"]:hover) .row[data-health="RED"]', self.text)
+        self.assertIn(':has(.count[data-health="RED"]:hover,.meter [data-health="RED"]:hover) .row[data-health="RED"]', self.text)
 
     def test_the_health_filter_keeps_only_that_health(self) -> None:
         self.assertIn('id="goal-XW-0001"', self.red)
@@ -218,6 +219,37 @@ class PrioritiesHomeTests(unittest.TestCase):
         self.assertGreaterEqual(len(weeks), 26)
         self.assertRegex(self.text, r'class="tl" style="--weeks:\d+;')
         self.assertIn(".row>.left,.axis>.corner{position:sticky;left:0", self.text)
+
+    def test_the_highlight_covers_the_goal_name_too(self) -> None:
+        self.assertIn('.row[data-health="RED"]::after', self.text)
+
+    def test_hovering_the_health_meter_highlights_its_goals(self) -> None:
+        self.assertRegex(self.text, r'class="meter"><span data-health="RED"')
+        self.assertIn('.meter [data-health="RED"]:hover', self.text)
+
+    def test_the_rank_is_a_plain_number_beside_a_health_dot(self) -> None:
+        first = row(self.text, "XW-0001")
+        self.assertIn('<span class="rnum">1</span>', first)
+        self.assertIn('class="hdot"', first)
+        self.assertNotIn('class="rank"', self.text)
+
+    def test_the_count_sits_before_the_owner(self) -> None:
+        parent = row(self.text, "XW-0003")
+        self.assertLess(parent.index('class="chev"'), parent.index('class="av'))
+
+    def test_every_row_keeps_the_same_columns(self) -> None:
+        leaf = row(self.text, "XW-0001")
+        self.assertIn('class="slot"', leaf)
+
+    def test_the_timeline_scrolls_into_the_past_and_opens_at_today(self) -> None:
+        first = re.findall(r'class="wk"[^>]*>([^<]+)<', self.text)[0]
+        self.assertGreaterEqual(days_since(datetime.datetime.strptime(f"{first} {datetime.date.today().year}", "%b %d %Y").date().isoformat()) if "," not in first else 999, 140)
+        self.assertIn("scroll-initial-target:nearest", self.text)
+        self.assertIn('class="opens"', self.text)
+
+    def test_the_help_icons_open_on_click(self) -> None:
+        cards = self.text[self.text.index('class="cards"'):self.text.index('class="card board"')]
+        self.assertEqual(cards.count('<details class="help">'), 3)
 
     def test_the_page_feels_like_an_app(self) -> None:
         self.assertIn("body{cursor:default", self.text.replace(" ", ""))

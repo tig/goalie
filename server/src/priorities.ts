@@ -20,12 +20,12 @@ export const PRIORITIES_VIEW = {
 } as const;
 
 const DAY = 86_400_000;
-/** The weeks the board draws. The board scrolls sideways through them. */
-const WEEKS = 39;
-/** The weeks the board shows before it scrolls. Today must start inside them. */
-const VISIBLE_WEEKS = 13;
-/** Today stays at least this many days inside the right edge of the window. */
-const AHEAD_DAYS = 28;
+/** The board draws this many weeks before and after the week it opens on, and scrolls sideways through them. */
+const PAST_WEEKS = 26;
+const FUTURE_WEEKS = 39;
+const WEEKS = PAST_WEEKS + FUTURE_WEEKS;
+/** By default the board opens on the week two weeks before today. */
+const LEAD_DAYS = 14;
 /** One press of Earlier or Later moves the window this many weeks. */
 const STEP_WEEKS = 4;
 
@@ -80,9 +80,10 @@ export type Summary = {
 export type PrioritiesView = {
   org: { id: string; name: string; level: string };
   today: string;
-  weeks: { at: number; label: string }[];
+  /** `open` marks the week the board scrolls to when it loads. */
+  weeks: { at: number; label: string; open: boolean }[];
   todayAt: number;
-  /** The window's first and last day, and where Earlier and Later go. */
+  /** The first and last day on screen when the board opens, and where Earlier and Later go. */
   window: { first: string; last: string; earlier: string; later: string };
   /** The filter in force. Empty when Home shows every goal. */
   filter: { health?: Exclude<Health, null>; q?: string };
@@ -185,18 +186,20 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
     [...goals.values()].filter((g) => g.priority === p.id && shown(g) && !(typeof g.parent === "string" && goals.get(g.parent)?.priority === p.id && shown(goals.get(g.parent) as Row))),
   );
 
-  // The window starts two weeks back, or earlier for a passed Committed date of a goal in the view.
-  // Today stays inside it. Weeks start on Monday.
+  // The board opens on one week, two weeks before today unless `from` names another. It reaches 26 weeks back from there. Weeks start on Monday.
   const inView = (g: Row): Row[] => [g, ...(childrenOf.get(g.id as string) ?? []).flatMap(inView)];
+  const monday = (t: number) => t - ((new Date(t).getUTCDay() + 6) % 7) * DAY;
+  // A Committed date that passed in the last 10 weeks opens the board early enough to show it.
   const passed = tops
     .flat()
     .flatMap(inView)
     .filter((g) => g.state === "In Progress")
     .map((g) => committedDate(g, getGoal))
     .filter((c): c is NonNullable<typeof c> => c !== undefined)
-    .map((c) => day(c.date) - 3 * DAY);
-  const first = isDate(from) ? day(from) : Math.max(Math.min(today - 14 * DAY, ...passed), today - (VISIBLE_WEEKS * 7 - AHEAD_DAYS) * DAY);
-  const start = first - ((new Date(first).getUTCDay() + 6) % 7) * DAY;
+    .map((c) => day(c.date) - 3 * DAY)
+    .filter((t) => t >= today - 10 * 7 * DAY);
+  const open = monday(isDate(from) ? day(from) : Math.min(today - LEAD_DAYS * DAY, ...passed));
+  const start = open - PAST_WEEKS * 7 * DAY;
   const end = start + WEEKS * 7 * DAY;
   const pos = (t: number) => (100 * (Math.min(Math.max(t, start), end) - start)) / (end - start);
   const outside = (t: number): Mark["outside"] => (t < start ? "before" : t > end ? "after" : null);
@@ -281,7 +284,7 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
 
   const weeks = Array.from({ length: WEEKS }, (_, i) => {
     const t = start + i * 7 * DAY;
-    return { at: pos(t), label: shortDate(iso(t), todayIso) };
+    return { at: pos(t), label: shortDate(iso(t), todayIso), open: t === open };
   });
   return {
     org,
@@ -289,7 +292,7 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
     weeks,
     todayAt: pos(today),
     filter: { health, q },
-    window: { first: iso(start), last: iso(end - DAY), earlier: iso(start - STEP_WEEKS * 7 * DAY), later: iso(start + STEP_WEEKS * 7 * DAY) },
+    window: { first: iso(open), last: iso(open + 13 * 7 * DAY - DAY), earlier: iso(open - STEP_WEEKS * 7 * DAY), later: iso(open + STEP_WEEKS * 7 * DAY) },
     funded,
     backlog,
     summary: {

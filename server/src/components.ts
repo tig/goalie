@@ -87,16 +87,14 @@ export function healthDot(health: Health): string {
   return `<span class="hdot${health ? "" : " none"}" style="background:${health ? l.bar : "transparent"}"></span>${hidden(health ?? "no health")}`;
 }
 
-/** The Priority rank on its goal's health color. */
-export function rankBadge(rank: number, health: Health): string {
-  const l = look(health);
-  const ring = health ? `;box-shadow:inset 0 0 0 1.5px ${l.bar}` : "";
-  return `<span class="rank" style="background:${l.bg};color:${l.ink}${ring}">${rank}${health ? hidden(health) : ""}</span>`;
+/** The Priority rank as a plain number. An empty slot keeps the columns aligned on rows with no rank. */
+export function rankNumber(rank?: number): string {
+  return `<span class="rnum">${rank ?? ""}</span>`;
 }
 
 /** A hover card. Each line is HTML. It shows on hover and on keyboard focus of its parent. */
 export function tip(lines: string[]): string {
-  return `<div class="tip" role="tooltip">${lines.map((l) => `<div>${l}</div>`).join("")}</div>`;
+  return `<div class="tip" role="note">${lines.map((l) => `<div>${l}</div>`).join("")}</div>`;
 }
 
 /** A date with its Date Type. It does not wrap inside. */
@@ -104,8 +102,13 @@ export function dateMark(label: string): string {
   return `<span class="date">${escape(label)}</span>`;
 }
 
-/** A summary card. `help` is a sentence shown on hover of the label. */
-export function card(label: string, body: string, help?: string): string {
-  const heading = help ? `<p class="lbl has-tip" tabindex="0">${escape(label)}<span class="q" aria-hidden="true">?</span>${tip([escape(help)])}</p>` : `<p class="lbl">${escape(label)}</p>`;
+/** A ? icon that opens its help on click, on Enter, or on hover. A details element, so it needs no browser script. Each line is HTML. */
+export function help(label: string, lines: string[]): string {
+  return `<details class="help"><summary class="q" aria-label="What ${escape(label)} means">?</summary>${tip(lines)}</details>`;
+}
+
+/** A summary card. `lines` is its help, shown from the ? icon by the label. */
+export function card(label: string, body: string, lines?: string[]): string {
+  const heading = `<div class="lbl">${escape(label)}${lines ? help(label, lines) : ""}</div>`;
   return `<div class="card">${heading}${body}</div>`;
 }
