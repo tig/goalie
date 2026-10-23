@@ -16,7 +16,7 @@ The commit check stays on the server ([SPEC.md](../specs/SPEC.md) §8.1).
 ## Decision
 
 There is one web app, served by the same Node process as the API.
-The server renders each view's HTML from the saved view definition.
+The web app is REACT based.
 The same pages must be usable at phone width.
 A phone browser is the mobile app.
 There is no native store client and no second codebase.
