@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Publish server/ to the host in GOALIE_DEPLOY_HOST.
+# Publish server/ to the host in GOALIE_DEPLOY_HOST: package files, src/, and the built React app in web/dist/.
 # The account, the installer, and the public name live in excaliwire/operations.
 # This file must not name the machine or the public hostname.
 set -euo pipefail
@@ -24,7 +24,7 @@ fi
 
 root=$(cd "$(dirname "$0")/../.." && pwd)
 server="$root/server"
-for name in package.json package-lock.json src/server.ts; do
+for name in package.json package-lock.json src/server.ts web/dist/index.html; do
   if [[ ! -s "$server/$name" ]]; then
     printf 'missing server/%s\n' "$name" >&2
     exit 1
@@ -40,7 +40,9 @@ chmod 600 "$key"
 cp "$server/package.json" "$server/package-lock.json" "$stage/"
 mkdir -p "$stage/src"
 cp -a "$server/src/." "$stage/src/"
-if [[ -d "$stage/node_modules" || -d "$stage/src/node_modules" ]]; then
+mkdir -p "$stage/web/dist"
+cp -a "$server/web/dist/." "$stage/web/dist/"
+if [[ -d "$stage/node_modules" || -d "$stage/src/node_modules" || -d "$stage/web/dist/node_modules" ]]; then
   printf 'refusing to publish node_modules\n' >&2
   exit 1
 fi

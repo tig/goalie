@@ -95,6 +95,7 @@ jobs:
           cache: npm
           cache-dependency-path: server/package-lock.json
       - run: npm ci --prefix server
+      - run: npm run build --prefix server
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -111,6 +112,8 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: server/package-lock.json
+      - run: npm ci --prefix server
+      - run: npm run build --prefix server
       - run: npm ci --omit=dev --ignore-scripts --prefix server
       - name: Publish
         env:
