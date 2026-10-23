@@ -83,16 +83,26 @@ h1{font-size:26px;font-weight:800;margin:0 0 20px}
 .segbtn.off{color:var(--cut)}.segbtn.off:hover{background:none}
 .segbtn.fmt{padding:0 14px;font-size:13px;font-weight:700}
 .segbtn.fmt.on{background:var(--brand);color:var(--brand-ink)}
-.rangelbl{padding:0 6px;text-align:center;font-weight:700;font-size:13px;white-space:nowrap}
+.rangelbl{display:inline-grid;padding:0 6px;font-weight:700;font-size:13px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.rangelbl>span{grid-area:1/1;text-align:center}
+.rangelbl>.sizer{visibility:hidden}
+.idle{visibility:hidden}
 .btn{height:36px;box-sizing:border-box;padding:0 14px;border-radius:999px;border:1.5px solid var(--cut);color:var(--ink);font-weight:700;font-size:13px;display:inline-flex;align-items:center}
 .btn:hover{background:var(--control)}
 :focus-visible{outline:3px solid var(--focus);outline-offset:2px}
 .row:focus-visible{outline-offset:-3px;border-radius:12px}
 .search input:focus-visible{outline:0}
 
-/* The timeline. The scrollbar sits at the top: the box is flipped, and its content flipped back (rule 20c). */
-.scroll{overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;scrollbar-color:var(--cut) transparent;transform:rotateX(180deg)}
-.scroll>.tl{transform:rotateX(180deg)}
+/* The timeline. No scrollbar shows (rule 20c); an edge fades where there is more to scroll. */
+.tlwrap{position:relative}
+.scroll{overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none}
+.scroll::-webkit-scrollbar{display:none}
+.scroll:focus-visible{outline-offset:-3px;border-radius:12px}
+.scroll.dragging,.scroll.dragging *{cursor:grabbing}
+.fade{position:absolute;top:0;bottom:0;width:28px;pointer-events:none;opacity:0;z-index:9;transition:opacity .12s ease}
+.fade.before{left:calc(var(--left) + var(--gap));background:linear-gradient(to right,var(--card),transparent)}
+.fade.after{right:0;background:linear-gradient(to left,var(--card),transparent)}
+.more-before>.fade.before,.more-after>.fade.after{opacity:1}
 .tl{position:relative;width:calc(var(--left) + var(--gap) + var(--weeks) * var(--week))}
 .tlbody>.cut{background:var(--card)}
 .row.note{min-height:40px}.row.note .lane{background:none}.row.note .title{font-weight:500;font-size:13px}
@@ -212,4 +222,4 @@ background-size:2px 100%,100% 100%;background-repeat:no-repeat;background-positi
 .calbar{flex-direction:column;align-items:stretch}.calbar .corner{width:auto}.callegend{display:none}
 .cal{border:0;border-radius:0}.calhead{display:none}.calweek{display:block}.day{display:none;min-height:0;border:0;border-bottom:1px solid var(--line);padding:10px 0}.day.has{display:flex}.day.out.has{background:none}
 .dnum{display:none}.dfull{display:block;font-size:12px;font-weight:800;color:var(--mute)}.day.today .dfull{color:var(--today)}
-.rangelbl{padding:0 4px;font-size:12px}}
+.rangelbl{padding:0 4px;font-size:12px}.idle{display:none}}

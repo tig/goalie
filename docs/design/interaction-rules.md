@@ -49,7 +49,8 @@ The screens are a React app in `server/web/`. It reads `GET /api/priorities` and
 20. The board draws one grid and one today line for every row, so they never break between rows. They are drawn as the background of each row, so the pinned column always covers them.
 20a. The timeline scrolls sideways into the past and the future: 26 weeks back and 39 weeks ahead of the week it opens on. A week is 84 px. The goal names stay pinned on the left while it scrolls, with a soft shadow on their edge.
 20b. The board opens on the week two weeks before today, or earlier to show a Committed date that passed in the last 10 weeks. The app sets the scroll position, so it opens there in every browser.
-20c. The horizontal scrollbar sits at the top of the timeline, above the week labels, not at the bottom of the board.
+20c. The timeline shows no scrollbar. A soft fade on its left or right edge shows there is more to scroll that way.
+20d. The timeline scrolls sideways by trackpad, by the mouse wheel, by dragging, and by the keyboard. Over the lanes a vertical wheel scrolls it sideways until it reaches its edge; then the page scrolls. Over the goal column a vertical wheel scrolls the page. Shift and the wheel scroll it sideways anywhere on it. A press on the lanes that moves more than 4 px pans it, with the grabbing cursor while it pans, and does not open or close a goal. With the timeline focused, Left and Right move it one week. Earlier, Later, and Today still work.
 21. Earlier and Later open the board one step before or after the week on screen, and write it to `?from=`. Today goes back to the default window and scrolls back to it.
 21a. Zoom out and zoom in are one pill of two buttons, − and +, beside the date pill. There are three levels: weeks (84 px a week, a label each week), months (30 px a week, a label each month), and quarters (14 px a week, a label each month, no week lines). At the closest or farthest level its button is shown, grayed, and does nothing.
 21b. Earlier and Later move 4 weeks at weeks, 13 weeks at months, and 26 weeks at quarters. The date pill shows the days on screen and follows the scroll.
@@ -70,6 +71,7 @@ H4. Pointing at a row turns it gray, with no colored bar.
 25. The search box sits right below the Priorities heading, at the top of the goal column, on the same line as the week labels. It is as wide as the goal column. It matches goal summaries as you type.
 25a. The filter in force sits beside the Priorities heading, with **Show all**.
 25b. Earlier, the window's dates, and Later are one pill. Today is a separate button beside it. Both are 36 px tall.
+25c. No control moves when a label changes. The date pill is as wide as its longest form, in tabular numbers, with its text centered, so scrolling, zooming, and stepping never shift the controls beside it. A control that does nothing in a view keeps its place, unseen, so switching views moves nothing.
 26. A filter keeps the parents of a goal that matches, dimmed, so the goal keeps its place in the tree.
 27. A filter that matches nothing says "No goals match."
 
@@ -78,7 +80,7 @@ H4. Pointing at a row turns it gray, with no colored bar.
 V1. One pill of three buttons beside the zoom pill picks the view: Timeline, List, or Calendar. The view in force is filled. All three draw the same goals with the same filter and search.
 V2. The List draws the saved view's columns (SPEC.md §8.2) right of the goal column: Health, Date Type, Promotion Milestone, PTG. The goal column, the tree, and the owner avatar are the Timeline's.
 V3. The Calendar is one month, Monday first. Each goal date is a chip on its day: a health dot, the title cut to fit, and a Date Type mark (solid for a committed date, light for Ambition, dotted for Fantasy, hatched red for a slip). A day shows 3 chips. "+N" opens the rest; Escape or a click outside closes them. A parent kept only for context draws no chip.
-V4. In the Calendar, Earlier and Later move one month, and the date pill names the month. The zoom pill is hidden in the List and the Calendar. The date pill is hidden in the List.
+V4. In the Calendar, Earlier and Later move one month, and the date pill names the month. The zoom pill is not shown in the List and the Calendar, and the date pill is not shown in the List; each keeps its place (rule 25c). On a phone they take no space.
 
 ## Access
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ApiError, Health, PrioritiesResponse } from "../../src/api.ts";
-import { monthYear, shortDate } from "./model/dates.ts";
+import { monthYear } from "./model/dates.ts";
+import { labelSizers, rangeLabel } from "./model/labels.ts";
 import { calendarMonth } from "./model/calendar.ts";
 import { filterPriorities, isFiltering } from "./model/filter.ts";
 import { ZOOM_ORDER, type View } from "./model/query.ts";
@@ -84,6 +85,7 @@ function Home({ data }: { data: PrioritiesResponse }) {
   const window = useMemo(() => timelineWindow(all, data.today, screen.zoom, screen.from), [all, data.today, screen.zoom, screen.from]);
   const [range, setRange] = useState({ first: window.first, last: window.last });
   const month = useMemo(() => calendarMonth([...funded, ...backlog], data.today, screen.from), [funded, backlog, data.today, screen.from]);
+  const sizers = useMemo(() => labelSizers(data.today), [data.today]);
   // On a phone the timeline is hidden, and the List stands in for it.
   const view: View = phone && screen.view === "timeline" ? "list" : screen.view;
 
@@ -137,36 +139,32 @@ function Home({ data }: { data: PrioritiesResponse }) {
                   </button>
                 ))}
               </span>
-              {view === "timeline" && (
-                <span className="seggroup zoom">
-                  {zoomStep(zoomAt + 1, "Zoom out", "−")}
-                  {zoomStep(zoomAt - 1, "Zoom in", "+")}
-                </span>
-              )}
-              {view !== "list" && (
-                <nav className="range" aria-label={view === "calendar" ? "Month" : "Timeline"}>
-                  <span className="seggroup">
-                    <button type="button" className="segbtn" aria-label="Earlier" onClick={() => step(-1)}>
-                      ‹
-                    </button>
-                    <span className="rangelbl">
-                      {view === "calendar" ? (
-                        monthYear(month.month)
-                      ) : (
-                        <>
-                          <span className="date">{shortDate(range.first, data.today)}</span> – <span className="date">{shortDate(range.last, data.today)}</span>
-                        </>
-                      )}
-                    </span>
-                    <button type="button" className="segbtn" aria-label="Later" onClick={() => step(1)}>
-                      ›
-                    </button>
-                  </span>
-                  <button type="button" className="btn" onClick={today}>
-                    Today
+              {/* A control that does nothing in this view keeps its place, so nothing beside it moves (rule 25c). */}
+              <span className={`seggroup zoom${view === "timeline" ? "" : " idle"}`} inert={view !== "timeline"}>
+                {zoomStep(zoomAt + 1, "Zoom out", "−")}
+                {zoomStep(zoomAt - 1, "Zoom in", "+")}
+              </span>
+              <nav className={`range${view === "list" ? " idle" : ""}`} aria-label={view === "calendar" ? "Month" : "Timeline"} inert={view === "list"}>
+                <span className="seggroup">
+                  <button type="button" className="segbtn" aria-label="Earlier" onClick={() => step(-1)}>
+                    ‹
                   </button>
-                </nav>
-              )}
+                  <span className="rangelbl">
+                    {sizers.map((t) => (
+                      <span key={t} className="sizer" aria-hidden="true">
+                        {t}
+                      </span>
+                    ))}
+                    <span className="now">{view === "calendar" ? monthYear(month.month) : rangeLabel(range.first, range.last, data.today)}</span>
+                  </span>
+                  <button type="button" className="segbtn" aria-label="Later" onClick={() => step(1)}>
+                    ›
+                  </button>
+                </span>
+                <button type="button" className="btn" onClick={today}>
+                  Today
+                </button>
+              </nav>
             </span>
           </div>
           {view === "timeline" && <TimelineView {...tree} window={window} search={search} home={home} onRange={setRange} />}

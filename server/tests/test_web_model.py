@@ -13,7 +13,7 @@ FIXTURE = Path(__file__).resolve().parents[1] / "web" / "fixtures" / "priorities
 
 def run(body: str) -> object:
     """Run an ES module that imports the model as `m` and the seed fixture as `api`, and return what it prints as JSON."""
-    imports = "".join(f'import * as {name} from "{(MODEL / f"{name}.ts").as_uri()}";\n' for name in ("dates", "query", "filter", "timeline", "calendar", "popover"))
+    imports = "".join(f'import * as {name} from "{(MODEL / f"{name}.ts").as_uri()}";\n' for name in ("dates", "query", "filter", "timeline", "calendar", "popover", "labels", "scroll"))
     script = f"""{imports}
 import {{ readFileSync }} from "node:fs";
 const api = JSON.parse(readFileSync({json.dumps(str(FIXTURE))}, "utf-8"));
@@ -183,6 +183,48 @@ class PopoverTests(unittest.TestCase):
 
     def test_it_opens_above_when_below_would_leave_the_screen(self) -> None:
         self.assertEqual(self.place({"left": 600, "top": 820, "right": 618, "bottom": 838}, 1440, 900)["top"], 820 - 8 - 150)
+
+
+class LabelTests(unittest.TestCase):
+    def test_the_range_names_a_year_only_outside_the_current_one(self) -> None:
+        labels = run('return [["2026-09-28", "2026-12-04"], ["2026-09-28", "2027-04-05"], ["2027-04-21", "2027-06-27"], ["2025-12-29", "2027-01-03"]].map(([a, b]) => labels.rangeLabel(a, b, "2026-10-23"));')
+        self.assertEqual(labels, ["Sep 28 – Dec 4", "Sep 28 – Apr 5, 2027", "Apr 21 – Jun 27, 2027", "Dec 29, 2025 – Jan 3, 2027"])
+
+    def test_the_sizers_hold_the_longest_form_for_every_month(self) -> None:
+        sizers = run('return labels.labelSizers("2026-10-23");')
+        for month in ("Jan", "May", "Sep", "Dec"):
+            self.assertIn(f"{month} 28, 2027 – {month} 28, 2028", sizers)
+        for month in ("January", "May", "September", "December"):
+            self.assertIn(f"{month} 2028", sizers)
+        self.assertEqual(len(sizers), 24)
+
+
+class ScrollTests(unittest.TestCase):
+    def wheel(self, event: dict, left: int, max_left: int = 1000) -> object:
+        return run(f"return scroll.wheelToScroll({json.dumps(event)}, {left}, {max_left});")
+
+    def test_a_vertical_wheel_scrolls_sideways(self) -> None:
+        self.assertEqual(self.wheel({"deltaX": 0, "deltaY": 100, "deltaMode": 0, "shiftKey": False}, 500), 100)
+        self.assertEqual(self.wheel({"deltaX": 0, "deltaY": -3, "deltaMode": 1, "shiftKey": False}, 500), -48)
+
+    def test_at_the_edge_a_vertical_wheel_scrolls_the_page(self) -> None:
+        self.assertIsNone(self.wheel({"deltaX": 0, "deltaY": -100, "deltaMode": 0, "shiftKey": False}, 0))
+        self.assertIsNone(self.wheel({"deltaX": 0, "deltaY": 100, "deltaMode": 0, "shiftKey": False}, 1000))
+
+    def test_shift_and_a_vertical_wheel_scrolls_sideways(self) -> None:
+        self.assertEqual(self.wheel({"deltaX": 0, "deltaY": 100, "deltaMode": 0, "shiftKey": True}, 500), 100)
+
+    def test_a_sideways_swipe_is_left_to_the_browser(self) -> None:
+        self.assertIsNone(self.wheel({"deltaX": 50, "deltaY": 10, "deltaMode": 0, "shiftKey": False}, 500))
+
+    def test_the_arrows_move_one_week(self) -> None:
+        self.assertEqual(run('return ["ArrowLeft", "ArrowRight", "ArrowUp", "a"].map((k) => scroll.arrowStep(k, 84));'), [-84, 84, None, None])
+
+    def test_the_edge_fades_show_where_there_is_more(self) -> None:
+        self.assertEqual(run("return [scroll.scrollEdges(0, 2000, 800), scroll.scrollEdges(600, 2000, 800), scroll.scrollEdges(1199.5, 2000, 800), scroll.scrollEdges(0, 800, 800)];"), [{"before": False, "after": True}, {"before": True, "after": True}, {"before": True, "after": False}, {"before": False, "after": False}])
+
+    def test_a_drag_pans_once_it_passes_4_px(self) -> None:
+        self.assertEqual(run("return [scroll.isDrag(3), scroll.isDrag(-5), scroll.dragLeft(500, 100, 160)];"), [False, True, 440])
 
 
 if __name__ == "__main__":
