@@ -208,7 +208,7 @@ background-size:2px 100%,100% 100%;background-repeat:no-repeat;background-positi
 .row{grid-template-columns:minmax(0,1fr)}.row>.left{position:relative;box-shadow:none}.left{padding-right:4px}.when{display:block}
 .lhead{display:block;height:auto;border:0;padding:0;margin-bottom:8px}.lhead .col{display:none}
 .list .row{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:10px;padding-bottom:6px}.list .row>.left{width:100%}
-.list .cell{display:none}.list .c-ptg:not(:empty){display:-webkit-box;flex-basis:100%;padding:0 0 4px calc(var(--depth, 0) * 26px + 38px);font-size:12px;color:var(--mute)}
+.list .cell{display:none}.list .cell.c-ptg:not(:empty){display:-webkit-box;flex-basis:100%;padding:0 0 4px calc(var(--depth, 0) * 26px + 38px);font-size:12px;color:var(--mute)}
 .calbar{flex-direction:column;align-items:stretch}.calbar .corner{width:auto}.callegend{display:none}
 .cal{border:0;border-radius:0}.calhead{display:none}.calweek{display:block}.day{display:none;min-height:0;border:0;border-bottom:1px solid var(--line);padding:10px 0}.day.has{display:flex}.day.out.has{background:none}
 .dnum{display:none}.dfull{display:block;font-size:12px;font-weight:800;color:var(--mute)}.day.today .dfull{color:var(--today)}
