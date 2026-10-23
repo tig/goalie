@@ -27,9 +27,12 @@ class ServerLayoutTests(unittest.TestCase):
         package = json.loads((SERVER / "package.json").read_text(encoding="utf-8"))
         self.assertEqual(package["engines"]["node"], ">=24")
         scripts = package["scripts"]
-        self.assertEqual(scripts["lint"], "eslint src")
-        self.assertEqual(scripts["typecheck"], "tsc --noEmit")
+        self.assertEqual(scripts["lint"], "eslint src web")
+        self.assertEqual(scripts["typecheck"], "tsc --noEmit && tsc --noEmit -p web")
         self.assertEqual(scripts["start"], "node src/server.ts")
+        # The server serves web/dist (ADR 0010). The build writes it.
+        self.assertEqual(scripts["build"], "vite build --config web/vite.config.ts")
+        self.assertEqual(scripts["dev"], "vite --config web/vite.config.ts")
 
 
 if __name__ == "__main__":

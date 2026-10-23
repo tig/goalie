@@ -42,6 +42,7 @@ RUNS = {
         "npm ci --prefix server",
         "npm run lint --prefix server",
         "npm run typecheck --prefix server",
+        "npm run build --prefix server",
         "python -m unittest discover -s server/tests -v",
     ],
     "tests": [
@@ -242,6 +243,18 @@ class CiTenets(unittest.TestCase):
         self.assertIn("Host configuration lives in excaliwire/operations.", contributing)
         self.assertNotIn("goalie.excaliwire.com", contributing)
         self.assertNotIn("129.212.164.158", contributing)
+
+    def test_the_publish_carries_the_built_web_app(self) -> None:
+        # ADR 0010: the same Node process serves the built React app, so a publish without server/web/dist is refused.
+        server = (WORKFLOWS / "server.yml").read_text(encoding="utf-8")
+        test = server.split("\n  test:", 1)[1].split("\n  deploy:", 1)[0]
+        self.assertLess(test.index("run: npm run build --prefix server\n"), test.index("run: python -m unittest discover -s server/tests -v\n"))
+        deploy = server.split("\n  deploy:", 1)[1]
+        self.assertLess(deploy.index("run: npm run build --prefix server\n"), deploy.index("run: npm ci --omit=dev"))
+        self.assertLess(deploy.index("run: npm ci --omit=dev"), deploy.index("deploy_server.sh"))
+        script = (REPO / ".github" / "scripts" / "deploy_server.sh").read_text(encoding="utf-8")
+        self.assertIn("web/dist/index.html", script)
+        self.assertIn('cp -a "$server/web/dist/." "$stage/web/dist/"', script)
 
     def test_required_checks_have_unique_names(self) -> None:
         # The ruleset on main requires these contexts. The job name is the check name.
