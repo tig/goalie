@@ -13,7 +13,7 @@ export const STYLE = `<style>
 --red-bg:#fbd9dd;--red-ink:#9c2a3c;--red:#e5677a;--yellow-bg:#fbefc6;--yellow-ink:#755800;--yellow:#e8c766;--green-bg:#d3f0e2;--green-ink:#1e6544;--green:#5cbf85;--none-bg:#eef2ef;--none:#b4beb7;
 --ahead:#e6ece8;--ambition:#8fadd9;--ambition-line:#b7c9e6;--ambition-ink:#2c5796;--fantasy:#a99ce0;--fantasy-line:#cfc6ee;--fantasy-ink:#5e4fa8;--slip-a:#f6b8c0;--slip-b:#fdeef0;
 --av-0-bg:#e3dafb;--av-0-ink:#4a3a91;--av-1-bg:#fadbe7;--av-1-ink:#9a2f5a;--av-2-bg:#d6ecfa;--av-2-ink:#1f5a85;--av-3-bg:#fde3cc;--av-3-ink:#8a4a12;--av-4-bg:#d3f0e2;--av-4-ink:#1e6544;--av-5-bg:#fbefc6;--av-5-ink:#6b5000;
---hover:#f7faf8;--tip-bg:#2f3a33;--tip-ink:#ffffff;--tip-shadow:rgba(47,58,51,.22);
+--hover:#f1f4f2;--tip-bg:#2f3a33;--tip-ink:#ffffff;--tip-shadow:rgba(47,58,51,.22);
 --radius:18px}
 body{cursor:default;margin:0;background:var(--ground);color:var(--ink);font:14px/1.4 var(--font);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;-webkit-tap-highlight-color:transparent}
 .top,.cards,.board,.legend,.signin{user-select:none;-webkit-user-select:none}
@@ -50,17 +50,17 @@ h1{font-size:26px;font-weight:800;margin:0 0 20px}
 .help[open] .tip,.help:hover .tip{display:block}
 .count{display:inline-flex;align-items:center;gap:6px;margin:0 6px 0 -8px;padding:2px 8px;border-radius:999px;color:var(--ink);text-decoration:none}
 .count:hover,.count:focus-visible{background:var(--control)}.count.on{background:var(--control);box-shadow:inset 0 0 0 1.5px var(--cut)}
-main:has(.count[data-health="RED"]:hover,.meter [data-health="RED"]:hover) .row[data-health="RED"]::after{box-shadow:inset 0 0 0 2px var(--red)}
 main:has(.count[data-health="RED"]:hover,.meter [data-health="RED"]:hover) .row[data-health="RED"]{background:var(--hover)}
-main:has(.count[data-health="RED"]:hover,.meter [data-health="RED"]:hover) .row[data-health="RED"]>.left{background:var(--hover);box-shadow:inset 2px 0 0 var(--red),inset 0 2px 0 var(--red),inset 0 -2px 0 var(--red),10px 0 10px -10px var(--tip-shadow)}
-main:has(.count[data-health="YELLOW"]:hover,.meter [data-health="YELLOW"]:hover) .row[data-health="YELLOW"]::after{box-shadow:inset 0 0 0 2px var(--yellow)}
+main:has(.count[data-health="RED"]:hover,.meter [data-health="RED"]:hover) .row[data-health="RED"]>.left{background:var(--hover);box-shadow:inset 3px 0 0 var(--red),10px 0 10px -10px var(--tip-shadow)}
 main:has(.count[data-health="YELLOW"]:hover,.meter [data-health="YELLOW"]:hover) .row[data-health="YELLOW"]{background:var(--hover)}
-main:has(.count[data-health="YELLOW"]:hover,.meter [data-health="YELLOW"]:hover) .row[data-health="YELLOW"]>.left{background:var(--hover);box-shadow:inset 2px 0 0 var(--yellow),inset 0 2px 0 var(--yellow),inset 0 -2px 0 var(--yellow),10px 0 10px -10px var(--tip-shadow)}
-main:has(.count[data-health="GREEN"]:hover,.meter [data-health="GREEN"]:hover) .row[data-health="GREEN"]::after{box-shadow:inset 0 0 0 2px var(--green)}
+main:has(.count[data-health="YELLOW"]:hover,.meter [data-health="YELLOW"]:hover) .row[data-health="YELLOW"]>.left{background:var(--hover);box-shadow:inset 3px 0 0 var(--yellow),10px 0 10px -10px var(--tip-shadow)}
 main:has(.count[data-health="GREEN"]:hover,.meter [data-health="GREEN"]:hover) .row[data-health="GREEN"]{background:var(--hover)}
-main:has(.count[data-health="GREEN"]:hover,.meter [data-health="GREEN"]:hover) .row[data-health="GREEN"]>.left{background:var(--hover);box-shadow:inset 2px 0 0 var(--green),inset 0 2px 0 var(--green),inset 0 -2px 0 var(--green),10px 0 10px -10px var(--tip-shadow)}
-.row::after{content:"";position:absolute;inset:0;border-radius:10px;pointer-events:none;z-index:8;transition:box-shadow .12s ease}
+main:has(.count[data-health="GREEN"]:hover,.meter [data-health="GREEN"]:hover) .row[data-health="GREEN"]>.left{background:var(--hover);box-shadow:inset 3px 0 0 var(--green),10px 0 10px -10px var(--tip-shadow)}
 .meter span{cursor:default}
+.row.sel,.row.sel>.left{background:var(--hover)}
+.row.sel[data-health="RED"]>.left{box-shadow:inset 3px 0 0 var(--red),10px 0 10px -10px var(--tip-shadow)}
+.row.sel[data-health="YELLOW"]>.left{box-shadow:inset 3px 0 0 var(--yellow),10px 0 10px -10px var(--tip-shadow)}
+.row.sel[data-health="GREEN"]>.left{box-shadow:inset 3px 0 0 var(--green),10px 0 10px -10px var(--tip-shadow)}
 .row.ctx .title,.row.ctx .rnum,.row.ctx .av,.row.ctx .chev,.row.ctx .hdot{opacity:.5}
 .search{display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border-radius:999px;border:1.5px solid var(--cut);background:var(--card);color:var(--mute);width:100%;box-sizing:border-box}
 .search:focus-within{border-color:var(--focus)}
@@ -86,7 +86,7 @@ main:has(.count[data-health="GREEN"]:hover,.meter [data-health="GREEN"]:hover) .
 .scroll>.tl{transform:rotateX(180deg)}
 .tl{position:relative;width:calc(var(--left) + var(--gap) + var(--weeks) * var(--week))}
 .tlbody>.cut{background:var(--card)}
-.row.note{min-height:40px}.row.note .title{font-weight:500;font-size:13px}
+.row.note{min-height:40px}.row.note .lane{background:none}.row.note .title{font-weight:500;font-size:13px}
 .row>.left,.axis>.corner{position:sticky;left:0;z-index:7;background:var(--card);padding-right:var(--gap);box-shadow:10px 0 10px -10px var(--tip-shadow)}
 .row:hover>.left{background:var(--hover)}
 .axis{display:grid;grid-template-columns:calc(var(--left) + var(--gap)) calc(var(--weeks) * var(--week));height:52px}

@@ -112,7 +112,8 @@ function goalHtml(view: PrioritiesView, actor: Actor, goal: GoalRow, rank?: numb
   const guide = goal.depth > 0 ? (last ? " tree" : " tree more") : "";
   const left = `<div class="left${guide}"${passing}>${rankNumber(rank)}${healthDot(goal.health)}<span class="title">${escape(goal.summary)}</span><span class="slot">${toggle}</span>${avatar({ id: goal.owner, name: goal.ownerName }, goal.owner === actor.id)}</div>`;
   const when = goal.when.length ? `<div class="when">${goal.when.map(dateMark).join(" · ")}</div>` : "";
-  const row = `<div class="row d${Math.min(goal.depth, 2)}${goal.match ? "" : " ctx"}" id="goal-${escape(goal.id)}" data-health="${goal.health ?? ""}" style="--depth:${goal.depth}">${left}${when}<div class="lane">${laneHtml(goal.lane, goal)}</div></div>`;
+  const selected = view.filter.health && goal.match ? " sel" : "";
+  const row = `<div class="row d${Math.min(goal.depth, 2)}${goal.match ? "" : " ctx"}${selected}" id="goal-${escape(goal.id)}" data-health="${goal.health ?? ""}" style="--depth:${goal.depth}">${left}${when}<div class="lane">${laneHtml(goal.lane, goal)}</div></div>`;
   if (!kids) return row;
   const childRails = goal.depth > 0 && !last ? [...rails, goal.depth - 1] : rails;
   const children = goal.children.map((c, i) => goalHtml(view, actor, c, undefined, childRails, i === kids - 1)).join("");

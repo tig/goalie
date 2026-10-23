@@ -188,6 +188,10 @@ class PrioritiesHomeTests(unittest.TestCase):
         self.assertNotIn('id="goal-XW-0002"', self.red)
         self.assertNotIn('id="goal-XW-0003"', self.red)
 
+    def test_goals_selected_by_a_health_filter_look_like_the_highlight(self) -> None:
+        self.assertRegex(self.red, r'class="row d0[^"]* sel" id="goal-XW-0001"')
+        self.assertNotRegex(self.text, r'class="row d0[^"]* sel" id="goal-XW-0001"')
+
     def test_the_active_filter_links_back_to_all_goals(self) -> None:
         active = self.red[self.red.index('data-health="RED"', self.red.index('class="counts"')) - 200:]
         self.assertIn('aria-current="true"', self.red)
@@ -221,7 +225,12 @@ class PrioritiesHomeTests(unittest.TestCase):
         self.assertIn(".row>.left,.axis>.corner{position:sticky;left:0", self.text)
 
     def test_the_highlight_covers_the_goal_name_too(self) -> None:
-        self.assertIn('.row[data-health="RED"]::after', self.text)
+        rule = re.search(r':hover\) \.row\[data-health="RED"\]>\.left\{([^}]*)\}', self.text)
+        self.assertIsNotNone(rule)
+        self.assertIn("background:var(--hover)", rule.group(1))
+        self.assertIn("inset 3px 0 0 var(--red)", rule.group(1))
+        self.assertNotIn("inset 0 2px", rule.group(1))
+        self.assertNotIn('.row[data-health="RED"]::after', self.text)
 
     def test_hovering_the_health_meter_highlights_its_goals(self) -> None:
         self.assertRegex(self.text, r'class="meter"><span data-health="RED"')

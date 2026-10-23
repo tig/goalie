@@ -51,9 +51,16 @@ The product contract is [SPEC.md](../specs/SPEC.md). The app shape is [ADR 0010]
 22. Moving the timeline keeps the filter and the search in force.
 23. A date past the edge of the window is written at that edge with an arrow.
 
+## Highlight and selection
+
+H1. A highlighted goal and a selected goal look the same: a gray row (`--hover`) and a 3 px bar of its health color on the left edge of the goal column. No border on the other three edges, and no fill in the health color, so the bar on the timeline stays visible.
+H2. A goal is highlighted while the pointer is on its health count or on its part of the health meter.
+H3. A goal is selected while a health filter shows it.
+H4. Pointing at a row turns it gray, with no colored bar.
+
 ## Filter and search
 
-24. The health counts and the health meter on the Committed dates card are controls. Pointing at either rings every goal with that health, including its name in the goal column. The ring must not hide the goal's bar, so a highlight never fills a row with the health color. Clicking it shows only those goals. Clicking it again, or **Show all**, shows every goal.
+24. The health counts and the health meter on the Committed dates card are controls. Pointing at either highlights every goal with that health (rule H1), including its name in the goal column. Clicking it shows only those goals. Clicking it again, or **Show all**, shows every goal.
 25. The search box sits right below the Priorities heading, at the top of the goal column, on the same line as the week labels. It is as wide as the goal column. It matches goal summaries. It is a GET form, so it needs no browser script.
 25a. The filter in force sits beside the Priorities heading, with **Show all**.
 25b. Earlier, the window's dates, and Later are one pill. Today is a separate button beside it. Both are 36 px tall.
