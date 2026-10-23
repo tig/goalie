@@ -50,7 +50,9 @@ The product contract is [SPEC.md](../specs/SPEC.md). The app shape is [ADR 0010]
 ## Filter and search
 
 24. The health counts on the Committed dates card are controls. Pointing at a count rings every goal with that health. The ring must not hide the goal's bar, so a highlight never fills a row with the health color. Clicking it shows only those goals. Clicking it again, or **Show all**, shows every goal.
-25. The search box sits right below the Priorities heading, on its own line. It matches goal summaries. It is a GET form, so it needs no browser script.
+25. The search box sits right below the Priorities heading, at the top of the goal column, on the same line as the week labels. It is as wide as the goal column. It matches goal summaries. It is a GET form, so it needs no browser script.
+25a. The filter in force sits beside the Priorities heading, with **Show all**.
+25b. Earlier, the window's dates, and Later are one pill. Today is a separate button beside it. Both are 36 px tall.
 26. A filter keeps the parents of a goal that matches, dimmed, so the goal keeps its place in the tree.
 27. A filter that matches nothing says "No goals match."
 

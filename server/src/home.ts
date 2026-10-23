@@ -135,24 +135,27 @@ ${card("Promotions due", promo, HELP.promotions)}
 </section>`;
 }
 
+/** One pill: Earlier, the window, Later. Today sits beside it. */
 function rangeHtml(view: PrioritiesView): string {
   const { first, last, earlier, later } = view.window;
   return `<nav class="range" aria-label="Timeline">
-<a class="navb" href="${homeUrl(view, { from: earlier })}" aria-label="Earlier">‹</a>
-<span class="rangelbl">${dateMark(shortDate(first, view.today))} – ${dateMark(shortDate(last, view.today))}</span>
-<a class="navb" href="${homeUrl(view, { from: later })}" aria-label="Later">›</a>
+<span class="seggroup"><a class="segbtn" href="${homeUrl(view, { from: earlier })}" aria-label="Earlier">‹</a><span class="rangelbl">${dateMark(shortDate(first, view.today))} – ${dateMark(shortDate(last, view.today))}</span><a class="segbtn" href="${homeUrl(view, { from: later })}" aria-label="Later">›</a></span>
 <a class="btn" href="${homeUrl(view)}">Today</a>
 </nav>`;
 }
 
-/** The search box and the filter in force. A GET form, so it needs no browser script (ADR 0010). */
+/** The search box. A GET form, so it needs no browser script (ADR 0010). It sits above the goal column. */
 function searchHtml(view: PrioritiesView): string {
   const { health, q } = view.filter;
   const keep = health ? `<input type="hidden" name="health" value="${health}">` : "";
-  const active = health || q
-    ? `<span class="filter">${health ? `${healthDot(health)}${health}` : ""}${health && q ? " · " : ""}${q ? `“${escape(q)}”` : ""}<a class="clear" href="/">Show all</a></span>`
-    : "";
-  return `<form class="search" method="get" action="/" role="search">${keep}<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg><input type="search" name="q" value="${escape(q ?? "")}" placeholder="Search goals" aria-label="Search goals"></form>${active}`;
+  return `<form class="search" method="get" action="/" role="search">${keep}<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg><input type="search" name="q" value="${escape(q ?? "")}" placeholder="Search goals" aria-label="Search goals"></form>`;
+}
+
+/** The filter in force, beside the heading, with the way out. */
+function filterHtml(view: PrioritiesView): string {
+  const { health, q } = view.filter;
+  if (!health && !q) return "";
+  return `<span class="filter">${health ? `${healthDot(health)}${health}` : ""}${health && q ? " · " : ""}${q ? `“${escape(q)}”` : ""}<a class="clear" href="/">Show all</a></span>`;
 }
 
 function legendHtml(): string {
@@ -180,10 +183,9 @@ export function homePage(view: PrioritiesView, actor: Actor): string {
     main: `<h1>${escape(view.org.name)}</h1>
 ${cardsHtml(view)}
 <section class="card board">
-<div class="bhead"><h2>Priorities</h2>${rangeHtml(view)}</div>
-<div class="bsearch">${searchHtml(view)}</div>
+<div class="bhead"><h2>Priorities</h2>${filterHtml(view)}${rangeHtml(view)}</div>
 <div class="scroll"><div class="tl" style="--weeks:${view.weeks.length};--now:${view.todayAt.toFixed(2)}">
-<div class="axis"><div class="corner"></div><div class="ticks"><span class="todaylbl" style="left:${pct(view.todayAt)}">Today</span>${weeks}</div></div>
+<div class="axis"><div class="corner">${searchHtml(view)}</div><div class="ticks"><span class="todaylbl" style="left:${pct(view.todayAt)}">Today</span>${weeks}</div></div>
 <div class="tlbody">
 ${view.funded.map((p) => priorityHtml(view, actor, p)).join("\n")}${none}
 <div class="cut"><span>✂ Backlog</span></div>
