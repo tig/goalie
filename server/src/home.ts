@@ -1,5 +1,5 @@
 import { avatar, BRAND, card, dateMark, escape, healthDot, help, layout, look, rankNumber, type Actor } from "./components.ts";
-import { shortDate, type GoalRow, type Lane, type PrioritiesView, type PriorityRow } from "./priorities.ts";
+import { shortDate, ZOOM_ORDER, type GoalRow, type Lane, type PrioritiesView, type PriorityRow, type Zoom } from "./priorities.ts";
 
 /**
  * Pages built on the server (ADR 0010). No browser script beyond the shared chrome.
@@ -31,10 +31,12 @@ const HELP = {
 };
 
 /** A link to Home that keeps the filter in force. `null` drops a value. */
-function homeUrl(view: PrioritiesView, change: { health?: string | null; q?: string | null; from?: string | null } = {}): string {
+function homeUrl(view: PrioritiesView, change: { health?: string | null; q?: string | null; zoom?: Zoom; from?: string | null } = {}): string {
+  const zoom = change.zoom ?? view.zoom.level;
   const values: [string, string | undefined | null][] = [
     ["health", change.health === undefined ? view.filter.health : change.health],
     ["q", change.q === undefined ? view.filter.q : change.q],
+    ["zoom", zoom === "weeks" ? null : zoom],
     ["from", change.from],
   ];
   const query = values
@@ -160,6 +162,18 @@ function rangeHtml(view: PrioritiesView): string {
 </nav>`;
 }
 
+/** Zoom out and in: one pill of two links. At the end of the range a button is shown but does nothing. */
+function zoomHtml(view: PrioritiesView): string {
+  const at = ZOOM_ORDER.indexOf(view.zoom.level);
+  const step = (to: number, label: string, sign: string) => {
+    const zoom = ZOOM_ORDER[to];
+    return zoom === undefined
+      ? `<span class="segbtn off" aria-label="${label}" aria-disabled="true">${sign}</span>`
+      : `<a class="segbtn" href="${homeUrl(view, { zoom })}" aria-label="${label}">${sign}</a>`;
+  };
+  return `<span class="seggroup zoom">${step(at + 1, "Zoom out", "−")}${step(at - 1, "Zoom in", "+")}</span>`;
+}
+
 /** The search box. A GET form, so it needs no browser script (ADR 0010). It sits above the goal column. */
 function searchHtml(view: PrioritiesView): string {
   const { health, q } = view.filter;
@@ -189,7 +203,7 @@ ${item("slip", "Slip")}
 const note = (text: string) => `<div class="row note"><div class="left"><span class="rnum"></span><span class="title muted">${escape(text)}</span></div><div class="lane"></div></div>`;
 
 export function homePage(view: PrioritiesView, actor: Actor): string {
-  const weeks = view.weeks.map((w) => `<span class="wk" style="left:${pct(w.at)}">${escape(w.label)}</span>${w.open ? `<span class="opens" style="left:calc(${pct(w.at)} - var(--left) - var(--gap))" aria-hidden="true"></span>` : ""}`).join("");
+  const weeks = view.weeks.map((w) => `<span class="wk" style="left:${pct(w.at)}">${escape(w.label)}</span>`).join("");
   const filtering = Boolean(view.filter.health || view.filter.q);
   const backlog = view.backlog.length
     ? view.backlog.map((p) => priorityHtml(view, actor, p)).join("")
@@ -201,9 +215,9 @@ export function homePage(view: PrioritiesView, actor: Actor): string {
     main: `<h1>${escape(view.org.name)}</h1>
 ${cardsHtml(view)}
 <section class="card board">
-<div class="bhead"><h2>Priorities</h2>${filterHtml(view)}${rangeHtml(view)}</div>
-<div class="scroll"><div class="tl" style="--weeks:${view.weeks.length};--now:${view.todayAt.toFixed(2)}">
-<div class="axis"><div class="corner">${searchHtml(view)}</div><div class="ticks"><span class="todaylbl" style="left:${pct(view.todayAt)}">Today</span>${weeks}</div></div>
+<div class="bhead"><h2>Priorities</h2>${filterHtml(view)}${zoomHtml(view)}${rangeHtml(view)}</div>
+<div class="scroll"><div class="tl z-${view.zoom.level}" style="--weeks:${view.weekCount};--now:${view.todayAt.toFixed(2)};--week:${view.zoom.week}px">
+<div class="axis"><div class="corner">${searchHtml(view)}</div><div class="ticks"><span class="todaylbl" style="left:${pct(view.todayAt)}">Today<span class="td"> · ${escape(shortDate(view.today, view.today))}</span></span><span class="opens" style="left:calc(${pct(view.openAt)} - var(--left) - var(--gap))" aria-hidden="true"></span>${weeks}</div></div>
 <div class="tlbody">
 ${view.funded.map((p) => priorityHtml(view, actor, p)).join("\n")}${none}
 <div class="cut"><span>✂ Backlog</span></div>

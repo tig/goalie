@@ -66,6 +66,9 @@ class PrioritiesHomeTests(unittest.TestCase):
             cls.spine = get(proc, port, "/?q=SPINE", auth).body.decode("utf-8")
             cls.nothing = get(proc, port, "/?q=zzzz-no-such-goal", auth).body.decode("utf-8")
             cls.bad_health = get(proc, port, "/?health=PURPLE", auth).body.decode("utf-8")
+            cls.months = get(proc, port, "/?zoom=months", auth).body.decode("utf-8")
+            cls.quarters = get(proc, port, "/?zoom=quarters&health=RED", auth).body.decode("utf-8")
+            cls.bad_zoom = get(proc, port, "/?zoom=decades", auth).body.decode("utf-8")
         cls.text = cls.home.body.decode("utf-8")
         code, cls.printed = cls.store.run("home")
 
@@ -159,9 +162,8 @@ class PrioritiesHomeTests(unittest.TestCase):
         self.assertIn('href="/"', self.text)
 
     def test_from_opens_the_week_that_holds_that_day(self) -> None:
-        opens = re.search(r'>([^<]+)</span><span class="opens"', self.later)
-        self.assertIsNotNone(opens)
-        self.assertEqual(opens.group(1), "Dec 7")
+        at = re.search(r'class="opens" style="left:calc\(([\d.]+)%', self.later).group(1)
+        self.assertRegex(self.later, r'class="wk" style="left:' + re.escape(at) + r'%">Dec 7<')
 
     def test_a_bad_from_falls_back_to_the_default_window(self) -> None:
         self.assertEqual(self.bad_from.status, 200)
@@ -221,7 +223,7 @@ class PrioritiesHomeTests(unittest.TestCase):
     def test_the_timeline_scrolls_with_the_goal_names_pinned(self) -> None:
         weeks = re.findall(r'class="wk"', self.text)
         self.assertGreaterEqual(len(weeks), 26)
-        self.assertRegex(self.text, r'class="tl" style="--weeks:\d+;')
+        self.assertRegex(self.text, r'class="tl[^"]*" style="--weeks:\d+;')
         self.assertIn(".row>.left,.axis>.corner{position:sticky;left:0", self.text)
 
     def test_the_highlight_covers_the_goal_name_too(self) -> None:
@@ -263,6 +265,30 @@ class PrioritiesHomeTests(unittest.TestCase):
     def test_the_help_icons_open_on_click(self) -> None:
         cards = self.text[self.text.index('class="cards"'):self.text.index('class="card board"')]
         self.assertEqual(cards.count('<details class="help">'), 3)
+
+    def test_the_timeline_zooms_in_and_out(self) -> None:
+        self.assertRegex(self.text, r'href="/\?zoom=months"[^>]*aria-label="Zoom out"')
+        self.assertRegex(self.text, r'aria-label="Zoom in"[^>]*aria-disabled="true"')
+        self.assertRegex(self.months, r'href="/"[^>]*aria-label="Zoom in"')
+        self.assertRegex(self.months, r'href="/\?zoom=quarters"[^>]*aria-label="Zoom out"')
+
+    def test_zooming_out_draws_narrower_weeks_and_month_labels(self) -> None:
+        width = lambda page: int(re.search(r'class="tl[^"]*" style="[^"]*--week:(\d+)px', page).group(1))
+        self.assertGreater(width(self.text), width(self.months))
+        self.assertGreater(width(self.months), width(self.quarters))
+        labels = re.findall(r'class="wk"[^>]*>([^<]+)<', self.months)
+        self.assertTrue(all(re.fullmatch(r"[A-Z][a-z]{2}( \d{4})?", label) for label in labels), labels[:5])
+
+    def test_a_bad_zoom_is_ignored(self) -> None:
+        week = lambda page: re.search(r'class="tl[^"]*" style="[^"]*--week:(\d+)px', page).group(1)
+        self.assertEqual(week(self.bad_zoom), week(self.text))
+
+    def test_zoom_keeps_the_filter(self) -> None:
+        self.assertRegex(self.quarters, r'href="/\?health=RED&amp;zoom=months"[^>]*aria-label="Zoom in"')
+
+    def test_pointing_at_today_shows_the_date(self) -> None:
+        today = datetime.date.today()
+        self.assertRegex(self.text, r'class="todaylbl"[^>]*>Today<span class="td"> · ' + today.strftime("%b") + " " + str(today.day) + "</span>")
 
     def test_the_page_feels_like_an_app(self) -> None:
         self.assertIn("body{cursor:default", self.text.replace(" ", ""))

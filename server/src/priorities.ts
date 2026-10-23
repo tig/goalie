@@ -26,8 +26,17 @@ const FUTURE_WEEKS = 39;
 const WEEKS = PAST_WEEKS + FUTURE_WEEKS;
 /** By default the board opens on the week two weeks before today. */
 const LEAD_DAYS = 14;
-/** One press of Earlier or Later moves the window this many weeks. */
-const STEP_WEEKS = 4;
+/**
+ * The timeline zoom levels, from closest to farthest. `week` is a week's width in px, `visible` the weeks on screen,
+ * `step` the weeks one press of Earlier or Later moves, `labels` what the axis names.
+ */
+export const ZOOMS = {
+  weeks: { week: 84, visible: 13, step: 4, labels: "week" },
+  months: { week: 30, visible: 34, step: 13, labels: "month" },
+  quarters: { week: 14, visible: 65, step: 26, labels: "month" },
+} as const;
+export type Zoom = keyof typeof ZOOMS;
+export const ZOOM_ORDER: readonly Zoom[] = ["weeks", "months", "quarters"];
 
 export type Health = "GREEN" | "YELLOW" | "RED" | null;
 
@@ -81,7 +90,12 @@ export type PrioritiesView = {
   org: { id: string; name: string; level: string };
   today: string;
   /** `open` marks the week the board scrolls to when it loads. */
-  weeks: { at: number; label: string; open: boolean }[];
+  weeks: { at: number; label: string }[];
+  /** How many weeks the board draws, and where the week it opens on starts. */
+  weekCount: number;
+  openAt: number;
+  /** The zoom in force and a week's width at it. */
+  zoom: { level: Zoom; week: number };
   todayAt: number;
   /** The first and last day on screen when the board opens, and where Earlier and Later go. */
   window: { first: string; last: string; earlier: string; later: string };
@@ -97,6 +111,22 @@ function day(iso: string): number {
 }
 
 const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
+
+const MONTH = new Intl.DateTimeFormat("en", { month: "short", timeZone: "UTC" });
+
+/** "Oct", or "Jan 2027" when a new year starts. */
+function monthLabel(t: number): string {
+  const d = new Date(t);
+  return d.getUTCMonth() === 0 ? `${MONTH.format(t)} ${d.getUTCFullYear()}` : MONTH.format(t);
+}
+
+/** The first day of each month that starts inside [start, end). */
+function monthStarts(start: number, end: number): number[] {
+  const d = new Date(start);
+  const out: number[] = [];
+  for (let t = Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1); t < end; t = Date.UTC(new Date(t).getUTCFullYear(), new Date(t).getUTCMonth() + 1, 1)) out.push(t);
+  return out;
+}
 
 const MONTH_DAY = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", timeZone: "UTC" });
 const MONTH_DAY_YEAR = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
@@ -154,12 +184,16 @@ export type HomeQuery = {
   health?: string;
   /** Show only goals whose summary holds this text. */
   q?: string;
+  /** How close the timeline is: weeks, months, or quarters. */
+  zoom?: string;
 };
 
 const HEALTHS = ["RED", "YELLOW", "GREEN"] as const;
 
 export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = new Date(), query: HomeQuery = {}): PrioritiesView {
   const from = query.from;
+  const zoom: Zoom = (ZOOM_ORDER as readonly string[]).includes(query.zoom ?? "") ? (query.zoom as Zoom) : "weeks";
+  const scale = ZOOMS[zoom];
   const health = (HEALTHS as readonly string[]).includes(query.health ?? "") ? (query.health as Exclude<Health, null>) : undefined;
   const q = query.q?.trim().slice(0, 100) || undefined;
   const todayIso = now.toISOString().slice(0, 10);
@@ -282,17 +316,22 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
     nextPromotion = { milestone: milestone.id as string, date, days: Math.round((day(date) - today) / DAY), goal: goal.id as string, summary: goal.summary as string };
   }
 
-  const weeks = Array.from({ length: WEEKS }, (_, i) => {
-    const t = start + i * 7 * DAY;
-    return { at: pos(t), label: shortDate(iso(t), todayIso), open: t === open };
-  });
+  // What is on screen when the board opens: from the opening week, or less far ahead when the board is not that long.
+  const shownFrom = Math.max(start, Math.min(open, end - scale.visible * 7 * DAY));
+  const weeks =
+    scale.labels === "week"
+      ? Array.from({ length: WEEKS }, (_, i) => start + i * 7 * DAY).map((t) => ({ at: pos(t), label: shortDate(iso(t), todayIso) }))
+      : monthStarts(start, end).map((t) => ({ at: pos(t), label: monthLabel(t) }));
   return {
     org,
     today: todayIso,
     weeks,
+    weekCount: WEEKS,
+    openAt: pos(open),
+    zoom: { level: zoom, week: scale.week },
     todayAt: pos(today),
     filter: { health, q },
-    window: { first: iso(open), last: iso(open + 13 * 7 * DAY - DAY), earlier: iso(open - STEP_WEEKS * 7 * DAY), later: iso(open + STEP_WEEKS * 7 * DAY) },
+    window: { first: iso(shownFrom), last: iso(shownFrom + scale.visible * 7 * DAY - DAY), earlier: iso(open - scale.step * 7 * DAY), later: iso(open + scale.step * 7 * DAY) },
     funded,
     backlog,
     summary: {

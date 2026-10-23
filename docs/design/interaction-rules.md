@@ -48,7 +48,10 @@ The product contract is [SPEC.md](../specs/SPEC.md). The app shape is [ADR 0010]
 20b. The board opens on the week two weeks before today, or earlier to show a Committed date that passed in the last 10 weeks. It uses CSS `scroll-initial-target`, so it needs no browser script. Chrome supports it. I have not measured Safari or Firefox; there it opens 26 weeks back.
 20c. The horizontal scrollbar sits at the top of the timeline, above the week labels, not at the bottom of the board.
 21. Earlier and Later move the timeline 4 weeks. Today goes back to the default window. They are links (`?from=`), so they need no browser script.
-22. Moving the timeline keeps the filter and the search in force.
+21a. Zoom out and zoom in are one pill of two buttons, − and +, beside the date pill. There are three levels: weeks (84 px a week, a label each week), months (30 px a week, a label each month), and quarters (14 px a week, a label each month, no week lines). At the closest or farthest level its button is shown, grayed, and does nothing.
+21b. Earlier and Later move 4 weeks at weeks, 13 weeks at months, and 26 weeks at quarters. The date pill shows what is on screen when the board opens.
+21c. The Today label reads "Today". Pointing at it adds the date: "Today · Oct 23".
+22. Moving or zooming the timeline keeps the filter and the search in force.
 23. A date past the edge of the window is written at that edge with an arrow.
 
 ## Highlight and selection
