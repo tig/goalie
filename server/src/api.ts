@@ -214,8 +214,11 @@ export type ApiCommand =
   | { op: "update"; kind: "work_item"; id: string | Ref; base_version: number; fields: Partial<WorkItemFields>; reason?: string }
   | { op: "comment"; kind: "goal" | "work_item"; id: string; text: string };
 
-/** POST /api/commands. The commands run in order, in one transaction: every one is stored, or none is. */
-export type CommandsRequest = { commands: ApiCommand[] };
+/**
+ * POST /api/commands. The commands run in order, in one transaction: every one is stored, or none is.
+ * With `check: true` the server runs the batch, rolls it back, and answers the same way, so the app holds no copy of the rules.
+ */
+export type CommandsRequest = { commands: ApiCommand[]; check?: true };
 
 /** A broken rule. `field` names the field it points to, when there is one. */
 export type ApiViolation = { rule: string; message: string; field?: string };

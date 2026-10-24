@@ -4,7 +4,8 @@ import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
-import type { ActorRef, ApiError, PrioritiesResponse } from "./api.ts";
+import type { ActorRef, ApiError, CommandsResponse, PrioritiesResponse } from "./api.ts";
+import { runCommands } from "./commands.ts";
 import { configuredIssuers, resolveActor, type Issuer } from "./auth.ts";
 import { configuredDatabase, configuredOrgUnit, configuredSignInUrl, configuredTimeZone, configuredToday, configuredWebDist } from "./config.ts";
 import { prioritiesView } from "./priorities.ts";
@@ -67,6 +68,11 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
   let orgUnit = "";
   const unit = () => (orgUnit ||= configuredOrgUnit(db));
   app.get("/api/priorities", (c) => c.json<PrioritiesResponse>({ ...prioritiesView(db, unit(), configuredToday(db), configuredTimeZone(db)), me: c.get("actor") }));
+  app.post("/api/commands", async (c) => {
+    const request: unknown = await c.req.json().catch(() => undefined);
+    const answer = runCommands(db, c.get("actor").id, request, configuredToday(db));
+    return c.json<CommandsResponse>(answer.body, answer.status);
+  });
   app.all("/api/*", (c) => refuse(c, 404, "not_found", `no API route ${c.req.method} ${c.req.path}`));
   app.get("/assets/*", async (c) => {
     const body = await built(webDist, c.req.path);
