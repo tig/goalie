@@ -4,8 +4,10 @@ import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
-import type { ActorRef, ApiError, CommandsResponse, PrioritiesResponse } from "./api.ts";
+import type { ActorRef, ApiError, CommandsResponse, FormOptions, GoalPageResponse, PrioritiesResponse } from "./api.ts";
 import { runCommands } from "./commands.ts";
+import { goalPage } from "./goalpage.ts";
+import { formOptions } from "./options.ts";
 import { configuredIssuers, resolveActor, type Issuer } from "./auth.ts";
 import { configuredDatabase, configuredOrgUnit, configuredSignInUrl, configuredTimeZone, configuredToday, configuredWebDist } from "./config.ts";
 import { prioritiesView } from "./priorities.ts";
@@ -68,6 +70,11 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
   let orgUnit = "";
   const unit = () => (orgUnit ||= configuredOrgUnit(db));
   app.get("/api/priorities", (c) => c.json<PrioritiesResponse>({ ...prioritiesView(db, unit(), configuredToday(db), configuredTimeZone(db)), me: c.get("actor") }));
+  app.get("/api/goals/:id", (c) => {
+    const page = goalPage(db, c.req.param("id"), c.get("actor").id, configuredToday(db), configuredTimeZone(db));
+    return page ? c.json<GoalPageResponse>(page) : refuse(c, 404, "not_found", `no goal ${c.req.param("id")}`);
+  });
+  app.get("/api/options", (c) => c.json<FormOptions>(formOptions(db, c.get("actor").id, unit(), configuredToday(db))));
   app.post("/api/commands", async (c) => {
     const request: unknown = await c.req.json().catch(() => undefined);
     const answer = runCommands(db, c.get("actor").id, request, configuredToday(db));

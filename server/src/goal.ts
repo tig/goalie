@@ -1,3 +1,5 @@
+import type { GoalDate } from "./api.ts";
+import { day, daysBetween } from "./dates.ts";
 import type { Row } from "./rules.ts";
 
 /**
@@ -73,4 +75,19 @@ export function committedDate(original: Row, getGoal: (id: string) => Row | unde
   const milestone = typeof goal.promotion_milestone === "string" ? getGoal(goal.promotion_milestone) : undefined;
   const date = milestone === undefined ? undefined : currentDate(milestone);
   return date === undefined ? undefined : { date, kind: "Promotion Milestone" };
+}
+
+/**
+ * The dates Home lists on a goal's row, and a sub-goal card shows (SPEC.md §8.2): the goal's own Committed or uncommitted date, then its Promotion Milestone's.
+ * `own` is false when a sub-goal has its parent's date: it then lists only a slip. `goal` is resolved (resolvedGoal).
+ */
+export function goalDates(goal: Row, own: boolean, getGoal: (id: string) => Row | undefined, today: string): GoalDate[] {
+  const dates: GoalDate[] = [];
+  const committed = committedDate(goal, getGoal);
+  const slipDays = committed && day(committed.date) < day(today) ? daysBetween(committed.date, today) : undefined;
+  const withSlip = (date: GoalDate): GoalDate => (slipDays !== undefined ? { ...date, slipDays } : date);
+  if (committed?.kind === "Committed" && (own || slipDays !== undefined)) dates.push(withSlip(committed));
+  if (own && (goal.date_type === "Ambition" || goal.date_type === "Fantasy")) dates.push({ date: goal.due_date as string, kind: goal.date_type });
+  if (committed?.kind === "Promotion Milestone" && (own || slipDays !== undefined)) dates.push(withSlip(committed));
+  return dates;
 }

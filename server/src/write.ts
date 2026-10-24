@@ -31,13 +31,20 @@ export type WriteResult =
  * The GOALIE owner sets the prefix as `goal_key_prefix` in owner settings (SPEC.md §6.1, §12). The default is the kind's prefix in read.ts.
  */
 function nextId(db: DatabaseSync, kind: Kind): string {
+  return nextIds(db, kind, 1)[0];
+}
+
+/** The next `count` unused keys, in the order creates would take them. New goal shows them before it saves (design N11, N12). */
+export function nextIds(db: DatabaseSync, kind: Kind, count: number): string[] {
   const settings = kind === "goal" ? (read(db, "owner_settings", "owner")?.settings as Row | undefined) : undefined;
   const prefix = typeof settings?.goal_key_prefix === "string" ? settings.goal_key_prefix : ENTITIES[kind].prefix;
   const { n } = db.prepare(`SELECT COUNT(*) AS n FROM ${kind}`).get() as { n: number };
-  for (let i = n + 1; ; i++) {
+  const ids: string[] = [];
+  for (let i = n + 1; ids.length < count; i++) {
     const id = `${prefix}-${kind === "goal" || kind === "work_item" ? String(i).padStart(4, "0") : i}`;
-    if (read(db, kind, id) === undefined) return id;
+    if (read(db, kind, id) === undefined) ids.push(id);
   }
+  return ids;
 }
 
 /** A field holds text, a number, or null. A `bool` field holds a boolean. A `json` field holds any JSON value. */
