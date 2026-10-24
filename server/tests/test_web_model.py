@@ -13,7 +13,7 @@ FIXTURE = Path(__file__).resolve().parents[1] / "web" / "fixtures" / "priorities
 
 def run(body: str) -> object:
     """Run an ES module that imports the model as `m` and the seed fixture as `api`, and return what it prints as JSON."""
-    imports = "".join(f'import * as {name} from "{(MODEL / f"{name}.ts").as_uri()}";\n' for name in ("query", "filter", "timeline", "calendar", "popover", "labels", "scroll", "route", "goalpage", "commands"))
+    imports = "".join(f'import * as {name} from "{(MODEL / f"{name}.ts").as_uri()}";\n' for name in ("query", "filter", "timeline", "calendar", "popover", "labels", "scroll", "route", "goalpage", "commands", "newgoal"))
     script = f"""{imports}
 import {{ readFileSync }} from "node:fs";
 const api = JSON.parse(readFileSync({json.dumps(str(FIXTURE))}, "utf-8"));
@@ -635,6 +635,14 @@ class CommandTests(unittest.TestCase):
         form = {**self.FORM, "parent": "XW-0003", "subGoals": [], "workItems": []}
         self.assertEqual(run(f"return commands.createBatch({json.dumps(form)}).commands.find((c) => c.ref === '$goal').fields.parent;"), "XW-0003")
 
+    def test_a_new_goal_under_a_parent_takes_the_parents_date(self) -> None:
+        form = {**self.FORM, "parent": "XW-0004", "subGoals": [], "workItems": []}
+        c = run(f"return commands.createBatch({json.dumps(form)}).commands;")
+        self.assertEqual([(x["op"], x.get("ref")) for x in c], [("create", "$goal")])  # type: ignore[union-attr]
+        fields = c[0]["fields"]  # type: ignore[index]
+        self.assertEqual([k for k in ("due_date", "date_type", "priority", "promotion_milestone") if k in fields], [])
+        self.assertEqual(fields["parent"], "XW-0004")
+
     def test_every_create_carries_the_required_fields(self) -> None:
         c = run(f"return commands.createBatch({json.dumps(self.FORM)}).commands.filter((x) => x.op === 'create' && x.kind === 'goal');")
         for x in c:  # type: ignore[union-attr]
@@ -660,6 +668,47 @@ class RouteTests(unittest.TestCase):
 
     def test_a_goal_link_and_the_back_link(self) -> None:
         self.assertEqual(run('return [route.goalPath("XW-0003"), route.newGoalPath(), route.newGoalPath("XW-0003"), route.backPath("?view=list&health=RED"), route.backPath("")];'), ["/goals/XW-0003", "/goals/new", "/goals/new?parent=XW-0003", "/?view=list&health=RED", "/"])
+
+
+
+class NewGoalV2Tests(unittest.TestCase):
+    """New goal v2 (design NF1 to NF18): the To save list, Create will make, and the closed Details line."""
+
+    BASE = {"summary": "", "owner": "chelsea", "due_date": "", "date_type": "", "milestone": None, "subGoals": [], "workItems": []}
+
+    def lines(self, form: dict, answer: object = None, details: bool = False) -> object:
+        return run(f"return newgoal.toSave({json.dumps({**self.BASE, **form})}, {json.dumps(answer)}, {json.dumps(details)}).map((l) => [l.key, l.text, l.done]);")
+
+    def test_an_empty_form_lists_the_foundation_with_nothing_done(self) -> None:
+        self.assertEqual(self.lines({}), [["summary", "Summary", False], ["due_date", "Date", False], ["date_type", "Date Type", False]])
+
+    def test_an_uncommitted_date_adds_the_milestone_date_and_a_committed_one_the_plan(self) -> None:
+        fantasy = self.lines({"summary": "Ship it", "due_date": "2027-02-26", "date_type": "Fantasy", "milestone": {"summary": "Commit", "due_date": "", "owner": "chelsea"}})
+        self.assertEqual(fantasy, [["summary", "Summary", True], ["due_date", "Date", True], ["date_type", "Date Type", True], ["milestone_date", "Promotion Milestone date", False]])
+        committed = self.lines({"summary": "Ship it", "due_date": "2027-02-26", "date_type": "Committed"}, {"ok": True, "ids": {}, "events": []})
+        self.assertEqual(committed[-1], ["plan_maturity", "Plan at Pencil", True])
+
+    def test_a_refusal_undoes_its_line_in_plain_words_and_details_wait_until_opened(self) -> None:
+        answer = {"ok": False, "at": 0, "error": "invalid", "violations": [], "all": [
+            {"rule": "committed-needs-pencil", "message": "XW-0012: a Committed date needs a Plan at Pencil.", "field": "plan_maturity", "at": 0},
+            {"rule": "health-while-in-progress", "message": "An In Progress goal needs a health: GREEN, YELLOW, or RED.", "field": "health", "at": 0},
+            {"rule": "not-checked", "message": "not checked yet: it names $m", "at": 1},
+        ]}
+        form = {"summary": "Ship it", "due_date": "2027-02-26", "date_type": "Committed"}
+        self.assertEqual(self.lines(form, answer)[-1], ["plan_maturity", "Plan at Pencil", False])
+        self.assertNotIn("health", [l[0] for l in self.lines(form, answer)])  # type: ignore[union-attr]
+        self.assertEqual(self.lines(form, answer, True)[-1], ["health", "Health", False])
+        said = run(f"return newgoal.toSave({json.dumps({**self.BASE, **form})}, {json.dumps(answer)}, false).map((l) => l.sentence);")
+        self.assertEqual(said[-1], "A Committed date needs a plan at Pencil.")  # type: ignore[index]
+
+    def test_create_will_make_names_what_without_keys(self) -> None:
+        form = {**self.BASE, "date_type": "Fantasy", "subGoals": [{"summary": "a", "owner": "chelsea"}, {"summary": "b", "owner": "chelsea"}], "workItems": [{"title": "t", "goal": 0, "owner": "chelsea", "due_date": None}]}
+        self.assertEqual(run(f"return newgoal.makes({json.dumps(form)});"), "This goal · its Promotion Milestone · 2 sub-goals · 1 work item")
+        self.assertEqual(run(f"return newgoal.makes({json.dumps({**self.BASE, 'date_type': 'Committed'})});"), "This goal")
+
+    def test_closed_details_show_five_values_then_how_many_more(self) -> None:
+        rows = [["Description", "None"], ["State", "Backlog"], ["Type", "Milestone (Launch)"], ["Severity", "sev2"], ["Origination", "New"], ["Visibility", "Organization-wide"], ["Work Product", "None"]]
+        self.assertEqual(run(f"return newgoal.detailsLine({json.dumps(rows)});"), "Description · None   State · Backlog   Type · Milestone (Launch)   Severity · sev2   Origination · New   and 2 more")
 
 
 if __name__ == "__main__":

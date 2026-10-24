@@ -601,7 +601,7 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 @media (max-width:960px){
 .nglayout{grid-template-columns:minmax(0,1fr)}
 .ngrail{position:static}
-.ngtopcount{display:block;margin:0 0 10px;color:var(--red-ink)}
+.ngtopcount{display:block;margin:0 0 10px;color:var(--ink)}.ngtopcount.miss{color:var(--red-ink)}
 .ngtopcount.good{color:var(--green-ink)}
 main.newgoal{padding-bottom:84px}
 .btn.create{position:fixed;left:16px;right:16px;bottom:12px;height:48px;z-index:40;box-shadow:0 6px 20px var(--tip-shadow)}}
@@ -633,3 +633,30 @@ main.newgoal{padding-bottom:84px}
 @media (pointer:coarse){.wstatus{min-height:44px;position:relative;z-index:2}}
 .qwho{display:inline-flex;align-items:baseline;flex-wrap:wrap}.qop{color:var(--mute);font-weight:500;font-size:14px}
 .phone .qwho{flex-direction:column;align-items:flex-start}.phone .qcomma{display:none}.phone .qop{font-size:13px}
+/* New goal v2 (NF1 to NF18). */
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:4px 0 6px}
+.tile{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-height:44px;padding:10px 12px;border:1px solid var(--cut);border-radius:12px;background:var(--card);text-align:left;font-size:12px;color:var(--ink);cursor:pointer}
+.tile b{font-size:14px}.tile .tcost{color:var(--mute)}
+.tile:hover{border-color:var(--ink)}
+.tile.on{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}.tile.on .tcost{color:var(--brand-ink)}
+.ngunder{margin:-6px 0 12px;font-weight:700;color:var(--mute)}
+.ownerpick{display:flex;align-items:center;gap:8px}.ownerpick select{flex:1}
+.pmbox h3{margin:0 0 4px;font-size:14px}
+.ngbacklog{margin:12px 0 0}
+.dhead{display:flex;align-items:center;justify-content:space-between;width:100%;padding:0;background:none;border:0;text-align:left;cursor:pointer;color:var(--ink)}
+.dhead h2{margin:0}
+.ngdetails .small.muted{margin:10px 0 0}
+.drows{display:flex;flex-direction:column;margin-top:10px}
+.drow{display:grid;grid-template-columns:minmax(140px,.9fr) minmax(0,1.2fr) 64px;align-items:center;gap:4px 12px;padding:8px 0;border-top:1px solid var(--line)}
+.dlabel{display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:700}
+.dvalue{font-size:13px;color:var(--mute)}.drow>.linkbtn{justify-self:end}
+.dline{white-space:pre-wrap}
+.dedit,.drow>.ferror{grid-column:1/-1}
+.tosave{list-style:none;padding:0;margin:6px 0 0}
+.tosave li .linkbtn{color:var(--ink);font-weight:600;padding:3px 0;text-decoration:none}
+.tosave li.ok .linkbtn{color:var(--green-ink)}
+.tosave li.miss .linkbtn{color:var(--red-ink)}
+.btn.create.muted{background:var(--control);color:var(--mute)}
+.phone .tiles{grid-template-columns:1fr}
+.phone .drow{grid-template-columns:minmax(0,1fr) auto}.phone .dvalue{grid-column:1;grid-row:2}
+@media (pointer:coarse){.tosave li .linkbtn,.ngtopcount{min-height:44px;min-width:44px;display:flex;align-items:center}}
