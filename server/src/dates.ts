@@ -28,9 +28,17 @@ export const weekStart = (date: string) => addDays(date, -weekday(date));
 /** Whole days from `from` to `to`. */
 export const daysBetween = (from: string, to: string) => Math.round((day(to) - day(from)) / DAY);
 
+/** One formatter per time zone: building one costs about ten times a format (Codebase QA). */
+const DAY_IN = new Map<string, Intl.DateTimeFormat>();
+
 /** The calendar day at instant `t` in an IANA time zone, e.g. "America/Denver". */
 export function dateIn(t: number, timeZone: string): string {
-  const parts = new Intl.DateTimeFormat("en", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(t);
+  let format = DAY_IN.get(timeZone);
+  if (format === undefined) {
+    format = new Intl.DateTimeFormat("en", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" });
+    DAY_IN.set(timeZone, format);
+  }
+  const parts = format.formatToParts(t);
   const part = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
   return `${part("year")}-${part("month")}-${part("day")}`;
 }
