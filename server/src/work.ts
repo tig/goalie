@@ -8,12 +8,14 @@ import type { Row } from "./rules.ts";
  * The app groups them: My work by status, the team view by owner, then status.
  */
 export function workQueue(db: DatabaseSync, me: string, today: string, owner?: string): WorkResponse {
+  const actors = actorsById(db);
+  // U4: a human's queue holds their own items and those of every agent they operate. Each item keeps its own owner.
+  const queue = (who: string) => who === owner || (actors[owner as string]?.kind === "human" && actors[who]?.operator === owner);
   const items = readAll(db, "work_item")
-    .filter((w) => owner === undefined || w.owner === owner)
+    .filter((w) => owner === undefined || queue(w.owner as string))
     .map((w) => toApiWorkItem(w, today));
   const named = new Set(items.map((w) => w.goal));
   const goals = Object.fromEntries(readAll(db, "goal").filter((g) => named.has(g.id as string)).map((g) => [g.id, { id: g.id as string, summary: g.summary as string }]));
-  const actors = actorsById(db);
   return { me: actors[me], today, items, goals, actors };
 }
 
