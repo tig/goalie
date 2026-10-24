@@ -68,8 +68,13 @@ export function goalPage(db: DatabaseSync, id: string, me: string, today: string
 
   const workItems: ApiWorkItem[] | null = on ? itemsOf(id).map((w) => toApiWorkItem(w, today)) : null;
   const itemIds = (workItems ?? []).map((w) => w.id);
+  // N6a: the history holds every goal that is or was this goal's Promotion Milestone, so a Promote row can name the one it completed.
+  const own = readEntityEvents(db, [{ kind: "goal", ids: [id] }]);
+  const milestones = new Set<string>(typeof stored.promotion_milestone === "string" ? [stored.promotion_milestone] : []);
+  for (const e of own) if (e.field === "promotion_milestone") for (const v of [e.old, e.new]) if (typeof v === "string") milestones.add(v);
+  milestones.delete(id);
   const events: ApiEvent[] = readEntityEvents(db, [
-    { kind: "goal", ids: [id] },
+    { kind: "goal", ids: [id, ...milestones] },
     { kind: "work_item", ids: itemIds },
   ]).map(toApiEvent);
 

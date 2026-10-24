@@ -5,7 +5,7 @@ import { postCommands, useJson } from "./data.ts";
 import { AddSubGoal, AddWorkItem, useTick } from "./GoalAdd.tsx";
 import { ClosePanel, DescriptionPanel, FieldsPanel, HealthPanel, PromotePanel, PursuePanel, SlipPanel, type PanelName } from "./GoalPanels.tsx";
 import { commentBatch } from "./model/commands.ts";
-import { comments, dateBar, labelRows, eventValue, fieldLabel, filterEvents, groupEvents, groupWorkItems, HISTORY_FILTERS, type EventGroup, type HistoryFilter, type Names } from "./model/goalpage.ts";
+import { comments, createdFields, historyNames, dateBar, labelRows, eventValue, fieldLabel, filterEvents, groupEvents, groupWorkItems, HISTORY_FILTERS, type EventGroup, type HistoryFilter, type Names } from "./model/goalpage.ts";
 import { dateLabel, slipLabel } from "./model/labels.ts";
 import { backPath, goalPath } from "./model/route.ts";
 import { Avatar, HealthDot } from "./parts.tsx";
@@ -420,6 +420,7 @@ function EventRow({ group, data }: { group: EventGroup; data: GoalPageResponse }
   const names: Names = {
     actors: data.actors,
     names: {
+      ...historyNames(data.events),
       ...(data.priority ? { [data.priority.id]: `Priority ${data.priority.rank} ${data.priority.title}` } : {}),
       [data.orgUnit.id]: data.orgUnit.name,
       ...(data.parent ? { [data.parent.id]: data.parent.summary } : {}),
@@ -427,14 +428,16 @@ function EventRow({ group, data }: { group: EventGroup; data: GoalPageResponse }
     },
   };
   const value = (v: unknown, field: string) => eventValue(v, field, names);
-  const find = (field: string) => group.events.find((x) => x.field === field)?.new;
+  // One write can touch several goals; the row speaks of this goal, and names any other goal before its step.
+  const find = (field: string) => group.events.find((x) => x.field === field && x.entity === data.goal.id)?.new;
+  const other = (x: { entity: string }) => (x.entity !== data.goal.id ? `${x.entity} ` : "");
   return (
     <li className="erow">
       <Avatar actor={actor} mine={actor.id === data.me.id} />
       <div>
         <p className="small">
           <b>{actor.name}</b> · {when(e.timestamp)}
-          {e.entity !== data.goal.id && <span className="muted"> · {e.entity}</span>}
+          {group.events.every((x) => x.entity !== data.goal.id) && <span className="muted"> · {e.entity}</span>}
         </p>
         {e.field === "comment" ? (
           <p>{String(e.new)}</p>
@@ -447,19 +450,34 @@ function EventRow({ group, data }: { group: EventGroup; data: GoalPageResponse }
               {e.reason && <span className="muted"> “{e.reason}”</span>}
             </summary>
             <ul>
-              {group.events
-                .filter((x) => x.new !== null && x.new !== "")
-                .map((x) => (
+              {createdFields(group.events, data.goal.id).map((x) => (
                   <li key={x.sequence}>
+                    {other(x)}
                     {fieldLabel(x.field)}: {value(x.new, x.field)}
                   </li>
                 ))}
+            </ul>
+          </details>
+        ) : group.promoted ? (
+          <details className="created">
+            <summary>
+              Promoted{group.promoted.milestone && ` · ${group.promoted.milestone} completed`}
+              {e.reason && <span className="muted"> “{e.reason}”</span>}
+            </summary>
+            <ul>
+              {[...group.events].reverse().map((x) => (
+                <li key={x.sequence}>
+                  {other(x)}
+                  {fieldLabel(x.field)}: {value(x.old, x.field)} → {value(x.new, x.field)}
+                </li>
+              ))}
             </ul>
           </details>
         ) : (
           <>
             {group.events.map((x) => (
               <p key={x.sequence}>
+                {other(x)}
                 {fieldLabel(x.field)}: {value(x.old, x.field)} → {value(x.new, x.field)}
               </p>
             ))}

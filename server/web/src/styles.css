@@ -500,8 +500,6 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 .btn.create{height:44px;justify-content:center;font-size:14px}
 .cancel{align-self:center;font-size:13px;font-weight:700;color:var(--link)}
 .newgoal-btn,.btn.newgoal{text-decoration:none}
-.phone .nglayout{grid-template-columns:1fr}
-.phone .ngrail{position:static}
 .phone .morechips{grid-template-columns:1fr 1fr}
 .ngcard input[type=radio]{width:auto;padding:0}
 .ngcard>.flabel,.ngcard .planbox>.flabel{display:block;margin:4px 0 4px}
@@ -535,7 +533,7 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 .dblabels>span.start{transform:none}
 .dblabels>span.end{transform:translateX(-100%)}
 .dblabels>span.low{top:16px}
-.datebar.two{margin-bottom:16px}
+.datebar.two{margin-bottom:24px}
 .dbstart{display:none}
 .created>summary{cursor:pointer;list-style:none}
 .created>summary::-webkit-details-marker{display:none}
@@ -572,7 +570,9 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 .phone .top .org{display:none}
 .phone .toptabs .tab{height:32px;padding:0 12px;white-space:nowrap}
 .phone .top{gap:10px}
-.workhead .flabel{margin-left:8px}
+.workhead .wowner{display:inline-flex;align-items:center;gap:8px}
+.phone .workhead{gap:8px}
+.phone .wtitle{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .qdone{margin:0 0 8px}
 .qdone>.linkbtn{padding:4px 0}
 .wdue.today{color:var(--ink);font-weight:700}
@@ -591,10 +591,13 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 @media (pointer:coarse){
 .ngcard input:not([type=radio]),.ngcard select,.ngcard textarea{min-height:44px}
 .prow{min-height:44px}}
-.phone .ngtopcount{display:block;margin:0 0 10px;color:var(--red-ink)}
-.phone .newgoal{padding-bottom:84px}
-.phone .btn.create{position:fixed;left:16px;right:16px;bottom:12px;height:48px;z-index:40;box-shadow:0 6px 20px var(--tip-shadow)}
-.phone .nglayout{grid-template-columns:minmax(0,1fr)}
 .qdone>.linkbtn{color:var(--mute)}
 .qdone>.linkbtn:hover{color:var(--ink)}
 .phone .radio{height:auto;min-height:36px;padding:6px 12px;border-radius:14px}
+/* N15, N15a: under 960 px of page New goal takes the phone layout: the form full width, the checks as a count at the top, Create as a fixed 48 px bar. */
+@media (max-width:960px){
+.nglayout{grid-template-columns:minmax(0,1fr)}
+.ngrail{position:static}
+.ngtopcount{display:block;margin:0 0 10px;color:var(--red-ink)}
+main.newgoal{padding-bottom:84px}
+.btn.create{position:fixed;left:16px;right:16px;bottom:12px;height:48px;z-index:40;box-shadow:0 6px 20px var(--tip-shadow)}}

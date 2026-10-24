@@ -103,6 +103,18 @@ class CommandsApiTests(unittest.TestCase):
         self.assertEqual(status, 422)
         self.assertEqual({v["rule"] for v in body["all"]}, {"committed-needs-pencil", "health-while-in-progress"})
 
+    def test_a_check_and_a_save_give_the_same_versions(self) -> None:
+        # Frontend Engineer: an In Progress create is version 2 after a save (Backlog, then In Progress), so a later update by ref names version 2.
+        batch = [
+            {"op": "create", "kind": "goal", "ref": "$g", "fields": {**SUB, "state": "In Progress", "health": "GREEN"}, "reason": "Started"},
+            {"op": "update", "kind": "goal", "id": "$g", "base_version": 2, "fields": {"parent": "XW-0003"}, "reason": "Under the MLP"},
+        ]
+        status, body = self.send(batch, check=True)
+        self.assertEqual(status, 200, body)
+        status, body = self.send(batch)
+        self.assertEqual(status, 200, body)
+        self.assertEqual(self.store.read("goal", body["ids"]["$g"])["version"], 3)
+
     def test_a_missing_field_does_not_hide_the_other_rules(self) -> None:
         fields = {**SUB, "type": "Milestone (Launch)", "plan_maturity": "Crayon", "severity": None}
         status, body = self.send([{"op": "create", "kind": "goal", "ref": "$g", "fields": fields, "reason": "Planned"}])
@@ -188,6 +200,13 @@ class CommandsApiTests(unittest.TestCase):
         states = [(e["old"], e["new"]) for e in body["events"] if e["field"] == "state"]
         self.assertEqual(states, [(None, "Backlog"), ("Backlog", "In Progress")])
         self.assertEqual(self.store.read("goal", "XW-0012")["state"], "In Progress")
+
+    def test_one_save_is_one_time(self) -> None:
+        # Frontend Engineer: History groups a write by actor, time, and reason, so every Event of one batch shares one timestamp.
+        status, body = self.send(create_batch() + [{"op": "comment", "kind": "goal", "id": "$goal", "text": "Made in one save."}])
+        self.assertEqual(status, 200, body)
+        self.assertGreater(len(body["events"]), 20)
+        self.assertEqual(len({e["timestamp"] for e in body["events"]}), 1)
 
     def test_a_comment_is_one_event_with_no_row_change(self) -> None:
         version = self.store.read("goal", "XW-0003")["version"]
