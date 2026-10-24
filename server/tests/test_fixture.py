@@ -35,10 +35,10 @@ const { formOptions } = await import("./src/options.ts");
 const { workQueue } = await import("./src/work.ts");
 const today = process.argv[1];
 const db = openStore(process.argv[2]);
-const seeded = seed(db, JSON.parse(readFileSync("seed/excaliwire.json", "utf-8")));
+const seeded = seed(db, JSON.parse(readFileSync("seed/excaliwire.json", "utf-8")), today);
 if (!seeded.ok) throw new Error(JSON.stringify(seeded));
 // The dev fixtures show our build team's queues too.
-const team = seed(db, JSON.parse(readFileSync("seed/build-team.json", "utf-8")));
+const team = seed(db, JSON.parse(readFileSync("seed/build-team.json", "utf-8")), today);
 if (!team.ok) throw new Error(JSON.stringify(team));
 const me = { id: "chelsea", name: "Chelsea" };
 process.stdout.write(JSON.stringify({

@@ -1,10 +1,9 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { FormOptions, PlanMaturity } from "./api.ts";
-import { DEFAULT_VISIBILITY, PROMOTION_MILESTONE_TYPE, WORK_ITEM_STATUSES } from "./goal.ts";
-import { actorsById, workItemsOn } from "./goalpage.ts";
+import { PROMOTION_MILESTONE_TYPE, WORK_ITEM_STATUSES } from "./goal.ts";
 import { isCurrentPeriod } from "./priorities.ts";
-import { read, readAll } from "./read.ts";
-import { nextIds } from "./write.ts";
+import { actorsById, read, readAll, workItemsOn } from "./read.ts";
+import { DEFAULTS, nextIds } from "./write.ts";
 
 /**
  * What New goal, + Sub-goal, and + Work item offer (plan B3, design N1 to N16), with the defaults the server writes.
@@ -34,14 +33,14 @@ export function formOptions(db: DatabaseSync, me: string, orgUnit: string, today
       .sort((a, b) => (a.rank as number) - (b.rank as number))
       .map((p) => ({ id: p.id as string, rank: p.rank as number, title: p.title as string })),
     defaults: {
-      description: "",
+      description: DEFAULTS.goal?.description as string,
       org_unit: orgUnit,
       level,
       type: "Milestone (Launch)",
       severity: "sev2",
       state: "In Progress",
       origination: "New",
-      visibility: DEFAULT_VISIBILITY,
+      visibility: DEFAULTS.goal?.visibility as string,
       // SPEC.md names no default plan maturity. The least firm is the honest start.
       plan_maturity: "Watercolor",
     },

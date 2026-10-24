@@ -224,7 +224,7 @@ class CheckTests(unittest.TestCase):
         self.addCleanup(store.close)
         store.run("seed")
         goal = store.read("goal", "XW-0002")
-        result = store.write("tig", {"op": "update", "kind": "goal", "id": "XW-0002", "base_version": goal["version"], "fields": {"summary": "Hire two humans"}})
+        result = store.write("tig", {"op": "update", "kind": "goal", "id": "XW-0002", "base_version": goal["version"], "fields": {"summary": "Hire two humans"}, "reason": "Shorter"})
         self.assertTrue(result["ok"], result)
         code, report = store.run("check")
         self.assertEqual(code, 0)

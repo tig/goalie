@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
-import type { ApiEvent, ApiWorkItem, CommandsResponse, Ref, StoredGoal } from "./api.ts";
+import type { ApiEvent, CommandsResponse, Ref, StoredGoal } from "./api.ts";
 import { publish, toApiEvent } from "./live.ts";
+import { toApiWorkItem } from "./work.ts";
 import type { Row } from "./rules.ts";
 import { inTransaction, write, type Command, type WriteResult } from "./write.ts";
 
@@ -16,7 +17,7 @@ const API_KINDS = ["goal", "work_item"] as const;
 /** The fields that hold a goal key, so a ref may stand there. A ref anywhere else is plain text. */
 const KEY_FIELDS: Record<(typeof API_KINDS)[number], readonly string[]> = { goal: ["promotion_milestone", "parent"], work_item: ["goal"] };
 
-export type CommandsAnswer = { status: 200 | 400 | 403 | 404 | 409 | 422; body: CommandsResponse };
+type CommandsAnswer = { status: 200 | 400 | 403 | 404 | 409 | 422; body: CommandsResponse };
 
 const STATUS = { stale: 409, exists: 409, invalid: 422, not_found: 404, bad_command: 400, unknown_actor: 403 } as const;
 
@@ -33,12 +34,6 @@ class Stop {
 
 const bad = (at: number, message: string): Stop => new Stop({ status: 400, body: { ok: false, at, error: "bad_command", message } });
 
-/** A stored work item, with `late` when it is open and its due date has passed. */
-export function toApiWorkItem(row: Row, today: string): ApiWorkItem {
-  const open = row.status !== "Completed" && row.status !== "Deleted";
-  return { ...(row as Omit<ApiWorkItem, "late">), late: open && typeof row.due_date === "string" && row.due_date < today };
-}
-
 /** Run a CommandsRequest as `actor`. With `check: true` the batch runs and is rolled back, and the answer is the same (plan, Checking before Create). */
 export function runCommands(db: DatabaseSync, actor: string, request: unknown, today: string): CommandsAnswer {
   if (!isObject(request) || !Array.isArray(request.commands) || request.commands.length === 0) {
@@ -52,8 +47,8 @@ export function runCommands(db: DatabaseSync, actor: string, request: unknown, t
       const ids: Record<Ref, string> = {};
       const events: ApiEvent[] = [];
       const run = (at: number, command: Command): Extract<WriteResult, { ok: true }> => {
-        const result = write(db, actor, command);
-        if (!result.ok) throw new Stop(failure(at, result, today));
+        const result = write(db, actor, command, today);
+        if (!result.ok) throw new Stop(failure(at, command.kind, result, today));
         events.push(...result.events.map(toApiEvent));
         return result;
       };
@@ -102,10 +97,10 @@ function resolve(at: number, raw: unknown, ids: Record<Ref, string>): Command {
   throw bad(at, "op is create, update, or comment");
 }
 
-function failure(at: number, result: Exclude<WriteResult, { ok: true }>, today: string): CommandsAnswer {
+function failure(at: number, kind: string, result: Exclude<WriteResult, { ok: true }>, today: string): CommandsAnswer {
   const status = STATUS[result.error];
   if (result.error === "stale") {
-    const current = "goal" in result.current ? toApiWorkItem(result.current, today) : (result.current as StoredGoal);
+    const current = kind === "work_item" ? toApiWorkItem(result.current, today) : (result.current as StoredGoal);
     return { status, body: { ok: false, at, error: "stale", current } };
   }
   if (result.error === "invalid") return { status, body: { ok: false, at, error: "invalid", violations: result.violations } };

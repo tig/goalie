@@ -18,12 +18,8 @@ export interface Lookup {
 }
 
 
-/** Goal fields whose change needs a reason (SPEC.md §6.1, §8.1). */
-export const REASONED: Record<string, readonly string[]> = {
-  goal: ["due_date", "changed_due_date", "date_type", "state", "health"],
-  priority: ["rank", "status"],
-  work_item: ["status", "owner", "due_date"],
-};
+/** Kinds whose every change needs a reason (SPEC.md §13 item 24: every change is an Event with a reason). */
+export const REASONED_KINDS: readonly string[] = ["goal", "work_item", "priority"];
 
 /** Fields only the write path sets. A command must not name them. */
 export const SYSTEM_FIELDS: Record<string, readonly string[]> = {
@@ -203,6 +199,13 @@ export function checkTransition(kind: string, before: Row | undefined, after: Ro
     // SPEC.md §7.2: Completed is met on or before the Original Committed Date, Completed Late after it.
     found.push({ rule: "completed-on-time", message: `${after.id}: met ${expected === "Completed" ? "on time" : "late"}, so it is ${expected}.`, field: "state" });
   }
+  // A slip moves the date later (SPEC.md §7.1: a missed Committed date is a slip, never a re-baseline).
+  if (after.changed_due_date != null && after.changed_due_date !== before.changed_due_date) {
+    const current = (before.changed_due_date ?? before.due_date) as string;
+    if (typeof current === "string" && (after.changed_due_date as string) <= current) {
+      found.push({ rule: "slip-moves-later", message: `${after.id}: a slip moves the date later than ${current}.`, field: "changed_due_date" });
+    }
+  }
   const moves = STATE_MOVES[before.state as State];
   if (before.state !== after.state && moves !== undefined && !(moves as readonly unknown[]).includes(after.state)) {
     found.push({ rule: "state-lifecycle", message: `${after.id}: a ${before.state} goal cannot move to ${after.state}.`, field: "state" });
@@ -239,11 +242,6 @@ export function checkAuthor(actor: Row, owner: string | undefined, kind: string,
   return [];
 }
 
-/** Lint from SPEC.md §6.1: a summary has 5 words or more. It flags, it does not block. */
-export function summaryLint(goal: Row): string | undefined {
-  const words = String(goal.summary ?? "").trim().split(/\s+/).filter(Boolean);
-  return words.length >= 5 ? undefined : `${goal.id}: the summary has ${words.length} words; it needs 5 or more.`;
-}
 
 /** The §6.1 description parts, each with words that show it is there. A heuristic: it flags, it does not block. */
 const DESCRIPTION_PARTS: { words: RegExp; hint: string }[] = [

@@ -26,7 +26,7 @@ function onto(db: DatabaseSync, command: Command): Command {
   return { op: "update", kind: command.kind, id: existing.id as string, base_version: existing.version as number, fields: command.fields, reason: command.reason };
 }
 
-export function seed(db: DatabaseSync, file: SeedFile): SeedResult {
+export function seed(db: DatabaseSync, file: SeedFile, today: string): SeedResult {
   if (!Array.isArray(file?.writes)) return { ok: false, reason: "the seed file has no writes list" };
   const { n } = db.prepare("SELECT COUNT(*) AS n FROM actor").get() as { n: number };
   if (file.onto === undefined && n > 0) return { ok: false, reason: "the store is not empty" };
@@ -35,7 +35,7 @@ export function seed(db: DatabaseSync, file: SeedFile): SeedResult {
     let events = 0;
     for (const { as, command } of file.writes) {
       const applied = file.onto === undefined ? command : onto(db, command);
-      const result = write(db, as, applied);
+      const result = write(db, as, applied, today);
       if (!result.ok) return { ok: false, reason: "a seed write was rejected", command: applied, result };
       events += result.events.length;
     }
