@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { ENTITIES, encode, goalieOwner, isKind, lookup, memoryLookup, read, readAll, readEvents, type EventRow, type Kind } from "./read.ts";
+import { configuredToday } from "./config.ts";
 import { DEFAULT_VISIBILITY } from "./goal.ts";
 import { checkAuthor, checkTransition, checkWrite, REASONED, summaryLint, SYSTEM_FIELDS, type Row, type Violation } from "./rules.ts";
 
@@ -16,26 +17,34 @@ const DEFAULTS: Partial<Record<Kind, Row>> = {
 
 export type Command =
   | { op: "create"; kind: Kind; id?: string; fields: Row; reason?: string }
-  | { op: "update"; kind: Kind; id: string; base_version: number; fields: Row; reason?: string };
+  | { op: "update"; kind: Kind; id: string; base_version: number; fields: Row; reason?: string }
+  | { op: "comment"; kind: Kind; id: string; text: string };
 
-type WriteResult =
+export type WriteResult =
   | { ok: true; entity: Row; events: EventRow[] }
   | { ok: false; error: "stale"; current: Row }
   | { ok: false; error: "invalid"; violations: Violation[] }
   | { ok: false; error: "unknown_actor" | "not_found" | "exists" | "bad_command"; message: string };
 
 /**
- * The next unused key. A goal key is the owner's prefix and a 4-digit number, e.g. XW-0012.
+ * The next unused key: a prefix and a 4-digit number, e.g. XW-0012 or WI-0001 (plan E-3).
  * The GOALIE owner sets the prefix as `goal_key_prefix` in owner settings (SPEC.md §6.1, §12). The default is the kind's prefix in read.ts.
  */
 function nextId(db: DatabaseSync, kind: Kind): string {
+  return nextIds(db, kind, 1)[0];
+}
+
+/** The next `count` unused keys, in the order creates would take them. New goal shows them before it saves (design N11, N12). */
+export function nextIds(db: DatabaseSync, kind: Kind, count: number): string[] {
   const settings = kind === "goal" ? (read(db, "owner_settings", "owner")?.settings as Row | undefined) : undefined;
   const prefix = typeof settings?.goal_key_prefix === "string" ? settings.goal_key_prefix : ENTITIES[kind].prefix;
   const { n } = db.prepare(`SELECT COUNT(*) AS n FROM ${kind}`).get() as { n: number };
-  for (let i = n + 1; ; i++) {
-    const id = `${prefix}-${kind === "goal" ? String(i).padStart(4, "0") : i}`;
-    if (read(db, kind, id) === undefined) return id;
+  const ids: string[] = [];
+  for (let i = n + 1; ids.length < count; i++) {
+    const id = `${prefix}-${kind === "goal" || kind === "work_item" ? String(i).padStart(4, "0") : i}`;
+    if (read(db, kind, id) === undefined) ids.push(id);
   }
+  return ids;
 }
 
 /** A field holds text, a number, or null. A `bool` field holds a boolean. A `json` field holds any JSON value. */
@@ -47,7 +56,7 @@ function wrongTypes(kind: Kind, fields: Row): Violation[] {
       if ((spec.bool as readonly string[]).includes(field)) return typeof value !== "boolean";
       return typeof value !== "string" && !(typeof value === "number" && Number.isFinite(value));
     })
-    .map(([field, value]) => ({ rule: "field-value", message: `${kind}.${field} cannot hold ${JSON.stringify(value)}.` }));
+    .map(([field, value]) => ({ rule: "field-value", message: `${kind}.${field} cannot hold ${JSON.stringify(value)}.`, field }));
 }
 
 function same(a: unknown, b: unknown): boolean {
@@ -71,16 +80,17 @@ const isObject = (value: unknown): value is Row => typeof value === "object" && 
 
 export function write(db: DatabaseSync, actor: string, command: Command): WriteResult {
   if (!isObject(command)) return badCommand("a command is a JSON object");
-  if (command.fields !== undefined && !isObject(command.fields)) return badCommand("fields is a JSON object");
   if (!isKind(command.kind)) return badCommand(`unknown kind ${String(command.kind)}`);
   const kind = command.kind;
+  if (command.op === "comment") return inTransaction(db, (result) => result.ok, () => comment(db, actor, kind, command.id, command.text));
+  if (command.fields !== undefined && !isObject(command.fields)) return badCommand("fields is a JSON object");
   const spec = ENTITIES[kind];
   const fields = command.fields ?? {};
   const unknown = Object.keys(fields).filter((f) => !(spec.fields as readonly string[]).includes(f));
   if (unknown.length > 0) return badCommand(`unknown fields for ${kind}: ${unknown.join(", ")}`);
   const system = Object.keys(fields).filter((f) => (SYSTEM_FIELDS[kind] ?? []).includes(f));
   if (system.length > 0) {
-    return { ok: false, error: "invalid", violations: system.map((f) => ({ rule: "system-field", message: `${f} is set by the system.` })) };
+    return { ok: false, error: "invalid", violations: system.map((f) => ({ rule: "system-field", message: `${f} is set by the system.`, field: f })) };
   }
 
   if (command.op === "update" && !Number.isInteger(command.base_version)) return badCommand("base_version must be a whole number");
@@ -134,17 +144,17 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
   applySystemFields(db, kind, after);
   const missing = requiredFields(db, kind).filter((f) => after[f] == null);
   if (missing.length > 0) {
-    return { ok: false, error: "invalid", violations: missing.map((f) => ({ rule: "required-field", message: `${kind}.${f} is required.` })) };
+    return { ok: false, error: "invalid", violations: missing.map((f) => ({ rule: "required-field", message: `${kind}.${f} is required.`, field: f })) };
   }
 
   const changed = spec.fields.filter((f) => !same(before?.[f], after[f]));
   if (before !== undefined && changed.length === 0) return { ok: true, entity: before, events: [] };
 
   const reason = command.reason?.trim() || null;
-  const violations: Violation[] = [...(author ? checkAuthor(author, goalieOwner(db), kind, before, after) : []), ...checkTransition(kind, before, after)];
+  const violations: Violation[] = [...(author ? checkAuthor(author, goalieOwner(db), kind, before, after) : []), ...checkTransition(kind, before, after, configuredToday(db))];
   const needReason = changed.filter((f) => (REASONED[kind] ?? []).includes(f));
   if (needReason.length > 0 && reason === null) {
-    violations.push({ rule: "reason-required", message: `a change to ${needReason.join(", ")} needs a reason.` });
+    violations.push({ rule: "reason-required", message: `a change to ${needReason.join(", ")} needs a reason.`, field: "reason" });
   }
 
   const columns = ["version", ...spec.fields];
@@ -190,13 +200,27 @@ function requiredFields(db: DatabaseSync, kind: Kind): string[] {
   return columns.filter((c) => c.notnull === 1 && c.dflt_value === null && c.pk === 0 && c.name !== "version").map((c) => c.name);
 }
 
+/** A comment is one Event on its entity: field "comment", old null, the text as new and as reason. No row changes (SPEC.md §6.6, plan E-4). */
+function comment(db: DatabaseSync, actor: string, kind: Kind, id: string, text: unknown): WriteResult {
+  if (read(db, "actor", actor) === undefined) return { ok: false, error: "unknown_actor", message: `no actor ${actor}` };
+  if (typeof id !== "string" || read(db, kind, id) === undefined) return { ok: false, error: "not_found", message: `no ${kind} ${String(id)}` };
+  if (typeof text !== "string" || text.trim() === "") {
+    return { ok: false, error: "invalid", violations: [{ rule: "comment-text", message: "a comment has text.", field: "text" }] };
+  }
+  const body = text.trim();
+  const { lastInsertRowid } = db
+    .prepare("INSERT INTO event (timestamp, actor, entity_kind, entity, field, old, new, reason) VALUES (?, ?, ?, ?, 'comment', NULL, ?, ?)")
+    .run(new Date().toISOString(), actor, kind, id, JSON.stringify(body), body);
+  return { ok: true, entity: read(db, kind, id) as Row, events: readEvents(db, Number(lastInsertRowid) - 1) };
+}
+
 /** Foreign keys are deferred inside the transaction, so a missing reference becomes a named violation. Only the written row is checked. */
 function missingReferences(db: DatabaseSync, kind: Kind, id: string): Violation[] {
   const keys = db.prepare(`PRAGMA foreign_key_list(${kind})`).all() as { table: string; from: string; to: string }[];
   const row = db.prepare(`SELECT * FROM ${kind} WHERE id = ?`).get(id) as Row;
   return keys
     .filter((k) => row[k.from] != null && db.prepare(`SELECT 1 FROM ${k.table} WHERE ${k.to} = ?`).get(row[k.from] as string) === undefined)
-    .map((k) => ({ rule: "reference-exists", message: `${kind} names a ${k.table} that does not exist.` }));
+    .map((k) => ({ rule: "reference-exists", message: `${kind} names a ${k.table} that does not exist.`, field: k.from }));
 }
 
 /** The first write to an empty store creates the acting human. It is the only write by an actor that does not exist yet. */

@@ -1,0 +1,113 @@
+import type { DatabaseSync } from "node:sqlite";
+import type { ApiEvent, ApiWorkItem, CommandsResponse, Ref, StoredGoal } from "./api.ts";
+import type { EventRow } from "./read.ts";
+import type { Row } from "./rules.ts";
+import { inTransaction, write, type Command, type WriteResult } from "./write.ts";
+
+/**
+ * The batch behind POST /api/commands (plan E-1). The commands run in order through write(), in one transaction.
+ * A create names itself with a ref ("$goal"); a later command uses it as an id or as a key field, and the server puts the key there (E-2).
+ * The MCP route will call runCommands too.
+ */
+
+/** Only goals and work items are written through the API in the MLP (E-10). */
+const API_KINDS = ["goal", "work_item"] as const;
+
+/** The fields that hold a goal key, so a ref may stand there. A ref anywhere else is plain text. */
+const KEY_FIELDS: Record<(typeof API_KINDS)[number], readonly string[]> = { goal: ["promotion_milestone", "parent"], work_item: ["goal"] };
+
+export type CommandsAnswer = { status: 200 | 400 | 403 | 404 | 409 | 422; body: CommandsResponse };
+
+const STATUS = { stale: 409, exists: 409, invalid: 422, not_found: 404, bad_command: 400, unknown_actor: 403 } as const;
+
+const isObject = (value: unknown): value is Row => typeof value === "object" && value !== null && !Array.isArray(value);
+const isRef = (value: unknown): value is Ref => typeof value === "string" && /^\$[A-Za-z0-9_-]+$/.test(value);
+
+/** Thrown inside the transaction to stop the batch and roll it back. */
+class Stop {
+  readonly answer: CommandsAnswer;
+  constructor(answer: CommandsAnswer) {
+    this.answer = answer;
+  }
+}
+
+const bad = (at: number, message: string): Stop => new Stop({ status: 400, body: { ok: false, at, error: "bad_command", message } });
+
+export function toApiEvent(event: EventRow): ApiEvent {
+  return { ...event, entity_kind: event.entity_kind as ApiEvent["entity_kind"] };
+}
+
+/** A stored work item, with `late` when it is open and its due date has passed. */
+export function toApiWorkItem(row: Row, today: string): ApiWorkItem {
+  const open = row.status !== "Completed" && row.status !== "Deleted";
+  return { ...(row as Omit<ApiWorkItem, "late">), late: open && typeof row.due_date === "string" && row.due_date < today };
+}
+
+/** Run a CommandsRequest as `actor`. With `check: true` the batch runs and is rolled back, and the answer is the same (plan, Checking before Create). */
+export function runCommands(db: DatabaseSync, actor: string, request: unknown, today: string): CommandsAnswer {
+  if (!isObject(request) || !Array.isArray(request.commands) || request.commands.length === 0) {
+    return bad(0, "a request is { commands: [...] } with at least one command").answer;
+  }
+  const commands = request.commands as unknown[];
+  const check = request.check === true;
+  try {
+    return inTransaction(db, (answer: CommandsAnswer) => answer.status === 200 && !check, () => {
+      const ids: Record<Ref, string> = {};
+      const events: ApiEvent[] = [];
+      const run = (at: number, command: Command): Extract<WriteResult, { ok: true }> => {
+        const result = write(db, actor, command);
+        if (!result.ok) throw new Stop(failure(at, result, today));
+        events.push(...result.events.map(toApiEvent));
+        return result;
+      };
+      commands.forEach((raw, at) => {
+        const command = resolve(at, raw, ids);
+        const ref = isObject(raw) ? raw.ref : undefined;
+        if (command.op === "create" && command.kind === "goal" && command.fields.state === "In Progress") {
+          // E-5: the state lifecycle starts at Backlog, so an In Progress create is a Backlog create and a state Event.
+          const created = run(at, { ...command, fields: { ...command.fields, state: "Backlog" } });
+          run(at, { op: "update", kind: "goal", id: created.entity.id as string, base_version: 1, fields: { state: "In Progress" }, reason: command.reason });
+          if (isRef(ref)) ids[ref] = created.entity.id as string;
+          return;
+        }
+        const result = run(at, command);
+        if (command.op === "create" && isRef(ref)) ids[ref] = result.entity.id as string;
+      });
+      return { status: 200, body: { ok: true, ids, events } };
+    });
+  } catch (error) {
+    if (error instanceof Stop) return error.answer;
+    throw error;
+  }
+}
+
+/** Check one command's shape and put the keys where its refs stand. */
+function resolve(at: number, raw: unknown, ids: Record<Ref, string>): Command {
+  if (!isObject(raw)) throw bad(at, "a command is a JSON object");
+  const kind = raw.kind as (typeof API_KINDS)[number];
+  if (!(API_KINDS as readonly unknown[]).includes(kind)) throw bad(at, `api-kind: the API writes goals and work items, not ${String(raw.kind)}`);
+  const key = (value: unknown): unknown => {
+    if (!isRef(value)) return value;
+    if (!(value in ids)) throw bad(at, `unknown-ref: ${value} is used before the command that creates it`);
+    return ids[value];
+  };
+  if (raw.op === "comment") return { op: "comment", kind, id: key(raw.id) as string, text: raw.text as string };
+  if (raw.op === "create" && raw.ref !== undefined && (!isRef(raw.ref) || raw.ref in ids)) throw bad(at, `ref ${String(raw.ref)} must be "$" and a word, used once`);
+  if (raw.fields !== undefined && !isObject(raw.fields)) throw bad(at, "fields is a JSON object");
+  const fields: Row = { ...(raw.fields as Row | undefined) };
+  for (const field of KEY_FIELDS[kind]) if (field in fields) fields[field] = key(fields[field]);
+  const reason = typeof raw.reason === "string" ? raw.reason : undefined;
+  if (raw.op === "create") return { op: "create", kind, fields, reason };
+  if (raw.op === "update") return { op: "update", kind, id: key(raw.id) as string, base_version: raw.base_version as number, fields, reason };
+  throw bad(at, "op is create, update, or comment");
+}
+
+function failure(at: number, result: Exclude<WriteResult, { ok: true }>, today: string): CommandsAnswer {
+  const status = STATUS[result.error];
+  if (result.error === "stale") {
+    const current = "goal" in result.current ? toApiWorkItem(result.current, today) : (result.current as StoredGoal);
+    return { status, body: { ok: false, at, error: "stale", current } };
+  }
+  if (result.error === "invalid") return { status, body: { ok: false, at, error: "invalid", violations: result.violations } };
+  return { status, body: { ok: false, at, error: result.error, message: result.message } };
+}

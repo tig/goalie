@@ -51,10 +51,14 @@ Tests do not need Entra. `server/tests/sign_token.mjs` signs tokens with a fresh
 Every token is still verified: RS256 signature, issuer, audience, and expiry.
 `node src/cli.ts` is a local tool against the `GOALIE_DB` file: `write --as <actor>`, `read <kind> <id>`, `events [after]`, `seed [file]`, `check`, and `whoami`. It is not reachable over HTTP.
 A seed is a data file of writes, each with its `as` actor. `server/seed/excaliwire.json` is the default. A seed lives outside `src/`, so the publish does not carry it.
+The Excaliwire seed makes each build seat an agent actor with `app_id` `app-<seat>`. `server/tests/sign_token.mjs` signs a seat token with claims `idtyp: "app"` and `azp: "app-<seat>"`.
+The app's dev fixtures in `server/web/fixtures/` are generated from the seed: `python server/tests/test_fixture.py --write`. `test_fixture.py` fails when they drift from the API.
 The default host is `127.0.0.1`.
 `GET /health` answers `ok`.
 `GET /health` is the one path that needs no verified actor.
 `GET /api/priorities` answers the Priorities view as JSON for the verified actor. The shape is `PrioritiesResponse` in `server/src/api.ts`. The app filters and draws it.
+`GET /api/goals/:id` answers one goal's page (`GoalPageResponse`). `GET /api/options` answers what New goal offers (`FormOptions`). `GET /api/work` answers every work item, or one actor's with `?owner=`.
+`POST /api/commands` writes: a list of commands, in order, in one transaction (`CommandsRequest`). With `check: true` it runs the batch, rolls it back, and answers the same.
 Every other `/api/` path answers 404. An `/api/` request with no verified token answers 401 with `{"error", "reason"}`.
 `GET /assets/*` answers a file of the build. Any other path that names a file, such as `/main.js`, answers 404. Every other path answers the build's `index.html`, so the app routes in the browser.
 A page or asset request with no verified token answers 401 with the sign-in page. The sign-in page loads the shared Excaliwire chrome from `/_xw/`. Host configuration serves `/_xw/`.
