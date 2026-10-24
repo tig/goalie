@@ -155,6 +155,12 @@ export function labelRows(labels: { at: number; text: string; align: "start" | "
   });
 }
 
+/** QA U5: the owners keep the order they had when the page loaded; anyone new joins at the end. `first` is null before the first load. */
+export function keepOrder(first: string[] | null, now: string[]): string[] {
+  if (!first) return now;
+  return [...first.filter((id) => now.includes(id)), ...now.filter((id) => !first.includes(id))];
+}
+
 /** The team view (plan F6): one queue per owner, people with work In Progress first; each queue by status. Deleted items are left out. */
 export function queues<T extends Pick<ApiWorkItem, "owner" | "status">>(items: T[], actors: Record<string, ApiActor>, me: string) {
   const owners = [...new Set(items.filter((i) => i.status !== "Deleted").map((i) => i.owner))];

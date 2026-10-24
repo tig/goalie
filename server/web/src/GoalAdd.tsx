@@ -185,32 +185,41 @@ export function AddWorkItem({ data, statuses, onDone }: { data: GoalPageResponse
  * Enter saves; Escape undoes the tick.
  */
 export function useTick(onSaved: () => void) {
-  const [ticked, setTicked] = useState<ApiWorkItem | null>(null);
+  // The item being moved and the status it moves to; the tick moves it to Completed (G24), the picker to any status (QA U6).
+  const [moving, setMoving] = useState<{ item: ApiWorkItem; status: WorkItemStatus } | null>(null);
   const [reason, setReason] = useState("");
   const [result, post] = usePost(() => {
-    setTicked(null);
+    setMoving(null);
     setReason("");
     onSaved();
   });
+  const save = () => moving && post(workItemStatusBatch(moving.item, moving.status, reason));
   const box = (item: ApiWorkItem) =>
-    ticked?.id === item.id ? (
+    moving?.item.id === item.id ? (
       <div className="tickreason">
         <input
           value={reason}
-          placeholder="Reason"
+          placeholder={`Reason for ${moving.status}`}
           aria-label="Reason"
           autoFocus
           onChange={(e) => setReason(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") post(workItemStatusBatch(item, "Completed", reason));
-            if (e.key === "Escape") setTicked(null);
+            if (e.key === "Enter") save();
+            if (e.key === "Escape") setMoving(null);
           }}
         />
-        <button type="button" className="btn primary" disabled={result.saving} onClick={() => post(workItemStatusBatch(item, "Completed", reason))}>
+        <button type="button" className="btn primary" disabled={result.saving} onClick={save}>
           Save
         </button>
         <Errors result={result} />
       </div>
     ) : null;
-  return { ticked, tick: (item: ApiWorkItem) => setTicked(ticked?.id === item.id ? null : item), box };
+  const ticked = moving?.status === "Completed" ? moving.item : null;
+  return {
+    ticked,
+    tick: (item: ApiWorkItem) => setMoving(ticked?.id === item.id ? null : { item, status: "Completed" }),
+    move: (item: ApiWorkItem, status: WorkItemStatus) => setMoving(status === item.status ? null : { item, status }),
+    chosen: (item: ApiWorkItem) => (moving?.item.id === item.id ? moving.status : item.status),
+    box,
+  };
 }

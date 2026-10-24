@@ -475,6 +475,9 @@ class GoalPageTests(unittest.TestCase):
         q = run(f"return goalpage.queues({json.dumps(items)}, {json.dumps(actors)}, 'chelsea').map((q) => [q.owner.id, q.groups.map((g) => [g.status, g.items.map((i) => i.id)])]);")
         self.assertEqual(q, [["chelsea", [["In Progress", ["WI-2"]]]], ["qa", [["In Progress", ["WI-3"]], ["Backlog", ["WI-1"]]]]])
 
+    def test_the_queue_order_holds_from_page_load(self) -> None:
+        self.assertEqual(run('return [goalpage.keepOrder(null, ["bob", "ann"]), goalpage.keepOrder(["bob", "ann"], ["ann", "cat", "bob"])];'), [["bob", "ann"], ["bob", "ann", "cat"]])
+
     def test_people_with_work_in_progress_come_first(self) -> None:
         items = [{"id": "1", "owner": "ann", "status": "Completed"}, {"id": "2", "owner": "bob", "status": "In Progress"}, {"id": "3", "owner": "me", "status": "Backlog"}, {"id": "4", "owner": "cat", "status": "In Progress"}]
         actors = {k: {"id": k, "name": k.title(), "kind": "human"} for k in ("ann", "bob", "cat", "me")}
