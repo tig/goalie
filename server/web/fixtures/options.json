@@ -49,8 +49,18 @@
       "kind": "agent"
     },
     {
+      "id": "codebase-qa",
+      "name": "Codebase QA",
+      "kind": "agent"
+    },
+    {
       "id": "frontend-engineer",
       "name": "Frontend Engineer",
+      "kind": "agent"
+    },
+    {
+      "id": "frontend-qa",
+      "name": "Frontend QA",
       "kind": "agent"
     },
     {
@@ -66,11 +76,6 @@
     {
       "id": "product-manager",
       "name": "Product Manager",
-      "kind": "agent"
-    },
-    {
-      "id": "qa",
-      "name": "QA",
       "kind": "agent"
     },
     {

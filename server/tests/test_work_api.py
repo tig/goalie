@@ -25,6 +25,8 @@ class WorkApiTests(unittest.TestCase):
         cls.store = Store()
         code, result = cls.store.run("seed")
         assert code == 0, result
+        code, result = cls.store.run("seed", str(SERVER / "seed" / "build-team.json"))
+        assert code == 0, result
         chelsea = cls.store.read("actor", "chelsea")
         assert cls.store.write("tig", update("actor", "chelsea", chelsea["version"], {"subject": "sub-chelsea"}))["ok"]
         token, env = signed("sub-chelsea")

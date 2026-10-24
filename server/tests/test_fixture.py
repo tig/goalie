@@ -37,6 +37,9 @@ const today = process.argv[1];
 const db = openStore(process.argv[2]);
 const seeded = seed(db, JSON.parse(readFileSync("seed/excaliwire.json", "utf-8")));
 if (!seeded.ok) throw new Error(JSON.stringify(seeded));
+// The dev fixtures show our build team's queues too.
+const team = seed(db, JSON.parse(readFileSync("seed/build-team.json", "utf-8")));
+if (!team.ok) throw new Error(JSON.stringify(team));
 const me = { id: "chelsea", name: "Chelsea" };
 process.stdout.write(JSON.stringify({
   "priorities.json": { ...prioritiesView(db, "excaliwire", today, "UTC"), me },
