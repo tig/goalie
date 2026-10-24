@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { ApiGoal, ApiPriority, ApiSummary, GoalDate, Health, PrioritiesResponse, PtgStep } from "./api.ts";
+import { day, daysBetween } from "./dates.ts";
 import { committedDate, currentDate, isOpen, OPEN_STATES } from "./goal.ts";
 import { read, readAll } from "./read.ts";
 import type { Row } from "./rules.ts";
@@ -20,12 +21,6 @@ export const PRIORITIES_VIEW = {
   sort: "rank",
   columns: ["Summary", "Owner", "Health", "Date Type", "Promotion Milestone", "PTG"],
 } as const;
-
-const DAY = 86_400_000;
-
-function day(iso: string): number {
-  return Date.parse(`${iso.slice(0, 10)}T00:00:00Z`);
-}
 
 /** A period is current when it names today's year ("2026") or quarter ("2026-Q4"). Calendar quarters are the default calendar (SPEC.md §12). */
 export function isCurrentPeriod(period: string, todayIso: string): boolean {
@@ -97,7 +92,7 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
   const datesOf = (goal: Row, own: boolean): GoalDate[] => {
     const dates: GoalDate[] = [];
     const committed = committedDate(goal, getGoal);
-    const slipDays = committed && day(committed.date) < today ? Math.round((today - day(committed.date)) / DAY) : undefined;
+    const slipDays = committed && day(committed.date) < today ? daysBetween(committed.date, todayIso) : undefined;
     const withSlip = (date: GoalDate): GoalDate => (slipDays !== undefined ? { ...date, slipDays } : date);
     if (committed?.kind === "Committed" && (own || slipDays !== undefined)) dates.push(withSlip(committed));
     if (own && (goal.date_type === "Ambition" || goal.date_type === "Fantasy")) dates.push({ date: goal.due_date as string, kind: goal.date_type });
@@ -142,7 +137,7 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
     if (!milestone || !isOpen(milestone)) continue;
     const date = currentDate(milestone);
     if (date === undefined || day(date) < today || (nextPromotion && day(date) >= day(nextPromotion.date))) continue;
-    nextPromotion = { milestone: milestone.id as string, date, days: Math.round((day(date) - today) / DAY), goal: goal.id as string, summary: goal.summary as string };
+    nextPromotion = { milestone: milestone.id as string, date, days: daysBetween(todayIso, date), goal: goal.id as string, summary: goal.summary as string };
   }
 
   return {

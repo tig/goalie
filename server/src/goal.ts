@@ -36,13 +36,6 @@ export function isOpen(goal: Row): boolean {
   return (OPEN_STATES as readonly unknown[]).includes(goal.state);
 }
 
-/** A real calendar date written YYYY-MM-DD. "2026-13-45" is not one. */
-export function isDate(value: unknown): value is string {
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const parsed = new Date(`${value}T00:00:00Z`);
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
-}
-
 /** The date a goal is judged against: the changed date after a slip, else the due date. */
 export function currentDate(goal: Row): string | undefined {
   const date = goal.changed_due_date ?? goal.due_date;

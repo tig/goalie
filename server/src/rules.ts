@@ -3,7 +3,8 @@
  * A rule returns violations. The write path rolls back when there is one.
  */
 
-import { COMPLETED_STATES, currentDate, DATE_TYPES, isDate, STATE_MOVES, type State } from "./goal.ts";
+import { isDate } from "./dates.ts";
+import { COMPLETED_STATES, currentDate, DATE_TYPES, STATE_MOVES, type State } from "./goal.ts";
 
 export type Row = Record<string, unknown>;
 
