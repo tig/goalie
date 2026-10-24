@@ -134,7 +134,7 @@ The seed: Tig owns XW-0001 and XW-0002 and is the GOALIE owner. Chelsea owns XW-
 41. A refused write in a batch with other commands stores nothing. The answer names the command that was refused (`at`).
 42. Galahad opens XW-0001's goal page. Health, PTG, dates, Date Type, state, and every other field show as read text, with no edit control, no Slip, Promote, or Close, and no + Sub-goal. The comment box is open and works. One muted line says who may change the goal: its owner, the owners above it, and the GOALIE owner, by avatar.
 43. Chelsea opens XW-0007's goal page and sees the edit controls. Tig sees them on every goal.
-44. The page decides read-only from what the server sends with the goal (a `can_change` value from the same rule), not from its own copy of the rule ([ADR 0010](../adr/0010-app-shape.md) as amended: rules live on the server). If the page shows a control anyway and the save is refused, the 422 message shows at the control in spec words.
+44. The page decides read-only from what the server sends with the goal (`mayChange` on `GET /api/goals/:id` for the signed-in actor, from the same rule), not from its own copy of the rule ([ADR 0010](../adr/0010-app-shape.md) as amended: rules live on the server). If the page shows a control anyway and the save is refused, the 422 message shows at the control in spec words.
 
 Words:
 
