@@ -576,6 +576,27 @@ class CommandTests(unittest.TestCase):
         got = run(f"const a = {json.dumps(answer)}; const b = commands.createBatch({json.dumps(self.FORM)}); return [commands.refusals(a, b).map((v) => v.rule), commands.notChecked(a)];")
         self.assertEqual(got, [["required-field"], 1])
 
+    def test_a_save_says_what_happened_naming_the_new_key(self) -> None:
+        ev = lambda kind, ent, field: {"entity_kind": kind, "entity": ent, "field": field, "old": None, "new": "x"}
+        cases = [
+            ("subgoal", {"ok": True, "ids": {"$s1": "XW-0020"}, "events": []}, {}),
+            ("workitem", {"ok": True, "ids": {}, "events": [ev("work_item", "WI-0050", "title")]}, {}),
+            ("promote", {"ok": True, "ids": {"$m": "XW-0021"}, "events": []}, {"to": "Ambition"}),
+            ("promote", {"ok": True, "ids": {}, "events": []}, {"to": "Committed"}),
+            ("close", {"ok": True, "ids": {}, "events": []}, {"state": "Completed Late"}),
+            ("promote-close", {"ok": True, "ids": {}, "events": []}, {"state": "Completed"}),
+            ("slip", {"ok": True, "ids": {}, "events": []}, {"date": "Dec 4, 2026"}),
+        ]
+        self.assertEqual(run(f"return {json.dumps(cases)}.map(([k, a, x]) => commands.savedStatus(k, a, x));"), [
+            "Added XW-0020 under this goal.",
+            "Added WI-0050 to this goal.",
+            "Promoted to Ambition. XW-0021 is the next Promotion Milestone.",
+            "Promoted to Committed.",
+            "Closed as Completed Late.",
+            "Promoted to Committed and closed as Completed.",
+            "Recorded a slip to Dec 4, 2026.",
+        ])
+
     def test_a_new_goal_is_sent_in_the_create_order(self) -> None:
         b = run(f"return commands.createBatch({json.dumps(self.FORM)});")
         steps = [(c["op"], c["kind"], c.get("ref") or c.get("id")) for c in b["commands"]]  # type: ignore[index]

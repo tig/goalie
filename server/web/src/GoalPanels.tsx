@@ -1,8 +1,8 @@
 import { useState, type ReactNode } from "react";
-import type { ApiActor, ApiViolation, CommandsRequest, FormOptions, GoalFields, GoalPageResponse, Health, PathToGreen, StoredGoal } from "../../src/api.ts";
+import type { ApiActor, ApiViolation, CommandsRequest, CommandsResponse, FormOptions, GoalFields, GoalPageResponse, Health, PathToGreen, StoredGoal } from "../../src/api.ts";
 import { addDays, shortDate } from "../../src/dates.ts";
 import { postCommands, useJson } from "./data.ts";
-import { closeBatch, fieldsBatch, goalTypes, healthBatch, promoteAndClose, promoteToAmbition, promoteToCommitted, pursueBatch, slipBatch, staleMerge } from "./model/commands.ts";
+import { closeBatch, fieldsBatch, goalTypes, healthBatch, promoteAndClose, promoteToAmbition, promoteToCommitted, pursueBatch, savedStatus, slipBatch, staleMerge } from "./model/commands.ts";
 import { eventValue, fieldLabel, humans } from "./model/goalpage.ts";
 import { HealthDot } from "./parts.tsx";
 
@@ -16,7 +16,10 @@ export type PanelName = "health" | "slip" | "promote" | "close" | "pursue" | "fi
 type Saved = { saving: boolean; violations: ApiViolation[]; message?: string; stale?: { current: Record<string, unknown> } };
 
 /** Save a batch. A 200 reloads the page and closes the panel. A 409 rebases the next save on the current version. */
-function useSave(goal: StoredGoal, onSaved: () => void) {
+/** A panel closes with whether it saved, and for G26 the line that says what happened. */
+export type Done = (saved: boolean, status?: string) => void;
+
+function useSave(goal: StoredGoal, onSaved: (answer: CommandsResponse) => void) {
   const [state, setState] = useState<Saved>({ saving: false, violations: [] });
   const [base, setBase] = useState(goal.version);
   const save = async (build: (goal: StoredGoal) => CommandsRequest, typed: Record<string, unknown>) => {
@@ -24,7 +27,7 @@ function useSave(goal: StoredGoal, onSaved: () => void) {
     const { body } = await postCommands(build({ ...goal, version: base }));
     if (body.ok) {
       setState({ saving: false, violations: [] });
-      onSaved();
+      onSaved(body);
     } else if (body.error === "stale") {
       const merged = staleMerge(typed, body.current as unknown as { version: number } & Record<string, unknown>);
       setBase(merged.base_version);
@@ -150,7 +153,7 @@ const PtgEditor = ({ value, onChange, health, data, saved }: { value: PathToGree
 const emptyPtg = (data: GoalPageResponse): PathToGreen => data.goal.path_to_green ?? { steps: [{ text: "", owner: data.goal.owner, date: "" }], criteria: "" };
 
 /** G9 to G11: health, with the Path to Green when YELLOW or RED. GREEN from YELLOW or RED asks only for a reason. */
-export function HealthPanel({ data, health, onDone }: { data: GoalPageResponse; health: Exclude<Health, null>; onDone: (saved: boolean) => void }) {
+export function HealthPanel({ data, health, onDone }: { data: GoalPageResponse; health: Exclude<Health, null>; onDone: Done }) {
   const [ptg, setPtg] = useState(emptyPtg(data));
   const [reason, setReason] = useState("");
   const saved = useSave(data.goal, () => onDone(true));
@@ -173,14 +176,14 @@ export function HealthPanel({ data, health, onDone }: { data: GoalPageResponse; 
 }
 
 /** G13: Record a slip. The original committed date is locked; the changed due date, health, and the Path to Green save together. */
-export function SlipPanel({ data, onDone }: { data: GoalPageResponse; onDone: (saved: boolean) => void }) {
+export function SlipPanel({ data, onDone }: { data: GoalPageResponse; onDone: Done }) {
   const { goal, today } = data;
   // A slip moves the date later (slip-moves-later), so no date is picked for you.
   const [date, setDate] = useState("");
   const [health, setHealth] = useState<"YELLOW" | "RED">(goal.health === "RED" ? "RED" : "YELLOW");
   const [ptg, setPtg] = useState(emptyPtg(data));
   const [reason, setReason] = useState("");
-  const saved = useSave(goal, () => onDone(true));
+  const saved = useSave(goal, (b) => onDone(true, savedStatus("slip", b, { date: shortDate(date, today) })));
   return (
     <Shell
       title="Record a slip"
@@ -215,18 +218,18 @@ export function SlipPanel({ data, onDone }: { data: GoalPageResponse; onDone: (s
 }
 
 /** G14: Promote date. Fantasy to Ambition asks for the next Promotion Milestone, filled in. Ambition to Committed shows the plan. */
-export function PromotePanel({ data, onDone }: { data: GoalPageResponse; onDone: (saved: boolean) => void }) {
+export function PromotePanel({ data, onDone }: { data: GoalPageResponse; onDone: Done }) {
   const { goal, today } = data;
   const fantasy = goal.date_type === "Fantasy";
-  const [ms, setMs] = useState({ summary: `Commit a date for ${goal.summary}`, due_date: addDays(today, 14), owner: goal.owner });
+  const next = fantasy ? "Ambition" : "Committed";
+  const [ms, setMs] = useState({ summary: `Commit a date to move ${goal.summary} to Committed`, due_date: addDays(today, 14), owner: goal.owner });
   const [date, setDate] = useState(goal.due_date ?? today);
   const [reason, setReason] = useState("");
-  const saved = useSave(goal, () => onDone(true));
+  const saved = useSave(goal, (b) => onDone(true, savedStatus("promote", b, { to: next })));
   const [options] = useJson<FormOptions>("/api/options");
   const milestoneType = options.state === "ok" ? goalTypes(options.data).milestone : "";
   const pm = data.promotionMilestone;
   const met = pm ? { id: pm.id, version: pm.version, state: pm.state } : undefined;
-  const next = fantasy ? "Ambition" : "Committed";
   return (
     <Shell
       title={`Promote date to ${next}`}
@@ -299,7 +302,7 @@ export function PromotePanel({ data, onDone }: { data: GoalPageResponse; onDone:
 }
 
 /** G15: Close goal. Completed or Completed Late is computed by the server and shown, not chosen. */
-export function ClosePanel({ data, onDone }: { data: GoalPageResponse; onDone: (saved: boolean) => void }) {
+export function ClosePanel({ data, onDone }: { data: GoalPageResponse; onDone: Done }) {
   const { goal, promotionMilestone: pm } = data;
   // G15: an Ambition goal can be promoted and closed in one step. The server computes the state it closes as (closesAsPromoted).
   const promoted = data.closesAsPromoted;
@@ -307,8 +310,8 @@ export function ClosePanel({ data, onDone }: { data: GoalPageResponse; onDone: (
   const choices = [data.closesAs, both, "Did Not Meet", "Deleted"].filter(Boolean) as string[];
   const [choice, setChoice] = useState(choices[0]);
   const [reason, setReason] = useState("");
-  const saved = useSave(goal, () => onDone(true));
   const state = (choice === PROMOTE_AND_CLOSE ? promoted : choice) as StoredGoal["state"];
+  const saved = useSave(goal, (b) => onDone(true, savedStatus(choice === PROMOTE_AND_CLOSE ? "promote-close" : "close", b, { state })));
   const build = (g: StoredGoal) => (choice === PROMOTE_AND_CLOSE && pm ? promoteAndClose(g, { id: pm.id, version: pm.version, state: pm.state }, state, reason) : closeBatch(g, state, reason));
   return (
     <Shell title="Close goal" saved={saved} fields={["state", "plan_maturity", "reason"]} saveLabel={choice === PROMOTE_AND_CLOSE ? PROMOTE_AND_CLOSE : "Close goal"} onSave={() => saved.save(build, { state })} onCancel={() => onDone(false)}>
@@ -337,7 +340,7 @@ export function ClosePanel({ data, onDone }: { data: GoalPageResponse; onDone: (
 const PROMOTE_AND_CLOSE = "Promote and close";
 
 /** G16: Pursue moves a Backlog goal to In Progress, with a health (GREEN by default). */
-export function PursuePanel({ data, onDone }: { data: GoalPageResponse; onDone: (saved: boolean) => void }) {
+export function PursuePanel({ data, onDone }: { data: GoalPageResponse; onDone: Done }) {
   const [health, setHealth] = useState<Exclude<Health, null>>("GREEN");
   const [reason, setReason] = useState("");
   const saved = useSave(data.goal, () => onDone(true));
@@ -358,7 +361,7 @@ export function PursuePanel({ data, onDone }: { data: GoalPageResponse; onDone: 
 }
 
 /** G18: the description as text, edited in a box with a reason. */
-export function DescriptionPanel({ data, onDone }: { data: GoalPageResponse; onDone: (saved: boolean) => void }) {
+export function DescriptionPanel({ data, onDone }: { data: GoalPageResponse; onDone: Done }) {
   const [text, setText] = useState(data.goal.description);
   const [reason, setReason] = useState("");
   const saved = useSave(data.goal, () => onDone(true));
@@ -375,7 +378,7 @@ export function DescriptionPanel({ data, onDone }: { data: GoalPageResponse; onD
 type Editable = Pick<GoalFields, "type" | "level" | "severity" | "plan" | "plan_maturity" | "origination" | "visibility">;
 
 /** G19: the Fields grid made editable in place, with one reason and Save. Choices come from GET /api/options. */
-export function FieldsPanel({ data, onDone }: { data: GoalPageResponse; onDone: (saved: boolean) => void }) {
+export function FieldsPanel({ data, onDone }: { data: GoalPageResponse; onDone: Done }) {
   const [options] = useJson<FormOptions>("/api/options");
   const g = data.goal;
   const [values, setValues] = useState<Editable>({ type: g.type, level: g.level, severity: g.severity, plan: g.plan, plan_maturity: g.plan_maturity, origination: g.origination, visibility: g.visibility });
