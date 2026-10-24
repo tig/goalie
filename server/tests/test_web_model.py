@@ -402,6 +402,11 @@ class GoalPageTests(unittest.TestCase):
         q = run(f"return goalpage.queues({json.dumps(items)}, {json.dumps(actors)}, 'chelsea').map((q) => [q.owner.id, q.groups.map((g) => [g.status, g.items.map((i) => i.id)])]);")
         self.assertEqual(q, [["chelsea", [["In Progress", ["WI-2"]]]], ["qa", [["In Progress", ["WI-3"]], ["Backlog", ["WI-1"]]]]])
 
+    def test_people_with_work_in_progress_come_first(self) -> None:
+        items = [{"id": "1", "owner": "ann", "status": "Completed"}, {"id": "2", "owner": "bob", "status": "In Progress"}, {"id": "3", "owner": "me", "status": "Backlog"}, {"id": "4", "owner": "cat", "status": "In Progress"}]
+        actors = {k: {"id": k, "name": k.title(), "kind": "human"} for k in ("ann", "bob", "cat", "me")}
+        self.assertEqual(run(f"return goalpage.queues({json.dumps(items)}, {json.dumps(actors)}, 'me').map((q) => q.owner.id);"), ["bob", "cat", "me", "ann"])
+
     def test_comments_are_the_comment_events(self) -> None:
         events = [{"field": "comment", "actor": "tig"}, {"field": "health", "actor": "chelsea"}, {"field": "comment", "actor": "chelsea"}]
         self.assertEqual(run(f'return goalpage.comments({json.dumps(events)}).map((e) => e.actor);'), ["tig", "chelsea"])

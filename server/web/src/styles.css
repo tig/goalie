@@ -503,7 +503,6 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 .phone .nglayout{grid-template-columns:1fr}
 .phone .ngrail{position:static}
 .phone .morechips{grid-template-columns:1fr 1fr}
-.phone .btn.create{position:sticky;bottom:8px;height:48px;z-index:20}
 .ngcard input[type=radio]{width:auto;padding:0}
 .ngcard>.flabel,.ngcard .planbox>.flabel{display:block;margin:4px 0 4px}
 .phone .ngsub{grid-template-columns:1fr auto}
@@ -571,3 +570,29 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 .phone .top .org{display:none}
 .phone .toptabs .tab{height:32px;padding:0 12px;white-space:nowrap}
 .phone .top{gap:10px}
+.workhead .flabel{margin-left:8px}
+.qdone{margin:0 0 8px}
+.qdone>.linkbtn{padding:4px 0}
+.wdue.today{color:var(--ink);font-weight:700}
+@media (pointer:coarse){.wrow input[type=checkbox]{position:relative}.wrow{min-height:44px}}
+
+/* New goal, design check (N8, N15, rule 29). */
+.mchips{display:flex;flex-wrap:wrap;gap:8px}
+.mchip{display:inline-flex;align-items:center;gap:2px;padding:0 4px 0 12px;min-height:34px;border-radius:999px;background:var(--control);flex-wrap:wrap}
+.mchip>label{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.mlabel{font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--mute)}
+.ngcard .mchip select,.ngcard .mchip input{width:auto;border:0;background:transparent;padding:6px 4px;font-weight:700}
+.ngcard .mchip input{width:120px}
+.mchip .ferror{flex-basis:100%;margin:0 0 6px}
+.ngcount{text-align:center}
+.ngtopcount{display:none}
+@media (pointer:coarse){
+.ngcard input:not([type=radio]),.ngcard select,.ngcard textarea{min-height:44px}
+.prow{min-height:44px}}
+.phone .ngtopcount{display:block;margin:0 0 10px;color:var(--red-ink)}
+.phone .newgoal{padding-bottom:84px}
+.phone .btn.create{position:fixed;left:16px;right:16px;bottom:12px;height:48px;z-index:40;box-shadow:0 6px 20px var(--tip-shadow)}
+.phone .nglayout{grid-template-columns:minmax(0,1fr)}
+.qdone>.linkbtn{color:var(--mute)}
+.qdone>.linkbtn:hover{color:var(--ink)}
+.phone .radio{height:auto;min-height:36px;padding:6px 12px;border-radius:14px}

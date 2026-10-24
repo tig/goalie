@@ -90,7 +90,7 @@ export const Rank = ({ rank }: { rank?: number }) => <span className="rnum">{ran
  * A ? icon and its help card. A click or Enter opens it, a second click, Escape, or a click outside closes it. Pointing at it also shows it.
  * The card is placed in the screen by placePopover, so it never leaves the screen (rule 9).
  */
-function Help({ label, avoid, children }: { label: string; avoid?: React.RefObject<HTMLElement | null>; children: ReactNode }) {
+export function Help({ label, avoid, children }: { label: string; avoid?: React.RefObject<HTMLElement | null>; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [hover, setHover] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
