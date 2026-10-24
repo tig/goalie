@@ -133,7 +133,10 @@ class WebBatchTests(unittest.TestCase):
         key = self.send(build("return commands.createBatch(form);", form=form))["ids"]["$goal"]
         page = self.read(f"/api/goals/{key}")
         pm = page["promotionMilestone"]
-        batch = build("return commands.promoteAndClose(goal, met, 'Completed', 'Shipped');", goal=page["goal"], met={k: pm[k] for k in ("id", "version", "state")})
+        self.assertEqual(page["closesAsPromoted"], "Completed")
+        self.assertEqual(self.read(f"/api/goals/{pm['id']}")["goal"]["health"], "GREEN")
+        self.assertEqual(pm["state"], "In Progress")
+        batch = build("return commands.promoteAndClose(goal, met, state, 'Shipped');", goal=page["goal"], state=page["closesAsPromoted"], met={k: pm[k] for k in ("id", "version", "state")})
         self.assertTrue(self.send(batch)["ok"])
         goal = self.read(f"/api/goals/{key}")["goal"]
         self.assertEqual((goal["date_type"], goal["state"], goal["promotion_milestone"]), ("Committed", "Completed", None))
