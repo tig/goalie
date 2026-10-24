@@ -160,9 +160,11 @@ background-size:2px 100%,100% 100%;background-repeat:no-repeat;background-positi
 .dot.Fantasy{background:var(--card);box-shadow:inset 0 0 0 1.5px var(--fantasy),0 0 0 2px var(--card)}
 .endlbl{position:absolute;top:calc(50% + 8px);font-size:11px;font-weight:600;white-space:nowrap;color:var(--mute);z-index:3}
 .endlbl.Ambition{color:var(--ambition-ink)}.endlbl.Fantasy{color:var(--fantasy-ink)}
-.edge{position:absolute;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;z-index:3;background:var(--card);padding:2px 6px;border-radius:999px;white-space:nowrap}
-.edge.after{transform:translate(-100%,-50%)}
-.edge.endlbl{top:calc(50% + 8px);transform:none;padding:0 6px}.edge.endlbl.after{transform:translateX(-100%)}
+/* An edge label sits in the label band above the bars, with no fill, so it covers no bar, tick, or label (rule 23). */
+.edge{position:absolute;bottom:calc(50% + 11px);font-size:11px;font-weight:800;z-index:3;white-space:nowrap}
+.d1 .edge,.d2 .edge{bottom:calc(50% + 8px)}
+.edge>.ticklbl,.edge>.endlbl{position:static;font-size:inherit;font-weight:inherit}
+.edge.after{transform:translateX(-100%)}
 .edge.Ambition{color:var(--ambition-ink)}.edge.Fantasy{color:var(--fantasy-ink)}
 .cut{position:relative;z-index:6;display:flex;align-items:center;gap:10px;margin:0;padding:12px 0 6px;color:var(--mute);font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
 .cut::before,.cut::after{content:"";flex:1;border-top:1.5px dashed var(--cut)}

@@ -129,6 +129,42 @@ export function placeLabel(atPx: number, widthPx: number, view: { left: number; 
   return "right";
 }
 
+/** An edge label starts this far inside the edge, clear of the edge fade. */
+export const EDGE_INSET = 30;
+
+export type LaneMark = { key: string; atPx: number; text: string; outside: "before" | "after" | null };
+
+/**
+ * Where a lane's labels go, so no two overlap (rule 23).
+ * Every mark past an edge of the screen joins one label at that edge, in date order. A mark that its own label could not clear the edge label of joins it too.
+ * Each other mark labels to its right, else to its left.
+ */
+export function placeLaneLabels(marks: LaneMark[], view: { left: number; right: number }): { before: string[]; after: string[]; inside: { key: string; side: "left" | "right" }[] } {
+  const sorted = [...marks].sort((a, b) => a.atPx - b.atPx);
+  const before = new Set(sorted.filter((m) => m.outside === "before" || (!m.outside && m.atPx < view.left)).map((m) => m.key));
+  const after = new Set(sorted.filter((m) => m.outside === "after" || (!m.outside && m.atPx > view.right)).map((m) => m.key));
+  const reserve = (keys: Set<string>) => {
+    const text = sorted.filter((m) => keys.has(m.key)).map((m) => m.text).join(" · ");
+    return keys.size ? EDGE_INSET + labelWidth(text) + LABEL_GAP : 0;
+  };
+  let inner = view;
+  for (let changed = true; changed; ) {
+    changed = false;
+    inner = { left: view.left + reserve(before), right: view.right - reserve(after) };
+    for (const m of sorted) {
+      if (before.has(m.key) || after.has(m.key)) continue;
+      const side = m.atPx < inner.left ? before : m.atPx > inner.right ? after : undefined;
+      if (side) {
+        side.add(m.key);
+        changed = true;
+      }
+    }
+  }
+  const keys = (set: Set<string>) => sorted.filter((m) => set.has(m.key)).map((m) => m.key);
+  const inside = sorted.filter((m) => !before.has(m.key) && !after.has(m.key)).map((m) => ({ key: m.key, side: placeLabel(m.atPx, labelWidth(m.text), inner) as "left" | "right" }));
+  return { before: keys(before), after: keys(after), inside };
+}
+
 export type Mark = {
   at: number;
   date: GoalDate;
