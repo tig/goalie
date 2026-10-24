@@ -46,6 +46,21 @@
   "started": "2026-10-23",
   "closesAs": null,
   "closesAsPromoted": null,
+  "mayChange": true,
+  "above": [],
+  "changers": [
+    {
+      "actor": "chelsea",
+      "as": "owner",
+      "goal": "XW-0003"
+    },
+    {
+      "actor": "tig",
+      "as": "goalie-owner",
+      "goal": null
+    }
+  ],
+  "moreChangers": false,
   "promotionMilestone": {
     "id": "XW-0004",
     "summary": "Run the MLP prototype at goalie.excaliwire.com with Excaliwire's real goals loaded",

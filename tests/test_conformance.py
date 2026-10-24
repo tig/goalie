@@ -82,15 +82,15 @@ class ConformanceTests(unittest.TestCase):
         184: ("test_state_or_date_change_carries_a_written_reason",),
         187: ("test_state_or_date_change_carries_a_written_reason",),
         189: ("test_yellow_or_red_goal_has_a_path_to_green",),
-        196: ("test_org_unit_has_a_named_human_owner",),
-        208: ("test_priority_ranks_are_unique",),
-        227: ("test_doc_is_a_page", "test_doc_is_a_page"),
-        229: (
+        207: ("test_org_unit_has_a_named_human_owner",),
+        219: ("test_priority_ranks_are_unique",),
+        238: ("test_doc_is_a_page", "test_doc_is_a_page"),
+        240: (
             "test_markdown_edit_is_not_lost",
             "test_markdown_edit_is_not_lost",
             "test_saved_doc_version_comes_from_the_merged_text",
         ),
-        234: (
+        245: (
             "test_event_sequence_only_increases",
             "test_views_and_agents_share_one_stream",
             "test_client_resumes_from_the_last_sequence",
@@ -99,7 +99,7 @@ class ConformanceTests(unittest.TestCase):
             "test_comment_is_an_event_on_the_entity",
             "test_draft_appears_live_and_does_not_take_effect_until_approval",
         ),
-        236: (
+        247: (
             "test_every_change_is_an_event",
             "test_history_is_readable_on_the_record",
             "test_history_is_readable_on_the_record",
@@ -107,38 +107,41 @@ class ConformanceTests(unittest.TestCase):
             "test_history_is_readable_on_the_record",
             "test_history_is_readable_on_the_record",
         ),
-        241: (
+        252: (
             "test_work_items_are_the_list_under_the_goal",
             "test_human_can_file_a_work_item_with_no_agent",
         ),
-        272: (
+        283: (
             "test_draft_appears_live_and_does_not_take_effect_until_approval",
             "test_draft_appears_live_and_does_not_take_effect_until_approval",
             "test_stale_draft_approval_is_rejected",
         ),
-        347: (
+        359: (
             "test_structured_fields_are_not_merged",
             "test_structured_fields_are_not_merged",
         ),
-        348: (
+        360: (
             "test_write_names_the_version_it_read",
             "test_write_names_the_version_it_read",
         ),
-        349: ("test_commit_check_is_one_server_transaction",),
-        353: ("test_deleted_goal_stays_findable",),
-        359: ("test_view_is_a_screen_plus_a_saved_definition",),
-        365: ("test_between_reviews_work_starts_at_my_goals",),
-        366: ("test_committed_change_appears_within_the_live_update_time",),
-        367: (
+        361: ("test_commit_check_is_one_server_transaction",),
+        365: ("test_deleted_goal_stays_findable",),
+        371: ("test_view_is_a_screen_plus_a_saved_definition",),
+        377: ("test_between_reviews_work_starts_at_my_goals",),
+        378: ("test_committed_change_appears_within_the_live_update_time",),
+        379: (
             "test_client_resumes_from_the_last_sequence",
             "test_client_resumes_from_the_last_sequence",
         ),
-        368: ("test_view_shows_presence",),
-        460: ("test_only_the_goalie_owner_changes_owner_settings",),
-        478: ("test_a_user_changes_only_their_own_settings",),
+        380: ("test_view_shows_presence",),
+        472: ("test_only_the_goalie_owner_changes_owner_settings",),
+        490: ("test_a_user_changes_only_their_own_settings",),
+        196: ("test_only_owners_change_a_goal", "test_only_owners_change_a_goal"),
+        358: ("test_only_owners_change_a_goal",),
     }
 
     SKIP_WHY = {
+        "test_only_owners_change_a_goal": "Filled by #50.",
         "test_goal_has_exactly_one_human_owner": "Filled by #4.",
         "test_goal_date_carries_a_date_type": "Filled by #4.",
         "test_org_unit_has_a_named_human_owner": "Filled by #4.",
@@ -415,6 +418,11 @@ class ConformanceTests(unittest.TestCase):
     @unittest.skip("Filled by #6.")
     def test_mcp_can_subscribe_to_the_same_stream(self) -> None:
         """This is the MCP path for subscribing to the same stream, not a second copy of test_views_and_agents_share_one_stream. §6.6, §10, and §13 item 21."""
+        self.fail("not filled")
+
+    @unittest.skip("Filled by #50.")
+    def test_only_owners_change_a_goal(self) -> None:
+        """§6.1 rule owners-change-goal and §8.1 are this test. The goal's owner, the owner of any goal above it through parent, and the GOALIE owner change a goal. Any other actor's write is rejected and names the rule. Both marks on the §6.1 paragraph and the §8.1 bullet map here."""
         self.fail("not filled")
 
     def test_scaffold_names_every_marked_invariant(self) -> None:

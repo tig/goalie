@@ -4,7 +4,7 @@
  */
 
 import { isDate } from "./dates.ts";
-import { closesAs, COMPLETED_STATES, currentDate, DATE_TYPES, PROMOTION_MILESTONE_TYPE, resolvedGoal, STATE_MOVES, WORK_ITEM_STATUSES, type State } from "./goal.ts";
+import { closesAs, COMPLETED_STATES, currentDate, DATE_TYPES, mayChangeGoal, PROMOTION_MILESTONE_TYPE, resolvedGoal, STATE_MOVES, WORK_ITEM_STATUSES, type State } from "./goal.ts";
 
 export type Row = Record<string, unknown>;
 
@@ -217,9 +217,18 @@ export function checkTransition(kind: string, before: Row | undefined, after: Ro
  * Who may write what (SPEC.md §6.9, §10, §12; ADR 0011). `actor` is the writer's row; `before` is the row the write replaces.
  * `owner` is the GOALIE owner, or undefined before the owner settings exist.
  */
-export function checkAuthor(actor: Row, owner: string | undefined, kind: string, before: Row | undefined, after: Row): Violation[] {
+export function checkAuthor(actor: Row, owner: string | undefined, kind: string, before: Row | undefined, after: Row, getGoal: (id: string) => Row | undefined): Violation[] {
   if (actor.kind === "agent" && (kind === "goal" || kind === "priority")) {
     return [{ rule: "agent-writes-a-draft", message: `${actor.id} is an agent. An agent proposes a change to a ${kind} as a Draft.` }];
+  }
+  if (kind === "goal") {
+    // SPEC.md §6.1 owners-change-goal: a change needs the right on the goal as it was; a goal placed under a parent needs the right on that parent.
+    const id = actor.id as string;
+    const newParent = typeof after.parent === "string" && after.parent !== before?.parent ? getGoal(after.parent) : undefined;
+    const allowed = (before === undefined || mayChangeGoal(id, owner, before, getGoal)) && (newParent === undefined || mayChangeGoal(id, owner, newParent, getGoal));
+    if (!allowed) {
+      return [{ rule: "owners-change-goal", message: `${id}: only the goal's owner, an owner of a goal above it, or the GOALIE owner changes it. Anyone may comment.` }];
+    }
   }
   // An actor row maps a token to an actor, and an org unit holds the goals. A write there could take over another actor.
   if ((kind === "actor" || kind === "org_unit") && (actor.kind !== "human" || (owner !== undefined && actor.id !== owner))) {

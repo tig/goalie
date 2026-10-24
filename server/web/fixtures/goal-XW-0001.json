@@ -52,6 +52,16 @@
   "started": "2026-10-23",
   "closesAs": "Completed Late",
   "closesAsPromoted": null,
+  "mayChange": false,
+  "above": [],
+  "changers": [
+    {
+      "actor": "tig",
+      "as": "owner",
+      "goal": "XW-0001"
+    }
+  ],
+  "moreChangers": false,
   "promotionMilestone": null,
   "parent": null,
   "priority": {

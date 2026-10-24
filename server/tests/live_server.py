@@ -117,3 +117,13 @@ def signed(subject: str) -> tuple[str, dict[str, str]]:
     out = json.loads(proc.stdout)
     env = {"GOALIE_ISSUERS": json.dumps([{"issuer": ISSUER, "audience": AUDIENCE, "jwks": out["jwks"]}])}
     return out["tokens"][0], env
+
+
+def signed_many(*subjects: str) -> tuple[dict[str, str], dict[str, str]]:
+    """One token per human subject, all signed by one key, and the GOALIE_ISSUERS environment that trusts them."""
+    now = int(time.time())
+    request = {"tokens": [{"claims": {"iss": ISSUER, "aud": AUDIENCE, "sub": s, "nbf": now - 5, "exp": now + 600}} for s in subjects]}
+    proc = subprocess.run(["node", "tests/sign_token.mjs"], cwd=SERVER, input=json.dumps(request).encode(), capture_output=True, check=True)
+    out = json.loads(proc.stdout)
+    env = {"GOALIE_ISSUERS": json.dumps([{"issuer": ISSUER, "audience": AUDIENCE, "jwks": out["jwks"]}])}
+    return dict(zip(subjects, out["tokens"])), env

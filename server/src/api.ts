@@ -4,7 +4,7 @@
  * Dates are ISO strings (YYYY-MM-DD). Labels are made in the app.
  */
 
-import type { State, WORK_ITEM_STATUSES } from "./goal.ts";
+import type { Changer, State, WORK_ITEM_STATUSES } from "./goal.ts";
 
 export type Health = "GREEN" | "YELLOW" | "RED" | null;
 
@@ -169,6 +169,14 @@ export type GoalPageResponse = {
   started: string;
   /** The state a Close would record now: Completed, or Completed Late against original_committed_date (G15). Null when the goal cannot be completed. */
   closesAs: "Completed" | "Completed Late" | null;
+  /** Rule owners-change-goal (SPEC.md §6.1): true when the signed-in actor may change this goal. Anyone may comment. */
+  mayChange: boolean;
+  /** The goals above this one through parent, nearest first, each with its owner's actor id (named in `actors`). Empty for a top goal. */
+  above: { id: string; owner: string }[];
+  /** Who may change the goal, for its page's line (product check 42): the owner, owners above nearest first, the GOALIE owner last; at most three, no actor twice. */
+  changers: Changer[];
+  /** True when someone who may change the goal is not in `changers`. */
+  moreChangers: boolean;
   /** G15 Promote and close: the state an In Progress Ambition goal would close as, once promoted on its own date. Null otherwise. */
   closesAsPromoted: "Completed" | "Completed Late" | null;
   /** The goal's Promotion Milestone, and what is still open under it (G14). */

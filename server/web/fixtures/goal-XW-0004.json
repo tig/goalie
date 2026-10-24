@@ -52,6 +52,26 @@
   "started": "2026-10-23",
   "closesAs": "Completed",
   "closesAsPromoted": null,
+  "mayChange": true,
+  "above": [
+    {
+      "id": "XW-0003",
+      "owner": "chelsea"
+    }
+  ],
+  "changers": [
+    {
+      "actor": "chelsea",
+      "as": "owner",
+      "goal": "XW-0004"
+    },
+    {
+      "actor": "tig",
+      "as": "goalie-owner",
+      "goal": null
+    }
+  ],
+  "moreChangers": false,
   "promotionMilestone": null,
   "parent": {
     "id": "XW-0003",
