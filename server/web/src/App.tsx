@@ -14,7 +14,9 @@ import { Search } from "./Search.tsx";
 import { TimelineView } from "./TimelineView.tsx";
 import { usePhone, useScreen } from "./useScreen.ts";
 import { GoalPage } from "./GoalPage.tsx";
-import { rememberHome, useRoute } from "./router.tsx";
+import { NewGoal } from "./NewGoal.tsx";
+import { newGoalPath } from "./model/route.ts";
+import { Link, rememberHome, useRoute } from "./router.tsx";
 
 /**
  * The Home screen (ADR 0010). It reads GET /api/priorities once and draws it. It holds no rule and writes nothing.
@@ -120,7 +122,13 @@ function Pages({ data }: { data: PrioritiesResponse }) {
   return (
     <>
       <TopBar data={data} />
-      {route.page === "goal" ? <GoalPage goalKey={route.key} viewName={data.view.name} /> : <Home data={data} />}
+      {route.page === "goal" ? (
+        <GoalPage goalKey={route.key} viewName={data.view.name} />
+      ) : route.page === "new" ? (
+        <NewGoal key={route.parent ?? ""} parent={route.parent} viewName={data.view.name} />
+      ) : (
+        <Home data={data} />
+      )}
     </>
   );
 }
@@ -185,6 +193,10 @@ function Home({ data }: { data: PrioritiesResponse }) {
                 </button>
               ))}
             </span>
+            {/* On a phone New goal sits on the first row, after the view tabs. */}
+            <Link to={newGoalPath()} className="btn primary newgoal mob">
+              New goal
+            </Link>
             {/* When one row does not fit, a break puts the search box and the right cluster together on a second row (rule 25b). */}
             <span className="tbreak" aria-hidden="true" />
             {search}
@@ -218,6 +230,10 @@ function Home({ data }: { data: PrioritiesResponse }) {
                   </button>
                 </nav>
               )}
+              {/* New goal is in every view, last in the right cluster, so it never moves. */}
+              <Link to={newGoalPath()} className="btn primary newgoal desk">
+                New goal
+              </Link>
             </span>
           </div>
           {view === "timeline" && <TimelineView {...tree} window={window} home={home} onRange={setRange} />}

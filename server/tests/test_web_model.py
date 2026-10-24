@@ -424,7 +424,7 @@ class CommandTests(unittest.TestCase):
 
     def test_a_sub_goal_on_its_parents_date_sends_no_date(self) -> None:
         b = run('return commands.subGoalBatch(page("XW-0003").goal, { summary: "Load the tree", owner: "chelsea" });')
-        self.assertEqual(b, {"commands": [{"op": "create", "kind": "goal", "ref": "$s1", "fields": {"summary": "Load the tree", "owner": "chelsea", "parent": "XW-0003", "org_unit": "excaliwire", "level": "Company", "state": "Backlog"}, "reason": "Sub-goal of XW-0003"}]})
+        self.assertEqual(b, {"commands": [{"op": "create", "kind": "goal", "ref": "$s1", "fields": {"summary": "Load the tree", "owner": "chelsea", "parent": "XW-0003", "org_unit": "excaliwire", "level": "Company", "severity": "sev1", "origination": "New", "visibility": "organization-wide", "plan_maturity": "Crayon", "state": "Backlog"}, "reason": "Sub-goal of XW-0003"}]})
 
     def test_an_uncommitted_sub_goal_brings_its_own_milestone_in_the_create_order(self) -> None:
         b = run('return commands.subGoalBatch(page("XW-0004").goal, { summary: "Open a goal", owner: "chelsea", date: { due_date: "2026-12-01", date_type: "Ambition" }, milestone: { summary: "Commit a date for Open a goal", due_date: "2026-11-20", owner: "chelsea" } });')
@@ -440,6 +440,56 @@ class CommandTests(unittest.TestCase):
     def test_ticking_a_work_item_is_a_status_change_with_a_reason(self) -> None:
         b = run('return commands.workItemStatusBatch({ id: "WI-0001", version: 1 }, "Completed", "Shipped");')
         self.assertEqual(b, {"commands": [{"op": "update", "kind": "work_item", "id": "WI-0001", "base_version": 1, "fields": {"status": "Completed"}, "reason": "Shipped"}]})
+
+    FORM = {
+        "summary": "Launch the goal page", "description": "", "owner": "chelsea", "priority": "PRI-3",
+        "due_date": "2027-02-28", "date_type": "Fantasy", "health": "GREEN", "path_to_green": None, "plan": None, "plan_maturity": "Watercolor",
+        "more": {"type": "Milestone (Launch)", "severity": "sev2", "state": "In Progress", "origination": "New", "level": "Company", "visibility": "organization-wide", "org_unit": "excaliwire"},
+        "milestone": {"summary": "Commit a date for Launch the goal page", "due_date": "2026-11-20", "owner": "chelsea"},
+        "subGoals": [
+            {"summary": "Draw the header", "owner": "chelsea"},
+            {"summary": "Wire the panels", "owner": "tig", "date": {"due_date": "2027-01-15", "date_type": "Ambition"}, "milestone": {"summary": "Commit a date for Wire the panels", "due_date": "2026-12-01", "owner": "tig"}},
+        ],
+        "workItems": [{"title": "Sketch it", "goal": 1, "owner": "frontend-engineer", "due_date": None}],
+    }
+
+    def test_a_new_goal_is_sent_in_the_create_order(self) -> None:
+        b = run(f"return commands.createBatch({json.dumps(self.FORM)});")
+        steps = [(c["op"], c["kind"], c.get("ref") or c.get("id")) for c in b["commands"]]  # type: ignore[index]
+        self.assertEqual(steps, [
+            ("create", "goal", "$m"), ("create", "goal", "$m1"), ("create", "goal", "$goal"), ("update", "goal", "$m"),
+            ("create", "goal", "$s1"), ("create", "goal", "$s2"), ("update", "goal", "$m1"), ("create", "work_item", None),
+        ])
+
+    def test_each_create_names_its_refs(self) -> None:
+        c = run(f"return commands.createBatch({json.dumps(self.FORM)}).commands;")
+        goal, s1, s2, wi = c[2], c[4], c[5], c[7]  # type: ignore[index]
+        self.assertEqual((goal["fields"]["promotion_milestone"], goal["fields"]["priority"], goal["fields"]["date_type"]), ("$m", "PRI-3", "Fantasy"))
+        self.assertNotIn("due_date", s1["fields"])
+        self.assertEqual((s1["fields"]["parent"], s2["fields"]["promotion_milestone"]), ("$goal", "$m1"))
+        self.assertEqual((wi["fields"]["goal"], wi["reason"]), ("$s1", "Filed"))
+
+    def test_a_committed_goal_has_no_milestone(self) -> None:
+        form = {**self.FORM, "date_type": "Committed", "plan_maturity": "Pencil", "milestone": None, "subGoals": [], "workItems": []}
+        c = run(f"return commands.createBatch({json.dumps(form)}).commands;")
+        self.assertEqual([(x["op"], x.get("ref")) for x in c], [("create", "$goal")])  # type: ignore[union-attr]
+        self.assertNotIn("promotion_milestone", c[0]["fields"])  # type: ignore[index]
+
+    def test_a_refusal_points_back_to_its_part_of_the_form(self) -> None:
+        places = run(f"const b = commands.createBatch({json.dumps(self.FORM)}); return b.commands.map((_, i) => commands.commandPlace(b, i));")
+        self.assertEqual(places, ["milestone", "sub:1", "goal", "milestone", "sub:0", "sub:1", "sub:1", "workitem:0"])
+
+    def test_a_new_goal_under_a_parent_names_it(self) -> None:
+        form = {**self.FORM, "parent": "XW-0003", "subGoals": [], "workItems": []}
+        self.assertEqual(run(f"return commands.createBatch({json.dumps(form)}).commands.find((c) => c.ref === '$goal').fields.parent;"), "XW-0003")
+
+    def test_every_create_carries_the_required_fields(self) -> None:
+        c = run(f"return commands.createBatch({json.dumps(self.FORM)}).commands.filter((x) => x.op === 'create' && x.kind === 'goal');")
+        for x in c:  # type: ignore[union-attr]
+            self.assertTrue({"severity", "state", "origination", "plan_maturity", "type"} <= set(x["fields"]), x["ref"])
+
+    def test_the_check_asks_the_server_to_roll_back(self) -> None:
+        self.assertTrue(run(f"return commands.createBatch({json.dumps(self.FORM)}, true).check;"))
 
     def test_a_stale_save_keeps_the_typed_values_beside_the_current_ones(self) -> None:
         m = run('const g = page("XW-0003").goal; return commands.staleMerge({ severity: "sev2", health: "YELLOW" }, { ...g, version: 4, severity: "sev3" });')

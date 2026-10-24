@@ -95,6 +95,20 @@ L4. Cards have a 16 px radius. A summary card lifts a little under the pointer (
 
 X16, X17, and X18 were Chelsea's calls. The coordinator decided them on the reviewers' recommendations: a 36 px pill with a 44 px tap area, Priorities first on a phone with the health line above, and the polish in L1 and L4.
 
+## Goal page and New goal
+
+The rules G1 to G24 and N1 to N16 in [goal-page-and-create.md](goal-page-and-create.md) bind these screens. These are how the app holds them.
+
+GP1. A goal's title on Home opens its goal page at `/goals/<key>` (rule 19). The back link returns to the view you came from, with its query (G1).
+GP2. The goal page leads with the date health is judged on, as the server sends it first (G5). The goal's own date follows, lighter.
+GP3. One panel is open at a time, in place (G9). Each Save is one batch to the server, which checks every rule. A rule broken shows at the field it names, in the server's words. A stale save keeps the typed values, says "Someone saved this goal after you opened it.", and shows the current value under each field changed. A saved panel reloads the page.
+GP4. Choosing a health that is not saved outlines it in its color; the saved health is filled (G4).
+GP5. + Sub-goal and + Work item open one add row in place (G20, G22). A sub-goal takes this goal's date, written out, unless it is given its own; its own Ambition or Fantasy date opens its own Promotion Milestone.
+GP6. Ticking a work item asks for its reason in the row; Enter saves and Escape undoes the tick (G24).
+NG1. New goal is a filled 32 px button, last in the toolbar's right cluster in every view, so it never moves (rule 25c). On a phone it is a 40 px button after the view tabs.
+NG2. The New goal page is one form of five numbered cards and a rail (N1). The rail asks the server to check the save 400 ms after the last change and shows its answer: the keys it would make, or what it refuses. The browser checks no rule (ADR 0010). The Create button names the goal's key from that answer.
+NG3. A refusal shows at the card and field it names. Typing again clears it until the next check.
+
 ## Access
 
 28. Text meets 4.5:1 contrast. No text is below 11 px, and body text is 12 px or more.
