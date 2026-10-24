@@ -14,7 +14,8 @@
     "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "types": [],
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "erasableSyntaxOnly": true
   },
   "include": [
     "src"

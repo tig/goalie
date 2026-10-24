@@ -1,0 +1,94 @@
+{
+  "me": {
+    "id": "chelsea",
+    "name": "Chelsea",
+    "kind": "human"
+  },
+  "today": "2026-10-23",
+  "orgUnit": {
+    "id": "excaliwire",
+    "name": "Excaliwire",
+    "level": "Company"
+  },
+  "nextGoalKeys": [
+    "XW-0012",
+    "XW-0013",
+    "XW-0014",
+    "XW-0015",
+    "XW-0016",
+    "XW-0017"
+  ],
+  "actors": [
+    {
+      "id": "tig",
+      "name": "Tig",
+      "kind": "human"
+    },
+    {
+      "id": "chelsea",
+      "name": "Chelsea",
+      "kind": "human"
+    },
+    {
+      "id": "frontend-engineer",
+      "name": "Frontend Engineer",
+      "kind": "agent"
+    }
+  ],
+  "priorities": [
+    {
+      "id": "PRI-1",
+      "rank": 1,
+      "title": "Regenerate the E28 canon"
+    },
+    {
+      "id": "PRI-2",
+      "rank": 2,
+      "title": "Grow the XW team"
+    },
+    {
+      "id": "PRI-3",
+      "rank": 3,
+      "title": "Run Excaliwire on GOALIE"
+    }
+  ],
+  "defaults": {
+    "description": "",
+    "org_unit": "excaliwire",
+    "level": "Company",
+    "type": "Milestone (Launch)",
+    "severity": "sev2",
+    "state": "In Progress",
+    "origination": "New",
+    "visibility": "organization-wide",
+    "plan_maturity": "Watercolor"
+  },
+  "choices": {
+    "type": [
+      "Milestone (Launch)",
+      "Milestone (Commit)",
+      "Metric"
+    ],
+    "severity": [
+      "sev1",
+      "sev2",
+      "sev3"
+    ],
+    "level": [
+      "Company",
+      "Team"
+    ],
+    "plan_maturity": [
+      "Watercolor",
+      "Crayon",
+      "Pencil"
+    ],
+    "workItemStatus": [
+      "Backlog",
+      "In Progress",
+      "Completed",
+      "Deleted"
+    ]
+  },
+  "workItems": true
+}

@@ -1,0 +1,79 @@
+{
+  "me": {
+    "id": "chelsea",
+    "name": "Chelsea",
+    "kind": "human"
+  },
+  "today": "2026-10-23",
+  "items": [
+    {
+      "id": "WI-0001",
+      "version": 1,
+      "goal": "XW-0003",
+      "title": "Build the goal page",
+      "owner": "frontend-engineer",
+      "status": "In Progress",
+      "due_date": "2026-10-30",
+      "links": null,
+      "late": false
+    },
+    {
+      "id": "WI-0002",
+      "version": 2,
+      "goal": "XW-0003",
+      "title": "Write the goal page fixtures",
+      "owner": "chelsea",
+      "status": "In Progress",
+      "due_date": "2026-10-20",
+      "links": null,
+      "late": true
+    },
+    {
+      "id": "WI-0003",
+      "version": 1,
+      "goal": "XW-0003",
+      "title": "Plan the write API",
+      "owner": "tig",
+      "status": "Backlog",
+      "due_date": null,
+      "links": null,
+      "late": false
+    },
+    {
+      "id": "WI-0004",
+      "version": 3,
+      "goal": "XW-0003",
+      "title": "Draw the goal page on the canvas",
+      "owner": "chelsea",
+      "status": "Completed",
+      "due_date": "2026-10-22",
+      "links": [
+        "https://claude.ai/artifact/KL6KBcJMeBMG3Cr7bPWyMk"
+      ],
+      "late": false
+    }
+  ],
+  "goals": {
+    "XW-0003": {
+      "id": "XW-0003",
+      "summary": "Tig, Chelsea, and agents use GOALIE to drive Excaliwire execution"
+    }
+  },
+  "actors": {
+    "tig": {
+      "id": "tig",
+      "name": "Tig",
+      "kind": "human"
+    },
+    "chelsea": {
+      "id": "chelsea",
+      "name": "Chelsea",
+      "kind": "human"
+    },
+    "frontend-engineer": {
+      "id": "frontend-engineer",
+      "name": "Frontend Engineer",
+      "kind": "agent"
+    }
+  }
+}

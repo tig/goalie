@@ -2,6 +2,8 @@ import { useState, type CSSProperties, type ReactNode } from "react";
 import type { ActorRef, Health } from "../../src/api.ts";
 import { isLit, type GoalRow, type PriorityRow } from "./model/filter.ts";
 import { dateLabel, listDates, slipLabel } from "./model/labels.ts";
+import { goalPath } from "./model/route.ts";
+import { Link } from "./router.tsx";
 import { Avatar, CHEVRON, HealthDot, look, Rank } from "./parts.tsx";
 
 /** The x of the health dot's center at a level: the rank column, the gap, the indent, half the dot. The sizes are CSS variables on .board. */
@@ -39,10 +41,10 @@ const Note = ({ text, blank }: { text: string; blank: ReactNode }) => (
  * A row's line under its title on a phone: the health mark and word first, then the dates in the List's order,
  * the date health is judged on dark and the others light (rule 10, review: phone row). A sub-goal with its parent's date writes it muted.
  */
-function When({ goal, today }: { goal: GoalRow; today: string }) {
+function When({ goal, today, chip }: { goal: GoalRow; today: string; chip?: ReactNode }) {
   const { own, pm, judged } = listDates(goal.dates.length ? goal.dates : goal.inherited);
   const dates = [...own, ...pm];
-  if (!dates.length && goal.health === null) return null;
+  if (!dates.length && goal.health === null && !chip) return null;
   return (
     <div className={`when${goal.dates.length ? "" : " inherited"}`}>
       <HealthDot health={goal.health} />
@@ -53,6 +55,7 @@ function When({ goal, today }: { goal: GoalRow; today: string }) {
           {d.slipDays !== undefined && <span className="late"> · {slipLabel(d.slipDays)}</span>}
         </span>
       ))}
+      {chip}
     </div>
   );
 }
@@ -80,9 +83,6 @@ export function GoalTree(props: TreeProps) {
       : {};
     const guide = g.depth > 0 ? (last ? " tree" : " tree more") : "";
     const lit = isLit(g, props);
-    const control = kids
-      ? { role: "button", tabIndex: 0, "aria-expanded": open, onClick: () => toggle(g.id), onKeyDown: (e: React.KeyboardEvent) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), toggle(g.id)) }
-      : {};
     const childRails = g.depth > 0 && !last ? [...rails, g.depth - 1] : rails;
     return (
       <div key={g.id} className="goal">
@@ -90,23 +90,30 @@ export function GoalTree(props: TreeProps) {
           className={`row d${Math.min(g.depth, 2)}${g.match ? "" : " ctx"}${lit ? " lit" : ""}${kids ? " parent" : ""}`}
           data-health={g.health ?? ""}
           style={{ "--depth": g.depth, "--hc": look(g.health).bar } as CSSProperties}
-          {...control}
         >
           <div className={`left${guide}`} style={passing}>
             <Rank rank={rank} />
             {props.mark !== false && <HealthDot health={g.health} />}
-            <span className="title">{g.summary}</span>
+            {/* The title opens the goal page. The count chip alone opens and closes the tree (rule 19). */}
+            <Link to={goalPath(g.id)} className="title">
+              {g.summary}
+            </Link>
             <span className="slot">
               {kids > 0 && (
-                <span className={`chev${open ? " open" : ""}`}>
+                <button type="button" className={`chev${open ? " open" : ""}`} aria-expanded={open} aria-label={`${open ? "Close" : "Open"} ${kids} sub-goals`} onClick={() => toggle(g.id)}>
                   <span className="n">{kids}</span>
                   {CHEVRON}
-                </span>
+                </button>
               )}
             </span>
             <Avatar actor={g.owner} mine={g.owner.id === props.me.id} />
           </div>
-          <When goal={g} today={props.today} />
+          <When goal={g} today={props.today} chip={kids > 0 && (
+            <button type="button" className={`chev inline${open ? " open" : ""}`} aria-expanded={open} aria-label={`${open ? "Close" : "Open"} ${kids} sub-goals`} onClick={() => toggle(g.id)}>
+              <span className="n">{kids}</span>
+              {CHEVRON}
+            </button>
+          )} />
           {props.cells(g)}
         </div>
         {open && <div className="kids">{g.children.map((c, i) => goal(c, undefined, childRails, i === kids - 1))}</div>}
@@ -136,12 +143,12 @@ export function GoalTree(props: TreeProps) {
     <>
       {funded.map(group)}
       {filtering && !funded.length && !backlog.length && <Note text="No goals match." blank={blank} />}
-      {!filtering && !funded.length && <Note text="No Priorities." blank={blank} />}
+      {!filtering && !funded.length && <Note text="No Priorities above the cut line." blank={blank} />}
       {/* The cut line (SPEC.md §6.3), named once. */}
       <div className="cut">
         <span>✂ Cut line</span>
       </div>
-      {backlog.length ? backlog.map(group) : !filtering && <Note text="No Priorities." blank={blank} />}
+      {backlog.length ? backlog.map(group) : !filtering && <Note text="No Priorities below the cut line." blank={blank} />}
     </>
   );
 }

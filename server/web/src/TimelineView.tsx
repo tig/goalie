@@ -36,7 +36,7 @@ function SideLabel({ cls, at, side, color, children }: { cls: string; at: number
 type Labeled = LaneMark & { cls: string; color?: string };
 
 /** One label at an edge of the screen for every mark past it, in date order, with an arrow (rule 23). */
-function EdgeLabel({ side, marks, view }: { side: "before" | "after"; marks: Labeled[]; view: View }) {
+function EdgeLabel({ side, band, marks, view }: { side: "before" | "after"; band: "above" | "below"; marks: Labeled[]; view: View }) {
   if (!marks.length) return null;
   const parts = marks.map((m, i) => (
     <span key={m.key} className={m.cls} style={{ color: m.color }}>
@@ -45,7 +45,7 @@ function EdgeLabel({ side, marks, view }: { side: "before" | "after"; marks: Lab
     </span>
   ));
   return (
-    <span className={`edge ${side}`} style={{ left: side === "before" ? view.left + EDGE_INSET : view.right - EDGE_INSET, maxWidth: Math.max(0, view.right - view.left - 2 * EDGE_INSET) }}>
+    <span className={`edge ${side} ${band}`} style={{ left: side === "before" ? view.left + EDGE_INSET : view.right - EDGE_INSET }}>
       {side === "before" && "← "}
       {parts}
       {side === "after" && " →"}
@@ -68,14 +68,14 @@ function LaneMarks({ lane, goal, today, view, board }: { lane: Lane; goal: GoalR
     const pm = lane.tick.date.kind === "Promotion Milestone";
     const text = dateLabel(lane.tick.date, today) + (lane.slip ? ` · ${slipLabel(lane.slip.days)}` : "");
     if (!lane.tick.outside) parts.push(<span key="t" className={`tick${pm ? " pm" : ""}`} style={{ left: pct(lane.tick.at) }} />);
-    labeled.push({ key: "tick", atPx: (lane.tick.at / 100) * board, text, outside: lane.tick.outside, cls: "ticklbl", color: lane.slip ? "var(--red-ink)" : "var(--ink)" });
+    labeled.push({ key: "tick", atPx: (lane.tick.at / 100) * board, text, outside: lane.tick.outside, band: "above", cls: "ticklbl", color: lane.slip ? "var(--red-ink)" : "var(--ink)" });
   }
   if (lane.end) {
     if (!lane.end.outside) parts.push(<span key="d" className={`dot ${lane.end.date.kind}`} style={{ left: pct(lane.end.at) }} />);
-    labeled.push({ key: "end", atPx: (lane.end.at / 100) * board, text: dateLabel(lane.end.date, today), outside: lane.end.outside, cls: `endlbl ${lane.end.date.kind}` });
+    labeled.push({ key: "end", atPx: (lane.end.at / 100) * board, text: dateLabel(lane.end.date, today), outside: lane.end.outside, band: "below", cls: `endlbl ${lane.end.date.kind}` });
   }
   const placed = placeLaneLabels(labeled, view);
-  const byKey = (keys: string[]) => labeled.filter((m) => keys.includes(m.key));
+  const byKey = (keys: string[], band: "above" | "below") => labeled.filter((m) => keys.includes(m.key) && m.band === band);
   for (const { key, side } of placed.inside) {
     const m = labeled.find((x) => x.key === key) as Labeled;
     parts.push(
@@ -84,8 +84,10 @@ function LaneMarks({ lane, goal, today, view, board }: { lane: Lane; goal: GoalR
       </SideLabel>,
     );
   }
-  parts.push(<EdgeLabel key="eb" side="before" marks={byKey(placed.before)} view={view} />);
-  parts.push(<EdgeLabel key="ea" side="after" marks={byKey(placed.after)} view={view} />);
+  for (const band of ["above", "below"] as const) {
+    parts.push(<EdgeLabel key={`eb-${band}`} side="before" band={band} marks={byKey(placed.before, band)} view={view} />);
+    parts.push(<EdgeLabel key={`ea-${band}`} side="after" band={band} marks={byKey(placed.after, band)} view={view} />);
+  }
   return <>{parts}</>;
 }
 

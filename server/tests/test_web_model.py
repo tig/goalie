@@ -13,10 +13,11 @@ FIXTURE = Path(__file__).resolve().parents[1] / "web" / "fixtures" / "priorities
 
 def run(body: str) -> object:
     """Run an ES module that imports the model as `m` and the seed fixture as `api`, and return what it prints as JSON."""
-    imports = "".join(f'import * as {name} from "{(MODEL / f"{name}.ts").as_uri()}";\n' for name in ("query", "filter", "timeline", "calendar", "popover", "labels", "scroll"))
+    imports = "".join(f'import * as {name} from "{(MODEL / f"{name}.ts").as_uri()}";\n' for name in ("query", "filter", "timeline", "calendar", "popover", "labels", "scroll", "route", "goalpage", "commands"))
     script = f"""{imports}
 import {{ readFileSync }} from "node:fs";
 const api = JSON.parse(readFileSync({json.dumps(str(FIXTURE))}, "utf-8"));
+const page = (key) => JSON.parse(readFileSync({json.dumps(str(FIXTURE.parent))} + "/goal-" + key + ".json", "utf-8"));
 const out = await (async () => {{ {body} }})();
 process.stdout.write(JSON.stringify(out));
 """
@@ -98,7 +99,11 @@ class FilterTests(unittest.TestCase):
     def test_a_health_filter_selects_what_its_count_counts(self) -> None:
         # "1 GREEN" counts one top-level goal in progress above the cut line. Its GREEN sub-goals are not counted.
         self.assertEqual(titles(run('return filter.filterPriorities(api.funded, { health: "GREEN" });')), [["XW-0003", True]])
-        self.assertEqual(run('return filter.filterPriorities(api.funded, { health: "GREEN" }, { counted: false });'), [])
+
+    def test_the_server_says_what_the_count_counts(self) -> None:
+        # The app keeps no counting rule of its own (plan E-9): a goal the server marks counted is the one a health filter selects.
+        rows = run('const funded = structuredClone(api.funded); funded[2].goals[0].counted = false; funded[2].goals[0].children[0].counted = true; return filter.filterPriorities(funded, { health: "GREEN" });')
+        self.assertEqual(titles(rows), [["XW-0003", False], ["XW-0004", True]])
 
     def test_pointing_at_a_count_lights_what_it_counts(self) -> None:
         lit = run('return filter.flatten(filter.filterPriorities(api.funded, {}).flatMap((p) => p.goals)).filter((g) => filter.isLit(g, { hot: "GREEN" })).map((g) => g.id);')
@@ -219,6 +224,11 @@ class TimelineTests(unittest.TestCase):
         placed = self.lanes([{"key": "tick", "atPx": 1100, "text": "Promotion Milestone Nov 6", "outside": None}, {"key": "end", "atPx": 1400, "text": "Fantasy Nov 30", "outside": None}], {"left": 1000, "right": 1250})
         self.assertEqual(placed, {"before": [], "after": ["tick", "end"], "inside": []})
 
+    def test_labels_in_different_bands_never_join(self) -> None:
+        # A tick's label sits above the bar and an uncommitted date's below it, so they cannot cover each other: each keeps its own edge label.
+        placed = self.lanes([{"key": "tick", "atPx": 100, "text": "Committed Oct 1", "outside": None, "band": "above"}, {"key": "end", "atPx": 1050, "text": "Fantasy Nov 30", "outside": None, "band": "below"}])
+        self.assertEqual(placed, {"before": ["tick"], "after": [], "inside": [{"key": "end", "side": "right"}]})
+
     def test_a_mark_on_screen_keeps_its_own_label(self) -> None:
         placed = self.lanes([{"key": "tick", "atPx": 1200, "text": "Committed Nov 15", "outside": None}, {"key": "end", "atPx": 1790, "text": "Fantasy Nov 30", "outside": None}])
         self.assertEqual(placed, {"before": [], "after": [], "inside": [{"key": "tick", "side": "right"}, {"key": "end", "side": "left"}]})
@@ -336,6 +346,93 @@ class ScrollTests(unittest.TestCase):
 
     def test_a_drag_pans_once_it_passes_4_px(self) -> None:
         self.assertEqual(run("return [scroll.isDrag(3), scroll.isDrag(-5), scroll.dragLeft(500, 100, 160)];"), [False, True, 440])
+
+
+class GoalPageTests(unittest.TestCase):
+    def test_work_items_group_by_status_in_order(self) -> None:
+        groups = run('const items = [...page("XW-0003").workItems, { id: "WI-0009", status: "Deleted" }]; return goalpage.groupWorkItems(items).map((g) => [g.status, g.items.map((i) => i.id)]);')
+        self.assertEqual(groups, [["In Progress", ["WI-0001", "WI-0002"]], ["Backlog", ["WI-0003"]], ["Completed", ["WI-0004"]]])
+
+    def test_history_filters_by_kind_of_change(self) -> None:
+        counts = run('const e = page("XW-0003").events; return ["All", "Dates", "Health", "State", "Comments"].map((f) => goalpage.filterEvents(e, f).length);')
+        self.assertEqual(counts[4], 1)  # type: ignore[index]
+        self.assertEqual(counts[3], 1)  # type: ignore[index]
+        self.assertGreater(counts[0], counts[1])  # type: ignore[index]
+
+    def test_an_event_value_reads_as_words(self) -> None:
+        values = run('return [goalpage.eventValue(null), goalpage.eventValue("GREEN"), goalpage.eventValue(3), goalpage.eventValue({ steps: [1, 2], criteria: "x" }), goalpage.eventValue([{ repo: "github.com/tig/goalie" }])];')
+        self.assertEqual(values, ["None", "GREEN", "3", "Path to Green, 2 steps", "github.com/tig/goalie"])
+
+    def test_a_field_reads_as_its_spec_words(self) -> None:
+        self.assertEqual(run('return ["due_date", "date_type", "path_to_green", "original_committed_date", "comment", "status"].map(goalpage.fieldLabel);'), ["Due Date", "Date Type", "Path to Green", "Original Committed Date", "Comment", "Status"])
+
+    def test_an_actor_field_reads_as_the_name(self) -> None:
+        self.assertEqual(run('return goalpage.eventValue("tig", "owner", page("XW-0003").actors);'), "Tig")
+
+    def test_the_date_bar_spans_start_today_and_every_date(self) -> None:
+        bar = run('return goalpage.dateBar("2026-10-23", "2026-10-23", [{ date: "2026-11-06", kind: "Promotion Milestone" }, { date: "2026-11-30", kind: "Fantasy" }]);')
+        self.assertEqual(bar["start"], 0)  # type: ignore[index]
+        self.assertEqual(bar["today"], 0)  # type: ignore[index]
+        self.assertEqual([round(m["at"]) for m in bar["marks"]], [37, 100])  # type: ignore[index]
+
+    def test_a_date_before_the_start_widens_the_bar(self) -> None:
+        bar = run('return goalpage.dateBar("2026-10-23", "2026-10-23", [{ date: "2026-10-01", kind: "Committed" }]);')
+        self.assertEqual((bar["marks"][0]["at"], bar["start"], bar["today"]), (0, 100, 100))  # type: ignore[index]
+
+    def test_comments_are_the_comment_events(self) -> None:
+        self.assertEqual(run('return goalpage.comments(page("XW-0003").events).map((e) => e.actor);'), ["tig"])
+
+
+class CommandTests(unittest.TestCase):
+    """Each goal-page panel saves one CommandsRequest (docs/engineering/goal-page-and-create.md, Edits from the goal page)."""
+
+    def test_health_with_a_path_to_green_is_one_update(self) -> None:
+        b = run('const g = page("XW-0003").goal; return commands.healthBatch(g, "YELLOW", { steps: [{ text: "Load the tree", owner: "chelsea", date: "2026-10-30" }], criteria: "Tree loaded", trigger: "Not loaded by Nov 2" }, "Seed is late");')
+        self.assertEqual(b, {"commands": [{"op": "update", "kind": "goal", "id": "XW-0003", "base_version": 1, "fields": {"health": "YELLOW", "path_to_green": {"steps": [{"text": "Load the tree", "owner": "chelsea", "date": "2026-10-30"}], "criteria": "Tree loaded", "trigger": "Not loaded by Nov 2"}}, "reason": "Seed is late"}]})
+
+    def test_back_to_green_drops_the_path_to_green(self) -> None:
+        b = run('return commands.healthBatch(page("XW-0001").goal, "GREEN", null, "Done");')
+        self.assertEqual(b["commands"][0]["fields"], {"health": "GREEN", "path_to_green": None})  # type: ignore[index]
+
+    def test_a_slip_sets_the_changed_due_date_with_health(self) -> None:
+        b = run('const g = page("XW-0001").goal; return commands.slipBatch(g, "2026-11-20", "RED", g.path_to_green, "Canon slipped");')
+        self.assertEqual(sorted(b["commands"][0]["fields"]), ["changed_due_date", "health", "path_to_green"])  # type: ignore[index]
+        self.assertEqual(b["commands"][0]["fields"]["changed_due_date"], "2026-11-20")  # type: ignore[index]
+
+    def test_promoting_fantasy_makes_a_new_milestone_first(self) -> None:
+        b = run('const g = page("XW-0003").goal; return commands.promoteBatch(g, { summary: "Commit a date for the launch", due_date: "2026-12-01", owner: "chelsea" }, "2026-12-15", "Plan is clearer");')
+        c = b["commands"]  # type: ignore[index]
+        self.assertEqual([x["op"] for x in c], ["create", "update"])
+        self.assertEqual((c[0]["ref"], c[0]["fields"]["type"], c[0]["fields"]["date_type"]), ("$m", "Milestone (Commit)", "Committed"))
+        self.assertEqual(c[1]["fields"], {"date_type": "Ambition", "promotion_milestone": "$m", "due_date": "2026-12-15"})
+
+    def test_promoting_ambition_to_committed_is_one_update(self) -> None:
+        b = run('const g = { ...page("XW-0003").goal, date_type: "Ambition" }; return commands.promoteBatch(g, null, "2026-11-30", "At Pencil");')
+        self.assertEqual(b["commands"][0]["fields"], {"date_type": "Committed", "promotion_milestone": None})  # type: ignore[index]
+
+    def test_close_and_pursue_set_the_state(self) -> None:
+        c = run('const g = page("XW-0003").goal; return [commands.closeBatch(g, "Did Not Meet", "Dropped").commands[0].fields, commands.pursueBatch({ ...g, state: "Backlog" }, "GREEN", "Starting").commands[0].fields];')
+        self.assertEqual(c, [{"state": "Did Not Meet"}, {"state": "In Progress", "health": "GREEN"}])
+
+    def test_fields_send_only_what_changed(self) -> None:
+        b = run('const g = page("XW-0003").goal; return commands.fieldsBatch(g, { ...g, severity: "sev2", plan: g.plan }, "Lower");')
+        self.assertEqual(b["commands"][0]["fields"], {"severity": "sev2"})  # type: ignore[index]
+
+    def test_a_comment_is_one_comment_command(self) -> None:
+        self.assertEqual(run('return commands.commentBatch("goal", "XW-0003", " Looks right. ");'), {"commands": [{"op": "comment", "kind": "goal", "id": "XW-0003", "text": "Looks right."}]})
+
+    def test_a_stale_save_keeps_the_typed_values_beside_the_current_ones(self) -> None:
+        m = run('const g = page("XW-0003").goal; return commands.staleMerge({ severity: "sev2", health: "YELLOW" }, { ...g, version: 4, severity: "sev3" });')
+        self.assertEqual(m, {"base_version": 4, "current": {"severity": "sev3", "health": "GREEN"}})
+
+
+class RouteTests(unittest.TestCase):
+    def test_each_path_opens_its_page(self) -> None:
+        pages = run('return ["/", "/goals/XW-0003", "/goals/new", "/goals/new?parent=XW-0003", "/goals/xw-0003/", "/nowhere"].map((p) => { const u = new URL(p, "http://x"); return route.parseRoute(u.pathname, u.search); });')
+        self.assertEqual(pages, [{"page": "home"}, {"page": "goal", "key": "XW-0003"}, {"page": "new"}, {"page": "new", "parent": "XW-0003"}, {"page": "goal", "key": "XW-0003"}, {"page": "home"}])
+
+    def test_a_goal_link_and_the_back_link(self) -> None:
+        self.assertEqual(run('return [route.goalPath("XW-0003"), route.newGoalPath(), route.newGoalPath("XW-0003"), route.backPath("?view=list&health=RED"), route.backPath("")];'), ["/goals/XW-0003", "/goals/new", "/goals/new?parent=XW-0003", "/?view=list&health=RED", "/"])
 
 
 if __name__ == "__main__":
