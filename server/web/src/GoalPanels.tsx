@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import type { ApiViolation, CommandsRequest, FormOptions, GoalFields, GoalPageResponse, Health, PathToGreen, StoredGoal } from "../../src/api.ts";
+import type { ApiActor, ApiViolation, CommandsRequest, FormOptions, GoalFields, GoalPageResponse, Health, PathToGreen, StoredGoal } from "../../src/api.ts";
 import { addDays, shortDate } from "../../src/dates.ts";
 import { postCommands, useJson } from "./data.ts";
 import { closeBatch, fieldsBatch, healthBatch, promoteBatch, pursueBatch, slipBatch, staleMerge } from "./model/commands.ts";
@@ -87,8 +87,8 @@ function Reason({ value, onChange, saved }: { value: string; onChange: (v: strin
 
 const humans = (data: GoalPageResponse) => Object.values(data.actors).filter((a) => a.kind === "human");
 
-/** The Path to Green editor (G10): steps with an owner and a date, criteria for GREEN, and for YELLOW the trigger for RED. */
-function PtgEditor({ value, onChange, health, data, saved }: { value: PathToGreen; onChange: (v: PathToGreen) => void; health: Health; data: GoalPageResponse; saved: Saved }) {
+/** The Path to Green editor (G10, N5a): steps with an owner and a date, criteria for GREEN, and for YELLOW the trigger for RED. */
+export function PtgFields({ value, onChange, health, people, me, today, error }: { value: PathToGreen; onChange: (v: PathToGreen) => void; health: Health; people: ApiActor[]; me: string; today: string; error?: ReactNode }) {
   const step = (i: number, part: Partial<PathToGreen["steps"][number]>) => onChange({ ...value, steps: value.steps.map((s, j) => (j === i ? { ...s, ...part } : s)) });
   return (
     <div className="ptgedit">
@@ -108,7 +108,7 @@ function PtgEditor({ value, onChange, health, data, saved }: { value: PathToGree
               </td>
               <td>
                 <select value={s.owner} onChange={(e) => step(i, { owner: e.target.value })} aria-label="Owner">
-                  {humans(data).map((a) => (
+                  {people.map((a) => (
                     <option key={a.id} value={a.id}>
                       {a.name}
                     </option>
@@ -122,10 +122,10 @@ function PtgEditor({ value, onChange, health, data, saved }: { value: PathToGree
           ))}
         </tbody>
       </table>
-      <button type="button" className="linkbtn" onClick={() => onChange({ ...value, steps: [...value.steps, { text: "", owner: data.me.id, date: data.today }] })}>
+      <button type="button" className="linkbtn" onClick={() => onChange({ ...value, steps: [...value.steps, { text: "", owner: me, date: today }] })}>
         + Step
       </button>
-      <FieldError saved={saved} field="path_to_green" />
+      {error}
       <label className="field">
         <span className="flabel">Criteria for GREEN</span>
         <textarea rows={2} value={value.criteria} onChange={(e) => onChange({ ...value, criteria: e.target.value })} />
@@ -140,6 +140,11 @@ function PtgEditor({ value, onChange, health, data, saved }: { value: PathToGree
     </div>
   );
 }
+
+/** The goal page's use of the editor: its people, and the rule's message at path_to_green. */
+const PtgEditor = ({ value, onChange, health, data, saved }: { value: PathToGreen; onChange: (v: PathToGreen) => void; health: Health; data: GoalPageResponse; saved: Saved }) => (
+  <PtgFields value={value} onChange={onChange} health={health} people={humans(data)} me={data.me.id} today={data.today} error={<FieldError saved={saved} field="path_to_green" />} />
+);
 
 const emptyPtg = (data: GoalPageResponse): PathToGreen => data.goal.path_to_green ?? { steps: [{ text: "", owner: data.goal.owner, date: data.today }], criteria: "" };
 

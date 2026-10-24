@@ -5,6 +5,14 @@ import type { ApiWorkItem, CommandsRequest, GoalFields, Health, PathToGreen, Sto
  * Each panel is one update with base_version from the goal it read; a Fantasy promotion is a milestone create, then the update. The server checks every rule.
  */
 
+/** The required fields a goal made from another one carries over from it: severity, origination, visibility, and plan maturity. */
+const kept = (goal: Pick<StoredGoal, "severity" | "origination" | "visibility" | "plan_maturity">) => ({
+  severity: goal.severity,
+  origination: goal.origination,
+  visibility: goal.visibility,
+  plan_maturity: goal.plan_maturity,
+});
+
 const update = (goal: Pick<StoredGoal, "id" | "version">, fields: Partial<GoalFields>, reason: string): CommandsRequest => ({
   commands: [{ op: "update", kind: "goal", id: goal.id, base_version: goal.version, fields, reason }],
 });
@@ -30,7 +38,7 @@ export function promoteBatch(goal: StoredGoal, milestone: NewMilestone | null, n
   if (goal.date_type === "Fantasy" && milestone) {
     return {
       commands: [
-        { op: "create", kind: "goal", ref: "$m", fields: { ...milestone, type: "Milestone (Commit)", date_type: "Committed", org_unit: goal.org_unit, level: goal.level }, reason },
+        { op: "create", kind: "goal", ref: "$m", fields: { ...milestone, type: "Milestone (Commit)", date_type: "Committed", org_unit: goal.org_unit, level: goal.level, ...kept(goal), state: "Backlog" }, reason },
         { op: "update", kind: "goal", id: goal.id, base_version: goal.version, fields: { date_type: "Ambition", promotion_milestone: "$m", ...date }, reason },
       ],
     };
@@ -77,14 +85,14 @@ export type SubGoalRow = {
  * + Sub-goal (G20): step 4 of the create order, with the page's goal as parent. It starts in Backlog.
  * A sub-goal with its own uncommitted date brings its milestone first ($m1), and the milestone then joins it as a sub-goal (steps 1 and 3).
  */
-export function subGoalBatch(parent: Pick<StoredGoal, "id" | "org_unit" | "level">, row: SubGoalRow): CommandsRequest {
+export function subGoalBatch(parent: StoredGoal, row: SubGoalRow): CommandsRequest {
   const reason = `Sub-goal of ${parent.id}`;
-  const base = { summary: row.summary, owner: row.owner, parent: parent.id, org_unit: parent.org_unit, level: parent.level, state: "Backlog" as const };
+  const base = { summary: row.summary, owner: row.owner, parent: parent.id, org_unit: parent.org_unit, level: parent.level, ...kept(parent), state: "Backlog" as const };
   if (!row.date) return { commands: [{ op: "create", kind: "goal", ref: "$s1", fields: base, reason }] };
   if (row.date.date_type === "Committed" || !row.milestone) return { commands: [{ op: "create", kind: "goal", ref: "$s1", fields: { ...base, ...row.date }, reason }] };
   return {
     commands: [
-      { op: "create", kind: "goal", ref: "$m1", fields: { ...row.milestone, type: "Milestone (Commit)", date_type: "Committed", org_unit: parent.org_unit, level: parent.level }, reason },
+      { op: "create", kind: "goal", ref: "$m1", fields: { ...row.milestone, type: "Milestone (Commit)", date_type: "Committed", org_unit: parent.org_unit, level: parent.level, ...kept(parent), state: "Backlog" }, reason },
       { op: "create", kind: "goal", ref: "$s1", fields: { ...base, ...row.date, promotion_milestone: "$m1" }, reason },
       { op: "update", kind: "goal", id: "$m1", base_version: 1, fields: { parent: "$s1" }, reason },
     ],
@@ -99,4 +107,98 @@ export function workItemBatch(goal: string, item: Pick<WorkItemFields, "title" |
 /** The work item tick (G24), or any status change: one update with its reason. */
 export function workItemStatusBatch(item: Pick<ApiWorkItem, "id" | "version">, status: WorkItemStatus, reason: string): CommandsRequest {
   return { commands: [{ op: "update", kind: "work_item", id: item.id, base_version: item.version, fields: { status }, reason }] };
+}
+
+/** The New goal form (N1 to N16), as the batch builder reads it. A work item's `goal` is 0 for this goal, or k for the k-th sub-goal. */
+export type NewGoalForm = {
+  summary: string;
+  description: string;
+  owner: string;
+  priority: string | null;
+  due_date: string;
+  date_type: "Committed" | "Ambition" | "Fantasy";
+  health: Exclude<Health, null> | null;
+  path_to_green: PathToGreen | null;
+  plan: string | null;
+  plan_maturity: GoalFields["plan_maturity"];
+  more: Pick<GoalFields, "type" | "severity" | "state" | "origination" | "level" | "visibility" | "org_unit">;
+  milestone: NewMilestone | null;
+  /** Set when the form opens from a goal page's + Sub-goal (N2). */
+  parent?: string | null;
+  subGoals: SubGoalRow[];
+  workItems: { title: string; goal: number; owner: string; due_date: string | null }[];
+};
+
+/**
+ * New goal as one batch, in the plan's create order: each Promotion Milestone ($m, then $m1, ...), this goal ($goal),
+ * its milestone joining it, each sub-goal ($s1, ...) with its own milestone joining it, then each work item. `check` asks the server to roll it back and answer.
+ */
+export function createBatch(form: NewGoalForm, check = false): CommandsRequest {
+  const reason = "New goal";
+  const where = { org_unit: form.more.org_unit, level: form.more.level };
+  // Milestones and sub-goals start in Backlog and carry the form's required fields (severity, origination, visibility, plan maturity).
+  const carried = kept({ ...form.more, plan_maturity: form.plan_maturity });
+  const milestone = (m: NewMilestone) => ({ ...m, type: "Milestone (Commit)", date_type: "Committed" as const, ...where, ...carried, state: "Backlog" as const });
+  const uncommitted = form.date_type !== "Committed" && form.milestone;
+  // A sub-goal with its own uncommitted date and milestone gets the next milestone ref: $m1, $m2, ...
+  let n = 0;
+  const own = form.subGoals.map((row, i) => ({ row, i, ref: row.date && row.date.date_type !== "Committed" && row.milestone ? (`$m${++n}` as const) : null }));
+  const commands: CommandsRequest["commands"] = [];
+  if (uncommitted && form.milestone) commands.push({ op: "create", kind: "goal", ref: "$m", fields: milestone(form.milestone), reason });
+  for (const s of own) if (s.ref && s.row.milestone) commands.push({ op: "create", kind: "goal", ref: s.ref, fields: milestone(s.row.milestone), reason });
+  commands.push({
+    op: "create",
+    kind: "goal",
+    ref: "$goal",
+    fields: {
+      summary: form.summary,
+      description: form.description,
+      owner: form.owner,
+      ...(form.priority ? { priority: form.priority } : {}),
+      due_date: form.due_date,
+      date_type: form.date_type,
+      ...(uncommitted ? { promotion_milestone: "$m" } : {}),
+      ...(form.health ? { health: form.health, ...(form.health !== "GREEN" ? { path_to_green: form.path_to_green } : {}) } : {}),
+      plan: form.plan,
+      plan_maturity: form.plan_maturity,
+      ...(form.parent ? { parent: form.parent } : {}),
+      ...form.more,
+    },
+    reason,
+  });
+  if (uncommitted) commands.push({ op: "update", kind: "goal", id: "$m", base_version: 1, fields: { parent: "$goal" }, reason });
+  for (const s of own) {
+    const ref = `$s${s.i + 1}` as `$${string}`;
+    commands.push({
+      op: "create",
+      kind: "goal",
+      ref,
+      fields: { summary: s.row.summary, owner: s.row.owner, parent: "$goal", type: form.more.type, ...where, ...carried, state: "Backlog", ...(s.row.date ?? {}), ...(s.ref ? { promotion_milestone: s.ref } : {}) },
+      reason,
+    });
+    if (s.ref) commands.push({ op: "update", kind: "goal", id: s.ref, base_version: 1, fields: { parent: ref }, reason });
+  }
+  for (const w of form.workItems) {
+    commands.push({ op: "create", kind: "work_item", fields: { goal: w.goal === 0 ? "$goal" : `$s${w.goal}`, title: w.title, owner: w.owner, status: "In Progress", due_date: w.due_date }, reason: "Filed" });
+  }
+  return check ? { commands, check: true } : { commands };
+}
+
+/**
+ * Which part of the New goal form a command of createBatch came from, so a refusal at `at` shows there:
+ * "goal", "milestone" (this goal's), "sub:k" (the k-th sub-goal or its milestone), or "workitem:k".
+ */
+export function commandPlace(batch: CommandsRequest, at: number): string {
+  const command = batch.commands[at];
+  if (!command) return "goal";
+  if (command.op === "create" && command.kind === "work_item") return `workitem:${batch.commands.slice(0, at).filter((c) => c.op === "create" && c.kind === "work_item").length}`;
+  const ref = command.op === "create" ? command.ref : command.op === "update" ? command.id : undefined;
+  if (ref === "$goal") return "goal";
+  if (ref === "$m") return "milestone";
+  if (typeof ref === "string" && /^\$s\d+$/.test(ref)) return `sub:${Number(ref.slice(2)) - 1}`;
+  if (typeof ref === "string" && /^\$m\d+$/.test(ref)) {
+    const owner = batch.commands.find((c) => c.op === "create" && c.kind === "goal" && c.fields.promotion_milestone === ref && c.ref !== "$goal");
+    if (owner && owner.op === "create" && owner.ref) return `sub:${Number(owner.ref.slice(2)) - 1}`;
+  }
+  return "goal";
 }
