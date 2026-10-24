@@ -74,7 +74,8 @@ export function runCommands(db: DatabaseSync, actor: string, request: unknown, t
           if (error instanceof Skip) return void (ref && refused.add(ref));
           throw error;
         }
-        if (command.op === "create" && command.kind === "goal" && command.fields.state === "In Progress") {
+        // A check tests an In Progress create in its final state, so every rule of In Progress runs. A create has no lifecycle step to test.
+        if (!check && command.op === "create" && command.kind === "goal" && command.fields.state === "In Progress") {
           // E-5: the state lifecycle starts at Backlog, so an In Progress create is a Backlog create and a state Event.
           const created = run(at, { ...command, fields: { ...command.fields, state: "Backlog" } });
           if (created) run(at, { op: "update", kind: "goal", id: created.entity.id as string, base_version: 1, fields: { state: "In Progress" }, reason: command.reason });

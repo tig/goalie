@@ -144,9 +144,6 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
   applySystemFields(db, kind, after);
   // A blank text is missing too (Codebase QA).
   const missing = requiredFields(db, kind).filter((f) => after[f] == null || (typeof after[f] === "string" && (after[f] as string).trim() === "" && f !== "description"));
-  if (missing.length > 0) {
-    return { ok: false, error: "invalid", violations: missing.map((f) => ({ rule: "required-field", message: `${fieldWords(f)} is required.`, field: f })) };
-  }
 
   const changed = spec.fields.filter((f) => !same(before?.[f], after[f]));
   if (before !== undefined && changed.length === 0) return { ok: true, entity: before, events: [] };
@@ -156,6 +153,11 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
   const needReason = REASONED_KINDS.includes(kind) ? changed : [];
   if (needReason.length > 0 && reason === null) {
     violations.push({ rule: "reason-required", message: `a change to ${needReason.join(", ")} needs a reason.`, field: "reason" });
+  }
+  if (missing.length > 0) {
+    // The row cannot be stored, but the rules still run on it, so one refusal names every rule it breaks (Product Designer's check).
+    const rest = checkWrite(lookup(db), kind, after).filter((v) => v.field === undefined || !missing.includes(v.field));
+    return { ok: false, error: "invalid", violations: [...missing.map((f) => ({ rule: "required-field", message: `${fieldWords(f)} is required.`, field: f })), ...violations, ...rest] };
   }
 
   const columns = ["version", ...spec.fields];
