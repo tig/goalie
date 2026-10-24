@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import tempfile
 import unittest
+from pathlib import Path
 
-from goalie_cli import Store
+from goalie_cli import SERVER, Store
 from live_server import get, running_server, signed
 
 
@@ -93,6 +95,40 @@ class SeedTransactionTests(unittest.TestCase):
         self.assertNotEqual(code, 0, result)
         self.assertEqual(store.events(), [])
         self.assertIsNone(store.read("actor", "tig"))
+
+
+class SeedFileTests(unittest.TestCase):
+    """Review E7: a seed is a data file outside src/, so no deployment ships another's data."""
+
+    def test_the_seed_code_holds_no_deployment_data(self) -> None:
+        code = (SERVER / "src" / "seed.ts").read_text(encoding="utf-8")
+        for data in ("XW-", "excaliwire", "Chelsea", "tig/goalie"):
+            self.assertNotIn(data, code)
+        self.assertTrue((SERVER / "seed" / "excaliwire.json").is_file())
+
+    def test_seed_loads_the_file_it_is_given(self) -> None:
+        store = Store()
+        self.addCleanup(store.close)
+        with tempfile.TemporaryDirectory() as scratch:
+            path = Path(scratch) / "acme.json"
+            path.write_text(json.dumps({"writes": [
+                {"as": "jane", "command": {"op": "create", "kind": "actor", "id": "jane", "fields": {"kind": "human", "display_name": "Jane Roe"}}},
+                {"as": "jane", "command": {"op": "create", "kind": "org_unit", "id": "acme", "fields": {"name": "Acme Widgets", "level": "Company", "owner": "jane"}}},
+            ]}))
+            code, result = store.run("seed", str(path))
+        self.assertEqual(code, 0, result)
+        self.assertEqual(store.read("org_unit", "acme")["name"], "Acme Widgets")
+        self.assertIsNone(store.read("org_unit", "excaliwire"))
+
+    def test_a_seed_file_that_is_not_json_is_a_named_rejection(self) -> None:
+        store = Store()
+        self.addCleanup(store.close)
+        with tempfile.TemporaryDirectory() as scratch:
+            path = Path(scratch) / "bad.json"
+            path.write_text("{not json")
+            code, result = store.run("seed", str(path))
+        self.assertEqual(code, 2)
+        self.assertFalse(result["ok"])
 
 
 class DefaultsTests(unittest.TestCase):

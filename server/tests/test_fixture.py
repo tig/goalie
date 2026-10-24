@@ -20,11 +20,12 @@ globalThis.Date = class extends Real {
   constructor(...args) { if (args.length === 0) super(fixed); else super(...args); }
   static now() { return fixed; }
 };
+const { readFileSync } = await import("node:fs");
 const { openStore } = await import("./src/store.ts");
 const { seed } = await import("./src/seed.ts");
 const { prioritiesView } = await import("./src/priorities.ts");
 const db = openStore(process.argv[2]);
-const seeded = seed(db);
+const seeded = seed(db, JSON.parse(readFileSync("seed/excaliwire.json", "utf-8")));
 if (!seeded.ok) throw new Error(JSON.stringify(seeded));
 process.stdout.write(JSON.stringify({ ...prioritiesView(db, "excaliwire", new Date()), me: { id: "chelsea", name: "Chelsea" } }));
 """

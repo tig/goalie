@@ -47,7 +47,8 @@ Unset means no issuer, so every token is refused.
 A deployment's issuer list lives with its host configuration, not in this repo. Keys come from the issuer's discovery document.
 Tests do not need Entra. `server/tests/sign_token.mjs` signs tokens with a fresh key, and the test sets a test issuer with that key inline in `jwks`.
 Every token is still verified: RS256 signature, issuer, audience, and expiry.
-`node src/cli.ts` is a local tool against the `GOALIE_DB` file: `write --as <actor>`, `read <kind> <id>`, `events [after]`, `seed`, `check`, and `whoami`. It is not reachable over HTTP.
+`node src/cli.ts` is a local tool against the `GOALIE_DB` file: `write --as <actor>`, `read <kind> <id>`, `events [after]`, `seed [file]`, `check`, and `whoami`. It is not reachable over HTTP.
+A seed is a data file of writes, each with its `as` actor. `server/seed/excaliwire.json` is the default. A seed lives outside `src/`, so the publish does not carry it.
 The default host is `127.0.0.1`.
 `GET /health` answers `ok`.
 `GET /health` is the one path that needs no verified actor.
