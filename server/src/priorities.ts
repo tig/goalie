@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { ApiGoal, ApiPriority, ApiSummary, GoalDate, Health, PrioritiesResponse, PtgStep } from "./api.ts";
-import { day, daysBetween } from "./dates.ts";
+import { dateIn, day, daysBetween } from "./dates.ts";
 import { committedDate, currentDate, isOpen, OPEN_STATES, type State } from "./goal.ts";
 import { read, readAll } from "./read.ts";
 import type { Row } from "./rules.ts";
@@ -15,7 +15,7 @@ import type { Row } from "./rules.ts";
  * The saved definition behind the screen. A stored view table is a later issue (#8, Epic 7).
  * The view opens on one org unit. It selects that unit's goals at that unit's level.
  */
-export const PRIORITIES_VIEW = {
+const PRIORITIES_VIEW = {
   name: "Priorities",
   select: { state: OPEN_STATES, period: "current" },
   sort: "rank",
@@ -23,7 +23,7 @@ export const PRIORITIES_VIEW = {
 } as const;
 
 /** A period is current when it names today's year ("2026") or quarter ("2026-Q4"). Calendar quarters are the default calendar (SPEC.md §12). */
-export function isCurrentPeriod(period: string, todayIso: string): boolean {
+function isCurrentPeriod(period: string, todayIso: string): boolean {
   const year = todayIso.slice(0, 4);
   const quarter = Math.floor((Number(todayIso.slice(5, 7)) - 1) / 3) + 1;
   return period === year || period === `${year}-Q${quarter}`;
@@ -33,8 +33,8 @@ function all(db: DatabaseSync, sql: string, ...params: string[]): Row[] {
   return db.prepare(sql).all(...params) as Row[];
 }
 
-/** When each goal started: its first move to In Progress, else its first Event. One query. */
-function startedAll(db: DatabaseSync): Map<string, string> {
+/** When each goal started, as a day in `timeZone`: its first move to In Progress, else its first Event. One query. */
+function startedAll(db: DatabaseSync, timeZone: string): Map<string, string> {
   const rows = all(
     db,
     `SELECT entity,
@@ -42,7 +42,7 @@ function startedAll(db: DatabaseSync): Map<string, string> {
        MIN(timestamp) AS first
      FROM event e WHERE entity_kind = 'goal' GROUP BY entity`,
   );
-  return new Map(rows.map((r) => [r.entity as string, ((r.moved ?? r.first) as string).slice(0, 10)]));
+  return new Map(rows.map((r) => [r.entity as string, dateIn(Date.parse((r.moved ?? r.first) as string), timeZone)]));
 }
 
 /** A goal's own date and Date Type, to compare a sub-goal with its parent. */
@@ -61,8 +61,8 @@ function firstStep(ptg: unknown, names: Map<string, string>): PtgStep | undefine
   };
 }
 
-export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = new Date()): Omit<PrioritiesResponse, "me"> {
-  const todayIso = now.toISOString().slice(0, 10);
+/** The view on `todayIso`, the org's calendar day. Event timestamps are UTC instants, read as days in `timeZone`. */
+export function prioritiesView(db: DatabaseSync, orgUnit: string, todayIso: string, timeZone: string): Omit<PrioritiesResponse, "me"> {
   const today = day(todayIso);
   const unit = read(db, "org_unit", orgUnit);
   const org = { id: orgUnit, name: (unit?.name as string) ?? orgUnit, level: (unit?.level as string) ?? "" };
@@ -71,7 +71,7 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
   // Load once and build from memory.
   const goals = new Map(readAll(db, "goal").map((g) => [g.id as string, g]));
   const getGoal = (id: string) => goals.get(id);
-  const started = startedAll(db);
+  const started = startedAll(db, timeZone);
   const names = new Map(readAll(db, "actor").map((a) => [a.id as string, a.display_name as string]));
   const actor = (id: string) => ({ id, name: names.get(id) ?? id });
   const shown = (g: Row) => g.org_unit === org.id && g.level === org.level && (select.state as readonly unknown[]).includes(g.state);

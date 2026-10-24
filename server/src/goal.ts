@@ -7,11 +7,9 @@ import type { Row } from "./rules.ts";
 
 /** The Date Types (SPEC.md §5), from least to most firm. */
 export const DATE_TYPES = ["Fantasy", "Ambition", "Committed"] as const;
-export type DateType = (typeof DATE_TYPES)[number];
 
 /** The states (SPEC.md §7.2). */
-export const STATES = ["Backlog", "In Progress", "Completed", "Completed Late", "Did Not Meet", "Deleted"] as const;
-export type State = (typeof STATES)[number];
+export type State = "Backlog" | "In Progress" | "Completed" | "Completed Late" | "Did Not Meet" | "Deleted";
 
 /** States in which a goal is still open: not yet closed out. */
 export const OPEN_STATES: readonly State[] = ["Backlog", "In Progress"];
@@ -42,7 +40,7 @@ export function currentDate(goal: Row): string | undefined {
   return typeof date === "string" ? date : undefined;
 }
 
-export type CommittedDate = { date: string; kind: "Committed" | "Promotion Milestone" };
+type CommittedDate = { date: string; kind: "Committed" | "Promotion Milestone" };
 
 /** The committed date health is judged against (SPEC.md §6.1): its own, else its Promotion Milestone's. */
 export function committedDate(goal: Row, getGoal: (id: string) => Row | undefined): CommittedDate | undefined {

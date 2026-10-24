@@ -8,11 +8,12 @@ import unittest
 from typing import Any
 
 from goalie_cli import Store, create, update
-from live_server import Reply, get, running_server, signed
+from live_server import TODAY, Reply, get, running_server, signed
 
 
 def days_since(iso: str) -> int:
-    return (datetime.datetime.now(datetime.timezone.utc).date() - datetime.date.fromisoformat(iso)).days
+    """Days from iso to the pinned TODAY, never the wall clock."""
+    return (datetime.date.fromisoformat(TODAY) - datetime.date.fromisoformat(iso)).days
 
 
 def flatten(goals: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -28,15 +29,16 @@ def seeded_store() -> Store:
     code, result = store.run("seed")
     assert code == 0, result
     chelsea = store.read("actor", "chelsea")
-    result = store.write("chelsea", update("actor", "chelsea", chelsea["version"], {"subject": "sub-chelsea"}))
+    # Only the GOALIE owner, Tig, writes an actor row.
+    result = store.write("tig", update("actor", "chelsea", chelsea["version"], {"subject": "sub-chelsea"}))
     assert result["ok"], result
     return store
 
 
-def fetch(store: Store, *paths: str) -> tuple[list[Reply], Reply]:
+def fetch(store: Store, *paths: str, env: dict[str, str] | None = None) -> tuple[list[Reply], Reply]:
     """GET each path signed in as Chelsea, then the first path with no token."""
-    token, env = signed("sub-chelsea")
-    with running_server(store.path, env) as (proc, port):
+    token, issuers = signed("sub-chelsea")
+    with running_server(store.path, {**issuers, **(env or {})}) as (proc, port):
         replies = [get(proc, port, path, {"Authorization": f"Bearer {token}"}) for path in paths]
         anonymous = get(proc, port, paths[0])
     return replies, anonymous
@@ -73,7 +75,7 @@ class PrioritiesApiTests(unittest.TestCase):
         self.assertEqual(self.body["org"], {"id": "excaliwire", "name": "Excaliwire", "level": "Company"})
         self.assertEqual(self.body["view"]["name"], "Priorities")
         self.assertEqual(self.body["view"]["columns"], ["Summary", "Owner", "Health", "Date Type", "Promotion Milestone", "PTG"])
-        self.assertEqual(self.body["today"], datetime.datetime.now(datetime.timezone.utc).date().isoformat())
+        self.assertEqual(self.body["today"], TODAY)
 
     def test_priorities_are_in_rank_order_and_the_cut_line_splits_them(self) -> None:
         self.assertEqual([p["rank"] for p in self.body["funded"]], [1, 2, 3])
@@ -91,8 +93,7 @@ class PrioritiesApiTests(unittest.TestCase):
 
     def test_a_slip_names_its_days_past_the_committed_date(self) -> None:
         days = days_since("2026-10-01")
-        if days <= 0:
-            self.skipTest("Oct 1 has not passed")
+        self.assertEqual(days, 22)
         self.assertEqual(self.goals["XW-0001"]["dates"], [{"date": "2026-10-01", "kind": "Committed", "slipDays": days}])
         self.assertEqual(self.body["summary"]["slips"], [{"goal": "XW-0001", "summary": self.goals["XW-0001"]["summary"], "date": "2026-10-01", "kind": "Committed", "days": days}])
 
@@ -124,8 +125,7 @@ class PrioritiesApiTests(unittest.TestCase):
 
     def test_the_promotion_milestone_due_is_counted_in_days(self) -> None:
         days = -days_since("2026-11-06")
-        if days < 0:
-            self.skipTest("Nov 6 has passed")
+        self.assertEqual(days, 14)
         self.assertEqual(self.body["summary"]["nextPromotion"], {"milestone": "XW-0004", "date": "2026-11-06", "days": days, "goal": "XW-0003", "summary": self.goals["XW-0003"]["summary"]})
 
     def test_the_server_does_not_filter_or_draw(self) -> None:
@@ -141,20 +141,27 @@ class PrioritiesDefinitionTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.store = seeded_store()
-        quarter = (datetime.date.today().month - 1) // 3 + 1
-        period = f"{datetime.date.today().year}-Q{quarter}"
-        writes = [
+        period = "2026-Q4"
+        owner_writes = [
             create("org_unit", "xw-team", {"name": "XW Team", "level": "Team", "parent": "excaliwire", "owner": "tig"}, "Test data"),
+            create("actor", "bot", {"kind": "agent", "display_name": "Bot", "operator": "tig"}),
+        ]
+        for command in owner_writes:
+            result = cls.store.write("tig", command)
+            assert result["ok"], (command, result)
+        writes = [
             create("priority", "PRI-4", {"org_unit": "excaliwire", "period": period, "rank": 4, "title": "An empty Priority", "status": "Current"}, "Test data"),
             create("priority", "PRI-OLD", {"org_unit": "excaliwire", "period": "2020-Q1", "rank": 5, "title": "A Priority of an old period", "status": "Current"}, "Test data"),
             create("goal", "XW-0090", {**OLD_GOAL, "summary": "An old Committed date in the view", "priority": "PRI-1"}, "Test data"),
             create("goal", "XW-0091", {**OLD_GOAL, "summary": "A Team goal on a company Priority", "priority": "PRI-1", "org_unit": "xw-team", "level": "Team"}, "Test data"),
             create("goal", "XW-0092", {**OLD_GOAL, "summary": "A Completed goal", "priority": "PRI-2", "state": "Completed", "health": None, "path_to_green": None}, "Test data"),
-            create("draft", "DR-1", {"entity": "XW-0001", "actor": "chelsea", "base_version": 1, "change": {"health": "YELLOW"}, "reason": "test"}, "Test data"),
-            create("draft", "DR-2", {"entity": "XW-0091", "actor": "chelsea", "base_version": 1, "change": {"health": "YELLOW"}, "reason": "A goal outside the view"}, "Test data"),
         ]
-        for command in writes:
-            result = cls.store.write("chelsea", command)
+        drafts = [
+            create("draft", "DR-1", {"entity": "XW-0001", "actor": "bot", "base_version": 1, "change": {"health": "YELLOW"}, "reason": "test"}, "Test data"),
+            create("draft", "DR-2", {"entity": "XW-0091", "actor": "bot", "base_version": 1, "change": {"health": "YELLOW"}, "reason": "A goal outside the view"}, "Test data"),
+        ]
+        for actor, command in [*(("chelsea", c) for c in writes), *(("bot", c) for c in drafts)]:
+            result = cls.store.write(actor, command)
             assert result["ok"], (command, result)
         (reply,), _ = fetch(cls.store, "/api/priorities")
         cls.body = json.loads(reply.body)
@@ -182,6 +189,50 @@ class PrioritiesDefinitionTests(unittest.TestCase):
     def test_the_drafts_count_counts_only_this_views_drafts(self) -> None:
         # Review E20: DR-2 is on a goal the view does not show.
         self.assertEqual(self.body["summary"]["drafts"], 1)
+
+
+class TodayTests(unittest.TestCase):
+    """Today is the org's calendar day (review: at 18:40 MDT the API said tomorrow). GOALIE_TODAY pins it."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.store = seeded_store()
+        # Kiritimati is UTC+14 and Pago Pago is UTC-11. Their dates always differ, so no test reads the wall clock.
+        far = {"GOALIE_TODAY": ""}
+        cls.east = cls.today(far | {"TZ": "Pacific/Kiritimati"})
+        cls.west = cls.today(far | {"TZ": "Pacific/Pago_Pago"})
+        cls.pinned = cls.today({"GOALIE_TODAY": "2027-01-04", "TZ": "Pacific/Kiritimati"})
+        owner = cls.store.read("owner_settings", "owner")
+        result = cls.store.write("tig", update("owner_settings", "owner", owner["version"], {"settings": {**owner["settings"], "time_zone": "Pacific/Pago_Pago"}}))
+        assert result["ok"], result
+        cls.setting = cls.today(far | {"TZ": "Pacific/Kiritimati"})
+
+    @classmethod
+    def today(cls, env: dict[str, str]) -> dict[str, Any]:
+        (reply,), _ = fetch(cls.store, "/api/priorities", env=env)
+        assert reply.status == 200, reply.body
+        return json.loads(reply.body)
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.store.close()
+
+    def test_today_is_the_process_time_zone_day_by_default(self) -> None:
+        self.assertGreater(self.east["today"], self.west["today"])
+
+    def test_the_owner_setting_names_the_time_zone(self) -> None:
+        self.assertEqual(self.setting["today"], self.west["today"])
+
+    def test_goalie_today_pins_the_day(self) -> None:
+        self.assertEqual(self.pinned["today"], "2027-01-04")
+
+    def test_a_slip_counts_days_to_the_org_day(self) -> None:
+        east = goals_of(self.east)["XW-0001"]["dates"][0]["slipDays"]
+        west = goals_of(self.west)["XW-0001"]["dates"][0]["slipDays"]
+        self.assertEqual(east - west, (datetime.date.fromisoformat(self.east["today"]) - datetime.date.fromisoformat(self.west["today"])).days)
+
+    def test_a_goal_starts_on_the_org_day(self) -> None:
+        self.assertGreater(goals_of(self.east)["XW-0001"]["started"], goals_of(self.west)["XW-0001"]["started"])
 
 
 OLD_GOAL = {

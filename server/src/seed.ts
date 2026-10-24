@@ -8,7 +8,7 @@ import { inTransaction, write, type Command } from "./write.ts";
 
 export type SeedFile = { about?: string[]; writes: { as: string; command: Command }[] };
 
-export type SeedResult = { ok: true; events: number } | { ok: false; reason: string; command?: Command; result?: unknown };
+type SeedResult = { ok: true; events: number } | { ok: false; reason: string; command?: Command; result?: unknown };
 
 /** Load the seed into an empty store. Stop at the first rejected write and keep nothing. */
 export function seed(db: DatabaseSync, file: SeedFile): SeedResult {

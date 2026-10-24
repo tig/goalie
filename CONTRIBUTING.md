@@ -39,9 +39,11 @@ The web app is React in `server/web/` ([ADR 0010](docs/adr/0010-app-shape.md)).
 The server workflow builds it before the server tests, and the publish carries it.
 You must not put a second server language here.
 `npm start --prefix server` starts the process.
-`PORT`, `HOST`, `GOALIE_DB`, and `GOALIE_WEB_DIST` are process configuration.
+`PORT`, `HOST`, `GOALIE_DB`, `GOALIE_WEB_DIST`, `GOALIE_SIGN_IN_URL`, and `GOALIE_TODAY` are process configuration.
 `GOALIE_DB` is the path of the SQLite file ([ADR 0006](docs/adr/0006-deployment-target.md)). The default is `goalie.db` in the working directory.
 `GOALIE_WEB_DIST` is the folder of the built web app. The default is `server/web/dist`.
+`GOALIE_SIGN_IN_URL` is the host's login route that the sign-in page links to, with the page to return to as `rd`. The default is `/oauth2/start`.
+Today is the org's calendar day: the owner setting `time_zone`, else the process's local time zone. `GOALIE_TODAY` (YYYY-MM-DD) pins it. The server tests pin it to 2026-10-23, so no test reads the wall clock for a product date.
 `GOALIE_ISSUERS` is the issuer list ([ADR 0005](docs/adr/0005-auth-and-identity.md)). It is a JSON list of `{"issuer", "audience"}`, with optional `jwks_uri` or inline `jwks`.
 Unset means no issuer, so every token is refused.
 A deployment's issuer list lives with its host configuration, not in this repo. Keys come from the issuer's discovery document.

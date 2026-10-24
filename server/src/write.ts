@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import { ENTITIES, encode, isKind, lookup, memoryLookup, read, readAll, readEvents, type EventRow, type Kind } from "./read.ts";
+import { ENTITIES, encode, goalieOwner, isKind, lookup, memoryLookup, read, readAll, readEvents, type EventRow, type Kind } from "./read.ts";
 import { DEFAULT_VISIBILITY } from "./goal.ts";
 import { checkAuthor, checkTransition, checkWrite, REASONED, summaryLint, SYSTEM_FIELDS, type Row, type Violation } from "./rules.ts";
 
@@ -18,7 +18,7 @@ export type Command =
   | { op: "create"; kind: Kind; id?: string; fields: Row; reason?: string }
   | { op: "update"; kind: Kind; id: string; base_version: number; fields: Row; reason?: string };
 
-export type WriteResult =
+type WriteResult =
   | { ok: true; entity: Row; events: EventRow[] }
   | { ok: false; error: "stale"; current: Row }
   | { ok: false; error: "invalid"; violations: Violation[] }
@@ -67,7 +67,11 @@ function badCommand(message: string): WriteResult {
 }
 
 /** Apply one command as `actor`. Every invariant is checked on the committed result, in the transaction. */
+const isObject = (value: unknown): value is Row => typeof value === "object" && value !== null && !Array.isArray(value);
+
 export function write(db: DatabaseSync, actor: string, command: Command): WriteResult {
+  if (!isObject(command)) return badCommand("a command is a JSON object");
+  if (command.fields !== undefined && !isObject(command.fields)) return badCommand("fields is a JSON object");
   if (!isKind(command.kind)) return badCommand(`unknown kind ${String(command.kind)}`);
   const kind = command.kind;
   const spec = ENTITIES[kind];
@@ -137,7 +141,7 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
   if (before !== undefined && changed.length === 0) return { ok: true, entity: before, events: [] };
 
   const reason = command.reason?.trim() || null;
-  const violations: Violation[] = [...(author ? checkAuthor(author, kind, before, after) : []), ...checkTransition(kind, before, after)];
+  const violations: Violation[] = [...(author ? checkAuthor(author, goalieOwner(db), kind, before, after) : []), ...checkTransition(kind, before, after)];
   const needReason = changed.filter((f) => (REASONED[kind] ?? []).includes(f));
   if (needReason.length > 0 && reason === null) {
     violations.push({ rule: "reason-required", message: `a change to ${needReason.join(", ")} needs a reason.` });

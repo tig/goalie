@@ -11,7 +11,7 @@ import type { Row } from "./rules.ts";
 /** One trusted issuer. Keys come from `jwks`, else `jwks_uri`, else the issuer's OpenID discovery document. */
 export type Issuer = { issuer: string; audience: string; jwks_uri?: string; jwks?: { keys: JsonWebKey[] } };
 
-export type Resolution = { ok: true; actor: Row } | { ok: false; reason: string };
+type Resolution = { ok: true; actor: Row } | { ok: false; reason: string };
 
 /** Clock skew allowed on exp and nbf, in seconds. */
 const SKEW = 60;
@@ -82,7 +82,7 @@ function decodePart(part: string): Record<string, unknown> {
 }
 
 /** Verify an RS256 token against the issuer list. Return its claims, or why it was refused. */
-export async function verifyToken(
+async function verifyToken(
   token: string,
   issuers: Issuer[],
 ): Promise<{ ok: true; claims: Record<string, unknown> } | { ok: false; reason: string }> {

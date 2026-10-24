@@ -6,7 +6,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
 import type { ActorRef, ApiError, PrioritiesResponse } from "./api.ts";
 import { configuredIssuers, resolveActor, type Issuer } from "./auth.ts";
-import { configuredDatabase, configuredOrgUnit, configuredWebDist } from "./config.ts";
+import { configuredDatabase, configuredOrgUnit, configuredSignInUrl, configuredTimeZone, configuredToday, configuredWebDist } from "./config.ts";
 import { prioritiesView } from "./priorities.ts";
 import { BRAND_SLOT, brandHead } from "./brand.ts";
 import { signInPage } from "./signin.ts";
@@ -43,6 +43,13 @@ async function built(dist: string, path: string): Promise<Buffer | undefined> {
   return readFile(file).catch(() => undefined);
 }
 
+/** The host's login route, with the page to return to after sign-in. */
+function signInHref(url: string): string {
+  const { pathname, search } = new URL(url);
+  const login = configuredSignInUrl();
+  return `${login}${login.includes("?") ? "&" : "?"}rd=${encodeURIComponent(pathname + search)}`;
+}
+
 /**
  * The one Hono application. /api/* is the JSON API (ADR 0003). Every other path is the built React app (ADR 0010).
  * No request is anonymous except /health (ADR 0005).
@@ -52,14 +59,14 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
   app.get("/health", (c) => c.text("ok"));
   app.use("*", async (c, next) => {
     const who = await resolveActor(db, c.req.header(), issuers);
-    if (!who.ok) return c.req.path.startsWith("/api/") ? refuse(c, 401, "unauthenticated", who.reason) : c.html(signInPage(who.reason), 401);
+    if (!who.ok) return c.req.path.startsWith("/api/") ? refuse(c, 401, "unauthenticated", who.reason) : c.html(signInPage(who.reason, signInHref(c.req.url)), 401);
     c.set("actor", { id: who.actor.id as string, name: who.actor.display_name as string });
     await next();
   });
   // Resolve the org unit once (review E22). An empty store has none yet, so try again until it does.
   let orgUnit = "";
   const unit = () => (orgUnit ||= configuredOrgUnit(db));
-  app.get("/api/priorities", (c) => c.json<PrioritiesResponse>({ ...prioritiesView(db, unit()), me: c.get("actor") }));
+  app.get("/api/priorities", (c) => c.json<PrioritiesResponse>({ ...prioritiesView(db, unit(), configuredToday(db), configuredTimeZone(db)), me: c.get("actor") }));
   app.all("/api/*", (c) => refuse(c, 404, "not_found", `no API route ${c.req.method} ${c.req.path}`));
   app.get("/assets/*", async (c) => {
     const body = await built(webDist, c.req.path);
