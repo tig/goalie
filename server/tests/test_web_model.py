@@ -416,6 +416,14 @@ class GoalPageTests(unittest.TestCase):
         ]
         self.assertEqual(run(f"return goalpage.createdFields({json.dumps(events)}).map((e) => [e.field, e.new]);"), [["state", "In Progress"], ["summary", "Ship it"]])
 
+    def test_a_created_row_lists_this_goal_before_the_others(self) -> None:
+        events = [
+            {"sequence": 3, "entity": "XW-0014", "field": "health", "old": None, "new": "GREEN"},
+            {"sequence": 2, "entity": "XW-0015", "field": "summary", "old": None, "new": "Ship it"},
+            {"sequence": 1, "entity": "XW-0014", "field": "summary", "old": None, "new": "Commit"},
+        ]
+        self.assertEqual(run(f"return goalpage.createdFields({json.dumps(events)}, 'XW-0015').map((e) => e.sequence);"), [2, 3, 1])
+
     def test_a_promote_is_one_row_naming_the_milestone_it_completed(self) -> None:
         w = {"timestamp": "t1", "actor": "chelsea", "reason": "Met"}
         events = [

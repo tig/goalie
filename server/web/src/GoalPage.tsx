@@ -450,7 +450,7 @@ function EventRow({ group, data }: { group: EventGroup; data: GoalPageResponse }
               {e.reason && <span className="muted"> “{e.reason}”</span>}
             </summary>
             <ul>
-              {createdFields(group.events).map((x) => (
+              {createdFields(group.events, data.goal.id).map((x) => (
                   <li key={x.sequence}>
                     {other(x)}
                     {fieldLabel(x.field)}: {value(x.new, x.field)}

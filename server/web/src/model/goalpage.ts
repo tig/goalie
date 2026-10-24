@@ -80,10 +80,11 @@ export function groupEvents(events: ApiEvent[]): EventGroup[] {
   return groups;
 }
 
-/** What a create row lists: each field once, at the value the write left it (newest first), with no empty values. */
-export function createdFields(events: ApiEvent[]): ApiEvent[] {
+/** What a create row lists: each field once, at the value the write left it (newest first), with no empty values. The page's own goal comes first. */
+export function createdFields(events: ApiEvent[], first?: string): ApiEvent[] {
   const seen = new Set<string>();
-  return events.filter((e) => {
+  const ordered = first ? [...events.filter((e) => e.entity === first), ...events.filter((e) => e.entity !== first)] : events;
+  return ordered.filter((e) => {
     const key = `${e.entity} ${e.field}`;
     if (seen.has(key)) return false;
     seen.add(key);
