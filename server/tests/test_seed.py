@@ -19,18 +19,11 @@ class SeedTests(unittest.TestCase):
         code, self.result = self.store.run("seed")
         self.assertEqual(code, 0, self.result)
 
-    def test_the_seats_are_agents_operated_by_chelsea(self) -> None:
-        # Plan B4: one agent actor per build seat, written by Tig, the GOALIE owner.
-        for seat in SEATS:
-            actor = self.store.read("actor", seat)
-            self.assertEqual((actor["kind"], actor["operator"], actor["app_id"]), ("agent", "chelsea", f"app-{seat}"), seat)
-
-    def test_each_seat_has_a_queue_of_work_items_under_the_mlp(self) -> None:
+    def test_the_excaliwire_seed_holds_no_build_team(self) -> None:
+        # The build team is ours. A deployment that loads only excaliwire.json never gets it.
         with sqlite3.connect(self.store.path) as db:
-            rows = db.execute("SELECT owner, goal, status FROM work_item").fetchall()
-        self.assertEqual({owner for owner, _, _ in rows}, set(SEATS))
-        self.assertLessEqual({goal for _, goal, _ in rows}, {f"XW-{n:04d}" for n in range(5, 12)})
-        self.assertLessEqual({status for _, _, status in rows}, {"Backlog", "In Progress", "Completed"})
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM actor WHERE kind = 'agent'").fetchone()[0], 0)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM work_item").fetchone()[0], 0)
 
     def test_seed_loads_org_unit_humans_and_owner(self) -> None:
         unit = self.store.read("org_unit", "excaliwire")
@@ -110,7 +103,66 @@ class SeedTransactionTests(unittest.TestCase):
         self.assertIsNone(store.read("actor", "tig"))
 
 
-SEATS = ("chief-of-staff", "product-manager", "product-designer", "head-of-engineering", "frontend-engineer", "backend-engineer", "qa", "user-researcher")
+SEATS = ("chief-of-staff", "product-manager", "product-designer", "head-of-engineering", "frontend-engineer", "backend-engineer", "codebase-qa", "frontend-qa", "user-researcher")
+BUILD_TEAM = SERVER / "seed" / "build-team.json"
+
+
+class BuildTeamTests(unittest.TestCase):
+    """server/seed/build-team.json loads onto the Excaliwire seed: the seats and their current tasks (plan part 2, the build team's queues)."""
+
+    def setUp(self) -> None:
+        self.store = Store()
+        self.addCleanup(self.store.close)
+        code, result = self.store.run("seed")
+        self.assertEqual(code, 0, result)
+        code, self.result = self.store.run("seed", str(BUILD_TEAM))
+        self.assertEqual(code, 0, self.result)
+
+    def rows(self) -> list[tuple[str, str, str, str]]:
+        with sqlite3.connect(self.store.path) as db:
+            return db.execute("SELECT id, owner, goal, status FROM work_item ORDER BY id").fetchall()
+
+    def test_the_seats_are_agents_operated_by_chelsea(self) -> None:
+        for seat in SEATS:
+            actor = self.store.read("actor", seat)
+            self.assertEqual((actor["kind"], actor["operator"], actor["app_id"]), ("agent", "chelsea", f"app-{seat}"), seat)
+
+    def test_each_seat_has_a_queue_under_the_mlp_sub_goals(self) -> None:
+        rows = self.rows()
+        self.assertEqual({owner for _, owner, _, _ in rows}, set(SEATS))
+        self.assertLessEqual({goal for _, _, goal, _ in rows}, {f"XW-{n:04d}" for n in range(5, 12)})
+        self.assertLessEqual({status for _, _, _, status in rows}, {"Backlog", "In Progress", "Completed"})
+
+    def test_the_team_needs_the_excaliwire_seed_first(self) -> None:
+        empty = Store()
+        self.addCleanup(empty.close)
+        code, result = empty.run("seed", str(BUILD_TEAM))
+        self.assertEqual(code, 2)
+        self.assertIn("excaliwire.json", result["reason"])
+
+    def test_a_second_load_writes_nothing(self) -> None:
+        before = self.rows()
+        events = len(self.store.events())
+        code, result = self.store.run("seed", str(BUILD_TEAM))
+        self.assertEqual((code, result["events"]), (0, 0), result)
+        self.assertEqual(self.rows(), before)
+        self.assertEqual(len(self.store.events()), events)
+
+    def test_a_changed_task_updates_in_place_with_the_files_reason(self) -> None:
+        team = json.loads(BUILD_TEAM.read_text(encoding="utf-8"))
+        task = next(w for w in team["writes"] if w["command"]["kind"] == "work_item" and w["command"]["fields"]["status"] != "Completed")
+        task["command"]["fields"]["status"] = "Completed"
+        task["command"]["reason"] = "Done in the test"
+        before = self.rows()
+        count = len(self.store.events())
+        with tempfile.TemporaryDirectory() as scratch:
+            path = Path(scratch) / "team.json"
+            path.write_text(json.dumps(team))
+            code, result = self.store.run("seed", str(path))
+        self.assertEqual(code, 0, result)
+        self.assertEqual(len(self.rows()), len(before))
+        changed = self.store.events()[count:]
+        self.assertEqual([(e["field"], e["new"], e["reason"]) for e in changed], [("status", "Completed", "Done in the test")])
 
 
 class SeedFileTests(unittest.TestCase):

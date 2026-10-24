@@ -51,7 +51,7 @@ Tests do not need Entra. `server/tests/sign_token.mjs` signs tokens with a fresh
 Every token is still verified: RS256 signature, issuer, audience, and expiry.
 `node src/cli.ts` is a local tool against the `GOALIE_DB` file: `write --as <actor>`, `read <kind> <id>`, `events [after]`, `seed [file]`, `check`, and `whoami`. It is not reachable over HTTP.
 A seed is a data file of writes, each with its `as` actor. `server/seed/excaliwire.json` is the default. A seed lives outside `src/`, so the publish does not carry it.
-The Excaliwire seed makes each build seat an agent actor with `app_id` `app-<seat>`. `server/tests/sign_token.mjs` signs a seat token with claims `idtyp: "app"` and `azp: "app-<seat>"`.
+`server/seed/build-team.json` is our build team: each seat an agent actor with `app_id` `app-<seat>`, and each seat's current tasks as work items. It loads onto the Excaliwire seed with `node src/cli.ts seed seed/build-team.json`, and loads again after an edit: an existing actor, or a work item with the same owner and title, is updated, and an unchanged one writes nothing. `server/tests/sign_token.mjs` signs a seat token with claims `idtyp: "app"` and `azp: "app-<seat>"`.
 The app's dev fixtures in `server/web/fixtures/` are generated from the seed: `python server/tests/test_fixture.py --write`. `test_fixture.py` fails when they drift from the API.
 The default host is `127.0.0.1`.
 `GET /health` answers `ok`.
