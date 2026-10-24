@@ -145,7 +145,7 @@ Words:
 Source: [SPEC.md §6.1](../specs/SPEC.md#s6-1), [server/src/write.ts](../../server/src/write.ts) (`DEFAULTS`, the `required-field` and `reason-required` checks), [server/src/rules.ts](../../server/src/rules.ts) (`checkGoal`), and [server/src/options.ts](../../server/src/options.ts) (the form's defaults), at chelsea/mlp 4468090.
 Measured on 2026-10-24 by create commands against a copy of the preview store. An empty create returns `required-field` for summary, owner, org unit, level, type, plan maturity, severity, state, and origination, and `date-and-date-type`.
 
-Bad news first: the server defaults only two fields, `description` ("") and `visibility` (organization-wide). Every other default lives in the form (options.ts). A create through the API, or by an agent's Draft, must send nine fields a person never chose. The form also defaults State to In Progress, which makes Health required at create. [SPEC.md §7.2](../specs/SPEC.md#s7-2) starts every goal at Backlog.
+Bad news first: the server defaults only two fields, `description` ("") and `visibility` (organization-wide). Every other default lives in the form (options.ts). A create through the API, or by an agent's Draft, must send seven fields a person never chose (org unit, level, type, severity, state, origination, plan maturity). The form also defaults State to In Progress, which makes Health required at create. [SPEC.md §7.2](../specs/SPEC.md#s7-2) starts every goal at Backlog.
 
 What the server requires to create a goal:
 
