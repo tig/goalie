@@ -21,7 +21,9 @@ async function main(args: string[]): Promise<number> {
   switch (command) {
     case "write": {
       if (rest[0] !== "--as" || !rest[1]) return usage();
-      const result = write(db, rest[1], JSON.parse(readFileSync(0, "utf-8")) as Command);
+      const command = stdinJson();
+      if (command === undefined) return badStdin();
+      const result = write(db, rest[1], command as Command);
       print(result);
       return result.ok ? 0 : 2;
     }
@@ -45,14 +47,30 @@ async function main(args: string[]): Promise<number> {
       return report.violations.length === 0 ? 0 : 2;
     }
     case "whoami": {
-      const headers = JSON.parse(readFileSync(0, "utf-8")) as Record<string, string>;
-      const result = await resolveActor(db, headers, configuredIssuers());
+      const headers = stdinJson();
+      if (headers === undefined) return badStdin();
+      const result = await resolveActor(db, headers as Record<string, string>, configuredIssuers());
       print(result);
       return result.ok ? 0 : 2;
     }
     default:
       return usage();
   }
+}
+
+/** The JSON on stdin, or undefined when it is not JSON. */
+function stdinJson(): unknown {
+  try {
+    return JSON.parse(readFileSync(0, "utf-8")) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Bad stdin is a named rejection, like a rejected write. */
+function badStdin(): number {
+  print({ ok: false, error: "bad_command", message: "stdin is not JSON" });
+  return 2;
 }
 
 function print(value: unknown): void {

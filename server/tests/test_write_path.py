@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import json
+import os
 import sqlite3
+import subprocess
 import unittest
 from typing import Any
 
-from goalie_cli import Store, create, update
+from goalie_cli import SERVER, Store, create, update
 
 JANE = "jane@example.com"
 
@@ -314,6 +317,22 @@ class BootstrapTests(unittest.TestCase):
         result = store.write("tig", create("actor", "tig", {"kind": "human", "display_name": "Tig"}))
         self.assertTrue(result["ok"], result)
         self.assertEqual(store.events()[0]["actor"], "tig")
+
+
+class CliInputTests(unittest.TestCase):
+    """Review Q11: the local tool answers bad stdin with a named rejection, not a crash."""
+
+    def test_bad_json_on_stdin_is_a_bad_command(self) -> None:
+        store = Store()
+        self.addCleanup(store.close)
+        env = {**os.environ, "GOALIE_DB": str(store.path)}
+        for args in (["write", "--as", JANE], ["whoami"]):
+            proc = subprocess.run(["node", "--no-warnings", "src/cli.ts", *args], cwd=SERVER, env=env, input=b"{not json", capture_output=True, timeout=30)
+            self.assertEqual(proc.returncode, 2, args)
+            self.assertNotIn(b"SyntaxError", proc.stderr)
+            result = json.loads(proc.stdout)
+            self.assertEqual(result["error"], "bad_command", args)
+            self.assertIn("JSON", result["message"])
 
 
 if __name__ == "__main__":
