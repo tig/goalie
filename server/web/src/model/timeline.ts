@@ -156,7 +156,7 @@ export type LaneMark = { key: string; atPx: number; text: string; outside: "befo
 
 /**
  * Where a lane's labels go, so no two overlap (rule 23). Each band places its labels on its own.
- * Every mark past an edge of the screen joins one label at that edge in its band, in date order. A mark whose own label could not clear that edge label, or fits on neither side of the mark, joins it too.
+ * Every mark past an edge of the screen joins one label at that edge in its band, in date order. A mark whose own label could not clear that edge label, or fits on neither side of the mark, joins it too, or starts one at the nearer edge.
  * Each other mark labels to its right, else to its left.
  */
 export function placeLaneLabels(marks: LaneMark[], view: { left: number; right: number }): Placed {
@@ -186,10 +186,11 @@ function placeBand(marks: LaneMark[], view: { left: number; right: number }): Pl
     inner = { left: view.left + reserve(before), right: view.right - reserve(after) };
     for (const m of sorted) {
       if (before.has(m.key) || after.has(m.key)) continue;
-      // A label that fits on neither side of its mark joins the nearer edge label, when there is one, so it covers nothing.
+      // A label that fits on neither side of its mark joins the nearer edge label, so it is whole and covers nothing.
+      // With no edge label yet, it starts one at the nearer edge (QA R15: a lone slip label was cut at the right).
       const w = labelWidth(m.text);
       const fits = m.atPx + LABEL_GAP + w <= inner.right || m.atPx - LABEL_GAP - w >= inner.left;
-      const nearer = after.size && (!before.size || inner.right - m.atPx < m.atPx - inner.left) ? after : before.size ? before : undefined;
+      const nearer = after.size && !before.size ? after : before.size && !after.size ? before : inner.right - m.atPx < m.atPx - inner.left ? after : before;
       const side = m.atPx < inner.left ? before : m.atPx > inner.right ? after : fits ? undefined : nearer;
       if (side) {
         side.add(m.key);

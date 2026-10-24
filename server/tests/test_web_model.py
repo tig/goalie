@@ -211,6 +211,11 @@ class TimelineTests(unittest.TestCase):
     def lanes(self, marks: list, view: dict = {"left": 1000, "right": 1800}) -> dict:
         return run(f"return timeline.placeLaneLabels({json.dumps(marks)}, {json.dumps(view)});")  # type: ignore[return-value]
 
+    def test_a_lone_label_that_fits_neither_side_goes_to_the_nearer_edge(self) -> None:
+        # QA R15, measured at 768 Weeks, scroll 2024: the board shows 2024 to 2281; the slip label fit neither side and was cut 100 px at the right.
+        placed = self.lanes([{"key": "tick", "atPx": 2218, "text": "Committed Oct 1 · slip 23 days", "outside": None}], {"left": 2024, "right": 2281})
+        self.assertEqual(placed, {"before": [], "after": ["tick"], "inside": []})
+
     def test_two_marks_past_one_edge_become_one_label(self) -> None:
         placed = self.lanes([{"key": "end", "atPx": 300, "text": "Fantasy Nov 30", "outside": None}, {"key": "tick", "atPx": 100, "text": "Promotion Milestone Nov 6", "outside": None}])
         self.assertEqual(placed, {"before": ["tick", "end"], "after": [], "inside": []})
