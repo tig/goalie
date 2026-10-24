@@ -30,18 +30,19 @@ class GoalPageApiTests(unittest.TestCase):
             reply = post(proc, port, "/api/commands", {"commands": batch}, auth)
             assert reply.status == 200, reply.body
             cls.item = json.loads(reply.body)["ids"]["$w"]
-            ambition = {"owner": "chelsea", "org_unit": "excaliwire", "level": "Company", "type": "Milestone (Launch)", "severity": "sev2", "origination": "New", "plan_maturity": "Crayon", "state": "In Progress", "health": "GREEN", "date_type": "Ambition"}
+            ambition = {"owner": "chelsea", "org_unit": "excaliwire", "level": "Company", "type": "Milestone (Launch)", "severity": "sev2", "origination": "New", "plan_maturity": "Pencil", "plan": "docs/plan.md", "state": "In Progress", "health": "GREEN", "date_type": "Ambition"}
             milestone = {**ambition, "type": "Milestone (Commit)", "date_type": "Committed", "health": "GREEN"}
             promote = [
                 {"op": "create", "kind": "goal", "ref": "$m1", "fields": {**milestone, "summary": "Commit a date for the onboarding launch", "due_date": "2026-11-01"}, "reason": "Planned"},
                 {"op": "create", "kind": "goal", "ref": "$on_time", "fields": {**ambition, "summary": "Launch the onboarding flow for new accounts", "due_date": "2026-12-01", "promotion_milestone": "$m1"}, "reason": "Planned"},
                 {"op": "create", "kind": "goal", "ref": "$m2", "fields": {**milestone, "summary": "Commit a date for the billing launch", "due_date": "2026-09-01"}, "reason": "Planned"},
                 {"op": "create", "kind": "goal", "ref": "$late", "fields": {**ambition, "summary": "Launch the billing page for every account", "due_date": "2026-10-10", "promotion_milestone": "$m2"}, "reason": "Planned"},
+                {"op": "create", "kind": "goal", "ref": "$crayon", "fields": {**ambition, "summary": "Launch the help pages for new accounts", "due_date": "2026-12-01", "promotion_milestone": "$m1", "plan_maturity": "Crayon"}, "reason": "Planned"},
             ]
             reply = post(proc, port, "/api/commands", {"commands": promote}, auth)
             assert reply.status == 200, reply.body
             cls.ambition = json.loads(reply.body)["ids"]
-            cls.replies = {key: page(key) for key in ("XW-0001", "XW-0002", "XW-0003", "XW-0004", "XW-0007", cls.ambition["$on_time"], cls.ambition["$late"])}
+            cls.replies = {key: page(key) for key in ("XW-0001", "XW-0002", "XW-0003", "XW-0004", "XW-0007", cls.ambition["$on_time"], cls.ambition["$late"], cls.ambition["$crayon"])}
             cls.missing = page("XW-0999")
             cls.anonymous = get(proc, port, "/api/goals/XW-0003")
         cls.pages: dict[str, dict[str, Any]] = {key: json.loads(reply.body) for key, reply in cls.replies.items()}
@@ -103,6 +104,8 @@ class GoalPageApiTests(unittest.TestCase):
 
     def test_promote_and_close_says_how_an_ambition_goal_would_close(self) -> None:
         # G15 Promote and close: closesAs of the goal promoted on its own date. Today is 2026-10-23.
+        # Codebase QA Q13: only a goal on a Plan at Pencil can be promoted, so only it gets an answer.
+        self.assertIsNone(self.pages[self.ambition["$crayon"]]["closesAsPromoted"])
         self.assertEqual(self.pages[self.ambition["$on_time"]]["closesAsPromoted"], "Completed")
         self.assertEqual(self.pages[self.ambition["$late"]]["closesAsPromoted"], "Completed Late")
         self.assertIsNone(self.pages[self.ambition["$on_time"]]["closesAs"])

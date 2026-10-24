@@ -73,10 +73,10 @@ export function goalPage(db: DatabaseSync, id: string, me: string, today: string
   const milestones = new Set<string>(typeof stored.promotion_milestone === "string" ? [stored.promotion_milestone] : []);
   for (const e of own) if (e.field === "promotion_milestone") for (const v of [e.old, e.new]) if (typeof v === "string") milestones.add(v);
   milestones.delete(id);
-  const events: ApiEvent[] = readEntityEvents(db, [
-    { kind: "goal", ids: [id, ...milestones] },
-    { kind: "work_item", ids: itemIds },
-  ]).map(toApiEvent);
+  // Codebase QA Q14: the goal's own Events are read once, and only the others are read again.
+  const events: ApiEvent[] = [...own, ...readEntityEvents(db, [{ kind: "goal", ids: [...milestones] }, { kind: "work_item", ids: itemIds }])]
+    .sort((a, b) => b.sequence - a.sequence)
+    .map(toApiEvent);
 
   const unit = read(db, "org_unit", stored.org_unit as string);
   const priority = typeof stored.priority === "string" ? read(db, "priority", stored.priority) : undefined;
