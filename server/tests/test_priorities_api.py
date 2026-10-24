@@ -164,6 +164,7 @@ class PrioritiesDefinitionTests(unittest.TestCase):
             create("goal", "XW-0091", {**OLD_GOAL, "summary": "A Team goal on a company Priority", "priority": "PRI-1", "org_unit": "xw-team", "level": "Team"}, "Test data"),
             create("priority", "PRI-5", {"org_unit": "excaliwire", "period": period, "rank": 5, "title": "A Priority below the cut line", "status": "Current"}, "Test data"),
             create("goal", "XW-0093", {**OLD_GOAL, "summary": "An In Progress goal below the cut line", "priority": "PRI-5"}, "Test data"),
+            create("goal", "XW-0094", {**OLD_GOAL, "summary": "Write the plan for the next hire", "priority": "PRI-2", "parent": "XW-0002", "due_date": None, "date_type": None, "plan": None, "plan_maturity": "Crayon", "health": "GREEN", "path_to_green": None}, "Test data"),
             create("goal", "XW-0092", {**OLD_GOAL, "summary": "A Completed goal", "priority": "PRI-2", "state": "Completed", "health": None, "path_to_green": None}, "Test data"),
         ]
         drafts = [
@@ -180,6 +181,11 @@ class PrioritiesDefinitionTests(unittest.TestCase):
     @classmethod
     def tearDownClass(cls) -> None:
         cls.store.close()
+
+    def test_a_sub_goal_with_no_date_lists_no_date(self) -> None:
+        # D2: it takes its parent's date, so Home draws none of its own.
+        self.assertEqual(self.goals["XW-0094"]["dates"], [])
+        self.assertIn("XW-0094", [g["id"] for g in self.goals["XW-0002"]["children"]])
 
     def test_a_goal_below_the_cut_line_is_not_counted(self) -> None:
         self.assertFalse(self.goals["XW-0093"]["counted"])
@@ -262,7 +268,7 @@ OLD_GOAL = {
     "severity": "sev2",
     "state": "In Progress",
     "health": "RED",
-    "path_to_green": {"steps": [{"owner": "tig", "date": "2026-10-29", "text": "Test step"}]},
+    "path_to_green": {"steps": [{"owner": "tig", "date": "2026-10-29", "text": "Test step"}], "criteria": "Test criteria"},
     "origination": "New",
 }
 

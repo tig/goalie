@@ -26,6 +26,8 @@ class Store:
         """Run one CLI command. Return the exit code and the parsed JSON it printed."""
         full_env = os.environ.copy()
         full_env["GOALIE_DB"] = str(self.path)
+        # The same pinned day as live_server.TODAY. No test reads the wall clock for a product date.
+        full_env["GOALIE_TODAY"] = "2026-10-23"
         full_env.update(env or {})
         proc = subprocess.run(
             ["node", "--no-warnings", "src/cli.ts", *args],
