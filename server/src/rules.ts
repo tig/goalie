@@ -80,7 +80,7 @@ function checkGoal(store: Lookup, own: Row): Violation[] {
     add("parent-not-cycle", `${goal.id}: a goal cannot be its own ancestor.`, "parent");
   }
   if (goal.state === "In Progress" && goal.health == null) {
-    add("health-while-in-progress", `${goal.id}: an In Progress goal has a health.`, "health");
+    add("health-while-in-progress", "An In Progress goal needs a health: GREEN, YELLOW, or RED.", "health");
   }
   if ((goal.health === "YELLOW" || goal.health === "RED") && !isPathToGreen(store, goal.path_to_green)) {
     add(

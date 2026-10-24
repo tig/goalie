@@ -204,7 +204,9 @@ class WritePathTests(unittest.TestCase):
         self.rejected(update("goal", "GOAL-57", 1, {"health": "RED"}, "Date at risk"), "ptg-when-yellow-or-red")
 
     def test_in_progress_needs_health(self) -> None:
-        self.rejected(update("goal", "GOAL-57", 1, {"health": None}, "Unknown"), "health-while-in-progress")
+        result = self.rejected(update("goal", "GOAL-57", 1, {"health": None}, "Unknown"), "health-while-in-progress")
+        # U8: the New goal rail shows these words as written.
+        self.assertIn("An In Progress goal needs a health: GREEN, YELLOW, or RED.", [v["message"] for v in result["violations"]])
 
     def test_no_ties_in_a_priority_list(self) -> None:
         self.rejected(create("priority", "PRI-4", {"org_unit": "program/growth", "period": "2026", "rank": 3, "title": "Win SMB", "status": "Current"}, "Added"), "no-rank-ties")

@@ -77,7 +77,7 @@ export type Origination = "New" | "Carryover" | "Repeating";
 export type ActorKind = "human" | "agent";
 
 /** An actor with its kind, so the app draws a human and an agent apart (SPEC.md §6.4). */
-export type ApiActor = ActorRef & { kind: ActorKind };
+export type ApiActor = ActorRef & { kind: ActorKind; /** An agent's operating human (SPEC.md §6.4). Absent on a human. */ operator?: string };
 
 /** A goal named from another goal: its key and summary. */
 export type GoalRef = { id: string; summary: string };

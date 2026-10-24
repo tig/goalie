@@ -1208,7 +1208,8 @@
     "backend-engineer": {
       "id": "backend-engineer",
       "name": "Backend Engineer",
-      "kind": "agent"
+      "kind": "agent",
+      "operator": "chelsea"
     },
     "chelsea": {
       "id": "chelsea",
@@ -1218,37 +1219,44 @@
     "chief-of-staff": {
       "id": "chief-of-staff",
       "name": "Chief of Staff",
-      "kind": "agent"
+      "kind": "agent",
+      "operator": "chelsea"
     },
     "codebase-qa": {
       "id": "codebase-qa",
       "name": "Codebase QA",
-      "kind": "agent"
+      "kind": "agent",
+      "operator": "chelsea"
     },
     "frontend-engineer": {
       "id": "frontend-engineer",
       "name": "Frontend Engineer",
-      "kind": "agent"
+      "kind": "agent",
+      "operator": "chelsea"
     },
     "frontend-qa": {
       "id": "frontend-qa",
       "name": "Frontend QA",
-      "kind": "agent"
+      "kind": "agent",
+      "operator": "chelsea"
     },
     "head-of-engineering": {
       "id": "head-of-engineering",
       "name": "Head of Engineering",
-      "kind": "agent"
+      "kind": "agent",
+      "operator": "chelsea"
     },
     "product-designer": {
       "id": "product-designer",
       "name": "Product Designer",
-      "kind": "agent"
+      "kind": "agent",
+      "operator": "chelsea"
     },
     "product-manager": {
       "id": "product-manager",
       "name": "Product Manager",
-      "kind": "agent"
+      "kind": "agent",
+      "operator": "chelsea"
     },
     "tig": {
       "id": "tig",
@@ -1258,7 +1266,8 @@
     "user-researcher": {
       "id": "user-researcher",
       "name": "User Researcher",
-      "kind": "agent"
+      "kind": "agent",
+      "operator": "chelsea"
     }
   }
 }
