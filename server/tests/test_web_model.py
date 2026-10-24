@@ -396,6 +396,12 @@ class GoalPageTests(unittest.TestCase):
         v = run(f'const c = {json.dumps(ctx)}; return [goalpage.eventValue("2026-11-30", "due_date", c), goalpage.eventValue("PRI-3", "priority", c), goalpage.eventValue("excaliwire", "org_unit", c), goalpage.eventValue("tig", "owner", c), goalpage.eventValue("organization-wide", "visibility", c)];')
         self.assertEqual(v, ["Nov 30, 2026", "Priority 3 Run Excaliwire on GOALIE", "Excaliwire", "Tig", "Organization-wide"])
 
+    def test_the_team_view_groups_by_owner_then_status(self) -> None:
+        items = [{"id": "WI-1", "owner": "qa", "status": "Backlog"}, {"id": "WI-2", "owner": "chelsea", "status": "In Progress"}, {"id": "WI-3", "owner": "qa", "status": "In Progress"}, {"id": "WI-4", "owner": "qa", "status": "Deleted"}]
+        actors = {"qa": {"id": "qa", "name": "QA", "kind": "agent"}, "chelsea": {"id": "chelsea", "name": "Chelsea", "kind": "human"}}
+        q = run(f"return goalpage.queues({json.dumps(items)}, {json.dumps(actors)}, 'chelsea').map((q) => [q.owner.id, q.groups.map((g) => [g.status, g.items.map((i) => i.id)])]);")
+        self.assertEqual(q, [["chelsea", [["In Progress", ["WI-2"]]]], ["qa", [["In Progress", ["WI-3"]], ["Backlog", ["WI-1"]]]]])
+
     def test_comments_are_the_comment_events(self) -> None:
         events = [{"field": "comment", "actor": "tig"}, {"field": "health", "actor": "chelsea"}, {"field": "comment", "actor": "chelsea"}]
         self.assertEqual(run(f'return goalpage.comments({json.dumps(events)}).map((e) => e.actor);'), ["tig", "chelsea"])
@@ -528,6 +534,11 @@ class RouteTests(unittest.TestCase):
     def test_each_path_opens_its_page(self) -> None:
         pages = run('return ["/", "/goals/XW-0003", "/goals/new", "/goals/new?parent=XW-0003", "/goals/xw-0003/", "/nowhere"].map((p) => { const u = new URL(p, "http://x"); return route.parseRoute(u.pathname, u.search); });')
         self.assertEqual(pages, [{"page": "home"}, {"page": "goal", "key": "XW-0003"}, {"page": "new"}, {"page": "new", "parent": "XW-0003"}, {"page": "goal", "key": "XW-0003"}, {"page": "home"}])
+
+    def test_the_work_page_opens_one_queue_or_every_queue(self) -> None:
+        pages = run('return ["/work", "/work?owner=frontend-engineer", "/work/"].map((p) => { const u = new URL(p, "http://x"); return route.parseRoute(u.pathname, u.search); });')
+        self.assertEqual(pages, [{"page": "work"}, {"page": "work", "owner": "frontend-engineer"}, {"page": "work"}])
+        self.assertEqual(run('return [route.workPath(), route.workPath("qa")];'), ["/work", "/work?owner=qa"])
 
     def test_a_goal_link_and_the_back_link(self) -> None:
         self.assertEqual(run('return [route.goalPath("XW-0003"), route.newGoalPath(), route.newGoalPath("XW-0003"), route.backPath("?view=list&health=RED"), route.backPath("")];'), ["/goals/XW-0003", "/goals/new", "/goals/new?parent=XW-0003", "/?view=list&health=RED", "/"])

@@ -113,6 +113,12 @@ NG1. New goal is a filled 32 px button, last in the toolbar's right cluster in e
 NG2. The New goal page is one form of five numbered cards and a rail (N1). The rail asks the server to check the save 400 ms after the last change and shows its answer: the keys it would make, or what it refuses. The browser checks no rule (ADR 0010). The Create button names the goal's key from that answer.
 NG3. A refusal shows at the card and field it names. Typing again clears it until the next check.
 
+## Work items page
+
+W1. The top bar has two pages: Home and Work items. The page you are on is filled.
+W2. Work items lists one queue per owner (the team view, titled with the org unit's name) or one owner's queue (titled with that owner's name), each by status: In Progress, Backlog, then Completed, closed. The signed-in actor's queue comes first. An agent owner carries the muted word "agent". Each row shows its goal, linked, and its due date, with "late" when it is past.
+W3. The page updates live: a change to any work item, by anyone, reloads it (ADR 0007). Ticking a row asks for its reason, as on a goal page.
+
 ## Access
 
 28. Text meets 4.5:1 contrast. No text is below 11 px, and body text is 12 px or more.

@@ -15,8 +15,9 @@ import { TimelineView } from "./TimelineView.tsx";
 import { usePhone, useScreen } from "./useScreen.ts";
 import { GoalPage } from "./GoalPage.tsx";
 import { NewGoal } from "./NewGoal.tsx";
-import { newGoalPath } from "./model/route.ts";
-import { Link, rememberHome, useRoute } from "./router.tsx";
+import { WorkPage } from "./WorkPage.tsx";
+import { backPath, newGoalPath, workPath } from "./model/route.ts";
+import { homeSearch, Link, rememberHome, useRoute } from "./router.tsx";
 
 /**
  * The Home screen (ADR 0010). It reads GET /api/priorities once and draws it. It holds no rule and writes nothing.
@@ -32,13 +33,28 @@ async function load(): Promise<Load> {
   return { state: "refused", status: reply.status, reason: error.reason ?? reply.statusText };
 }
 
+/** The top bar's pages: Home and Work items. The one you are on is filled. */
+function TopTabs() {
+  const route = useRoute();
+  return (
+    <nav className="toptabs" aria-label="Pages">
+      <Link to={backPath(route.page === "home" ? location.search : homeSearch())} className={`tab${route.page === "work" ? " off" : ""}`}>
+        Home
+      </Link>
+      <Link to={workPath()} className={`tab${route.page === "work" ? "" : " off"}`}>
+        Work items
+      </Link>
+    </nav>
+  );
+}
+
 function TopBar({ data }: { data?: PrioritiesResponse }) {
   return (
     <header className="top">
       <span className="logo">{BRAND.mark}</span>
       <span className="brand">{BRAND.app}</span>
       {data && <span className="org">/ {data.org.name}</span>}
-      {data && <span className="tab">Home</span>}
+      {data && <TopTabs />}
       {data && (
         <span className="me">
           <Avatar actor={data.me} />
@@ -124,6 +140,8 @@ function Pages({ data }: { data: PrioritiesResponse }) {
       <TopBar data={data} />
       {route.page === "goal" ? (
         <GoalPage goalKey={route.key} viewName={data.view.name} />
+      ) : route.page === "work" ? (
+        <WorkPage data={data} owner={route.owner} />
       ) : route.page === "new" ? (
         <NewGoal key={route.parent ?? ""} parent={route.parent} viewName={data.view.name} />
       ) : (
