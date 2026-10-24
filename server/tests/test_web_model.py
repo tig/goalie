@@ -32,6 +32,13 @@ class DateTests(unittest.TestCase):
     def test_a_date_label_carries_its_date_type(self) -> None:
         self.assertEqual(run('return labels.dateLabel({ date: "2026-11-06", kind: "Promotion Milestone" }, "2026-10-23");'), "Promotion Milestone Nov 6")
 
+    def test_dates_are_written_in_the_lists_order(self) -> None:
+        d = run("return [labels.listDates(api.funded[2].goals[0].dates), labels.listDates(api.funded[0].goals[0].dates)];")
+        self.assertEqual([x["kind"] for x in d[0]["own"]], ["Fantasy"])  # type: ignore[index]
+        self.assertEqual([x["kind"] for x in d[0]["pm"]], ["Promotion Milestone"])  # type: ignore[index]
+        self.assertEqual(d[0]["judged"]["kind"], "Promotion Milestone")  # type: ignore[index]
+        self.assertEqual(d[1]["judged"], {"date": "2026-10-01", "kind": "Committed", "slipDays": 22})  # type: ignore[index]
+
     def test_a_slip_is_written_in_one_place(self) -> None:
         self.assertEqual(run("return [labels.slipLabel(22), labels.slipLabel(1)];"), ["slip 22 days", "slip 1 day"])
 
@@ -52,6 +59,9 @@ class QueryTests(unittest.TestCase):
     def test_a_from_outside_1970_to_9999_is_ignored(self) -> None:
         froms = run('return ["0099-01-01", "1969-12-31", "1970-01-01", "9999-12-31"].map((d) => query.parseScreen("?from=" + d).from ?? null);')
         self.assertEqual(froms, [None, None, "1970-01-01", "9999-12-31"])
+
+    def test_search_collapses_repeated_spaces(self) -> None:
+        self.assertEqual(run('return query.parseScreen("?q=" + encodeURIComponent("  spine   store ")).q;'), "spine store")
 
     def test_search_is_trimmed_to_100_characters(self) -> None:
         self.assertEqual(run('return query.parseScreen("?q=" + "x".repeat(150) + "%20").q.length;'), 100)
@@ -120,7 +130,23 @@ class TimelineTests(unittest.TestCase):
         self.assertEqual(sizes, [[65, 26 * 84, 65 * 84, "2026-09-28"], [130, 52 * 30, 130 * 30, "2026-09-28"], [260, 104 * 14, 260 * 14, "2026-09-28"]])
 
     def test_the_board_opens_inside_its_scroll_range(self) -> None:
-        self.assertEqual(run("return [timeline.openScroll(2184, 5460, 1200), timeline.openScroll(2184, 2500, 1200), timeline.openScroll(-5, 2500, 1200)];"), [2184, 1300, 0])
+        self.assertEqual(run("return [timeline.openScroll(2184, 2300, 816, 5460, 1208), timeline.openScroll(2184, 2300, 816, 2500, 1200), timeline.openScroll(-5, 0, 816, 2500, 1200)];"), [2184, 1300, 0])
+
+    def test_the_board_opens_with_today_in_the_left_third(self) -> None:
+        # Wide: today is 300 px past the opening week, more than a third of 816, so the board scrolls 28 px on. Narrow: a third of 272 px.
+        self.assertEqual(run("return [timeline.openScroll(2184, 2484, 816, 5460, 1208), Math.round(timeline.openScroll(2184, 2484, 272, 5460, 664))];"), [2212, 2393])
+
+    def test_the_window_stays_inside_1970_to_9999(self) -> None:
+        w = run('const a = timeline.timelineWindow(api.funded, "2026-10-23", "quarters", "9999-12-20"); const b = timeline.timelineWindow(api.funded, "2026-10-23", "quarters", "1970-01-01"); return [a.end, b.start, a.labels.some((l) => /1\\d{4}/.test(l.label))];')
+        self.assertLessEqual(w[0], "9999-12-31")  # type: ignore[index]
+        self.assertGreaterEqual(w[1], "1970-01-01")  # type: ignore[index]
+        self.assertFalse(w[2])  # type: ignore[index]
+
+    def test_an_axis_label_shows_only_when_it_fits_whole(self) -> None:
+        self.assertEqual(run('const v = { left: 1000, right: 1800 }; return [timeline.fitsView(1100, 50, v), timeline.fitsView(990, 50, v), timeline.fitsView(1760, 50, v)];'), [True, False, False])
+
+    def test_the_today_pill_stays_inside_the_screen(self) -> None:
+        self.assertEqual(run('const v = { left: 1000, right: 1800 }; return [timeline.todayPill(1400, 34, v), timeline.todayPill(1010, 34, v), timeline.todayPill(1790, 34, v), timeline.todayPill(900, 34, v)];'), [1400, 1034, 1766, None])
 
     def test_with_no_recent_slip_it_opens_two_weeks_before_today(self) -> None:
         w = run('return timeline.timelineWindow(api.funded.slice(1), "2026-10-23", "weeks");')
@@ -188,6 +214,11 @@ class TimelineTests(unittest.TestCase):
         placed = self.lanes([{"key": "tick", "atPx": 100, "text": "Committed Oct 1", "outside": None}, {"key": "end", "atPx": 1050, "text": "Fantasy Nov 30", "outside": None}])
         self.assertEqual(placed["before"], ["tick", "end"])
 
+    def test_a_label_that_fits_neither_side_joins_the_edge_label(self) -> None:
+        # A 250 px view: "Promotion Milestone Nov 6" (175 px) fits neither side of its mark at 1100, beside a right-edge label.
+        placed = self.lanes([{"key": "tick", "atPx": 1100, "text": "Promotion Milestone Nov 6", "outside": None}, {"key": "end", "atPx": 1400, "text": "Fantasy Nov 30", "outside": None}], {"left": 1000, "right": 1250})
+        self.assertEqual(placed, {"before": [], "after": ["tick", "end"], "inside": []})
+
     def test_a_mark_on_screen_keeps_its_own_label(self) -> None:
         placed = self.lanes([{"key": "tick", "atPx": 1200, "text": "Committed Nov 15", "outside": None}, {"key": "end", "atPx": 1790, "text": "Fantasy Nov 30", "outside": None}])
         self.assertEqual(placed, {"before": [], "after": [], "inside": [{"key": "tick", "side": "right"}, {"key": "end", "side": "left"}]})
@@ -251,6 +282,15 @@ class PopoverTests(unittest.TestCase):
 
     def test_it_stays_inside_the_bottom_edge(self) -> None:
         self.assertEqual(self.place({"left": 600, "top": 820, "right": 618, "bottom": 838}, 1440, 900)["top"], 900 - 16 - 150)
+
+    def test_a_card_help_opens_beside_its_card(self) -> None:
+        card = {"left": 96, "top": 147, "right": 636, "bottom": 291}
+        q = {"left": 247, "top": 166, "right": 265, "bottom": 184}
+        self.assertEqual(run(f"return popover.placePopover({json.dumps(q)}, 300, {{ width: 1440, height: 900 }}, {json.dumps(card)});")["left"], 644)  # type: ignore[index]
+        right = {"left": 1006, "top": 147, "right": 1344, "bottom": 291}
+        self.assertEqual(run(f"return popover.placePopover({json.dumps(q)}, 176, {{ width: 1440, height: 900 }}, {json.dumps(right)});")["left"], 1006 - 8 - 300)  # type: ignore[index]
+        phone = {"left": 16, "top": 500, "right": 374, "bottom": 640}
+        self.assertEqual(run(f"return popover.placePopover({json.dumps(q)}, 176, {{ width: 390, height: 900 }}, {json.dumps(phone)});"), {"left": 74, "top": 648, "width": 300})
 
     def test_its_width_is_one_number(self) -> None:
         self.assertEqual(run("return [popover.popoverWidth(1440), popover.popoverWidth(320)];"), [300, 288])

@@ -3,7 +3,7 @@ import { shortDate } from "../../src/dates.ts";
 import type { GoalRow } from "./model/filter.ts";
 import { dateLabel, slipLabel } from "./model/labels.ts";
 import { arrowStep, dragLeft, isDrag, scrollEdges, wheelToScroll } from "./model/scroll.ts";
-import { EDGE_INSET, laneOf, openScroll, placeLaneLabels, visibleRange, type Lane, type LaneMark, type TimelineWindow } from "./model/timeline.ts";
+import { EDGE_INSET, fitsView, labelWidth, laneOf, openScroll, placeLaneLabels, todayPill, visibleRange, type Lane, type LaneMark, type TimelineWindow } from "./model/timeline.ts";
 import { GoalTree, type TreeProps } from "./GoalTree.tsx";
 import { HELP } from "./helpText.tsx";
 import { Legend, look } from "./parts.tsx";
@@ -12,6 +12,10 @@ const pct = (n: number) => `${n.toFixed(3)}%`;
 
 /** The board's px on screen: what the pinned goal column does not cover. */
 type View = { left: number; right: number };
+
+/** An axis label sits this far right of its week line. Half the Today pill's width, with its date. */
+const AXIS_INSET = 5;
+const PILL_HALF = 28;
 
 /** A segment. Round only the outer ends of the bar. */
 function Seg({ cls, from, to, style, first, last }: { cls: string; from: number; to: number; style?: CSSProperties; first: boolean; last: boolean }) {
@@ -41,7 +45,7 @@ function EdgeLabel({ side, marks, view }: { side: "before" | "after"; marks: Lab
     </span>
   ));
   return (
-    <span className={`edge ${side}`} style={{ left: side === "before" ? view.left + EDGE_INSET : view.right - EDGE_INSET }}>
+    <span className={`edge ${side}`} style={{ left: side === "before" ? view.left + EDGE_INSET : view.right - EDGE_INSET, maxWidth: Math.max(0, view.right - view.left - 2 * EDGE_INSET) }}>
       {side === "before" && "← "}
       {parts}
       {side === "after" && " →"}
@@ -87,7 +91,6 @@ function LaneMarks({ lane, goal, today, view, board }: { lane: Lane; goal: GoalR
 
 type Props = Omit<TreeProps, "cells" | "blank"> & {
   window: TimelineWindow;
-  search: ReactNode;
   /** Bumped by Today, to scroll back even when the window did not change. */
   home: number;
   /** The days on screen, as the board scrolls. */
@@ -99,7 +102,7 @@ type Props = Omit<TreeProps, "cells" | "blank"> & {
  * It opens scrolled to the window's opening week in every browser: the app sets scrollLeft, and sets it again after fonts and layout settle, until the viewer scrolls (review X2).
  * It shows no scrollbar (rule 20c). It scrolls by trackpad, by the wheel, by dragging the lanes, and by the arrow keys; an edge fades where there is more.
  */
-export function TimelineView({ window: w, search, home, onRange, ...tree }: Props) {
+export function TimelineView({ window: w, home, onRange, ...tree }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const report = useRef(onRange);
   const board = w.weeks * w.weekPx;
@@ -124,7 +127,8 @@ export function TimelineView({ window: w, search, home, onRange, ...tree }: Prop
     let touched = false;
     const open = () => {
       if (touched) return;
-      el.scrollLeft = openScroll(w.openPx, el.scrollWidth, el.clientWidth);
+      const left = el.querySelector(".axis > .corner")?.getBoundingClientRect().width ?? 0;
+      el.scrollLeft = openScroll(w.openPx, (w.todayAt / 100) * board, el.clientWidth - left, el.scrollWidth, el.clientWidth);
       measure();
     };
     const touch = () => {
@@ -210,7 +214,9 @@ export function TimelineView({ window: w, search, home, onRange, ...tree }: Prop
       el.removeEventListener("pointercancel", onUp);
       removeEventListener("resize", onScroll);
     };
-  }, [w, home]);
+  }, [w, home, board]);
+  // The Today pill is held inside the screen by half its width (review: Timeline labels).
+  const pill = todayPill((w.todayAt / 100) * board, PILL_HALF, view);
   const style = { "--weeks": w.weeks, "--now": w.todayAt.toFixed(3), "--week": `${w.weekPx}px` } as CSSProperties;
   return (
     <>
@@ -218,13 +224,20 @@ export function TimelineView({ window: w, search, home, onRange, ...tree }: Prop
         <div className={`scroll${dragging ? " dragging" : ""}`} ref={scroller} tabIndex={0} aria-label="Timeline">
           <div className={`tl z-${w.zoom}`} style={style}>
             <div className="axis">
-              <div className="corner">{search}</div>
+              {/* The goal column's titles, on the line of the week labels (rule 25d). */}
+              <div className="corner colhead">
+                <span>Priority</span>
+                <span>Owner</span>
+              </div>
               <div className="ticks">
-                <span className="todaylbl" style={{ left: pct(w.todayAt) }}>
-                  Today<span className="td"> · {shortDate(tree.today, tree.today)}</span>
-                </span>
+                {pill !== null && (
+                  <span className="todaylbl" style={{ left: pill }}>
+                    Today<span className="td"> · {shortDate(tree.today, tree.today)}</span>
+                  </span>
+                )}
+                {/* An axis label shows only when it fits whole on screen. */}
                 {w.labels.map((l) => (
-                  <span key={l.at} className="wk" style={{ left: pct(l.at) }}>
+                  <span key={l.at} className={`wk${fitsView((l.at / 100) * board, labelWidth(l.label) + AXIS_INSET, view) ? "" : " off"}`} style={{ left: pct(l.at) }}>
                     {l.label}
                   </span>
                 ))}

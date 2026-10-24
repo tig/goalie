@@ -47,7 +47,20 @@ export function Cards(props: Props) {
         <HealthCounts {...props} />
         <div className="meter">
           {healths.map((h, i) => (
-            <span key={i} style={{ background: look(h).bar }} {...(h ? { role: "button", "aria-label": h, onClick: () => pick(h) } : {})} {...hover(h)} />
+            <span
+              key={i}
+              style={{ background: look(h).bar }}
+              {...(h
+                ? {
+                    role: "button",
+                    tabIndex: 0,
+                    "aria-label": h,
+                    onClick: () => pick(h),
+                    onKeyDown: (e: React.KeyboardEvent) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), pick(h)),
+                  }
+                : {})}
+              {...hover(h)}
+            />
           ))}
         </div>
         {slip ? (

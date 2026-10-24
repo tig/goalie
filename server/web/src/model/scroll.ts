@@ -5,7 +5,7 @@ const LINE = 16;
 /** A press moves this far before it is a drag and not a click. */
 const DRAG = 4;
 
-export type Wheel = { deltaX: number; deltaY: number; deltaMode: number; shiftKey: boolean };
+type Wheel = { deltaX: number; deltaY: number; deltaMode: number; shiftKey: boolean };
 
 /**
  * How far a wheel turn scrolls the timeline sideways, or null to leave it to the browser.

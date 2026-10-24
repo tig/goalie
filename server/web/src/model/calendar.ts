@@ -45,6 +45,6 @@ export function calendarMonth(priorities: { goals: GoalRow[] }[], today: string,
 }
 
 /** A day shows this many chips. The rest open from "+N". */
-export const SHOWN = 3;
+const SHOWN = 3;
 
 export const dayChips = <T>(marks: T[]) => ({ shown: marks.slice(0, SHOWN), more: marks.slice(SHOWN) });

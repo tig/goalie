@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type ReactNode } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { Health } from "../../src/api.ts";
 import { shortDate, weekday } from "../../src/dates.ts";
 import { isLit } from "./model/filter.ts";
@@ -67,13 +67,9 @@ function Day({ d, today, lit }: { d: CalendarDay; today: string; lit: Lit }) {
 
 
 /** The Priorities as a month calendar, Monday first. Each goal date is a chip on its day. */
-export function CalendarView({ month, today, search, none, ...lit }: { month: CalendarMonth; today: string; search: ReactNode; none: boolean } & Lit) {
+export function CalendarView({ month, today, none, ...lit }: { month: CalendarMonth; today: string; none: boolean } & Lit) {
   return (
     <>
-      <div className="calbar">
-        <div className="corner">{search}</div>
-        <Legend kind="calendar" />
-      </div>
       {none && <p className="note muted">No goals match.</p>}
       <div className="cal">
         <div className="calhead">
@@ -91,6 +87,7 @@ export function CalendarView({ month, today, search, none, ...lit }: { month: Ca
           </div>
         ))}
       </div>
+      <Legend kind="calendar" />
     </>
   );
 }

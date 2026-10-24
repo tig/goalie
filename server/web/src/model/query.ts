@@ -6,7 +6,7 @@ import { isDate } from "../../../src/dates.ts";
 export const ZOOM_ORDER = ["weeks", "months", "quarters"] as const;
 export type Zoom = (typeof ZOOM_ORDER)[number];
 
-export const VIEWS = ["timeline", "list", "calendar"] as const;
+const VIEWS = ["timeline", "list", "calendar"] as const;
 export type View = (typeof VIEWS)[number];
 
 export const HEALTHS = ["RED", "YELLOW", "GREEN"] as const;
@@ -23,7 +23,7 @@ const oneOf = <T extends string>(list: readonly T[], value: string | null): T | 
 
 export function parseScreen(search: string): Screen {
   const params = new URLSearchParams(search);
-  const q = params.get("q")?.trim().slice(0, 100);
+  const q = params.get("q")?.replace(/\s+/g, " ").trim().slice(0, 100);
   // A year outside 1970 to 9999 does not draw (review Q10).
   const from = params.get("from");
   const inRange = (d: string) => d >= "1970-01-01" && d <= "9999-12-31";

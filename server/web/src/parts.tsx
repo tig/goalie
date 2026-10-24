@@ -29,28 +29,54 @@ function slot(id: string): number {
   return hash % AVATAR_COLORS;
 }
 
-/** An actor's initial on a palette color. `mine` outlines the signed-in actor's own avatar. The name is the tooltip. */
+/**
+ * An actor's initial on a palette color. `mine` outlines the signed-in actor's own avatar.
+ * The name is the tooltip under the pointer, and a tap shows it too (rule 12). A tap does not open or close the row.
+ */
 export function Avatar({ actor, mine = false }: { actor: ActorRef; mine?: boolean }) {
   const n = slot(actor.id);
+  const [open, setOpen] = useState(false);
+  const [at, setAt] = useState<CSSProperties>({});
+  const box = useRef<HTMLSpanElement>(null);
+  const tip = useRef<HTMLSpanElement>(null);
+  useDismiss(open, [box, tip], useCallback(() => setOpen(false), []));
   return (
-    <span className={`av${mine ? " mine" : ""}`} style={{ background: `var(--av-${n}-bg)`, color: `var(--av-${n}-ink)` }} title={actor.name}>
+    <span
+      ref={box}
+      className={`av${mine ? " mine" : ""}`}
+      style={{ background: `var(--av-${n}-bg)`, color: `var(--av-${n}-ink)` }}
+      title={actor.name}
+      onClick={(e) => {
+        e.stopPropagation();
+        const r = e.currentTarget.getBoundingClientRect();
+        setAt({ left: Math.max(16, Math.min(r.left + r.width / 2, document.documentElement.clientWidth - 16)), top: r.bottom + 6 });
+        setOpen((o) => !o);
+      }}
+    >
       {actor.name.slice(0, 1)}
+      {open &&
+        createPortal(
+          <span ref={tip} className="tip name" role="note" style={at}>
+            {actor.name}
+          </span>,
+          document.body,
+        )}
     </span>
   );
 }
 
 /** Text a screen reader reads and the eye does not see. */
-export const Hidden = ({ children }: { children: ReactNode }) => <span className="vh">{children}</span>;
+const Hidden = ({ children }: { children: ReactNode }) => <span className="vh">{children}</span>;
 
 /**
- * The health as a mark of its color and its own shape, so color is not the only cue (review X3): GREEN a circle, YELLOW a diamond, RED a square.
- * No health is a hollow circle. The word is there for a screen reader, and on a phone it shows beside the mark.
+ * The health as a mark of its color and its own shape, so color is not the only cue (rule 10): GREEN a circle, YELLOW a triangle, RED a square.
+ * No health is a hollow circle. The word is there for a screen reader, and on a phone it shows beside the mark. `shown` writes it on every screen, as in the List's Health column.
  */
-export function HealthDot({ health, word = true }: { health: Health; word?: boolean }) {
+export function HealthDot({ health, word = true }: { health: Health; word?: boolean | "shown" }) {
   return (
     <>
       <span className={`hdot ${health ?? "none"}`} style={{ background: health ? look(health).bar : "transparent" }} aria-hidden="true" />
-      {word ? <span className={`hword ${health ?? "none"}`}>{health ?? "no health"}</span> : <Hidden>{health ?? "no health"}</Hidden>}
+      {word ? <span className={`hword ${health ?? "none"}${word === "shown" ? " shown" : ""}`}>{health ?? "no health"}</span> : <Hidden>{health ?? "no health"}</Hidden>}
     </>
   );
 }
@@ -72,7 +98,7 @@ export function DateMark({ date, today }: { date: GoalDate; today: string }) {
  * A ? icon and its help card. A click or Enter opens it, a second click, Escape, or a click outside closes it. Pointing at it also shows it.
  * The card is placed in the screen by placePopover, so it never leaves the screen (rule 9).
  */
-export function Help({ label, children }: { label: string; children: ReactNode }) {
+function Help({ label, avoid, children }: { label: string; avoid?: React.RefObject<HTMLElement | null>; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [hover, setHover] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
@@ -85,7 +111,8 @@ export function Help({ label, children }: { label: string; children: ReactNode }
     if (!shown) return;
     const measure = () => {
       if (!button.current || !card.current) return;
-      setPlace(placePopover(button.current.getBoundingClientRect(), card.current.offsetHeight, { width: document.documentElement.clientWidth, height: innerHeight }));
+      const anchor = button.current.getBoundingClientRect();
+      setPlace(placePopover(anchor, card.current.offsetHeight, { width: document.documentElement.clientWidth, height: innerHeight }, avoid?.current?.getBoundingClientRect() ?? anchor));
     };
     measure();
     addEventListener("resize", measure);
@@ -94,7 +121,7 @@ export function Help({ label, children }: { label: string; children: ReactNode }
       removeEventListener("resize", measure);
       removeEventListener("scroll", measure, true);
     };
-  }, [shown]);
+  }, [shown, avoid]);
   return (
     <span className="help">
       <button
@@ -120,13 +147,18 @@ export function Help({ label, children }: { label: string; children: ReactNode }
   );
 }
 
-/** A summary card. `help` is shown from the ? icon by the label. */
+/** A summary card. `help` is shown from the ? icon by the label, beside the card, so it covers none of the card's own controls (review X10). */
 export function Card({ label, help, children }: { label: string; help?: ReactNode; children: ReactNode }) {
+  const box = useRef<HTMLDivElement>(null);
   return (
-    <div className="card">
+    <div className="card" ref={box}>
       <div className="lbl">
         {label}
-        {help && <Help label={label}>{help}</Help>}
+        {help && (
+          <Help label={label} avoid={box}>
+            {help}
+          </Help>
+        )}
       </div>
       {children}
     </div>

@@ -28,7 +28,7 @@ The screens are a React app in `server/web/`. It reads `GET /api/priorities` and
 8. A goal row must not open a hover card. Help cards are only for the **?** icon by a card label and in the legend.
 9. A help card must stay inside the screen. The app opens it beside its icon, on the right, else on the left, so it never covers what the icon labels (review X10). With no room on either side it opens below its icon, or above when below would leave the screen. It stays 16 px inside every screen edge and is never wider than the screen less 32 px. Check every help card open at 1440 px, 1100 px, and 390 px before a change ships.
 9b. Every card carries a **?** help icon. A click (or Enter) opens it. A second click, Escape, or a click outside closes it. Pointing at it also shows it. Its text uses SPEC.md §4 and §6.1 words: what the card counts, what each word means, and what a click does.
-10. Health is a mark of its color and its own shape on every screen, so color is not the only cue (review X3): GREEN a circle, YELLOW a diamond, RED a square. Each fits the same 10 px box. On a phone the word shows beside the mark; elsewhere it stays in the page for a screen reader. No health pills.
+10. Health is a mark of its color and its own shape on every screen, so color is not the only cue: GREEN a circle, YELLOW a triangle, RED a square. Each fits the same 10 px box. A diamond is only a Promotion Milestone (rule 23a). In the List the mark and the word are the Health column. On a phone the word follows the mark at the start of the row's date line. No health pills.
 10a. The Priority rank is a plain number in the first column, muted, right-aligned. No badge.
 11. A goal with no health shows a hollow circle.
 12. An owner is an avatar. The signed-in actor's own avatar is outlined. The name is the avatar's tooltip.
@@ -39,20 +39,20 @@ The screens are a React app in `server/web/`. It reads `GET /api/priorities` and
 ## Goal tree
 
 16. Goals under a goal sit in a tree. Each level is indented 26 px and joined to its parent by a guide line.
-17. Each level down is lighter: 14 px bold, then 13.5 px semibold, then 13 px. A title shows two lines, three on a phone (review X13).
+17. Each level down is lighter: 14 px bold, then 13.5 px semibold, then 13 px. A title shows two lines at most on a desktop, and three on a phone. In the List it takes a second line only when it needs one.
 18. A top-level goal starts open. A deeper goal with goals under it starts closed. A filter opens every level.
 19. The open and close control shows how many goals sit under the goal.
-19a. Every row has the same columns, left to right: rank, health dot, title, count, owner. The count sits before the owner. A row with no count keeps the empty slot, so every owner avatar lines up.
+19a. Every row has the same columns, left to right: rank, health mark, title, count, owner. In the List the health mark moves to the Health column. The count sits before the owner. A row with no count keeps the empty slot, so every owner avatar lines up.
 
 ## Timeline
 
 20. The board draws one grid and one today line for every row, so they never break between rows. They are drawn as the background of each row, so the pinned column always covers them.
 20a. The timeline scrolls sideways into the past and the future, and is wider than the screen at every zoom (review Q2): 26 weeks back and 39 ahead of the week it opens on at weeks, 52 and 78 at months, 104 and 156 at quarters. The goal names stay pinned on the left while it scrolls, with a soft shadow on their edge.
-20b. The board opens on the week two weeks before today, or earlier to show a Committed date that passed in the last 10 weeks. The app sets the scroll position, so it opens there in every browser. Until the viewer scrolls, it sets it again when fonts or the layout settle late, or when the browser restores an old position (review X2).
+20b. The board opens on the week two weeks before today, or earlier to show a Committed date that passed in the last 10 weeks. When that would put today past the left third of the timeline on screen, as on a narrow board, it opens with today at the left third. The app sets the scroll position, so it opens there in every browser. Until the viewer scrolls, it sets it again when fonts or the layout settle late, or when the browser restores an old position (review X2).
 20c. The timeline shows no scrollbar. A soft fade on its left or right edge shows there is more to scroll that way.
 20d. The timeline scrolls sideways by trackpad, by the mouse wheel, by dragging, and by the keyboard. Over the lanes a vertical wheel scrolls it sideways until it reaches its edge; then the page scrolls. Over the goal column a vertical wheel scrolls the page. Shift and the wheel scroll it sideways anywhere on it. A press on the lanes that moves more than 4 px pans it, with the grabbing cursor while it pans, and does not open or close a goal. With the timeline focused, Left and Right move it one week. Earlier, Later, and Today still work.
 21. Earlier and Later open the board one step before or after the week on screen, and write it to `?from=`. Today goes back to the default window and scrolls back to it.
-21a. Zoom out and zoom in are one pill of two buttons, − and +, beside the date pill. There are three levels: weeks (84 px a week, a label each week), months (30 px a week, a label each month), and quarters (14 px a week, a label every other month, no week lines; review X4). A month label names its year on the first label and on the first label of each new year. At the closest or farthest level its button is shown, grayed, and does nothing.
+21a. Zoom out and zoom in are one group of two buttons, − and +, first in the toolbar's right cluster. There are three levels: weeks (84 px a week, a label each week), months (30 px a week, a label each month), and quarters (14 px a week, a label every other month, no week lines; review X4). A month label names its year on the first label and on the first label of each new year. An axis label that does not fit whole on screen is hidden. The Today pill stays inside the screen. At the closest or farthest level a zoom button is grayed and does nothing.
 21b. Earlier and Later move 4 weeks at weeks, 13 weeks at months, and 26 weeks at quarters. The date pill shows the days on screen and follows the scroll exactly; a day cut by an edge counts (review X11). A year is named outside the current one, on both dates when they differ (review Q3).
 21c. The Today label reads "Today". Pointing at it adds the date: "Today · Oct 23".
 22. Moving or zooming the timeline keeps the filter and the search in force.
@@ -70,19 +70,21 @@ H4. Pointing at a row turns it gray, with no colored bar.
 ## Filter and search
 
 24. The health counts and the health meter on the Committed dates card are controls. Pointing at either highlights every goal with that health (rule H1), including its name in the goal column. Clicking it shows only those goals. Clicking it again, or **Show all**, shows every goal.
-25. The search box sits right below the Priorities heading, at the top of the goal column, on the same line as the week labels. It is as wide as the goal column. It matches goal summaries as you type.
-25a. The filter in force sits beside the Priorities heading, with **Show all**.
-25b. Earlier, the window's dates, and Later are one pill. Today is a separate button beside it. Both are 36 px tall.
-25c. No control moves when a label changes. The date pill is as wide as its longest form, in tabular numbers, with its text centered, so scrolling, zooming, and stepping never shift the controls beside it. A control that does nothing in a view keeps its place, unseen, so switching views moves nothing.
+25. The search box is in the toolbar's left cluster, after the view tabs, in every view: 240 px wide, 200 px when the board's content is under 1040 px. It matches goal summaries as you type. Repeated spaces count as one.
+25a. The health filter in force is a chip at the start of the search box, with its shape, its word, and an x. The x is **Show all**. The box keeps its width.
+25b. The toolbar is one 44 px row: Priorities, the view tabs, and the search box anchored left; zoom, the date range, and Today anchored right. Every control is 32 px tall. The date range is Earlier, a label as wide as its longest form (at least 184 px), and Later, in one group. When one row does not fit, the search box takes a second row, full width.
+25c. No control moves when a label changes or the view changes. The date range label is as wide as its longest form in every view, in tabular numbers, centered. A control that does not apply is not drawn, and the right cluster is anchored right, so the rest keep their place. The page keeps a fixed scrollbar gutter.
+25d. The Timeline's goal column header, on the line of the week labels, titles the column: Priority at the left and Owner over the avatars, as in the List.
 26. A filter keeps the parents of a goal that matches, dimmed, so the goal keeps its place in the tree.
 27. A filter that matches nothing says "No goals match."
+27a. The cut line (SPEC.md §6.3) is named once, on its divider: "✂ Cut line". A side of it with no Priorities says "No Priorities."
 
 ## Views
 
-V1. One pill of three buttons beside the zoom pill picks the view: Timeline, List, or Calendar. The view in force is filled. All three draw the same goals with the same filter and search.
-V2. The List draws the saved view's columns (SPEC.md §8.2) right of the goal column: Health, Date Type, Promotion Milestone, Path to Green (PTG). The goal column is titled Priority, over the rank, and Owner, over the avatars (review X14). The Date Type cell writes the date health is judged on first, then the uncommitted date in light text (review X8). PTG is spelled out once, in its title; a RED or YELLOW goal with no Path to Green says "No Path to Green" (review X7). The tree and the owner avatar are the Timeline's.
+V1. The view tabs follow Priorities in the toolbar: Timeline, List, Calendar on a desktop; List and Calendar on a phone. The view in force is a raised white tab on a `--control` track. All views draw the same goals with the same filter and search.
+V2. The List is one grid: rank, Priority (the tree), Owner, Health, Date Type, Promotion Milestone, Path to Green (PTG), titled once in a 32 px header that stays on screen. A top-level row is 40 px and a sub-goal row 36 px; a title that needs a second line makes its row taller. Only the title wraps; any other long cell ends in an ellipsis. The Date Type cell writes the goal's own date. The Promotion Milestone cell writes only its date. The date health is judged on is dark and the other light. A RED or YELLOW goal with no Path to Green says "No Path to Green". On a board under about 1000 px of content, Promotion Milestone and PTG drop to a second line in the row, each named.
 V3. The Calendar is one month, Monday first. Each goal date is a chip on its day: the health mark, the title on up to two lines, and a Date Type mark (solid for a Committed date, a diamond for a Promotion Milestone, light for Ambition, dotted for Fantasy, hatched red for a slip). The Date Type is in the chip's text for a screen reader (review X9). A day shows 3 chips. "+N" opens the rest; Escape or a click outside closes them. A parent kept only for context draws no chip.
-V4. In the Calendar, Earlier and Later move one month, and the date pill names the month. The zoom pill is not shown in the List and the Calendar, and the date pill is not shown in the List; each keeps its place (rule 25c). On a phone they take no space.
+V4. The Timeline draws zoom, the date range, and Today. The Calendar draws the date range, which names the month, and Today; Earlier and Later move one month. The List draws no time control. The legend is in the board footer in the Timeline and the Calendar.
 
 ## Load and look
 
@@ -96,12 +98,12 @@ X16, X17, and X18 were Chelsea's calls. The coordinator decided them on the revi
 ## Access
 
 28. Text meets 4.5:1 contrast. No text is below 11 px, and body text is 12 px or more.
-29. A control is at least 44 px tall to tap, or sits inside a row that is. A 36 px pill (rule 25b) and a small icon answer a 44 px tap on a touch screen (review X16).
+29. On a touch screen every control answers a 44 px tap, even when it draws smaller. A parent must not clip the tap area (review X16).
 30. Every control shows a focus ring on keyboard focus.
 31. Every color is a token on `:root`, so an organization can reskin GOALIE.
 
 ## Phone
 
 32. On a phone, Priorities come before the cards. A line of health counts sits above Priorities, so the first screen says how things stand (review X5, X17).
-33. The timeline is hidden. The List takes its place, and the view pill shows List and Calendar. Each row writes its dates as text, and its PTG under them.
-34. The search box takes its own line.
+33. The timeline is hidden. The List takes its place, and the view tabs show List and Calendar. Under each title the row writes its health mark and word, then its dates in the List's order (the date health is judged on dark, the other light), then its PTG.
+34. On a phone the toolbar takes two rows: Priorities and the view tabs, then the search box, full width, 40 px. The Calendar adds a third row: the date range and Today.

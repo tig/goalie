@@ -15,6 +15,14 @@ export const slipLabel = (days: number) => `slip ${days} ${days === 1 ? "day" : 
 export const isCommitted = (date: GoalDate) => date.kind === "Committed" || date.kind === "Promotion Milestone";
 
 /**
+ * A goal's dates in the List's order: its own dates, then its Promotion Milestone's.
+ * `judged` is the date health is judged on: its Committed date, else its Promotion Milestone's. It is written dark, the others light.
+ */
+export function listDates(dates: GoalDate[]): { own: GoalDate[]; pm: GoalDate[]; judged?: GoalDate } {
+  return { own: dates.filter((d) => d.kind !== "Promotion Milestone"), pm: dates.filter((d) => d.kind === "Promotion Milestone"), judged: dates.find(isCommitted) };
+}
+
+/**
  * "Sep 28 – Dec 4". A year is named only outside the current one. When the two ends are in different years, both name it.
  * When both ends share a year that is not the current one, it is named once, at the end.
  */

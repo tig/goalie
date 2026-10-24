@@ -25,7 +25,7 @@ export function useScreen(): [Screen, (change: Partial<Screen>, replace?: boolea
 }
 
 /** The one home of the phone width (review E11). The CSS draws the phone layout under the `phone` class this sets on the root. */
-export const PHONE_QUERY = "(max-width:760px)";
+const PHONE_QUERY = "(max-width:760px)";
 
 /** True on a phone. It keeps the root's `phone` class in step. */
 export function usePhone(): boolean {
@@ -37,7 +37,7 @@ export function usePhone(): boolean {
 }
 
 /** True while the media query holds. */
-export function useMedia(query: string): boolean {
+function useMedia(query: string): boolean {
   return useSyncExternalStore(
     (onChange) => {
       const list = matchMedia(query);

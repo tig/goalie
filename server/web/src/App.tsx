@@ -9,7 +9,7 @@ import { moveFrom, timelineWindow } from "./model/timeline.ts";
 import { Cards, HealthCounts } from "./Cards.tsx";
 import { CalendarView } from "./CalendarView.tsx";
 import { ListView } from "./ListView.tsx";
-import { Avatar, BRAND, HealthDot } from "./parts.tsx";
+import { Avatar, BRAND } from "./parts.tsx";
 import { Search } from "./Search.tsx";
 import { TimelineView } from "./TimelineView.tsx";
 import { usePhone, useScreen } from "./useScreen.ts";
@@ -129,13 +129,13 @@ function Home({ data }: { data: PrioritiesResponse }) {
   // On a phone the timeline is hidden, and the List stands in for it.
   const view: View = phone && screen.view === "timeline" ? "list" : screen.view;
 
-  const search = <Search q={screen.q} onSearch={(q) => change({ q }, Boolean(screen.q) === Boolean(q.trim()))} />;
+  const search = <Search q={screen.q} health={screen.health} onSearch={(q) => change({ q }, Boolean(screen.q) === Boolean(q.trim()))} onClear={() => change({ health: undefined, q: undefined })} />;
   const tree = { funded, backlog, me: data.me, today: data.today, filtering, selected: screen.health, hot };
   const zoomAt = ZOOM_ORDER.indexOf(screen.zoom);
   const zoomStep = (to: number, label: string, sign: string) => {
     const zoom = ZOOM_ORDER[to];
     return (
-      <button type="button" className={`segbtn${zoom ? "" : " off"}`} aria-label={label} aria-disabled={!zoom} onClick={() => zoom && change({ zoom })}>
+      <button type="button" className={`gbtn${zoom ? "" : " off"}`} aria-label={label} aria-disabled={!zoom} onClick={() => zoom && change({ zoom })}>
         {sign}
       </button>
     );
@@ -160,64 +160,52 @@ function Home({ data }: { data: PrioritiesResponse }) {
           </div>
         )}
         <section className="card board" data-view={view}>
-          <div className="bhead">
+          {/* One toolbar for every view (rules 25 to 25c, V1, V4). The left cluster never moves; the right cluster is anchored right. */}
+          <div className="toolbar">
             <h2>{data.view.name}</h2>
-            {filtering && (
-              <span className="filter">
-                {screen.health && (
-                  <>
-                    <HealthDot health={screen.health} word={false} />
-                    {screen.health}
-                  </>
-                )}
-                {screen.health && screen.q && " · "}
-                {screen.q && `“${screen.q}”`}
-                <button type="button" className="clear" onClick={() => change({ health: undefined, q: undefined })}>
-                  Show all
+            <span className="tabs" role="group" aria-label="View">
+              {(Object.keys(VIEW_LABELS) as View[]).map((v) => (
+                <button key={v} type="button" className={`vtab vtab-${v}${view === v ? " on" : ""}`} aria-pressed={view === v} onClick={() => change({ view: v })}>
+                  {VIEW_LABELS[v]}
                 </button>
-              </span>
-            )}
-            <span className="tools">
-              <span className="seggroup views" role="group" aria-label="View">
-                {(Object.keys(VIEW_LABELS) as View[]).map((v) => (
-                  <button key={v} type="button" className={`segbtn fmt fmt-${v}${view === v ? " on" : ""}`} aria-pressed={view === v} onClick={() => change({ view: v })}>
-                    {VIEW_LABELS[v]}
-                  </button>
-                ))}
-              </span>
-              {/* A control that does nothing in this view keeps its place, so nothing beside it moves (rule 25c). */}
-              <span className={`seggroup zoom${view === "timeline" ? "" : " idle"}`} inert={view !== "timeline"}>
-                {zoomStep(zoomAt + 1, "Zoom out", "−")}
-                {zoomStep(zoomAt - 1, "Zoom in", "+")}
-              </span>
-              <nav className={`range${view === "list" ? " idle" : ""}`} aria-label={view === "calendar" ? "Month" : "Timeline"} inert={view === "list"}>
-                <span className="seggroup">
-                  <button type="button" className="segbtn" aria-label="Earlier" onClick={() => step(-1)}>
-                    ‹
-                  </button>
-                  <span className="rangelbl">
-                    {sizers.map((t) => (
-                      <span key={t} className="sizer" aria-hidden="true">
-                        {t}
-                      </span>
-                    ))}
-                    <span className="now">{view === "calendar" ? monthYear(month.month) : rangeLabel(range.first, range.last, data.today)}</span>
-                  </span>
-                  <button type="button" className="segbtn" aria-label="Later" onClick={() => step(1)}>
-                    ›
-                  </button>
+              ))}
+            </span>
+            {search}
+            <span className="tright">
+              {view === "timeline" && (
+                <span className="pgroup zoom">
+                  {zoomStep(zoomAt + 1, "Zoom out", "−")}
+                  {zoomStep(zoomAt - 1, "Zoom in", "+")}
                 </span>
-                <button type="button" className="btn" onClick={today}>
-                  Today
-                </button>
-              </nav>
+              )}
+              {view !== "list" && (
+                <nav className="range" aria-label={view === "calendar" ? "Month" : "Timeline"}>
+                  <span className="pgroup">
+                    <button type="button" className="gbtn" aria-label="Earlier" onClick={() => step(-1)}>
+                      ‹
+                    </button>
+                    <span className="rangelbl">
+                      {sizers.map((t) => (
+                        <span key={t} className="sizer" aria-hidden="true">
+                          {t}
+                        </span>
+                      ))}
+                      <span className="now">{view === "calendar" ? monthYear(month.month) : rangeLabel(range.first, range.last, data.today)}</span>
+                    </span>
+                    <button type="button" className="gbtn" aria-label="Later" onClick={() => step(1)}>
+                      ›
+                    </button>
+                  </span>
+                  <button type="button" className="btn" onClick={today}>
+                    Today
+                  </button>
+                </nav>
+              )}
             </span>
           </div>
-          {view === "timeline" && <TimelineView {...tree} window={window} search={search} home={home} onRange={setRange} />}
-          {view === "list" && <ListView {...tree} columns={data.view.columns} search={search} />}
-          {view === "calendar" && (
-            <CalendarView month={month} today={data.today} search={search} none={filtering && !funded.length && !backlog.length} selected={screen.health} hot={hot} />
-          )}
+          {view === "timeline" && <TimelineView {...tree} window={window} home={home} onRange={setRange} />}
+          {view === "list" && <ListView {...tree} columns={data.view.columns} />}
+          {view === "calendar" && <CalendarView month={month} today={data.today} none={filtering && !funded.length && !backlog.length} selected={screen.health} hot={hot} />}
         </section>
       </main>
     </>

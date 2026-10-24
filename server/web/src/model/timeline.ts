@@ -14,7 +14,7 @@ const LEAD_DAYS = 14;
  * so it is wider than the screen at every zoom (review Q2). `visible` is the weeks the date pill names before the board is measured,
  * `step` the weeks one press of Earlier or Later moves, `labels` what the axis names.
  */
-export const ZOOMS = {
+const ZOOMS = {
   weeks: { week: 84, past: 26, future: 39, visible: 13, step: 4, labels: "week" },
   months: { week: 30, past: 52, future: 78, visible: 34, step: 13, labels: "month" },
   quarters: { week: 14, past: 104, future: 156, visible: 65, step: 26, labels: "other month" },
@@ -70,8 +70,12 @@ export function timelineWindow(priorities: { goals: ApiGoal[] }[], today: string
     .flatMap((g) => g.dates.filter(isCommitted))
     .map((d) => addDays(d.date, -3))
     .filter((d) => daysBetween(d, today) <= 10 * 7);
-  const open = weekStart(from ?? [addDays(today, -LEAD_DAYS), ...passed].sort()[0]);
   const weeks = scale.past + scale.future;
+  // The board stays inside 1970 to 9999, so no label names a year past 9999 (review Q10).
+  const first = weekStart(addDays("1970-01-01", scale.past * 7 + 6));
+  const last = weekStart(addDays("9999-12-31", -scale.future * 7));
+  const wanted = weekStart(from ?? [addDays(today, -LEAD_DAYS), ...passed].sort()[0]);
+  const open = wanted < first ? first : wanted > last ? last : wanted;
   const start = addDays(open, -scale.past * 7);
   const end = addDays(start, weeks * 7);
   const span = day(end) - day(start);
@@ -98,8 +102,23 @@ export function timelineWindow(priorities: { goals: ApiGoal[] }[], today: string
   };
 }
 
-/** The scroll position that opens the board on its week, held inside what the board can scroll. */
-export const openScroll = (openPx: number, scrollWidth: number, clientWidth: number) => Math.max(0, Math.min(openPx, scrollWidth - clientWidth));
+/**
+ * The scroll position that opens the board on its week, held inside what the board can scroll.
+ * When that would put today past the left third of the `width` px on screen, as on a narrow board, it opens with today at the left third.
+ */
+export function openScroll(openPx: number, todayPx: number, width: number, scrollWidth: number, clientWidth: number): number {
+  const left = todayPx - openPx > width / 3 ? todayPx - width / 3 : openPx;
+  return Math.max(0, Math.min(left, scrollWidth - clientWidth));
+}
+
+/** True when a label `widthPx` wide at `atPx` is whole on screen. An axis label that is not is hidden. */
+export const fitsView = (atPx: number, widthPx: number, view: { left: number; right: number }) => atPx >= view.left && atPx + widthPx <= view.right;
+
+/** Where the Today pill sits: over the today line, held inside the screen by half its width. Null when the line is off screen. */
+export function todayPill(atPx: number, halfWidth: number, view: { left: number; right: number }): number | null {
+  if (atPx < view.left || atPx > view.right) return null;
+  return Math.max(view.left + halfWidth, Math.min(atPx, view.right - halfWidth));
+}
 
 /** The days in view when the board is scrolled `scrollLeft` px and shows `width` px of timeline. A day cut by an edge counts. */
 export function visibleRange(window: TimelineWindow, scrollLeft: number, width: number): { first: string; last: string } {
@@ -136,7 +155,7 @@ export type LaneMark = { key: string; atPx: number; text: string; outside: "befo
 
 /**
  * Where a lane's labels go, so no two overlap (rule 23).
- * Every mark past an edge of the screen joins one label at that edge, in date order. A mark that its own label could not clear the edge label of joins it too.
+ * Every mark past an edge of the screen joins one label at that edge, in date order. A mark whose own label could not clear that edge label, or fits on neither side of the mark, joins it too.
  * Each other mark labels to its right, else to its left.
  */
 export function placeLaneLabels(marks: LaneMark[], view: { left: number; right: number }): { before: string[]; after: string[]; inside: { key: string; side: "left" | "right" }[] } {
@@ -153,7 +172,11 @@ export function placeLaneLabels(marks: LaneMark[], view: { left: number; right: 
     inner = { left: view.left + reserve(before), right: view.right - reserve(after) };
     for (const m of sorted) {
       if (before.has(m.key) || after.has(m.key)) continue;
-      const side = m.atPx < inner.left ? before : m.atPx > inner.right ? after : undefined;
+      // A label that fits on neither side of its mark joins the nearer edge label, when there is one, so it covers nothing.
+      const w = labelWidth(m.text);
+      const fits = m.atPx + LABEL_GAP + w <= inner.right || m.atPx - LABEL_GAP - w >= inner.left;
+      const nearer = after.size && (!before.size || inner.right - m.atPx < m.atPx - inner.left) ? after : before.size ? before : undefined;
+      const side = m.atPx < inner.left ? before : m.atPx > inner.right ? after : fits ? undefined : nearer;
       if (side) {
         side.add(m.key);
         changed = true;
@@ -165,7 +188,7 @@ export function placeLaneLabels(marks: LaneMark[], view: { left: number; right: 
   return { before: keys(before), after: keys(after), inside };
 }
 
-export type Mark = {
+type Mark = {
   at: number;
   date: GoalDate;
   /** Which edge of the board the date lies past, if any. */
