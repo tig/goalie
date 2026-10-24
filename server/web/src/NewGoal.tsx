@@ -4,7 +4,7 @@ import { addDays, shortDate } from "../../src/dates.ts";
 import { postCommands, useJson } from "./data.ts";
 import { PtgFields } from "./GoalPanels.tsx";
 import { stillMissing } from "./model/labels.ts";
-import { commandPlace, createBatch, goalTypes, refusals, type NewGoalForm, type NewMilestone, type SubGoalRow } from "./model/commands.ts";
+import { commandPlace, createBatch, goalTypes, notChecked, refusals, type NewGoalForm, type NewMilestone, type SubGoalRow } from "./model/commands.ts";
 import { eventValue, fieldLabel } from "./model/goalpage.ts";
 import { backPath, goalPath } from "./model/route.ts";
 import { Avatar, HealthDot, Help } from "./parts.tsx";
@@ -135,6 +135,7 @@ function Form({ options, parent, back }: { options: FormOptions; parent?: string
   const refused = shown && !shown.ok ? shown : null;
   const batch = createBatch(sent);
   const every = refused ? refusals(refused, batch) : [];
+  const later = refused ? notChecked(refused) : 0;
   const violations: ApiViolation[] = every;
   const at = (where: string, field?: string) =>
     every
@@ -431,6 +432,7 @@ function Form({ options, parent, back }: { options: FormOptions; parent?: string
                       ✕ {v.message}
                     </li>
                   ))}
+                  {later > 0 && <li className="muted">{count(later, "more check")} after these</li>}
                 </ul>
               ) : shown?.ok ? (
                 <p className="good">✓ Every check passes</p>

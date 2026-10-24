@@ -570,6 +570,12 @@ class CommandTests(unittest.TestCase):
         got = run('return [commands.commandsAnswer({ error: "forbidden", reason: "No verified actor." }), commands.commandsAnswer({ ok: true, ids: {} })];')
         self.assertEqual(got, [{"ok": False, "at": 0, "error": "bad_command", "message": "No verified actor."}, {"ok": True, "ids": {}}])
 
+    def test_a_command_the_check_could_not_run_is_not_a_fix(self) -> None:
+        answer = {"ok": False, "at": 0, "error": "invalid", "violations": [{"rule": "required-field", "message": "Summary is required.", "field": "summary"}],
+                  "all": [{"rule": "required-field", "message": "Summary is required.", "field": "summary", "at": 0}, {"rule": "not-checked", "message": "not checked yet: it names $m, whose create was refused", "at": 1}]}
+        got = run(f"const a = {json.dumps(answer)}; const b = commands.createBatch({json.dumps(self.FORM)}); return [commands.refusals(a, b).map((v) => v.rule), commands.notChecked(a)];")
+        self.assertEqual(got, [["required-field"], 1])
+
     def test_a_new_goal_is_sent_in_the_create_order(self) -> None:
         b = run(f"return commands.createBatch({json.dumps(self.FORM)});")
         steps = [(c["op"], c["kind"], c.get("ref") or c.get("id")) for c in b["commands"]]  # type: ignore[index]

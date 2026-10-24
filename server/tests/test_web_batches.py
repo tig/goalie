@@ -107,6 +107,21 @@ class WebBatchTests(unittest.TestCase):
         self.assertEqual({v["place"] for v in found}, {"goal"})
         self.assertGreaterEqual(len(found), 2, found)
 
+    def test_a_refused_milestone_leaves_the_rest_as_checks_to_come(self) -> None:
+        options = self.read("/api/options")
+        form = {
+            "summary": "Open the second office", "description": "", "owner": "chelsea", "priority": options["priorities"][0]["id"],
+            "due_date": "2027-05-01", "date_type": "Fantasy", "health": "GREEN", "path_to_green": None, "plan": None, "plan_maturity": options["defaults"]["plan_maturity"],
+            "more": {k: options["defaults"][k] for k in ("type", "severity", "state", "origination", "level", "visibility", "org_unit")},
+            "milestone": {"summary": "", "due_date": "2026-12-01", "owner": "chelsea"},
+            "milestoneType": self.types()["milestone"], "subGoals": [], "workItems": [],
+        }
+        batch = build("return { ...commands.createBatch(form), check: true };", form=form)
+        answer = json.loads(post(self.proc, self.port, "/api/commands", batch, self.auth).body)
+        got = build("return [commands.refusals(answer, batch).map((v) => v.place), commands.notChecked(answer)];", answer=answer, batch=batch)
+        self.assertEqual(got[0], ["milestone"])
+        self.assertGreater(got[1], 0)
+
     def test_health_with_a_path_to_green_is_stored(self) -> None:
         goal = self.read("/api/goals/XW-0003")["goal"]
         ptg = {"steps": [{"text": "Load the tree", "owner": "chelsea", "date": "2026-10-30"}], "criteria": "The tree is loaded", "trigger": "Not loaded by Nov 2"}

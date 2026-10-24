@@ -4,9 +4,9 @@ import { commandsAnswer } from "./model/commands.ts";
 
 /** Reading the API. Every read is one GET with the actor's session; the server holds the rules. */
 
-export type Loaded<T> = { state: "loading" } | { state: "ok"; data: T } | { state: "refused"; status: number; reason: string };
+type Loaded<T> = { state: "loading" } | { state: "ok"; data: T } | { state: "refused"; status: number; reason: string };
 
-export async function getJson<T>(url: string): Promise<Loaded<T>> {
+async function getJson<T>(url: string): Promise<Loaded<T>> {
   try {
     const reply = await fetch(url, { headers: { accept: "application/json" } });
     if (reply.ok) return { state: "ok", data: (await reply.json()) as T };

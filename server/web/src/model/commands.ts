@@ -34,7 +34,7 @@ const pursued = (health: Health, ptg: PathToGreen | null) =>
   health ? { state: "In Progress" as const, health, ...(health !== "GREEN" ? { path_to_green: ptg } : {}) } : { state: "Backlog" as const };
 
 /** The Promotion Milestone being met. */
-export type MetMilestone = { id: string; version: number; state: StoredGoal["state"] };
+type MetMilestone = { id: string; version: number; state: StoredGoal["state"] };
 
 /** Completes a met milestone. A Backlog milestone cannot move straight to Completed (SPEC.md §7), so it passes through In Progress, GREEN, in the same batch. */
 function completes(met: MetMilestone, reason: string): CommandsRequest["commands"] {
@@ -108,7 +108,7 @@ export function staleMerge(typed: Record<string, unknown>, current: { version: n
 export const goalTypes = (options: FormOptions): GoalTypes => ({ goal: options.defaults.type, milestone: options.promotionMilestoneType });
 
 /** The type names the server's options give: a new goal's default type, and the type of a Promotion Milestone (§6.1, D1). */
-export type GoalTypes = { goal: string; milestone: string };
+type GoalTypes = { goal: string; milestone: string };
 
 export type SubGoalRow = {
   summary: string;
@@ -252,8 +252,14 @@ export function commandPlace(batch: CommandsRequest, at: number): string {
 export function refusals(answer: CommandsResponse, batch: CommandsRequest): (ApiViolation & { place: string })[] {
   if (answer.ok) return [];
   if (answer.error !== "invalid") return [{ rule: answer.error, message: answer.error === "stale" ? "" : answer.message, place: commandPlace(batch, answer.at) }];
-  return (answer.all ?? answer.violations.map((v) => ({ ...v, at: answer.at }))).map(({ at, ...v }) => ({ ...v, place: commandPlace(batch, at) }));
+  return (answer.all ?? answer.violations.map((v) => ({ ...v, at: answer.at })))
+    .filter((v) => v.rule !== NOT_CHECKED)
+    .map(({ at, ...v }) => ({ ...v, place: commandPlace(batch, at) }));
 }
+
+/** A check names each command it could not run, because it uses a refused create (QA Q11). Those are checks still to come, not fixes. */
+const NOT_CHECKED = "not-checked";
+export const notChecked = (answer: CommandsResponse) => (!answer.ok && answer.error === "invalid" ? (answer.all ?? []).filter((v) => v.rule === NOT_CHECKED).length : 0);
 
 /** POST /api/commands answers with CommandsResponse, but a 403, 413, or 415 answers ApiError ({ error, reason }). That one reads as a refusal with its reason (QA F1). */
 export function commandsAnswer(body: unknown): CommandsResponse {
