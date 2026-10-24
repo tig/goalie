@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import type { ApiGoal, ApiPriority, ApiSummary, GoalDate, Health, PrioritiesResponse, PtgStep } from "./api.ts";
+import type { ApiGoal, ApiPriority, ApiSummary, GoalDate, Health, PathToGreen, PrioritiesResponse, PtgStep } from "./api.ts";
 import { dateIn, day, daysBetween } from "./dates.ts";
 import { committedDate, currentDate, isOpen, OPEN_STATES, type State } from "./goal.ts";
 import { read, readAll } from "./read.ts";
@@ -50,9 +50,9 @@ function ownDate(goal: Row): string {
   return `${goal.date_type} ${currentDate(goal)}`;
 }
 
+/** The first step of a Path to Green (SPEC.md §6.1, plan E-8). Home shows only that. */
 function firstStep(ptg: unknown, names: Map<string, string>): PtgStep | undefined {
-  if (typeof ptg === "string") return ptg ? { text: ptg } : undefined;
-  const step = (ptg as { steps?: { text?: unknown; owner?: unknown; date?: unknown }[] } | null)?.steps?.[0];
+  const step = (ptg as Partial<PathToGreen> | null)?.steps?.[0];
   if (!step || typeof step.text !== "string") return undefined;
   return {
     text: step.text,
@@ -100,7 +100,8 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, todayIso: stri
     return dates;
   };
 
-  const goalOf = (goal: Row, parent?: Row): ApiGoal => {
+  /** `funded` is true for a goal under a Priority above the cut line. */
+  const goalOf = (goal: Row, funded: boolean, parent?: Row): ApiGoal => {
     const health = (goal.health as Health) ?? null;
     const ptg = health === "RED" || health === "YELLOW" ? firstStep(goal.path_to_green, names) : undefined;
     return {
@@ -112,17 +113,18 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, todayIso: stri
       dates: datesOf(goal, !parent || ownDate(goal) !== ownDate(parent)),
       started: started.get(goal.id as string) ?? todayIso,
       ...(ptg ? { ptg } : {}),
-      children: (childrenOf.get(goal.id as string) ?? []).map((child) => goalOf(child, goal)),
+      counted: funded && !parent && goal.state === "In Progress",
+      children: (childrenOf.get(goal.id as string) ?? []).map((child) => goalOf(child, funded, goal)),
     };
   };
 
-  const built = tops.map((list) => list.map((g) => goalOf(g)));
-  const rows: ApiPriority[] = priorities.map((p, i) => ({ id: p.id as string, rank: p.rank as number, title: p.title as string, goals: built[i] }));
   const cut = priorities.findIndex((p) => p.cut_line === true);
+  const built = tops.map((list, i) => list.map((g) => goalOf(g, cut === -1 || i <= cut)));
+  const rows: ApiPriority[] = priorities.map((p, i) => ({ id: p.id as string, rank: p.rank as number, title: p.title as string, goals: built[i] }));
   const funded = cut === -1 ? rows : rows.slice(0, cut + 1);
   const backlog = cut === -1 ? [] : rows.slice(cut + 1);
 
-  const top = funded.flatMap((p) => p.goals).filter((g) => g.state === "In Progress");
+  const top = funded.flatMap((p) => p.goals).filter((g) => g.counted);
   const slips = top.flatMap((g) => {
     const date = g.dates.find((d) => d.slipDays !== undefined);
     return date?.slipDays !== undefined ? [{ goal: g.id, summary: g.summary, date: date.date, kind: date.kind as "Committed" | "Promotion Milestone", days: date.slipDays }] : [];

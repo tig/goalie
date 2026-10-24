@@ -128,6 +128,14 @@ class PrioritiesApiTests(unittest.TestCase):
         self.assertEqual(days, 14)
         self.assertEqual(self.body["summary"]["nextPromotion"], {"milestone": "XW-0004", "date": "2026-11-06", "days": days, "goal": "XW-0003", "summary": self.goals["XW-0003"]["summary"]})
 
+    def test_counted_marks_the_goals_the_summary_counts(self) -> None:
+        # Review Q4 and plan E-9: the app filters by `counted` and keeps no rule of its own.
+        counted = sorted(g["id"] for g in self.goals.values() if g["counted"])
+        self.assertEqual(counted, ["XW-0001", "XW-0002", "XW-0003"])
+        self.assertTrue(all("counted" in g for g in self.goals.values()))
+        self.assertEqual(len(counted), sum(self.body["summary"]["counts"].values()))
+        self.assertFalse(self.goals["XW-0005"]["counted"], "a sub-goal In Progress is not counted")
+
     def test_the_server_does_not_filter_or_draw(self) -> None:
         self.assertEqual(json.loads(self.filtered.body), self.body)
         text = self.reply.body.decode("utf-8")
@@ -154,6 +162,8 @@ class PrioritiesDefinitionTests(unittest.TestCase):
             create("priority", "PRI-OLD", {"org_unit": "excaliwire", "period": "2020-Q1", "rank": 5, "title": "A Priority of an old period", "status": "Current"}, "Test data"),
             create("goal", "XW-0090", {**OLD_GOAL, "summary": "An old Committed date in the view", "priority": "PRI-1"}, "Test data"),
             create("goal", "XW-0091", {**OLD_GOAL, "summary": "A Team goal on a company Priority", "priority": "PRI-1", "org_unit": "xw-team", "level": "Team"}, "Test data"),
+            create("priority", "PRI-5", {"org_unit": "excaliwire", "period": period, "rank": 5, "title": "A Priority below the cut line", "status": "Current"}, "Test data"),
+            create("goal", "XW-0093", {**OLD_GOAL, "summary": "An In Progress goal below the cut line", "priority": "PRI-5"}, "Test data"),
             create("goal", "XW-0092", {**OLD_GOAL, "summary": "A Completed goal", "priority": "PRI-2", "state": "Completed", "health": None, "path_to_green": None}, "Test data"),
         ]
         drafts = [
@@ -171,8 +181,12 @@ class PrioritiesDefinitionTests(unittest.TestCase):
     def tearDownClass(cls) -> None:
         cls.store.close()
 
+    def test_a_goal_below_the_cut_line_is_not_counted(self) -> None:
+        self.assertFalse(self.goals["XW-0093"]["counted"])
+        self.assertTrue(self.goals["XW-0090"]["counted"])
+
     def test_an_empty_priority_is_listed_below_the_cut_line_with_its_rank(self) -> None:
-        self.assertEqual(self.body["backlog"], [{"id": "PRI-4", "rank": 4, "title": "An empty Priority", "goals": []}])
+        self.assertEqual(self.body["backlog"][0], {"id": "PRI-4", "rank": 4, "title": "An empty Priority", "goals": []})
 
     def test_a_priority_of_another_period_is_not_listed(self) -> None:
         self.assertNotIn("PRI-OLD", json.dumps(self.body))
