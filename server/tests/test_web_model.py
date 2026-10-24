@@ -396,6 +396,35 @@ class GoalPageTests(unittest.TestCase):
         rows = run(f"return goalpage.groupEvents({json.dumps(events)}).map((g) => [g.events.map((e) => e.sequence), g.created]);")
         self.assertEqual(rows, [[[5], False], [[4, 3], False], [[2, 1], True]])
 
+    def test_an_in_progress_create_is_still_one_created_row(self) -> None:
+        events = [
+            {"sequence": 3, "timestamp": "t0", "actor": "chelsea", "field": "state", "old": "Backlog", "new": "In Progress", "reason": "New goal", "entity": "XW-0013"},
+            {"sequence": 2, "timestamp": "t0", "actor": "chelsea", "field": "summary", "old": None, "new": "Ship it", "reason": "New goal", "entity": "XW-0013"},
+            {"sequence": 1, "timestamp": "t0", "actor": "chelsea", "field": "owner", "old": None, "new": "chelsea", "reason": "New goal", "entity": "XW-0013"},
+        ]
+        self.assertEqual(run(f"return goalpage.groupEvents({json.dumps(events)}).map((g) => [g.events.length, g.created]);"), [[3, True]])
+
+    def test_a_created_row_lists_each_field_once_at_its_final_value(self) -> None:
+        events = [
+            {"sequence": 3, "entity": "XW-0013", "field": "state", "old": "Backlog", "new": "In Progress"},
+            {"sequence": 2, "entity": "XW-0013", "field": "summary", "old": None, "new": "Ship it"},
+            {"sequence": 1, "entity": "XW-0013", "field": "state", "old": None, "new": "Backlog"},
+        ]
+        self.assertEqual(run(f"return goalpage.createdFields({json.dumps(events)}).map((e) => [e.field, e.new]);"), [["state", "In Progress"], ["summary", "Ship it"]])
+
+    def test_a_promote_is_one_row_naming_the_milestone_it_completed(self) -> None:
+        w = {"timestamp": "t1", "actor": "chelsea", "reason": "Met"}
+        events = [
+            {**w, "sequence": 9, "entity": "XW-0013", "field": "promotion_milestone", "old": "XW-0012", "new": None},
+            {**w, "sequence": 8, "entity": "XW-0013", "field": "date_type", "old": "Ambition", "new": "Committed"},
+            {**w, "sequence": 7, "entity": "XW-0012", "field": "state", "old": "In Progress", "new": "Completed"},
+            {**w, "sequence": 6, "entity": "XW-0012", "field": "health", "old": None, "new": "GREEN"},
+            {**w, "sequence": 5, "entity": "XW-0012", "field": "state", "old": "Backlog", "new": "In Progress"},
+            {"sequence": 4, "timestamp": "t0", "actor": "chelsea", "reason": "New goal", "entity": "XW-0013", "field": "summary", "old": None, "new": "Ship it"},
+        ]
+        rows = run(f"return goalpage.groupEvents({json.dumps(events)}).map((g) => [g.events.length, g.promoted]);")
+        self.assertEqual(rows, [[5, {"milestone": "XW-0012"}], [1, None]])
+
     def test_a_value_reads_as_names_and_dates(self) -> None:
         ctx = {"actors": {"tig": {"name": "Tig"}}, "names": {"PRI-3": "Priority 3 Run Excaliwire on GOALIE", "excaliwire": "Excaliwire"}}
         v = run(f'const c = {json.dumps(ctx)}; return [goalpage.eventValue("2026-11-30", "due_date", c), goalpage.eventValue("PRI-3", "priority", c), goalpage.eventValue("excaliwire", "org_unit", c), goalpage.eventValue("tig", "owner", c), goalpage.eventValue("organization-wide", "visibility", c)];')
