@@ -133,5 +133,46 @@ class GoalPageApiTests(unittest.TestCase):
         self.assertNotIn("summary", fields)
 
 
+class MilestoneHistoryTests(unittest.TestCase):
+    """N6a: a goal's history holds the Events of every goal that is or was its Promotion Milestone (Frontend Engineer)."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.store = Store()
+        code, result = cls.store.run("seed")
+        assert code == 0, result
+        chelsea = cls.store.read("actor", "chelsea")
+        assert cls.store.write("tig", update("actor", "chelsea", chelsea["version"], {"subject": "sub-chelsea"}))["ok"]
+        token, env = signed("sub-chelsea")
+        auth = {"Authorization": f"Bearer {token}"}
+        xw3 = cls.store.read("goal", "XW-0003")
+        milestone = {"summary": "Commit a date for the MLP running on GOALIE", "owner": "chelsea", "org_unit": "excaliwire", "level": "Company", "type": "Milestone (Commit)", "due_date": "2026-11-20", "date_type": "Committed", "plan_maturity": "Crayon", "severity": "sev1", "state": "Backlog", "origination": "New"}
+        promote = [
+            {"op": "create", "kind": "goal", "ref": "$m", "fields": milestone, "reason": "Next milestone"},
+            {"op": "update", "kind": "goal", "id": "XW-0003", "base_version": xw3["version"], "fields": {"date_type": "Ambition", "promotion_milestone": "$m"}, "reason": "XW-0004 is met"},
+        ]
+        with running_server(cls.store.path, env) as (proc, port):
+            assert get(proc, port, "/health").status == 200
+            reply = post(proc, port, "/api/commands", {"commands": promote}, auth)
+            assert reply.status == 200, reply.body
+            cls.new = json.loads(reply.body)["ids"]["$m"]
+            cls.page = json.loads(get(proc, port, "/api/goals/XW-0003", auth).body)
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.store.close()
+
+    def test_the_history_holds_the_current_and_the_former_milestone(self) -> None:
+        entities = {(e["entity_kind"], e["entity"]) for e in self.page["events"]}
+        self.assertIn(("goal", self.new), entities)
+        self.assertIn(("goal", "XW-0004"), entities)
+        sequences = [e["sequence"] for e in self.page["events"]]
+        self.assertEqual(sequences, sorted(sequences, reverse=True))
+
+    def test_the_history_holds_no_other_goal(self) -> None:
+        others = {e["entity"] for e in self.page["events"] if e["entity_kind"] == "goal"} - {"XW-0003", "XW-0004", self.new}
+        self.assertEqual(others, set())
+
+
 if __name__ == "__main__":
     unittest.main()

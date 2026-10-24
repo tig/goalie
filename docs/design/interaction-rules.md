@@ -105,7 +105,7 @@ GP3. One panel is open at a time, in place (G9). Each Save is one batch to the s
 GP4. Choosing a health that is not saved outlines it in its color; the saved health is filled (G4).
 GP5. + Sub-goal and + Work item open one add row in place (G20, G22). A sub-goal takes this goal's date, written out, unless it is given its own; its own Ambition or Fantasy date opens its own Promotion Milestone.
 GP6. Ticking a work item asks for its reason in the row; Enter saves and Escape undoes the tick (G24).
-GP7. History shows one row per write: the Events of one save (same actor, time, and reason). A create reads "Created" with its date and health, and opens to list its fields. Values are names and dates with their year, never ids.
+GP7. History shows one row per write: the Events of one save (same actor, time, and reason), on any goal; another goal's step names it first. A Promote reads "Promoted · XW-0012 completed" and opens to its steps (N6a). A create reads "Created" with its date and health, and opens to list its fields. Values are names and dates with their year, never ids.
 GP8. Dates on the goal page header carry their year: "Nov 6, 2026". The goal's own date reads "Nov 30, 2026 Fantasy · this goal's date". Each mark on the date bar is labelled under it. A label that would touch the one before it drops to a second row.
 GP9. A panel's buttons sit at its right, Cancel then Save. A new Path to Green step has no date until one is picked. Panel tints are light (--yellow-tint, --red-tint, --green-tint) with the health's -bg border.
 GP10. Description and Fields stack under 900 px of page.
@@ -116,6 +116,7 @@ NG3. A refusal shows at the card and field it names, and the rail lists every re
 NG4. "Create will make" names each key with what it is: "XW-0013 this goal", "XW-0012 its Promotion Milestone". The server gives keys in its create order, so the milestone may take the lower key. A sub-goal on an uncommitted goal's date says "· this goal's date · shares XW-0012", and the rail says how many share it.
 NG5. More fields is one row of chips, each a field, its default as a small picker, and a ? with its §6.1 meaning; Work Product is among them (N8). The preview leads with the judged date.
 NG6. On a phone the checks are a one-line count at the top, and Create is a 48 px bar fixed to the bottom of the screen (N15). On touch every field is 44 px tall, and a Priority row is its own tap target.
+NG7. Under 960 px of page New goal takes the phone layout (N15a): the form full width, the checks as the one-line count at the top, and Create as the fixed 48 px bar. The rail never shrinks.
 
 ## Work items page
 
