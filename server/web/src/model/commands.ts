@@ -1,4 +1,4 @@
-import type { CommandsRequest, GoalFields, Health, PathToGreen, StoredGoal } from "../../../src/api.ts";
+import type { ApiWorkItem, CommandsRequest, GoalFields, Health, PathToGreen, StoredGoal, WorkItemFields, WorkItemStatus } from "../../../src/api.ts";
 
 /**
  * The goal page's panels as batches for POST /api/commands (docs/engineering/goal-page-and-create.md, Edits from the goal page).
@@ -62,4 +62,41 @@ export function commentBatch(kind: "goal" | "work_item", id: string, text: strin
  */
 export function staleMerge(typed: Record<string, unknown>, current: { version: number } & Record<string, unknown>): { base_version: number; current: Record<string, unknown> } {
   return { base_version: current.version, current: Object.fromEntries(Object.keys(typed).map((k) => [k, current[k]])) };
+}
+
+export type SubGoalRow = {
+  summary: string;
+  owner: string;
+  /** A date of its own. With none, the sub-goal takes its parent's date and Date Type (D2). */
+  date?: { due_date: string; date_type: "Committed" | "Ambition" | "Fantasy" };
+  /** Its own Promotion Milestone, when its own date is Ambition or Fantasy. */
+  milestone?: NewMilestone;
+};
+
+/**
+ * + Sub-goal (G20): step 4 of the create order, with the page's goal as parent. It starts in Backlog.
+ * A sub-goal with its own uncommitted date brings its milestone first ($m1), and the milestone then joins it as a sub-goal (steps 1 and 3).
+ */
+export function subGoalBatch(parent: Pick<StoredGoal, "id" | "org_unit" | "level">, row: SubGoalRow): CommandsRequest {
+  const reason = `Sub-goal of ${parent.id}`;
+  const base = { summary: row.summary, owner: row.owner, parent: parent.id, org_unit: parent.org_unit, level: parent.level, state: "Backlog" as const };
+  if (!row.date) return { commands: [{ op: "create", kind: "goal", ref: "$s1", fields: base, reason }] };
+  if (row.date.date_type === "Committed" || !row.milestone) return { commands: [{ op: "create", kind: "goal", ref: "$s1", fields: { ...base, ...row.date }, reason }] };
+  return {
+    commands: [
+      { op: "create", kind: "goal", ref: "$m1", fields: { ...row.milestone, type: "Milestone (Commit)", date_type: "Committed", org_unit: parent.org_unit, level: parent.level }, reason },
+      { op: "create", kind: "goal", ref: "$s1", fields: { ...base, ...row.date, promotion_milestone: "$m1" }, reason },
+      { op: "update", kind: "goal", id: "$m1", base_version: 1, fields: { parent: "$s1" }, reason },
+    ],
+  };
+}
+
+/** + Work item (G22): step 5 alone. Its Event's reason is "Filed". */
+export function workItemBatch(goal: string, item: Pick<WorkItemFields, "title" | "owner" | "status" | "due_date">): CommandsRequest {
+  return { commands: [{ op: "create", kind: "work_item", fields: { goal, ...item }, reason: "Filed" }] };
+}
+
+/** The work item tick (G24), or any status change: one update with its reason. */
+export function workItemStatusBatch(item: Pick<ApiWorkItem, "id" | "version">, status: WorkItemStatus, reason: string): CommandsRequest {
+  return { commands: [{ op: "update", kind: "work_item", id: item.id, base_version: item.version, fields: { status }, reason }] };
 }
