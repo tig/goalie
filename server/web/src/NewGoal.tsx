@@ -119,6 +119,8 @@ function Form({ options, parent, under, back }: { options: FormOptions; parent?:
   // NF6: the Promotion Milestone's date starts empty; the form never picks a promise. Its summary follows the goal's until changed.
   const milestone: NewMilestone = form.milestone ?? { summary: `Commit a date for ${form.summary || "this goal"}`, due_date: "", owner: form.owner };
   const setMilestone = (part: Partial<NewMilestone>) => set({ milestone: { ...milestone, ...part } });
+  // NF4a: Priority is a deliberate choice, so no row is chosen until the person picks one, None included.
+  const [picked, setPicked] = useState(false);
   const sent = useMemo(() => ({ ...form, milestone: uncommitted ? milestone : null }), [form, uncommitted, milestone.summary, milestone.due_date, milestone.owner]); // eslint-disable-line react-hooks/exhaustive-deps
   const batch = useMemo(() => createBatch(sent), [sent]);
   // The server is asked once every foundation field has a value: a rule about a part not yet filled is never shown (NF15).
@@ -143,7 +145,7 @@ function Form({ options, parent, under, back }: { options: FormOptions; parent?:
   const [pressed, setPressed] = useState(false);
   const answer = ready ? (result ?? check) : null;
   // A press shows the Details card's refusals too, so a save never fails with nothing listed.
-  const lines = toSave(sent, answer, detailsTouched || pressed, batch);
+  const lines = toSave({ ...sent, priorityPicked: picked }, answer, detailsTouched || pressed, batch);
   const left = lines.filter((l) => !l.done);
   // NF15: after a press, each unmet line shows its sentence at its own field, in --red-ink.
   const miss = (key: string) => {
@@ -190,8 +192,6 @@ function Form({ options, parent, under, back }: { options: FormOptions; parent?:
 
   const owner = options.actors.find((a) => a.id === form.owner) ?? me;
   const [msOpen, setMsOpen] = useState(false);
-  // NF4a: Priority is a deliberate choice, so no row is chosen until the person picks one, None included.
-  const [picked, setPicked] = useState(false);
   const priority = options.priorities.find((p) => p.id === form.priority);
   const toGo = left.length ? `To save: ${left.length} to go` : "Ready to create";
 
@@ -342,7 +342,8 @@ function Form({ options, parent, under, back }: { options: FormOptions; parent?:
                     </label>
                   ))}
                 </div>
-                {!form.priority && <p className="small muted">It will not show on Priorities.</p>}
+                {picked && !form.priority && <p className="small muted">It will not show on Priorities.</p>}
+                {miss("priority")}
               </>
             )}
             {form.more.state === "Backlog" && <p className="small muted ngbacklog">It starts in Backlog. Set its health when work starts.</p>}

@@ -680,13 +680,17 @@ class NewGoalV2Tests(unittest.TestCase):
         return run(f"return newgoal.toSave({json.dumps({**self.BASE, **form})}, {json.dumps(answer)}, {json.dumps(details)}).map((l) => [l.key, l.text, l.done]);")
 
     def test_an_empty_form_lists_the_foundation_with_nothing_done(self) -> None:
-        self.assertEqual(self.lines({}), [["summary", "Summary", False], ["due_date", "Date", False], ["date_type", "Date Type", False]])
+        self.assertEqual(self.lines({}), [["summary", "Summary", False], ["due_date", "Date", False], ["date_type", "Date Type", False], ["priority", "Priority, or None", False]])
+
+    def test_priority_is_met_once_picked_even_as_none_and_from_a_parent(self) -> None:
+        self.assertEqual(self.lines({"priorityPicked": True})[-1], ["priority", "Priority, or None", True])
+        self.assertEqual(self.lines({"summary": "Help text", "parent": "XW-0004"}), [["summary", "Summary", True]])
 
     def test_an_uncommitted_date_adds_the_milestone_date_and_a_committed_one_the_plan(self) -> None:
         fantasy = self.lines({"summary": "Ship it", "due_date": "2027-02-26", "date_type": "Fantasy", "milestone": {"summary": "Commit", "due_date": "", "owner": "chelsea"}})
-        self.assertEqual(fantasy, [["summary", "Summary", True], ["due_date", "Date", True], ["date_type", "Date Type", True], ["milestone_date", "Promotion Milestone date", False]])
+        self.assertEqual(fantasy, [["summary", "Summary", True], ["due_date", "Date", True], ["date_type", "Date Type", True], ["milestone_date", "Promotion Milestone date", False], ["priority", "Priority, or None", False]])
         committed = self.lines({"summary": "Ship it", "due_date": "2027-02-26", "date_type": "Committed"}, {"ok": True, "ids": {}, "events": []})
-        self.assertEqual(committed[-1], ["plan_maturity", "Plan at Pencil", True])
+        self.assertEqual(committed[-2], ["plan_maturity", "Plan at Pencil", True])
 
     def test_a_refusal_undoes_its_line_in_plain_words_and_details_wait_until_opened(self) -> None:
         answer = {"ok": False, "at": 0, "error": "invalid", "violations": [], "all": [
@@ -695,11 +699,11 @@ class NewGoalV2Tests(unittest.TestCase):
             {"rule": "not-checked", "message": "not checked yet: it names $m", "at": 1},
         ]}
         form = {"summary": "Ship it", "due_date": "2027-02-26", "date_type": "Committed"}
-        self.assertEqual(self.lines(form, answer)[-1], ["plan_maturity", "Plan at Pencil", False])
+        self.assertEqual(self.lines(form, answer)[-2], ["plan_maturity", "Plan at Pencil", False])
         self.assertNotIn("health", [l[0] for l in self.lines(form, answer)])  # type: ignore[union-attr]
         self.assertEqual(self.lines(form, answer, True)[-1], ["health", "Health", False])
         said = run(f"return newgoal.toSave({json.dumps({**self.BASE, **form})}, {json.dumps(answer)}, false).map((l) => l.sentence);")
-        self.assertEqual(said[-1], "A Committed date needs a plan at Pencil.")  # type: ignore[index]
+        self.assertEqual(said[-2], "A Committed date needs a plan at Pencil.")  # type: ignore[index]
 
     def test_create_will_make_names_what_without_keys(self) -> None:
         form = {**self.BASE, "date_type": "Fantasy", "subGoals": [{"summary": "a", "owner": "chelsea"}, {"summary": "b", "owner": "chelsea"}], "workItems": [{"title": "t", "goal": 0, "owner": "chelsea", "due_date": None}]}

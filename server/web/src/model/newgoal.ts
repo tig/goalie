@@ -8,7 +8,11 @@ import { fieldLabel } from "./goalpage.ts";
  */
 
 /** The form's parts that this module reads. A form from a parent (NF9) takes the parent's date, so it has no date of its own to fill. */
-export type Foundation = Pick<NewGoalForm, "summary" | "owner" | "due_date" | "date_type" | "milestone" | "subGoals" | "workItems"> & { parent?: string | null };
+export type Foundation = Pick<NewGoalForm, "summary" | "owner" | "due_date" | "date_type" | "milestone" | "subGoals" | "workItems"> & {
+  parent?: string | null;
+  /** NF4a: a Priority, or None, was chosen. Priority has no default, so leaving it untouched is not a choice. */
+  priorityPicked?: boolean;
+};
 
 export type SaveLine = { key: string; text: string; done: boolean; sentence: string };
 
@@ -20,6 +24,7 @@ const WORDS: Record<string, [string, string]> = {
   milestone_date: ["Promotion Milestone date", "Pick a Committed date between tomorrow and this goal's date."],
   milestone: ["Promotion Milestone", "The Promotion Milestone needs a summary and a human owner."],
   plan_maturity: ["Plan at Pencil", "A Committed date needs a plan at Pencil."],
+  priority: ["Priority, or None", "Choose a Priority, or None. With None, it will not show on Priorities."],
   owner: ["Owner", "Choose one human owner."],
   health: ["Health", "An In Progress goal needs a health: GREEN, YELLOW, or RED."],
   path_to_green: ["Path to Green", "A YELLOW or RED goal needs a Path to Green: a step with an owner and a date, and criteria for GREEN."],
@@ -63,6 +68,7 @@ export function toSave(form: Foundation, answer: CommandsResponse | null, detail
     lines.push(line("due_date", Boolean(form.due_date)), line("date_type", Boolean(form.date_type)));
     if (uncommitted(form)) lines.push(line("milestone_date", Boolean(form.milestone?.due_date)));
     if (form.date_type === "Committed") lines.push(line("plan_maturity", answer !== null));
+    lines.push(line("priority", Boolean(form.priorityPicked)));
   }
   const shown = new Set(lines.map((l) => l.key));
   for (const key of keys) {
