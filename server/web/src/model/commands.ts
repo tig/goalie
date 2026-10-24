@@ -29,6 +29,10 @@ export function slipBatch(goal: StoredGoal, changedDueDate: string, health: Excl
 
 export type NewMilestone = { summary: string; due_date: string; owner: string };
 
+/** A new Promotion Milestone is pursued with the health of the goal it backs (N6a). A goal with no health yet is not pursued, so neither is its milestone. */
+const pursued = (health: Health, ptg: PathToGreen | null) =>
+  health ? { state: "In Progress" as const, health, ...(health !== "GREEN" ? { path_to_green: ptg } : {}) } : { state: "Backlog" as const };
+
 /** The Promotion Milestone being met. */
 export type MetMilestone = { id: string; version: number; state: StoredGoal["state"] };
 
@@ -46,7 +50,7 @@ export function promoteToAmbition(goal: StoredGoal, milestone: NewMilestone, new
     commands: [
       // The milestone that was met is completed first (G14).
       ...(met ? completes(met, reason) : []),
-      { op: "create", kind: "goal", ref: "$m", fields: { ...milestone, type: milestoneType, date_type: "Committed", org_unit: goal.org_unit, level: goal.level, ...kept(goal), state: "Backlog" }, reason },
+      { op: "create", kind: "goal", ref: "$m", fields: { ...milestone, type: milestoneType, date_type: "Committed", org_unit: goal.org_unit, level: goal.level, ...kept(goal), ...pursued(goal.health, goal.path_to_green) }, reason },
       { op: "update", kind: "goal", id: goal.id, base_version: goal.version, fields: { date_type: "Ambition", promotion_milestone: "$m", ...date }, reason },
     ],
   };
@@ -206,6 +210,8 @@ export function createBatch(form: NewGoalForm, check = false): CommandsRequest {
     reason,
   });
   if (uncommitted) commands.push({ op: "update", kind: "goal", id: "$m", base_version: 1, fields: { parent: "$goal" }, reason });
+  // N6a: the milestone is pursued with this goal's health. It moves after it joins the goal, so its version is the same in a check and a save.
+  if (uncommitted && form.health) commands.push({ op: "update", kind: "goal", id: "$m", base_version: 2, fields: pursued(form.health, form.path_to_green), reason });
   for (const s of own) {
     const ref = `$s${s.i + 1}` as `$${string}`;
     commands.push({
