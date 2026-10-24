@@ -150,50 +150,75 @@ Shown only when the owner setting `work_items` is on (D7).
 - Description, then Fields (one column), then sub-goal cards full width, then work items (each row two lines: title, then owner, status, and date), then the tabs.
 - Panels open full width in place. A table of PTG steps becomes one card per step.
 
-## Screen 2: New goal
+## Screen 2: New goal (foundation first)
 
-One page at `/goals/new`, not a dialog, not a wizard (wireframe 05). The canvas NewGoal layout: the form on the left (1fr), a 320 px summary rail on the right that stays on screen while the form scrolls. On a phone the rail becomes a bar at the bottom with the Create button.
+Rewritten on 2026-10-24 from the usability test ([docs/research/new-goal-usability.md](../research/new-goal-usability.md)) and the product spec's N-F1 to N-F4. It replaces N1 to N16. N6a (a made milestone starts with its goal's State and health), N13 (leave guard), and N15a (phone layout under 960 px) stay.
+The test: three people needed 4 to 10 decisions, and the form showed 21 to 29 inputs. Create was pressed 8 times for 3 goals; 5 presses saved nothing. The form chose a Committed date for the person in 2 of 2 cases.
 
 ```
-| < Priorities                                                       |
-| New goal                                       ( Goal | Sub-goal ) |  (no toggle: see N2)
-| ┌ 1 Summary and description ───────────────┐ ┌ rail ─────────────┐ |
-| ┌ 2 Owner and Priority ────────────────────┐ │ preview card      │ |
-| ┌ 3 Date ──────────────────────────────────┐ │ what will be made │ |
-| │   date · Date Type · Promotion Milestone │ │ checks            │ |
-| ┌ More fields (one row of defaults) ───────┐ │ (Create XW-0012)  │ |
-| ┌ 4 Sub-goals (optional) ──────────────────┐ └───────────────────┘ |
-| ┌ 5 Work items (optional) ─────────────────┐                       |
+| < Priorities                                                             |
+| New goal                                                                 |
+| ┌ NEEDED TO SAVE ─────────────────────────────┐ ┌ rail ────────────────┐ |
+| │ Summary   [Start with a verb …            ] │ │ Preview card         │ |
+| │ Owner     (C) Chelsea  ▾                    │ │ To save: 2 to go     │ |
+| │ Date      [Feb 28, 2027]                    │ │ ✓ Summary            │ |
+| │ How firm is the date?                       │ │ ○ Date Type          │ |
+| │ ( Committed  )( Ambition  )( Fantasy   )    │ │ ○ Milestone date     │ |
+| │  A promise.    A stretch.   A wish.         │ │ (Create goal)        │ |
+| │  Needs a plan  Needs a      Needs a         │ │ Cancel               │ |
+| │  at Pencil.    Promotion    Promotion       │ └──────────────────────┘ |
+| │                Milestone.   Milestone.      │                          |
+| │ ┌ Promotion Milestone ───────────────────┐  │                          |
+| │ │ Commit this goal's date by [ date ]    │  │                          |
+| │ └────────────────────────────────────────┘  │                          |
+| └─────────────────────────────────────────────┘                          |
+| ┌ OPTIONAL · add now or later on the goal page ────────────────── ▸ ┐    |
+| │ Description · None   Priority · None   State · Backlog   …          │  |
+| │ Sub-goals · none     Work items · none                              │  |
+| └─────────────────────────────────────────────────────────────────────┘  |
 ```
 
-- **N1.** Five numbered cards, in the order the walk liked (what, who, when, then sub-goals). The section titles are spec words: "Summary and description", "Owner and Priority", "Date", "Sub-goals", "Work items".
-- **N2.** No Goal or Sub-goal toggle (the walk could not tell what it switched). Starting from a goal page's "+ Sub-goal" opens the same form with **Parent** filled in and shown in card 2; that is the only difference.
-- **N3. Card 1.** Summary (one line, placeholder "Start with a verb: Launch, Reduce, Increase"). Description: a 6-line box. Under it, four chips for the §6.1 parts: Key results, Metrics, Why it matters, Who shares it. A chip turns green as its part is written (the canvas look). They are hints, not a gate. There is no "Done when" field: key results carry it.
-- **N4. Card 2.** Owner: a picker of humans, defaulting to you. Priority: the current Priorities of the org unit as a short list of rows (rank number, title), one selectable, or "None". Picking one maps the goal to it. The list does not move and has no arrows: creating a goal never re-ranks. Parent shows here when set.
-- **N5. Card 3.** Date: a date picker that always writes the year ("Feb 28, 2027"). Date Type: three choices, none selected, each with its one-line meaning under the control once chosen and in its help: Committed "A promise. Others plan around it.", Ambition "A stretch. Not a promise.", Fantasy "A wish. Fine as a starting point." (§5).
-- **N5a. Health.** Under the Date Type, Health: GREEN, YELLOW, RED, none selected, each with its §6.1 meaning in one line once chosen. YELLOW or RED opens the Path to Green fields there (G10). A new goal is never GREEN unless its owner picks it.
-- **N6.** Ambition or Fantasy opens the Promotion Milestone box in place (lavender, as the canvas): one sentence, "A Committed date by which this date moves up to Ambition (or Committed). Health is judged against it.", then its summary (filled: "Commit a date for <summary>"), its Committed date (filled: two weeks from today, before this goal's date), and its owner (filled: this goal's owner). The heading names the step the milestone promotes to.
+### The foundation
+
+- **NF1. One card, "Needed to save".** It holds only what a person must decide (N-F1): Summary, Owner, Date, Date Type, and the one block the Date Type opens. Every field in it is required, so no field carries a required mark; the card's title says it once. Nothing else is in this card.
+- **NF2. Summary** first, one line, placeholder "Start with a verb: Launch, Reduce, Increase". A summary under 5 words or with no verb shows one muted hint under it once the person leaves the field ("A good summary has a verb and 5 words or more."); it never blocks.
+- **NF3. Owner** is pre-filled with the signed-in person, shown as their avatar and name in a picker of humans.
+- **NF4. Date**, a date picker that always writes the year.
+- **NF5. Date Type** is three tiles, none chosen, under the question "How firm is the date?". Each tile shows its meaning and its cost before it is chosen: Committed "A promise. Needs a plan at Pencil.", Ambition "A stretch. Needs a Promotion Milestone.", Fantasy "A wish. Needs a Promotion Milestone." So no choice leads into a wall unseen (test problem 5). The order is the spec's (§5).
+- **NF6. Ambition or Fantasy** opens one block in place: "Promotion Milestone", one sentence, "A promise to make this goal's date firmer by a Committed date.", and one field, "Commit this goal's date by", **empty**, required, between tomorrow and the goal's date (test problem 4). Under the field, one muted line: "Owner Chelsea · 'Commit a date for <summary>'" with a Change link that opens the owner and summary fields. The form never picks the date.
+- **NF7. Committed** opens one block in place: Plan (a link) and Plan Maturity as three tiles with the §4 meanings, Watercolor, Crayon, Pencil. Below Pencil, one plain line, "A Committed date needs a plan at Pencil. No plan yet? Choose Ambition now and commit later.", with "Use Ambition instead" as a link that switches the tile and keeps the date.
+- **NF8. A new goal starts at Backlog** (N-F3). Health and the Path to Green are not in the foundation. The page says so once, muted, under the card: "It starts in Backlog. Set its health when work starts."
+- **NF9. From + Sub-goal** on a goal page, the same form opens with "Under <parent summary>" at the top of the card, and Date and Date Type start as "This goal's date" (D2): the foundation is then the summary only. A sub-goal on an uncommitted parent shares the parent's Promotion Milestone and says so.
+
+### The details
+
+- **NF10. One folded card, "Optional · add now or later on the goal page"**, closed by default, under the foundation (N-F2). Closed, it shows its rows' values in one muted line, so the defaults are visible without opening it.
+- **NF11. Open, it is a list of rows**, each a label, its value, and a Change link that opens the field in place: Description (None), Priority (None), State (Backlog), Type (Milestone (Launch)), Severity (sev2), Origination (New), Visibility (Organization-wide), Work Product (None), Sub-goals (none, "+ Add"), Work items (none, "+ Add"). Each field has its ? help with its §6.1 meaning. Level is not a choice: it reads "Level · Company, from Excaliwire" (§6.1: it agrees with the org unit). Org unit reads the same way.
+- **NF12. State In Progress** in the details asks for Health in the same row (no default), and YELLOW or RED opens the Path to Green there. This is the only way health enters New goal.
+- **NF13.** Sub-goal and work item rows add one item at a time, as today, and list what was added under the row.
+
+### The rail and Create
+
+- **NF14. The rail** keeps the Preview card and, under it, "Create will make" without keys: "This goal · its Promotion Milestone · 2 sub-goals · 1 work item". Under that, "To save" is a live checklist of what the foundation still needs, in plain words, one line each with an empty circle until done and a check when done: "Summary", "Date", "Date Type", "Promotion Milestone date" (or "Plan at Pencil"). It counts down: "To save: 2 to go". It shows only the step in view: details' checks appear only after the details card is opened and something in it is changed.
+- **NF15. Plain words only.** The form maps each server rule to its sentence and field; it never shows a raw server message, a `$name`, or an empty mark. A rule that depends on a part not yet filled (the milestone, before its date exists) is not shown (test problem 1). Before the first Create press nothing is red; after a press, unmet lines turn `--red-ink` and each field shows its own line in place (test problem 2).
+- **NF16. Every check at once.** The list is the whole dry-run answer for the step in view, all at once, live, never one at a time (product check: the server's `all`).
+- **NF17. Create** reads "Create goal". No key shows before save, because keys follow the server's create order and change as the form changes (test: "my goal's number changed"). Create is drawn muted while the list has lines left; a press scrolls to the first unmet field. The new goal's key appears on its page.
+- **NF18. Phone and under 960 px** (N15a): one column, the foundation card, then the details card; "To save: 2 to go" is a line at the top that opens the checklist; Create is a 48 px bar fixed to the bottom; every field and tile is at least 44 px tall.
+
+### Kept from the first New goal
+
 - **N6a.** A Promotion Milestone the app makes, on New goal or on Promote date, starts In Progress, with the health of the goal it backs. It is a Committed date being pursued, and that goal's health is judged on it. A goal created in Backlog has no health, so its milestone starts in Backlog too, as does a sub-goal's own milestone; the promotion rule still applies (SPEC §7.2). Completing a Backlog milestone on Promote date moves it through In Progress in the same save, and History shows that save as one row, "Promoted · XW-00NN completed", which opens to list its steps.
-- **N7.** Committed opens the plan box in place instead: Plan (a link or "None"), and Plan Maturity (Watercolor, Crayon, Pencil), with the chosen one's meaning from §4 under it: Watercolor "Broad strokes, soft edges.", Crayon "Main parts clear, details flexible.", Pencil "Precise and ready to execute." A muted line: "No plan yet? Choose Ambition now, and commit when the plan is at Pencil." Below Pencil, a `--red-ink` line: "A Committed date needs a Plan at Pencil." and a link: "Use Ambition with a Promotion Milestone instead", which switches the Date Type and opens N6.
-- **N8. More fields.** One row of chips, each a field and its default, each a small picker: Type Milestone (Launch) · Severity sev2 · State In Progress · Origination New · Level (from the org unit) · Visibility Organization-wide · Work Product None. Each chip has a ? help with its §6.1 meaning. Galahad never has to open them; Tig sees every default.
-- **N9. Card 4, Sub-goals.** Optional. One add row: summary, owner (default this goal's owner), date and Date Type (default this goal's date and Date Type, D2, written out: "Fantasy Feb 28, 2027", with "this goal's date" after it in `--mute`). A sub-goal on this goal's uncommitted date shares this goal's Promotion Milestone, and its row says so: "shares XW-0013". Added sub-goals list above the row with up and down to order them, and an x. Each is a full goal when saved. A row given its own date and Date Type follows the same rules as the goal: Committed opens that row's plan and Plan Maturity (N7); Ambition or Fantasy opens that row's own Promotion Milestone (N6). The row grows to show them, and its check joins the rail.
-- **N10. Card 5, Work items.** Optional, and shown only when the extension is on. One add row: title, which goal it sits on (this goal's summary, or one of the sub-goals above, by summary), owner (a human or an agent), due date. Each starts In Progress. Added items list above the row.
-- **N11. The rail.** Top: a preview card as it will sit on Home: rank (if a Priority is picked), health mark, summary, owner, the date bar. Then "Create will make": each key with what it is ("XW-0013 this goal", "XW-0012 its Promotion Milestone"). The keys come from the server in its create order, so the milestone may take the lower key; the labels make that clear, and no key is reserved. Then "N sub-goals" (and "sharing XW-0012" when they share it), "N work items". Then the checks: exactly what the server's dry run (`check: true`) returns for the whole save, one line per rule, a green check or a red mark with the field it points to. The app adds no check of its own. With today's rules that is: one human owner; a date and a Date Type; a Promotion Milestone before the date (uncommitted only); a Plan at Pencil (Committed only); every uncommitted sub-goal backed by a Promotion Milestone (its own, or this goal's shared one). Sub-goal dates need not fall on or before this goal's: no SPEC rule asks it. Clicking a red line scrolls to its field. This is the canvas's rules check, without the word "rules" and without lints.
-- **N12.** The button is **Create XW-0012** (the next key). It stays enabled. With a check red, a `--red-ink` line under it says "1 check to fix", so the button never looks ready when it is not. Pressing it with a check red scrolls to the first red field and names the rule there. Nothing is stored unless every goal in the save passes (one transaction).
 - **N13.** Cancel is a text link under the button. Leaving with typed text asks once: "Leave without creating?"
-- **N14.** On save, GOALIE opens the new goal's page. A Promotion Milestone made with it shows in the header as its judged date (G5), linked.
-- **N15.** On a phone, the cards stack full width in the same order, and every field stays a field (the Promotion Milestone too); the rail's checks move to the top of the page as a one-line count that opens the list; Create is a 48 px bar fixed at the bottom.
 - **N15a.** Under 960 px of page, New goal uses the phone layout of N15: the form takes the full width, the checks are a one-line count at the top, and Create is a 48 px bar fixed to the bottom. The rail does not shrink; a 410 px form beside a narrow rail breaks the three-field rows.
-- **N16.** Every date input writes the Date Type beside the date in the summary rail and in the preview (rule 14).
 
 ## How this answers the walk's six blocks
 
 | Block | Answer |
 | --- | --- |
-| No sub-goal on the create form (wf05) | Card 4 (N9), and + Sub-goal on the goal page (G20). |
-| No Plan Maturity anywhere; Committed was a dead end | N7: plan and maturity appear when Committed is picked, with the way out to Ambition. |
-| Required §6.1 fields missing on both forms | N8: every required field is on the form, with its default, in one row. Fields card on the page (G19). |
-| The canvas ranked the goal itself | N4: pick a Priority; no re-rank. |
+| No sub-goal on the create form (wf05) | The details card (NF13), and + Sub-goal on the goal page (G20). |
+| No Plan Maturity anywhere; Committed was a dead end | NF7: plan and maturity appear when Committed is picked, with the way out to Ambition. |
+| Required §6.1 fields missing on both forms | NF11: every required field is in the details card, with its default. Fields card on the page (G19). |
+| The canvas ranked the goal itself | NF11: Priority is picked in the details; no re-rank. |
 | No history or comments on the canvas Goal | The Comments and History tabs, on the goal and on each work item. |
 | The canvas Goal hid plan, type, severity, parent | The Fields card (G19). |
 
