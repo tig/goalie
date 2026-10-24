@@ -44,14 +44,14 @@
   ],
   "inherited": false,
   "started": "2026-10-23",
-  "closesAs": "Completed",
+  "closesAs": null,
   "promotionMilestone": {
     "id": "XW-0004",
     "summary": "Run the MLP prototype at goalie.excaliwire.com with Excaliwire's real goals loaded",
     "state": "In Progress",
     "date": "2026-11-06",
     "openSubGoals": 7,
-    "openWorkItems": 2
+    "openWorkItems": 9
   },
   "parent": null,
   "priority": {
@@ -80,96 +80,16 @@
       "promotionMilestone": true,
       "subGoals": 7,
       "workItems": {
-        "completed": 1,
-        "total": 3
+        "completed": 0,
+        "total": 0
       }
     }
   ],
-  "workItems": [
-    {
-      "id": "WI-0001",
-      "version": 1,
-      "goal": "XW-0003",
-      "title": "Build the goal page",
-      "owner": "frontend-engineer",
-      "status": "In Progress",
-      "due_date": "2026-10-30",
-      "links": null,
-      "late": false
-    },
-    {
-      "id": "WI-0002",
-      "version": 2,
-      "goal": "XW-0003",
-      "title": "Write the goal page fixtures",
-      "owner": "chelsea",
-      "status": "In Progress",
-      "due_date": "2026-10-20",
-      "links": null,
-      "late": true
-    },
-    {
-      "id": "WI-0003",
-      "version": 1,
-      "goal": "XW-0003",
-      "title": "Plan the write API",
-      "owner": "tig",
-      "status": "Backlog",
-      "due_date": null,
-      "links": null,
-      "late": false
-    },
-    {
-      "id": "WI-0004",
-      "version": 3,
-      "goal": "XW-0003",
-      "title": "Draw the goal page on the canvas",
-      "owner": "chelsea",
-      "status": "Completed",
-      "due_date": "2026-10-22",
-      "links": [
-        "https://claude.ai/artifact/KL6KBcJMeBMG3Cr7bPWyMk"
-      ],
-      "late": false
-    }
-  ],
+  "workItems": [],
   "events": [
     {
-      "sequence": 260,
-      "timestamp": "2026-10-23T15:10:00.000Z",
-      "actor": "tig",
-      "entity_kind": "goal",
-      "entity": "XW-0003",
-      "field": "comment",
-      "old": null,
-      "new": "The milestone date holds. Load the #47 tree first.",
-      "reason": "The milestone date holds. Load the #47 tree first."
-    },
-    {
-      "sequence": 255,
-      "timestamp": "2026-10-23T14:02:00.000Z",
-      "actor": "chelsea",
-      "entity_kind": "work_item",
-      "entity": "WI-0004",
-      "field": "status",
-      "old": "In Progress",
-      "new": "Completed",
-      "reason": "Boards drawn and walked"
-    },
-    {
-      "sequence": 250,
-      "timestamp": "2026-10-23T11:30:00.000Z",
-      "actor": "frontend-engineer",
-      "entity_kind": "work_item",
-      "entity": "WI-0001",
-      "field": "status",
-      "old": "Backlog",
-      "new": "In Progress",
-      "reason": "Started on F2"
-    },
-    {
       "sequence": 95,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0003",
@@ -180,7 +100,7 @@
     },
     {
       "sequence": 94,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0003",
@@ -191,7 +111,7 @@
     },
     {
       "sequence": 93,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0003",
@@ -202,7 +122,7 @@
     },
     {
       "sequence": 92,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0003",
@@ -213,7 +133,7 @@
     },
     {
       "sequence": 91,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0003",
@@ -224,7 +144,7 @@
     },
     {
       "sequence": 90,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0003",
@@ -235,7 +155,7 @@
     },
     {
       "sequence": 89,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0003",
@@ -246,7 +166,7 @@
     },
     {
       "sequence": 88,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0003",
@@ -257,7 +177,7 @@
     },
     {
       "sequence": 87,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0003",
@@ -268,7 +188,7 @@
     },
     {
       "sequence": 86,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0003",
@@ -279,7 +199,7 @@
     },
     {
       "sequence": 85,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0003",
@@ -290,7 +210,7 @@
     },
     {
       "sequence": 84,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0003",
@@ -301,7 +221,7 @@
     },
     {
       "sequence": 83,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0003",
@@ -312,7 +232,7 @@
     },
     {
       "sequence": 82,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0003",
@@ -323,7 +243,7 @@
     },
     {
       "sequence": 81,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0003",
@@ -334,7 +254,7 @@
     },
     {
       "sequence": 80,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0003",
@@ -345,7 +265,7 @@
     },
     {
       "sequence": 79,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0003",
@@ -356,31 +276,80 @@
     }
   ],
   "needsYou": {
-    "lateWorkItems": [
-      "WI-0002"
-    ],
+    "lateWorkItems": [],
     "missingPtg": false
   },
   "hints": [
     {
       "field": "description",
+      "text": "Add the key results"
+    },
+    {
+      "field": "description",
+      "text": "Add the metrics and how often they are reviewed"
+    },
+    {
+      "field": "description",
+      "text": "Add why it matters"
+    },
+    {
+      "field": "description",
       "text": "Add who shares responsibility"
+    },
+    {
+      "field": "work_product",
+      "text": "Link the work product."
     }
   ],
   "actors": {
-    "tig": {
-      "id": "tig",
-      "name": "Tig",
-      "kind": "human"
+    "backend-engineer": {
+      "id": "backend-engineer",
+      "name": "Backend Engineer",
+      "kind": "agent"
     },
     "chelsea": {
       "id": "chelsea",
       "name": "Chelsea",
       "kind": "human"
     },
+    "chief-of-staff": {
+      "id": "chief-of-staff",
+      "name": "Chief of Staff",
+      "kind": "agent"
+    },
     "frontend-engineer": {
       "id": "frontend-engineer",
       "name": "Frontend Engineer",
+      "kind": "agent"
+    },
+    "head-of-engineering": {
+      "id": "head-of-engineering",
+      "name": "Head of Engineering",
+      "kind": "agent"
+    },
+    "product-designer": {
+      "id": "product-designer",
+      "name": "Product Designer",
+      "kind": "agent"
+    },
+    "product-manager": {
+      "id": "product-manager",
+      "name": "Product Manager",
+      "kind": "agent"
+    },
+    "qa": {
+      "id": "qa",
+      "name": "QA",
+      "kind": "agent"
+    },
+    "tig": {
+      "id": "tig",
+      "name": "Tig",
+      "kind": "human"
+    },
+    "user-researcher": {
+      "id": "user-researcher",
+      "name": "User Researcher",
       "kind": "agent"
     }
   }

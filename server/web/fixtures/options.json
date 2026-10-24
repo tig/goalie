@@ -16,13 +16,27 @@
     "XW-0014",
     "XW-0015",
     "XW-0016",
-    "XW-0017"
+    "XW-0017",
+    "XW-0018",
+    "XW-0019",
+    "XW-0020",
+    "XW-0021",
+    "XW-0022",
+    "XW-0023",
+    "XW-0024",
+    "XW-0025",
+    "XW-0026",
+    "XW-0027",
+    "XW-0028",
+    "XW-0029",
+    "XW-0030",
+    "XW-0031"
   ],
   "actors": [
     {
-      "id": "tig",
-      "name": "Tig",
-      "kind": "human"
+      "id": "backend-engineer",
+      "name": "Backend Engineer",
+      "kind": "agent"
     },
     {
       "id": "chelsea",
@@ -30,8 +44,43 @@
       "kind": "human"
     },
     {
+      "id": "chief-of-staff",
+      "name": "Chief of Staff",
+      "kind": "agent"
+    },
+    {
       "id": "frontend-engineer",
       "name": "Frontend Engineer",
+      "kind": "agent"
+    },
+    {
+      "id": "head-of-engineering",
+      "name": "Head of Engineering",
+      "kind": "agent"
+    },
+    {
+      "id": "product-designer",
+      "name": "Product Designer",
+      "kind": "agent"
+    },
+    {
+      "id": "product-manager",
+      "name": "Product Manager",
+      "kind": "agent"
+    },
+    {
+      "id": "qa",
+      "name": "QA",
+      "kind": "agent"
+    },
+    {
+      "id": "tig",
+      "name": "Tig",
+      "kind": "human"
+    },
+    {
+      "id": "user-researcher",
+      "name": "User Researcher",
       "kind": "agent"
     }
   ],
@@ -65,9 +114,11 @@
   },
   "choices": {
     "type": [
-      "Milestone (Launch)",
       "Milestone (Commit)",
-      "Metric"
+      "Milestone (Launch)",
+      "Metric (Business)",
+      "Metric (Customer)",
+      "Metric (Operational Excellence)"
     ],
     "severity": [
       "sev1",
@@ -76,7 +127,9 @@
     ],
     "level": [
       "Company",
-      "Team"
+      "Program or Function",
+      "Team",
+      "Individual"
     ],
     "plan_maturity": [
       "Watercolor",

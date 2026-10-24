@@ -4,10 +4,6 @@
     "name": "Excaliwire",
     "level": "Company"
   },
-  "me": {
-    "id": "chelsea",
-    "name": "Chelsea"
-  },
   "today": "2026-10-23",
   "view": {
     "name": "Priorities",
@@ -269,5 +265,9 @@
       "goal": "XW-0003",
       "summary": "Tig, Chelsea, and agents use GOALIE to drive Excaliwire execution"
     }
+  },
+  "me": {
+    "id": "chelsea",
+    "name": "Chelsea"
   }
 }

@@ -68,7 +68,7 @@
   "events": [
     {
       "sequence": 43,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0001",
@@ -79,7 +79,7 @@
     },
     {
       "sequence": 42,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0001",
@@ -90,7 +90,7 @@
     },
     {
       "sequence": 41,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0001",
@@ -110,7 +110,7 @@
     },
     {
       "sequence": 40,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0001",
@@ -121,7 +121,7 @@
     },
     {
       "sequence": 39,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0001",
@@ -132,7 +132,7 @@
     },
     {
       "sequence": 38,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0001",
@@ -143,7 +143,7 @@
     },
     {
       "sequence": 37,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0001",
@@ -154,7 +154,7 @@
     },
     {
       "sequence": 36,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0001",
@@ -165,7 +165,7 @@
     },
     {
       "sequence": 35,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0001",
@@ -176,7 +176,7 @@
     },
     {
       "sequence": 34,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0001",
@@ -187,7 +187,7 @@
     },
     {
       "sequence": 33,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0001",
@@ -198,7 +198,7 @@
     },
     {
       "sequence": 32,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0001",
@@ -209,7 +209,7 @@
     },
     {
       "sequence": 31,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0001",
@@ -220,7 +220,7 @@
     },
     {
       "sequence": 30,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0001",
@@ -231,7 +231,7 @@
     },
     {
       "sequence": 29,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0001",
@@ -242,7 +242,7 @@
     },
     {
       "sequence": 28,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0001",
@@ -253,7 +253,7 @@
     },
     {
       "sequence": 27,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0001",
@@ -264,7 +264,7 @@
     },
     {
       "sequence": 26,
-      "timestamp": "2026-10-23T09:00:00.000Z",
+      "timestamp": "2026-10-23T12:00:00.000Z",
       "actor": "chelsea",
       "entity_kind": "goal",
       "entity": "XW-0001",
@@ -278,21 +278,77 @@
     "lateWorkItems": [],
     "missingPtg": false
   },
-  "hints": [],
+  "hints": [
+    {
+      "field": "description",
+      "text": "Add the key results"
+    },
+    {
+      "field": "description",
+      "text": "Add the metrics and how often they are reviewed"
+    },
+    {
+      "field": "description",
+      "text": "Add why it matters"
+    },
+    {
+      "field": "description",
+      "text": "Add who shares responsibility"
+    },
+    {
+      "field": "work_product",
+      "text": "Link the work product."
+    }
+  ],
   "actors": {
-    "tig": {
-      "id": "tig",
-      "name": "Tig",
-      "kind": "human"
+    "backend-engineer": {
+      "id": "backend-engineer",
+      "name": "Backend Engineer",
+      "kind": "agent"
     },
     "chelsea": {
       "id": "chelsea",
       "name": "Chelsea",
       "kind": "human"
     },
+    "chief-of-staff": {
+      "id": "chief-of-staff",
+      "name": "Chief of Staff",
+      "kind": "agent"
+    },
     "frontend-engineer": {
       "id": "frontend-engineer",
       "name": "Frontend Engineer",
+      "kind": "agent"
+    },
+    "head-of-engineering": {
+      "id": "head-of-engineering",
+      "name": "Head of Engineering",
+      "kind": "agent"
+    },
+    "product-designer": {
+      "id": "product-designer",
+      "name": "Product Designer",
+      "kind": "agent"
+    },
+    "product-manager": {
+      "id": "product-manager",
+      "name": "Product Manager",
+      "kind": "agent"
+    },
+    "qa": {
+      "id": "qa",
+      "name": "QA",
+      "kind": "agent"
+    },
+    "tig": {
+      "id": "tig",
+      "name": "Tig",
+      "kind": "human"
+    },
+    "user-researcher": {
+      "id": "user-researcher",
+      "name": "User Researcher",
       "kind": "agent"
     }
   }

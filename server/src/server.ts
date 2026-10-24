@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
-import type { ActorRef, ApiError, CommandsResponse, FormOptions, GoalPageResponse, PrioritiesResponse } from "./api.ts";
+import type { ActorRef, ApiError, CommandsResponse, FormOptions, GoalPageResponse, PrioritiesResponse, WorkResponse } from "./api.ts";
 import { runCommands } from "./commands.ts";
 import { goalPage } from "./goalpage.ts";
 import { formOptions } from "./options.ts";
@@ -14,6 +14,7 @@ import { prioritiesView } from "./priorities.ts";
 import { BRAND_SLOT, brandHead } from "./brand.ts";
 import { signInPage } from "./signin.ts";
 import { openStore } from "./store.ts";
+import { workQueue } from "./work.ts";
 
 /** The media types of the files a Vite build writes. */
 const TYPES: Record<string, string> = {
@@ -75,6 +76,7 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
     return page ? c.json<GoalPageResponse>(page) : refuse(c, 404, "not_found", `no goal ${c.req.param("id")}`);
   });
   app.get("/api/options", (c) => c.json<FormOptions>(formOptions(db, c.get("actor").id, unit(), configuredToday(db))));
+  app.get("/api/work", (c) => c.json<WorkResponse>(workQueue(db, c.get("actor").id, configuredToday(db), c.req.query("owner"))));
   app.post("/api/commands", async (c) => {
     const request: unknown = await c.req.json().catch(() => undefined);
     const answer = runCommands(db, c.get("actor").id, request, configuredToday(db));
