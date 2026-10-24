@@ -99,6 +99,20 @@ export function historyNames(events: ApiEvent[]): Record<string, string> {
   return names;
 }
 
+/** G25: the people in the read-only line with the words between them, so each can be drawn with its avatar. `more` when the server left some out. */
+export function changeParts<T>(people: T[], more: boolean): (T | string)[] {
+  const parts: (T | string)[] = [];
+  people.forEach((p, i) => {
+    if (i > 0) parts.push(more ? ", " : people.length === 2 ? " and " : i === people.length - 1 ? ", and " : ", ");
+    parts.push(p);
+  });
+  if (more) parts.push(", or an owner of a goal above it");
+  return parts;
+}
+
+/** G25: the read-only line as text. */
+export const changeLine = (names: string[], more: boolean) => `${changeParts(names, more).join("")} can change this goal. You can comment.`;
+
 /** The actors who may own a goal or a Path to Green step: the humans. */
 export const humans = (actors: Record<string, ApiActor> | ApiActor[]) => Object.values(actors).filter((a) => a.kind === "human");
 

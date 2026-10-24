@@ -445,6 +445,15 @@ class GoalPageTests(unittest.TestCase):
         ]
         self.assertEqual(run(f"return goalpage.historyNames({json.dumps(events)});"), {"XW-0012": "Commit a date", "XW-0013": "Ship it"})
 
+    def test_the_read_only_line_reads_as_g25(self) -> None:
+        cases = [(["Chelsea"], False), (["Chelsea", "Tig"], False), (["Chelsea", "Tig", "Ann"], False), (["Chelsea", "Tig", "Ann"], True)]
+        self.assertEqual(run(f"return {json.dumps(cases)}.map(([n, m]) => goalpage.changeLine(n, m));"), [
+            "Chelsea can change this goal. You can comment.",
+            "Chelsea and Tig can change this goal. You can comment.",
+            "Chelsea, Tig, and Ann can change this goal. You can comment.",
+            "Chelsea, Tig, Ann, or an owner of a goal above it can change this goal. You can comment.",
+        ])
+
     def test_a_value_reads_as_names_and_dates(self) -> None:
         ctx = {"actors": {"tig": {"name": "Tig"}}, "names": {"PRI-3": "Priority 3 Run Excaliwire on GOALIE", "excaliwire": "Excaliwire"}}
         v = run(f'const c = {json.dumps(ctx)}; return [goalpage.eventValue("2026-11-30", "due_date", c), goalpage.eventValue("PRI-3", "priority", c), goalpage.eventValue("excaliwire", "org_unit", c), goalpage.eventValue("tig", "owner", c), goalpage.eventValue("organization-wide", "visibility", c)];')
