@@ -532,8 +532,10 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 .datebar{height:44px}
 .dblabels{position:absolute;left:0;right:0;top:22px;height:16px}
 .dblabels>span{position:absolute;white-space:nowrap;transform:translateX(-50%)}
-.dblabels>span:first-child{transform:none}
+.dblabels>span.start{transform:none}
 .dblabels>span.end{transform:translateX(-100%)}
+.dblabels>span.low{top:16px}
+.datebar.two{margin-bottom:16px}
 .dbstart{display:none}
 .created>summary{cursor:pointer;list-style:none}
 .created>summary::-webkit-details-marker{display:none}

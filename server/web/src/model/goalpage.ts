@@ -1,5 +1,6 @@
 import type { ApiActor, ApiEvent, ApiWorkItem, WorkItemStatus } from "../../../src/api.ts";
 import { day, DAY, isDate } from "../../../src/dates.ts";
+import { labelWidth } from "./timeline.ts";
 
 /** The goal page's pure parts: work items by status (G23), the history filters, and how an Event's values read. */
 
@@ -90,6 +91,20 @@ export function dateBar(started: string, today: string, dates: { date: string; k
   const to = Math.max(from + DAY, t(today), ...dates.map((d) => t(d.date)));
   const at = (d: string) => (100 * (t(d) - from)) / (to - from);
   return { start: at(started), today: at(today), marks: dates.map((d) => ({ at: at(d.date), date: d.date, kind: d.kind })) };
+}
+
+/** Date bar labels (G6): each label's row, 0 or 1. A label that would touch the one before it in its row drops to the other row. `width` is the bar in pixels. */
+export function labelRows(labels: { at: number; text: string; align: "start" | "center" | "end" }[], width: number): number[] {
+  const gap = 8;
+  const ends = [-Infinity, -Infinity];
+  return labels.map((l) => {
+    const w = labelWidth(l.text);
+    const x = (l.at / 100) * width;
+    const left = l.align === "start" ? x : l.align === "end" ? x - w : x - w / 2;
+    const row = left >= ends[0] + gap ? 0 : left >= ends[1] + gap ? 1 : 0;
+    ends[row] = left + w;
+    return row;
+  });
 }
 
 /** The team view (plan F6): one queue per owner, people with work In Progress first; each queue by status. Deleted items are left out. */
