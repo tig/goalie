@@ -96,6 +96,19 @@ class CommandsApiTests(unittest.TestCase):
         self.assertEqual(body["violations"], [{k: v for k, v in x.items() if k != "at"} for x in body["all"] if x["at"] == 3])
         self.assertIsNone(self.store.read("goal", "XW-0012"))
 
+    def test_a_check_lists_every_rule_one_command_breaks(self) -> None:
+        # Product Designer's example: Committed, In Progress, no health, Plan Maturity Watercolor. Both rules count.
+        fields = {**SUB, "state": "In Progress", "plan_maturity": "Watercolor"}
+        status, body = self.send([{"op": "create", "kind": "goal", "ref": "$g", "fields": fields, "reason": "Planned"}], check=True)
+        self.assertEqual(status, 422)
+        self.assertEqual({v["rule"] for v in body["all"]}, {"committed-needs-pencil", "health-while-in-progress"})
+
+    def test_a_missing_field_does_not_hide_the_other_rules(self) -> None:
+        fields = {**SUB, "type": "Milestone (Launch)", "plan_maturity": "Crayon", "severity": None}
+        status, body = self.send([{"op": "create", "kind": "goal", "ref": "$g", "fields": fields, "reason": "Planned"}])
+        self.assertEqual(status, 422)
+        self.assertEqual({(v["rule"], v.get("field")) for v in body["violations"]}, {("required-field", "severity"), ("committed-needs-pencil", "plan_maturity")})
+
     def test_a_check_skips_a_command_whose_ref_was_refused(self) -> None:
         batch = create_batch()
         batch[0]["fields"] = {**batch[0]["fields"], "due_date": "2026-13-45"}
