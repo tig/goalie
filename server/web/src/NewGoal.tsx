@@ -3,6 +3,7 @@ import type { ApiActor, ApiViolation, CommandsResponse, FormOptions, Health, Pat
 import { addDays, shortDate } from "../../src/dates.ts";
 import { postCommands, useJson } from "./data.ts";
 import { PtgFields } from "./GoalPanels.tsx";
+import { stillMissing } from "./model/labels.ts";
 import { commandPlace, createBatch, goalTypes, refusals, type NewGoalForm, type NewMilestone, type SubGoalRow } from "./model/commands.ts";
 import { eventValue, fieldLabel } from "./model/goalpage.ts";
 import { backPath, goalPath } from "./model/route.ts";
@@ -160,7 +161,7 @@ function Form({ options, parent, back }: { options: FormOptions; parent?: string
 
   const create = async () => {
     if (!asked) {
-      setResult({ ok: false, at: 0, error: "invalid", violations: [{ rule: "asked", message: "Write a summary, and choose a date and a Date Type.", field: "summary" }] });
+      setResult({ ok: false, at: 0, error: "invalid", violations: [{ rule: "asked", message: stillMissing(form), field: "summary" }] });
       document.getElementById("ng-1")?.scrollIntoView({ behavior: "smooth" });
       return;
     }
@@ -434,7 +435,7 @@ function Form({ options, parent, back }: { options: FormOptions; parent?: string
                 <p className="good">✓ Every check passes</p>
               ) : null
             ) : (
-              <p className="small">Write a summary, and choose a date and a Date Type.</p>
+              <p className="small">{stillMissing(form)}</p>
             )}
           </div>
           <button type="button" className="btn primary create" onClick={create} disabled={saving} aria-busy={saving}>
@@ -514,10 +515,14 @@ function SubGoals({ form, set, humans, today, shares, errors }: Part & { humans:
   // A sub-goal on this goal's date says so, and under an uncommitted goal says it shares this goal's Promotion Milestone (N9).
   const thisDate = (
     <>
-      {form.due_date && form.date_type ? `${form.date_type} ${shortDate(form.due_date, "0000")} ` : ""}
-      <span className="muted">
-        · this goal's date{shares ? ` · shares ${shares}` : ""}
-      </span>
+      {form.due_date && form.date_type ? (
+        <>
+          {`${form.date_type} ${shortDate(form.due_date, "0000")} `}
+          <span className="muted">· this goal's date{shares ? ` · shares ${shares}` : ""}</span>
+        </>
+      ) : (
+        <span className="muted">This goal's date{shares ? ` · shares ${shares}` : ""}</span>
+      )}
     </>
   );
   return (

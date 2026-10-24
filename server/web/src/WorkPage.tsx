@@ -25,10 +25,12 @@ export function WorkPage({ data, owner }: { data: PrioritiesResponse; owner?: st
       <div className="workhead">
         <h1>Work items</h1>
         {/* The switch names what it switches: the Owner (SPEC.md §6.7). */}
-        <span className="flabel">Owner</span>
-        <span className="tabs" role="group" aria-label="Owner">
-          {tab(data.me.id, data.me.name)}
-          {tab(undefined, data.org.name)}
+        <span className="wowner">
+          <span className="flabel">Owner</span>
+          <span className="tabs" role="group" aria-label="Owner">
+            {tab(data.me.id, data.me.name)}
+            {tab(undefined, data.org.name)}
+          </span>
         </span>
       </div>
       {loaded.state === "loading" && <div className="skel skel-row" />}

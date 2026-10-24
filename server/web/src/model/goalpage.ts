@@ -50,21 +50,68 @@ export function eventValue(value: unknown, field?: string, ctx: Names = {}): str
   return String(value);
 }
 
-/** The Events of one write: the same actor, time, entity, and reason. `created` is true when every old value is empty (a create). */
-export type EventGroup = { events: ApiEvent[]; created: boolean };
+/**
+ * The Events of one write: the same actor, time, and reason, on any entity (one save is one row).
+ * `created` when the write gives a summary or title its first value: an In Progress create also moves its state from Backlog (E-5).
+ * `promoted` when the write moves a Date Type up; `milestone` is the Promotion Milestone the same write completed.
+ */
+export type EventGroup = { events: ApiEvent[]; created: boolean; promoted: { milestone: string | null } | null };
 
-/** History rows (design check): one row per write, newest first. A comment is always its own row. */
+const UNCOMMITTED: readonly unknown[] = ["Fantasy", "Ambition"];
+
+/** History rows (design check, N6a): one row per write, newest first. A comment is always its own row. */
 export function groupEvents(events: ApiEvent[]): EventGroup[] {
   const groups: EventGroup[] = [];
   for (const e of events) {
     const last = groups[groups.length - 1]?.events[0];
-    const same = last && e.field !== "comment" && last.field !== "comment" && last.actor === e.actor && last.timestamp === e.timestamp && last.entity === e.entity && last.reason === e.reason;
+    const same = last && e.field !== "comment" && last.field !== "comment" && last.actor === e.actor && last.timestamp === e.timestamp && last.reason === e.reason;
     if (same) groups[groups.length - 1].events.push(e);
-    else groups.push({ events: [e], created: false });
+    else groups.push({ events: [e], created: false, promoted: null });
   }
-  for (const g of groups) g.created = g.events.length > 1 && g.events.every((e) => e.old === null || e.old === undefined);
+  for (const g of groups) {
+    g.created = g.events.some((e) => (e.field === "summary" || e.field === "title") && (e.old === null || e.old === undefined));
+    const up = g.events.find((e) => e.field === "date_type" && UNCOMMITTED.includes(e.old) && e.new !== e.old);
+    if (up) {
+      const met = g.events.find((e) => e.entity === up.entity && e.field === "promotion_milestone")?.old;
+      const completed = g.events.some((e) => e.entity === met && e.field === "state" && e.new === "Completed");
+      g.promoted = { milestone: completed && typeof met === "string" ? met : null };
+    }
+  }
   return groups;
 }
+
+/** What a create row lists: each field once, at the value the write left it (newest first), with no empty values. The page's own goal comes first. */
+export function createdFields(events: ApiEvent[], first?: string): ApiEvent[] {
+  const seen = new Set<string>();
+  const ordered = first ? [...events.filter((e) => e.entity === first), ...events.filter((e) => e.entity !== first)] : events;
+  return ordered.filter((e) => {
+    const key = `${e.entity} ${e.field}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return e.new !== null && e.new !== undefined && e.new !== "";
+  });
+}
+
+/** Each goal in the History by its latest summary, so a former Promotion Milestone reads as its name, not its key (GP7). Events are newest first. */
+export function historyNames(events: ApiEvent[]): Record<string, string> {
+  const names: Record<string, string> = {};
+  for (const e of events) if (e.field === "summary" && typeof e.new === "string" && !(e.entity in names)) names[e.entity] = e.new;
+  return names;
+}
+
+/** G25: the people in the read-only line with the words between them, so each can be drawn with its avatar. `more` when the server left some out. */
+export function changeParts<T>(people: T[], more: boolean): (T | string)[] {
+  const parts: (T | string)[] = [];
+  people.forEach((p, i) => {
+    if (i > 0) parts.push(more ? ", " : people.length === 2 ? " and " : i === people.length - 1 ? ", and " : ", ");
+    parts.push(p);
+  });
+  if (more) parts.push(", or an owner of a goal above it");
+  return parts;
+}
+
+/** G25: the read-only line as text. */
+export const changeLine = (names: string[], more: boolean) => `${changeParts(names, more).join("")} can change this goal. You can comment.`;
 
 /** The actors who may own a goal or a Path to Green step: the humans. */
 export const humans = (actors: Record<string, ApiActor> | ApiActor[]) => Object.values(actors).filter((a) => a.kind === "human");
