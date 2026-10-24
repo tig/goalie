@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ApiError, Health, PrioritiesResponse } from "../../src/api.ts";
-import { monthYear } from "./model/dates.ts";
+import { monthYear } from "../../src/dates.ts";
 import { labelSizers, rangeLabel } from "./model/labels.ts";
 import { calendarMonth } from "./model/calendar.ts";
 import { filterPriorities, isFiltering } from "./model/filter.ts";
 import { ZOOM_ORDER, type View } from "./model/query.ts";
 import { moveFrom, timelineWindow } from "./model/timeline.ts";
-import { Cards } from "./Cards.tsx";
+import { Cards, HealthCounts } from "./Cards.tsx";
 import { CalendarView } from "./CalendarView.tsx";
 import { ListView } from "./ListView.tsx";
 import { Avatar, BRAND, HealthDot } from "./parts.tsx";
 import { Search } from "./Search.tsx";
 import { TimelineView } from "./TimelineView.tsx";
-import { useMedia, useScreen } from "./useScreen.ts";
+import { usePhone, useScreen } from "./useScreen.ts";
 
 /**
  * The Home screen (ADR 0010). It reads GET /api/priorities once and draws it. It holds no rule and writes nothing.
@@ -44,26 +44,66 @@ function TopBar({ data }: { data?: PrioritiesResponse }) {
   );
 }
 
+/** A 401 reloads the page once, so the server answers with its own sign-in page (review E5). The mark stops a second reload within a minute. */
+const RELOADED = "goalie-reloaded";
+
+function reloadOnce(): boolean {
+  try {
+    const at = Number(sessionStorage.getItem(RELOADED) ?? 0);
+    if (Date.now() - at < 60_000) return false;
+    sessionStorage.setItem(RELOADED, String(Date.now()));
+  } catch {
+    return false;
+  }
+  location.reload();
+  return true;
+}
+
+/** The screen's shape while /api/priorities loads: the cards and the board as soft blocks. */
+function Skeleton() {
+  return (
+    <main aria-busy="true">
+      <div className="skel skel-title" />
+      <section className="cards">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="card">
+            <div className="skel skel-line short" />
+            <div className="skel skel-line" />
+            <div className="skel skel-line" />
+          </div>
+        ))}
+      </section>
+      <section className="card board">
+        <div className="skel skel-line short" />
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="skel skel-row" />
+        ))}
+      </section>
+    </main>
+  );
+}
+
 export function App() {
+  usePhone();
   const [loaded, setLoaded] = useState<Load>({ state: "loading" });
   useEffect(() => {
-    load().then(setLoaded, (e: Error) => setLoaded({ state: "refused", status: 0, reason: e.message }));
+    load().then(
+      (result) => {
+        if (result.state === "refused" && result.status === 401 && reloadOnce()) return;
+        setLoaded(result);
+      },
+      (e: Error) => setLoaded({ state: "refused", status: 0, reason: e.message }),
+    );
   }, []);
   if (loaded.state === "ok") return <Home data={loaded.data} />;
   return (
     <>
       <TopBar />
-      {loaded.state === "refused" && (
+      {loaded.state === "loading" ? (
+        <Skeleton />
+      ) : (
         <main className="signin">
-          {loaded.status === 401 ? (
-            <>
-              <h1>Sign in to {BRAND.app}</h1>
-              <p>{BRAND.app} shows goals only to a signed-in actor.</p>
-              <p className="small">Not signed in: {loaded.reason}.</p>
-            </>
-          ) : (
-            <p className="small">{loaded.reason}</p>
-          )}
+          <p className="small">{loaded.reason}</p>
         </main>
       )}
     </>
@@ -76,11 +116,11 @@ function Home({ data }: { data: PrioritiesResponse }) {
   const [screen, change] = useScreen();
   const [hot, setHot] = useState<Health | undefined>();
   const [home, setHome] = useState(0);
-  const phone = useMedia("(max-width:760px)");
+  const phone = usePhone();
   const filter = { health: screen.health, q: screen.q };
   const filtering = isFiltering(filter);
   const funded = useMemo(() => filterPriorities(data.funded, { health: screen.health, q: screen.q }), [data, screen.health, screen.q]);
-  const backlog = useMemo(() => filterPriorities(data.backlog, { health: screen.health, q: screen.q }), [data, screen.health, screen.q]);
+  const backlog = useMemo(() => filterPriorities(data.backlog, { health: screen.health, q: screen.q }, { counted: false }), [data, screen.health, screen.q]);
   const all = useMemo(() => [...data.funded, ...data.backlog], [data]);
   const window = useMemo(() => timelineWindow(all, data.today, screen.zoom, screen.from), [all, data.today, screen.zoom, screen.from]);
   const [range, setRange] = useState({ first: window.first, last: window.last });
@@ -113,14 +153,20 @@ function Home({ data }: { data: PrioritiesResponse }) {
       <main>
         <h1>{data.org.name}</h1>
         <Cards data={data} filter={filter} onHealth={(health) => change({ health })} onHot={setHot} />
+        {/* On a phone the health counts also sit above Priorities, so the first screen answers how things stand (review X5, X17). */}
+        {phone && (
+          <div className="phonesum">
+            <HealthCounts data={data} filter={filter} onHealth={(health) => change({ health })} onHot={setHot} />
+          </div>
+        )}
         <section className="card board" data-view={view}>
           <div className="bhead">
-            <h2>Priorities</h2>
+            <h2>{data.view.name}</h2>
             {filtering && (
               <span className="filter">
                 {screen.health && (
                   <>
-                    <HealthDot health={screen.health} />
+                    <HealthDot health={screen.health} word={false} />
                     {screen.health}
                   </>
                 )}

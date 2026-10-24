@@ -2,15 +2,21 @@
   "compilerOptions": {
     "strict": true,
     "target": "ES2024",
-    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2024",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "isolatedModules": true,
-    "types": ["node"],
+    "types": [],
     "skipLibCheck": true
   },
-  "include": ["src", "vite.config.ts"]
+  "include": [
+    "src"
+  ]
 }

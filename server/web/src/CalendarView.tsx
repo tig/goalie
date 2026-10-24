@@ -1,21 +1,23 @@
 import { useCallback, useRef, useState, type ReactNode } from "react";
 import type { Health } from "../../src/api.ts";
-import { dateLabel, shortDate } from "./model/dates.ts";
+import { shortDate, weekday } from "../../src/dates.ts";
+import { isLit } from "./model/filter.ts";
+import { dateLabel, slipLabel } from "./model/labels.ts";
 import { dayChips, type CalendarDay, type CalendarMark, type CalendarMonth } from "./model/calendar.ts";
-import { HealthDot } from "./parts.tsx";
+import { HealthDot, Legend } from "./parts.tsx";
 import { useDismiss } from "./useScreen.ts";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-/** The Date Type mark: solid for a committed date, light for Ambition, dotted for Fantasy, hatched red for a slip. */
-const markClass = (mark: CalendarMark) => (mark.date.slipDays !== undefined ? "slip" : mark.date.kind === "Promotion Milestone" ? "Committed" : mark.date.kind);
+/** The Date Type mark: solid for a Committed date, a diamond for a Promotion Milestone, light for Ambition, dotted for Fantasy, hatched red for a slip. */
+const markClass = (mark: CalendarMark) => (mark.date.slipDays !== undefined ? "slip" : mark.date.kind === "Promotion Milestone" ? "pm" : mark.date.kind);
 
 type Lit = { selected?: Health; hot?: Health };
 
 function Chip({ mark, today, lit }: { mark: CalendarMark; today: string; lit: Lit }) {
   const { goal, date } = mark;
-  const label = `${dateLabel(date, today)}${date.slipDays !== undefined ? ` · slip ${date.slipDays} days` : ""}`;
-  const on = (lit.selected && goal.health === lit.selected) || (lit.hot !== undefined && goal.health === lit.hot);
+  const label = `${dateLabel(date, today)}${date.slipDays !== undefined ? ` · ${slipLabel(date.slipDays)}` : ""}`;
+  const on = isLit(goal, lit);
   return (
     <span className={`chip${on ? " lit" : ""}`} data-health={goal.health ?? ""} title={`${goal.summary} · ${label}`}>
       <HealthDot health={goal.health} />
@@ -53,7 +55,7 @@ function Day({ d, today, lit }: { d: CalendarDay; today: string; lit: Lit }) {
     <div className={`day${d.inMonth ? "" : " out"}${d.today ? " today" : ""}${d.marks.length ? " has" : ""}`} aria-current={d.today ? "date" : undefined}>
       <span className="dnum">{Number(d.date.slice(8))}</span>
       <span className="dfull">
-        {WEEKDAYS[(new Date(`${d.date}T00:00:00Z`).getUTCDay() + 6) % 7]} {shortDate(d.date, today)}
+        {WEEKDAYS[weekday(d.date)]} {shortDate(d.date, today)}
       </span>
       {shown.map((m, i) => (
         <Chip key={i} mark={m} today={today} lit={lit} />
@@ -63,22 +65,6 @@ function Day({ d, today, lit }: { d: CalendarDay; today: string; lit: Lit }) {
   );
 }
 
-function Legend() {
-  const item = (mark: string, label: string) => (
-    <span className="lg">
-      <i className={`mk ${mark}`} />
-      {label}
-    </span>
-  );
-  return (
-    <div className="legend callegend">
-      {item("Committed", "Committed date")}
-      {item("Ambition", "Ambition date")}
-      {item("Fantasy", "Fantasy date")}
-      {item("slip", "Slip")}
-    </div>
-  );
-}
 
 /** The Priorities as a month calendar, Monday first. Each goal date is a chip on its day. */
 export function CalendarView({ month, today, search, none, ...lit }: { month: CalendarMonth; today: string; search: ReactNode; none: boolean } & Lit) {
@@ -86,7 +72,7 @@ export function CalendarView({ month, today, search, none, ...lit }: { month: Ca
     <>
       <div className="calbar">
         <div className="corner">{search}</div>
-        <Legend />
+        <Legend kind="calendar" />
       </div>
       {none && <p className="note muted">No goals match.</p>}
       <div className="cal">

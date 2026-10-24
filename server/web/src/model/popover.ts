@@ -7,11 +7,20 @@ const EDGE = 16;
 const GAP = 8;
 const WIDTH = 300;
 
+/** A help card is 300 px wide, and never wider than the screen less 32 px. */
+export const popoverWidth = (viewportWidth: number) => Math.min(WIDTH, viewportWidth - 2 * EDGE);
+
+/**
+ * Beside its icon on the right, else beside it on the left, so it never covers what the icon labels (review X10).
+ * With no room on either side it opens below, or above when below would leave the screen. It always stays 16 px inside the screen.
+ */
 export function placePopover(anchor: Rect, height: number, viewport: { width: number; height: number }): { left: number; top: number; width: number } {
-  const width = Math.min(WIDTH, viewport.width - 2 * EDGE);
+  const width = popoverWidth(viewport.width);
+  const fitTop = (top: number) => Math.max(EDGE, Math.min(top, viewport.height - EDGE - height));
+  if (anchor.right + GAP + width <= viewport.width - EDGE) return { left: anchor.right + GAP, top: fitTop(anchor.top - GAP), width };
+  if (anchor.left - GAP - width >= EDGE) return { left: anchor.left - GAP - width, top: fitTop(anchor.top - GAP), width };
   const left = Math.max(EDGE, Math.min(anchor.left - GAP, viewport.width - EDGE - width));
   const below = anchor.bottom + GAP;
-  const above = anchor.top - GAP - height;
-  const top = below + height > viewport.height - EDGE && above >= EDGE ? above : below;
+  const top = below + height > viewport.height - EDGE && anchor.top - GAP - height >= EDGE ? anchor.top - GAP - height : below;
   return { left, top, width };
 }

@@ -1,13 +1,11 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
 import type { ActorRef, Health } from "../../src/api.ts";
-import { dateLabel } from "./model/dates.ts";
-import type { GoalRow, PriorityRow } from "./model/filter.ts";
+import { isLit, type GoalRow, type PriorityRow } from "./model/filter.ts";
+import { dateLabel, slipLabel } from "./model/labels.ts";
 import { Avatar, CHEVRON, HealthDot, look, Rank } from "./parts.tsx";
 
-/** Each tree level indents this much. */
-const INDENT = 26;
-/** The x of the health dot's center at a level: the rank column, the gap, the indent, half the dot. */
-const railX = (level: number) => `${28 + level * INDENT + 5}px`;
+/** The x of the health dot's center at a level: the rank column, the gap, the indent, half the dot. The sizes are CSS variables on .board. */
+const railX = (level: number) => `calc(var(--rank) + var(--colgap) + ${level} * var(--indent) + 5px)`;
 
 export type TreeProps = {
   funded: PriorityRow[];
@@ -57,7 +55,7 @@ export function GoalTree(props: TreeProps) {
       ? { backgroundImage: rails.map(() => "linear-gradient(var(--cut),var(--cut))").join(","), backgroundPosition: rails.map((l) => `${railX(l)} 0`).join(",") }
       : {};
     const guide = g.depth > 0 ? (last ? " tree" : " tree more") : "";
-    const lit = (props.selected && g.match && g.health === props.selected) || (props.hot !== undefined && g.health === props.hot);
+    const lit = isLit(g, props);
     const control = kids
       ? { role: "button", tabIndex: 0, "aria-expanded": open, onClick: () => toggle(g.id), onKeyDown: (e: React.KeyboardEvent) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), toggle(g.id)) }
       : {};
@@ -84,9 +82,9 @@ export function GoalTree(props: TreeProps) {
             </span>
             <Avatar actor={g.owner} mine={g.owner.id === props.me.id} />
           </div>
-          {g.dates.length > 0 && (
-            <div className="when">
-              {g.dates.map((d) => `${dateLabel(d, props.today)}${d.slipDays !== undefined ? ` · slip ${d.slipDays} days` : ""}`).join(" · ")}
+          {(g.dates.length > 0 || g.inherited.length > 0) && (
+            <div className={`when${g.dates.length ? "" : " inherited"}`}>
+              {(g.dates.length ? g.dates : g.inherited).map((d) => `${dateLabel(d, props.today)}${d.slipDays !== undefined ? ` · ${slipLabel(d.slipDays)}` : ""}`).join(" · ")}
             </div>
           )}
           {props.cells(g)}
