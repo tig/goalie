@@ -1,6 +1,6 @@
 # Goal page and goal creation: engineering plan
 
-**Status:** Part 1 (the contract and the split). Part 2 follows in this file.
+**Status:** Complete: part 1 (the contract and the split) and part 2 (rules, tests, coordination).
 
 **Date:** 2026-10-24
 
@@ -106,6 +106,104 @@ Frontend, against fixtures first:
 
 Until B1 lands, the Frontend Engineer builds every save as a `CommandsRequest` and posts it. The dev server answers it with a fixed 200 from `server/web/fixtures/commands-ok.json`, so the panels can be built against the shape.
 
-## Part 2
+## Rules
 
-Part 2 follows: the rules and SPEC.md impact, the test plan, the PTG reshape, the work item rules, the stale-write UX, the seats' tokens, and what the engineers must coordinate.
+Every rule lives in [server/src/rules.ts](../../server/src/rules.ts) and returns a named violation with the `field` it points to. The app shows the message at that field. It must not check a rule itself.
+
+Changed rules:
+
+| Rule | Change | Source |
+| --- | --- | --- |
+| `committed-needs-pencil` | A goal of type `Milestone (Commit)` is exempt (E-6). | D1 |
+| `date-and-date-type` | A sub-goal with null `due_date` and `date_type` passes when an ancestor has both (E-7). The rest of `checkGoal` reads the resolved date, Date Type, Promotion Milestone, and plan from goal.ts. | D2, DD3 |
+| `promotion-milestone` | Checked against the resolved values, so a sub-goal that takes its parent's uncommitted date shares the parent's milestone. | D2 |
+| `ptg-when-yellow-or-red` | The PTG must be the `PathToGreen` shape: at least one step, each step with text, a human owner, and a real date, and criteria that are not empty. | D6, §6.1 |
+
+New rules:
+
+| Rule | What it rejects | Where |
+| --- | --- | --- |
+| `completed-on-time` | A move to Completed after `original_committed_date`, or to Completed Late on or before it. `checkTransition` takes today as an argument, so it stays pure. | §7.2 |
+| `promotion-new-milestone` | A promotion from Fantasy to Ambition that keeps the old Promotion Milestone. | §5 |
+| `work-items-off` | Any work item write while the owner setting `work_items` is off. | D7, §13 item 26 |
+| `work-item-status` | A status not in Backlog, In Progress, Completed, Deleted. | D8 |
+| `real-date` | A work item `due_date` that is not a calendar date (the existing rule, extended). | §6.7 |
+| `reason-required` | Extended: a work item change to `status`, `owner`, or `due_date` needs a reason (`REASONED.work_item`). A create sends "Filed". | §6.6 |
+| `agent-own-work-items` | An agent writing a work item that it does not own before and after the write. An agent may file a work item for itself. | §6.7, story 29 |
+| `comment-text` | A comment with no text. | §6.6 |
+| `api-kind` (bad_command) | A command for a kind other than goal or work_item (E-10). | E-10 |
+| `unknown-ref` (bad_command) | A ref used before the command that creates it. | E-2 |
+
+Lints, flagged and never blocked, come back in `GoalPageResponse.hints`: the summary lint, a description missing a §6.1 part (a) to (d), a YELLOW with no trigger, a PTG step with no owner or date when the goal has since returned to GREEN, and a missing Work Product on an in-progress `Milestone (Launch)`.
+
+The design's rail check "sub-goal dates on or before this goal's" has no rule in SPEC.md. The rail must not show it (see Coordination).
+
+## Checking before Create
+
+The New goal rail (N11, N12) shows the rules the server will check. The app must not hold a copy of them (ADR 0010). So `CommandsRequest` gains `check?: true`. With it, the server runs the batch, rolls it back, and answers the same `CommandsResponse`: the violations, or `ok` with the keys it would make. The rail calls it 400 ms after the last change. "Create XW-0012" reads its key from that answer. The Backend Engineer adds `check` to api.ts in B1.
+
+## The Path to Green
+
+Stored in `path_to_green` as `PathToGreen` (api.ts): `{ steps: [{ text, owner, date }], criteria, trigger? }`. The seed already uses this shape. `firstStep` in priorities.ts drops its string branch. Home's `ApiGoal.ptg` stays the first step. On a return to GREEN the goal page sends `path_to_green: null`. The Event keeps the old PTG, so it is in the history (§6.1 "archived into history").
+
+## Work items
+
+The `work_item` table and its fields stay as they are. The owner setting `work_items` (boolean, default off) sits in `owner_settings.settings`. The seed turns it on for Excaliwire. With it off, `GoalPageResponse.workItems` and `FormOptions.workItems` say so, and every work item write is rejected. A work item's Events are read on the goal page with the goal's, newest first, each with its `entity`. A work item has no page.
+
+## The build team's queues
+
+This is the same entity, so it costs data and one read route:
+
+- **Seats are agent actors.** The seed adds one agent actor per seat (Chief of Staff, Product Manager, Product Designer, Head of Engineering, Frontend Engineer, Backend Engineer, QA, User Researcher), with operator `chelsea`. Only the GOALIE owner writes actors (`owner-writes-actors`), so those seed writes are made as `tig`.
+- **A task is a work item** owned by its seat, with `goal` the XW-0003 sub-goal it serves (XW-0005 to XW-0011), and status Backlog, In Progress, or Completed.
+- **My work** is `GET /api/work?owner=<seat>`, grouped by status in the app. **The team view** is `GET /api/work`, grouped by owner, then status.
+- **Live status** fits ADR 0007 with no change. `live.ts` keeps the open SSE connections. The batch module calls `publish(events)` after the outer COMMIT and never before, so a rolled-back write is never sent. A new connection gets every Event after `Last-Event-ID` from the log, then the live ones. A comment line every 15 seconds keeps the host proxy from closing an idle stream. Limit: a write from `cli.ts` runs in another process and is not pushed. The CLI is for local use only, so the seats write through the API.
+- **Seat tokens.** An agent token is verified like any other (ADR 0005) and maps by its app id to one agent actor. On the local preview, `server/tests/sign_token.mjs` signs one per seat (claims `idtyp: "app"`, `azp: <seat app id>`), and the seed sets each seat's `app_id` to match. On goalie.excaliwire.com each seat needs an app registration with the issuer, and its `app_id` written on its actor row by the GOALIE owner. That is host work in excaliwire/operations. The queues run on the preview until it is done.
+
+## Stale writes
+
+Every `update` names `base_version` from the row it read. On a 409 the answer carries `current`, the stored row.
+
+- The open panel keeps every typed value.
+- A card at the top of the panel says "Someone saved this goal after you opened it."
+- Under each field the panel changed, the current value shows in `--mute`.
+- The panel takes `current.version` as its new `base_version`. Save again writes the typed values over the current row, and the rules still run.
+- The page reloads `GET /api/goals/:id` after any 200, so every section shows the stored state.
+
+A create never goes stale. A batch's step 3 (`base_version: 1` on a milestone made in the same batch) is always current.
+
+## Test plan
+
+Test first: each test fails on the old code, then passes ([AGENTS.md](../../AGENTS.md)). Server tests are Python in `server/tests/`, against a seeded store, and with the live server where a route is under test.
+
+| Step | Test file | What fails first |
+| --- | --- | --- |
+| B0 | `test_priorities_api.py` | `counted` is true only on top-level In Progress goals above the cut line. `ptg` is the first step of the new shape. |
+| B1 | `test_commands_api.py` (new) | A batch of a Fantasy goal, its milestone, and two sub-goals stores 4 goals or none. A ref resolves. A ref used before it is made is `unknown-ref`. Each `WriteResult` maps to its HTTP status. A stale update answers 409 with `current`. `check: true` stores nothing. A create In Progress writes a Backlog Event, then a state Event. A comment is one Event with old null. A work item key is WI-0001. |
+| B2 | `test_write_path.py` | D1, D2, the PTG shape, `completed-on-time`, `promotion-new-milestone`, and each work item rule. Each rule rejects with its name and field. |
+| B3 | `test_goal_page_api.py`, `test_options_api.py` (new); `test_fixture.py` | XW-0003 answers its judged date first (XW-0004 Nov 6), `inherited` false, 7 sub-goal cards under XW-0004, and Events newest first. A missing key is 404. The fixtures equal the seeded answers. |
+| B4 | `test_work_api.py` (new), `test_seed.py` | The seats are agent actors with operator chelsea. `?owner=` returns only that seat's items. |
+| B5 | `test_events_stream.py` (new) | A write after connect arrives within 1 s. A reconnect with `Last-Event-ID: n` receives every Event after n, in order. A rolled-back batch sends nothing. |
+| F0 to F6 | `test_web_model.py` | The pure parts in `server/web/src/model/`: the panel-to-batch builders (each panel's `CommandsRequest`, the create order with refs), the stale merge (typed values kept, `current` beside them), and grouping work items by status. |
+
+Before reporting a screen, the Frontend Engineer renders it at 1440, 1100, and 390 px and looks (playbook). The commands are in [CONTRIBUTING.md](../../CONTRIBUTING.md).
+
+## SPEC.md impact
+
+A behavior change and its SPEC.md change land in the same commit ([AGENTS.md](../../AGENTS.md)). The Backend Engineer makes these SPEC.md edits with the rules that change behavior:
+
+- §5 and §6.1 `plan_maturity`: a `Milestone (Commit)` is Committed without a Pencil plan; its plan is its parent's (D1).
+- §6.1 `due_date` and `parent`: a sub-goal with no date of its own takes its parent's date, Date Type, Promotion Milestone, and plan (D2, DD3).
+- §6.7 and §12: the work-item status list (D8) and the owner setting `work_items` (D7).
+
+`tests/test_conformance.py` pins SPEC.md line numbers. An edit that moves lines must update those numbers in the same commit, or the shared tests fail.
+
+## Coordination
+
+1. **api.ts.** The Backend Engineer owns it. B1 adds `check` to `CommandsRequest`. Any change is sent to the Frontend Engineer before it lands.
+2. **Fixtures.** The Frontend Engineer writes them by hand until B3. From B3 the Backend Engineer generates them from the seed, and `test_fixture.py` holds them to the API.
+3. **Violation fields.** Each rule sets `field` to the §6.1 field name. A rule about a batch row also names the command index (`at`). The app places the message by both.
+4. **The rail.** It shows only what `check: true` returns. The Product Designer drops "sub-goal dates on or before this goal's" from N11, because no rule backs it. The Chief of Staff tells the Product Designer.
+5. **Home rule 19.** A goal title links to its page, and the count chip alone opens the tree. The Frontend Engineer moves the rule in interaction-rules.md with the change.
+6. **Today.** Every route takes today from `configuredToday(db)` in config.ts. Nothing reads the clock elsewhere.
+7. **Merging.** Each engineer pushes their branch; the Chief of Staff merges into chelsea/mlp after B1, B3, and B5, and the Frontend Engineer merges chelsea/mlp before F3 and F5.
