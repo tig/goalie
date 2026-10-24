@@ -1,8 +1,9 @@
 import { useState } from "react";
-import type { ApiActor, ApiViolation, ApiWorkItem, CommandsRequest, GoalPageResponse, WorkItemStatus } from "../../src/api.ts";
+import type { ApiActor, ApiViolation, ApiWorkItem, CommandsRequest, FormOptions, GoalPageResponse, WorkItemStatus } from "../../src/api.ts";
 import { addDays } from "../../src/dates.ts";
-import { postCommands } from "./data.ts";
-import { subGoalBatch, workItemBatch, workItemStatusBatch, type SubGoalRow } from "./model/commands.ts";
+import { postCommands, useJson } from "./data.ts";
+import { goalTypes, subGoalBatch, workItemBatch, workItemStatusBatch, type SubGoalRow } from "./model/commands.ts";
+import { humans } from "./model/goalpage.ts";
 import { dateLabel } from "./model/labels.ts";
 
 /** + Sub-goal, + Work item, and the work item tick (G20, G22, G24). Each posts one batch; the server checks every rule. */
@@ -35,13 +36,14 @@ const Errors = ({ result }: { result: Result }) => (
   </>
 );
 
-const humans = (data: GoalPageResponse): ApiActor[] => Object.values(data.actors).filter((a) => a.kind === "human");
+const people = (data: GoalPageResponse): ApiActor[] => humans(data.actors);
 
 /**
  * G20: one add row at the top of the sub-goals. Its date starts as this goal's (D2), written out.
  * Its own Ambition or Fantasy date opens its own Promotion Milestone, as on the New goal form (N6).
  */
 export function AddSubGoal({ data, onDone }: { data: GoalPageResponse; onDone: (saved: boolean) => void }) {
+  const [options] = useJson<FormOptions>("/api/options");
   const { goal, today } = data;
   const [summary, setSummary] = useState("");
   const [owner, setOwner] = useState(goal.owner);
@@ -62,7 +64,7 @@ export function AddSubGoal({ data, onDone }: { data: GoalPageResponse; onDone: (
         <label className="field">
           <span className="flabel">Owner</span>
           <select value={owner} onChange={(e) => setOwner(e.target.value)}>
-            {humans(data).map((a) => (
+            {people(data).map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name}
               </option>
@@ -113,7 +115,7 @@ export function AddSubGoal({ data, onDone }: { data: GoalPageResponse; onDone: (
       )}
       <Errors result={result} />
       <div className="pactions">
-        <button type="button" className="btn primary" disabled={result.saving} onClick={() => post(subGoalBatch(goal, row))}>
+        <button type="button" className="btn primary" disabled={result.saving || options.state !== "ok"} onClick={() => options.state === "ok" && post(subGoalBatch(goal, row, goalTypes(options.data)))}>
           Add
         </button>
         <button type="button" className="btn" onClick={() => onDone(false)}>

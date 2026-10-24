@@ -1,4 +1,5 @@
-import type { ApiEvent, ApiWorkItem, WorkItemStatus } from "../../../src/api.ts";
+import type { ApiActor, ApiEvent, ApiWorkItem, WorkItemStatus } from "../../../src/api.ts";
+import { day, DAY, isDate } from "../../../src/dates.ts";
 
 /** The goal page's pure parts: work items by status (G23), the history filters, and how an Event's values read. */
 
@@ -23,10 +24,22 @@ export const filterEvents = (events: ApiEvent[], filter: HistoryFilter) => (filt
 
 export const comments = (events: ApiEvent[]) => events.filter((e) => e.field === "comment");
 
-/** An Event's old or new value in words: None for nothing, an actor by name, a Path to Green by its steps, links by their targets. */
-export function eventValue(value: unknown, field?: string, actors?: Record<string, { name: string }>): string {
+const DATE_YEAR = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+
+/** What a value is named by: actors by id, and other ids (a Priority, an org unit, a goal) by name. */
+export type Names = { actors?: Record<string, { name: string }>; names?: Record<string, string> };
+
+/** An Event's old or new value in words: None for nothing, names for ids, a date with its year (rule 14), a Path to Green by its steps, links by their targets. */
+export function eventValue(value: unknown, field?: string, ctx: Names = {}): string {
   if (value === null || value === undefined || value === "") return "None";
-  if (field === "owner" && typeof value === "string" && actors?.[value]) return actors[value].name;
+  if (typeof value === "string") {
+    if (field === "owner" && ctx.actors?.[value]) return ctx.actors[value].name;
+    if (ctx.names?.[value]) return ctx.names[value];
+    const text: string = value;
+    if (/^\d{4}-/.test(text) && isDate(text)) return DATE_YEAR.format(day(text));
+    if (field === "visibility") return text.charAt(0).toUpperCase() + text.slice(1);
+    return text;
+  }
   if (Array.isArray(value)) return value.map((v) => (typeof v === "object" && v ? Object.values(v).join(" ") : String(v))).join(", ");
   if (typeof value === "object") {
     const steps = (value as { steps?: unknown[] }).steps;
@@ -35,6 +48,25 @@ export function eventValue(value: unknown, field?: string, actors?: Record<strin
   }
   return String(value);
 }
+
+/** The Events of one write: the same actor, time, entity, and reason. `created` is true when every old value is empty (a create). */
+export type EventGroup = { events: ApiEvent[]; created: boolean };
+
+/** History rows (design check): one row per write, newest first. A comment is always its own row. */
+export function groupEvents(events: ApiEvent[]): EventGroup[] {
+  const groups: EventGroup[] = [];
+  for (const e of events) {
+    const last = groups[groups.length - 1]?.events[0];
+    const same = last && e.field !== "comment" && last.field !== "comment" && last.actor === e.actor && last.timestamp === e.timestamp && last.entity === e.entity && last.reason === e.reason;
+    if (same) groups[groups.length - 1].events.push(e);
+    else groups.push({ events: [e], created: false });
+  }
+  for (const g of groups) g.created = g.events.length > 1 && g.events.every((e) => e.old === null || e.old === undefined);
+  return groups;
+}
+
+/** The actors who may own a goal or a Path to Green step: the humans. */
+export const humans = (actors: Record<string, ApiActor> | ApiActor[]) => Object.values(actors).filter((a) => a.kind === "human");
 
 /** SPEC.md §6.1 and §6.7 field names in words, for the History and the Fields card. */
 const LABELS: Record<string, string> = {
@@ -53,9 +85,9 @@ export const fieldLabel = (field: string) => LABELS[field] ?? field;
  * It is a picture of the dates above it, not a control.
  */
 export function dateBar(started: string, today: string, dates: { date: string; kind: string }[]): { start: number; today: number; marks: { at: number; date: string; kind: string }[] } {
-  const t = (d: string) => Date.parse(`${d}T00:00:00Z`);
+  const t = day;
   const from = Math.min(t(started), t(today), ...dates.map((d) => t(d.date)));
-  const to = Math.max(from + 86_400_000, t(today), ...dates.map((d) => t(d.date)));
+  const to = Math.max(from + DAY, t(today), ...dates.map((d) => t(d.date)));
   const at = (d: string) => (100 * (t(d) - from)) / (to - from);
   return { start: at(started), today: at(today), marks: dates.map((d) => ({ at: at(d.date), date: d.date, kind: d.kind })) };
 }

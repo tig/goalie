@@ -17,6 +17,7 @@ def run(body: str) -> object:
     script = f"""{imports}
 import {{ readFileSync }} from "node:fs";
 const api = JSON.parse(readFileSync({json.dumps(str(FIXTURE))}, "utf-8"));
+const TYPES = {{ goal: "Milestone (Launch)", milestone: "Milestone (Commit)" }};
 const page = (key) => JSON.parse(readFileSync({json.dumps(str(FIXTURE.parent))} + "/goal-" + key + ".json", "utf-8"));
 const out = await (async () => {{ {body} }})();
 process.stdout.write(JSON.stringify(out));
@@ -367,7 +368,7 @@ class GoalPageTests(unittest.TestCase):
         self.assertEqual(run('return ["due_date", "date_type", "path_to_green", "original_committed_date", "comment", "status"].map(goalpage.fieldLabel);'), ["Due Date", "Date Type", "Path to Green", "Original Committed Date", "Comment", "Status"])
 
     def test_an_actor_field_reads_as_the_name(self) -> None:
-        self.assertEqual(run('return goalpage.eventValue("tig", "owner", page("XW-0003").actors);'), "Tig")
+        self.assertEqual(run('return goalpage.eventValue("tig", "owner", { actors: page("XW-0003").actors });'), "Tig")
 
     def test_the_date_bar_spans_start_today_and_every_date(self) -> None:
         bar = run('return goalpage.dateBar("2026-10-23", "2026-10-23", [{ date: "2026-11-06", kind: "Promotion Milestone" }, { date: "2026-11-30", kind: "Fantasy" }]);')
@@ -378,6 +379,22 @@ class GoalPageTests(unittest.TestCase):
     def test_a_date_before_the_start_widens_the_bar(self) -> None:
         bar = run('return goalpage.dateBar("2026-10-23", "2026-10-23", [{ date: "2026-10-01", kind: "Committed" }]);')
         self.assertEqual((bar["marks"][0]["at"], bar["start"], bar["today"]), (0, 100, 100))  # type: ignore[index]
+
+    def test_events_of_one_write_group_into_one_row(self) -> None:
+        events = [
+            {"sequence": 5, "timestamp": "t2", "actor": "tig", "field": "comment", "reason": "Hi", "entity": "XW-0003"},
+            {"sequence": 4, "timestamp": "t1", "actor": "chelsea", "field": "health", "old": "GREEN", "reason": "Late", "entity": "XW-0003"},
+            {"sequence": 3, "timestamp": "t1", "actor": "chelsea", "field": "path_to_green", "reason": "Late", "entity": "XW-0003"},
+            {"sequence": 2, "timestamp": "t0", "actor": "chelsea", "field": "summary", "old": None, "reason": "Seeded", "entity": "XW-0003"},
+            {"sequence": 1, "timestamp": "t0", "actor": "chelsea", "field": "owner", "old": None, "reason": "Seeded", "entity": "XW-0003"},
+        ]
+        rows = run(f"return goalpage.groupEvents({json.dumps(events)}).map((g) => [g.events.map((e) => e.sequence), g.created]);")
+        self.assertEqual(rows, [[[5], False], [[4, 3], False], [[2, 1], True]])
+
+    def test_a_value_reads_as_names_and_dates(self) -> None:
+        ctx = {"actors": {"tig": {"name": "Tig"}}, "names": {"PRI-3": "Priority 3 Run Excaliwire on GOALIE", "excaliwire": "Excaliwire"}}
+        v = run(f'const c = {json.dumps(ctx)}; return [goalpage.eventValue("2026-11-30", "due_date", c), goalpage.eventValue("PRI-3", "priority", c), goalpage.eventValue("excaliwire", "org_unit", c), goalpage.eventValue("tig", "owner", c), goalpage.eventValue("organization-wide", "visibility", c)];')
+        self.assertEqual(v, ["Nov 30, 2026", "Priority 3 Run Excaliwire on GOALIE", "Excaliwire", "Tig", "Organization-wide"])
 
     def test_comments_are_the_comment_events(self) -> None:
         events = [{"field": "comment", "actor": "tig"}, {"field": "health", "actor": "chelsea"}, {"field": "comment", "actor": "chelsea"}]
@@ -401,15 +418,25 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(b["commands"][0]["fields"]["changed_due_date"], "2026-11-20")  # type: ignore[index]
 
     def test_promoting_fantasy_makes_a_new_milestone_first(self) -> None:
-        b = run('const g = page("XW-0003").goal; return commands.promoteBatch(g, { summary: "Commit a date for the launch", due_date: "2026-12-01", owner: "chelsea" }, "2026-12-15", "Plan is clearer");')
+        b = run('const g = page("XW-0003").goal; return commands.promoteToAmbition(g, { summary: "Commit a date for the launch", due_date: "2026-12-01", owner: "chelsea" }, "2026-12-15", "Plan is clearer", "Milestone (Commit)");')
         c = b["commands"]  # type: ignore[index]
         self.assertEqual([x["op"] for x in c], ["create", "update"])
         self.assertEqual((c[0]["ref"], c[0]["fields"]["type"], c[0]["fields"]["date_type"]), ("$m", "Milestone (Commit)", "Committed"))
         self.assertEqual(c[1]["fields"], {"date_type": "Ambition", "promotion_milestone": "$m", "due_date": "2026-12-15"})
 
-    def test_promoting_ambition_to_committed_is_one_update(self) -> None:
-        b = run('const g = { ...page("XW-0003").goal, date_type: "Ambition" }; return commands.promoteBatch(g, null, "2026-11-30", "At Pencil");')
-        self.assertEqual(b["commands"][0]["fields"], {"date_type": "Committed", "promotion_milestone": None})  # type: ignore[index]
+    def test_promoting_fantasy_completes_the_met_milestone_first(self) -> None:
+        c = run('return commands.promoteToAmbition(page("XW-0003").goal, { summary: "Next", due_date: "2026-12-01", owner: "chelsea" }, "2026-11-30", "Met", "Milestone (Commit)", { id: "XW-0004", version: 2 }).commands;')
+        self.assertEqual([(x["op"], x.get("ref") or x.get("id")) for x in c], [("update", "XW-0004"), ("create", "$m"), ("update", "XW-0003")])  # type: ignore[union-attr]
+        self.assertEqual(c[0]["fields"], {"state": "Completed"})  # type: ignore[index]
+
+    def test_promoting_ambition_to_committed_completes_the_milestone_first(self) -> None:
+        b = run('const g = { ...page("XW-0003").goal, date_type: "Ambition" }; return commands.promoteToCommitted(g, { id: "XW-0004", version: 3 }, "2026-11-30", "At Pencil");')
+        c = b["commands"]  # type: ignore[index]
+        self.assertEqual((c[0]["id"], c[0]["base_version"], c[0]["fields"], c[0]["reason"]), ("XW-0004", 3, {"state": "Completed"}, "At Pencil"))
+        self.assertEqual((c[1]["id"], c[1]["fields"]), ("XW-0003", {"date_type": "Committed", "promotion_milestone": None}))
+
+    def test_humans_are_the_human_actors(self) -> None:
+        self.assertEqual(run('return goalpage.humans({ a: { id: "a", name: "A", kind: "human" }, b: { id: "b", name: "B", kind: "agent" } }).map((x) => x.id);'), ["a"])
 
     def test_close_and_pursue_set_the_state(self) -> None:
         c = run('const g = page("XW-0003").goal; return [commands.closeBatch(g, "Did Not Meet", "Dropped").commands[0].fields, commands.pursueBatch({ ...g, state: "Backlog" }, "GREEN", "Starting").commands[0].fields];')
@@ -423,11 +450,11 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(run('return commands.commentBatch("goal", "XW-0003", " Looks right. ");'), {"commands": [{"op": "comment", "kind": "goal", "id": "XW-0003", "text": "Looks right."}]})
 
     def test_a_sub_goal_on_its_parents_date_sends_no_date(self) -> None:
-        b = run('return commands.subGoalBatch(page("XW-0003").goal, { summary: "Load the tree", owner: "chelsea" });')
-        self.assertEqual(b, {"commands": [{"op": "create", "kind": "goal", "ref": "$s1", "fields": {"summary": "Load the tree", "owner": "chelsea", "parent": "XW-0003", "org_unit": "excaliwire", "level": "Company", "severity": "sev1", "origination": "New", "visibility": "organization-wide", "plan_maturity": "Crayon", "state": "Backlog"}, "reason": "Sub-goal of XW-0003"}]})
+        b = run('return commands.subGoalBatch(page("XW-0003").goal, { summary: "Load the tree", owner: "chelsea" }, TYPES);')
+        self.assertEqual(b, {"commands": [{"op": "create", "kind": "goal", "ref": "$s1", "fields": {"summary": "Load the tree", "owner": "chelsea", "parent": "XW-0003", "type": "Milestone (Launch)", "org_unit": "excaliwire", "level": "Company", "severity": "sev1", "origination": "New", "visibility": "organization-wide", "plan_maturity": "Crayon", "state": "Backlog"}, "reason": "Sub-goal of XW-0003"}]})
 
     def test_an_uncommitted_sub_goal_brings_its_own_milestone_in_the_create_order(self) -> None:
-        b = run('return commands.subGoalBatch(page("XW-0004").goal, { summary: "Open a goal", owner: "chelsea", date: { due_date: "2026-12-01", date_type: "Ambition" }, milestone: { summary: "Commit a date for Open a goal", due_date: "2026-11-20", owner: "chelsea" } });')
+        b = run('return commands.subGoalBatch(page("XW-0004").goal, { summary: "Open a goal", owner: "chelsea", date: { due_date: "2026-12-01", date_type: "Ambition" }, milestone: { summary: "Commit a date for Open a goal", due_date: "2026-11-20", owner: "chelsea" } }, TYPES);')
         c = b["commands"]  # type: ignore[index]
         self.assertEqual([(x["op"], x.get("ref") or x.get("id")) for x in c], [("create", "$m1"), ("create", "$s1"), ("update", "$m1")])
         self.assertEqual(c[1]["fields"]["promotion_milestone"], "$m1")
@@ -446,6 +473,7 @@ class CommandTests(unittest.TestCase):
         "due_date": "2027-02-28", "date_type": "Fantasy", "health": "GREEN", "path_to_green": None, "plan": None, "plan_maturity": "Watercolor",
         "more": {"type": "Milestone (Launch)", "severity": "sev2", "state": "In Progress", "origination": "New", "level": "Company", "visibility": "organization-wide", "org_unit": "excaliwire"},
         "milestone": {"summary": "Commit a date for Launch the goal page", "due_date": "2026-11-20", "owner": "chelsea"},
+        "milestoneType": "Milestone (Commit)",
         "subGoals": [
             {"summary": "Draw the header", "owner": "chelsea"},
             {"summary": "Wire the panels", "owner": "tig", "date": {"due_date": "2027-01-15", "date_type": "Ambition"}, "milestone": {"summary": "Commit a date for Wire the panels", "due_date": "2026-12-01", "owner": "tig"}},
