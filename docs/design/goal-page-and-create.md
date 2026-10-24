@@ -99,6 +99,10 @@ Each opens a panel in place under the date block. One panel at a time. Each stat
 - **G15. Close** (wireframe 13): Completed, Did Not Meet, or Deleted, and a reason. Completed vs Completed Late is computed against the original committed date and shown, not chosen. An Ambition goal offers "Promote and close" in one step (SPEC §7.2 closing rule): it completes the Promotion Milestone, promotes the goal to Committed on its current date, and closes it as the server computes (Completed or Completed Late). It still needs a Plan at Pencil; that refusal shows in the panel, in place. A Fantasy goal moves up one step at a time (§5), so its Close goal panel offers Did Not Meet and Deleted only, with one muted line: "Promote to Ambition first to close as Completed."
 - **G16. Pursue** moves a Backlog goal to In Progress, asks for health (GREEN by default) and a reason.
 
+### Who may change it
+
+- **G25.** Only the goal's owner, an owner of a goal above it, and the GOALIE owner may change health, state, dates, and the Path to Green (Chelsea's rule). For anyone else the page is the same page, read-only in those parts: health is its shape and word in its `-ink` token (rule 10: no pill, no buttons); Pursue, Record a slip, Promote date, Close goal, and the Path to Green pencil are not drawn (hidden, not grayed, so nothing looks broken); the "Needs you" line is not drawn. One muted line sits under the date bar and names the people: "Chelsea, or Tig as owner of XW-0003 above it, can change health, dates, and state. You can comment." (the GOALIE owner is not named; with no goal above, the line names the owner only). Comments, and anything else the server lets the viewer write, stay open. The server decides; the page draws what the server's answer allows.
+
 ### Description and Fields
 
 - **G17.** Description and Fields sit side by side at 1440 and 1100 (1.4fr and 1fr), and stack on a phone.
