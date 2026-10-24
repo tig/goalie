@@ -195,6 +195,13 @@ class WritePathTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertEqual(result["error"], "unknown_actor")
 
+    def test_the_event_log_is_indexed_by_entity(self) -> None:
+        # Review E21: reading one goal's Events must not scan the whole log.
+        with sqlite3.connect(self.store.path) as db:
+            plan = " ".join(row[3] for row in db.execute("EXPLAIN QUERY PLAN SELECT * FROM event WHERE entity_kind = 'goal' AND entity = 'GOAL-57' ORDER BY sequence"))
+        self.assertIn("USING INDEX", plan)
+        self.assertNotIn("TEMP B-TREE", plan)
+
     def test_event_log_is_append_only(self) -> None:
         with sqlite3.connect(self.store.path) as db:
             with self.assertRaises(sqlite3.DatabaseError):

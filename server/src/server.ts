@@ -55,7 +55,10 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
     c.set("actor", { id: who.actor.id as string, name: who.actor.display_name as string });
     await next();
   });
-  app.get("/api/priorities", (c) => c.json<PrioritiesResponse>({ ...prioritiesView(db, configuredOrgUnit(db)), me: c.get("actor") }));
+  // Resolve the org unit once (review E22). An empty store has none yet, so try again until it does.
+  let orgUnit = "";
+  const unit = () => (orgUnit ||= configuredOrgUnit(db));
+  app.get("/api/priorities", (c) => c.json<PrioritiesResponse>({ ...prioritiesView(db, unit()), me: c.get("actor") }));
   app.all("/api/*", (c) => refuse(c, 404, "not_found", `no API route ${c.req.method} ${c.req.path}`));
   app.get("/assets/*", async (c) => {
     const body = await built(webDist, c.req.path);

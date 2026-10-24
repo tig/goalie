@@ -151,6 +151,7 @@ class PrioritiesDefinitionTests(unittest.TestCase):
             create("goal", "XW-0091", {**OLD_GOAL, "summary": "A Team goal on a company Priority", "priority": "PRI-1", "org_unit": "xw-team", "level": "Team"}, "Test data"),
             create("goal", "XW-0092", {**OLD_GOAL, "summary": "A Completed goal", "priority": "PRI-2", "state": "Completed", "health": None, "path_to_green": None}, "Test data"),
             create("draft", "DR-1", {"entity": "XW-0001", "actor": "chelsea", "base_version": 1, "change": {"health": "YELLOW"}, "reason": "test"}, "Test data"),
+            create("draft", "DR-2", {"entity": "XW-0091", "actor": "chelsea", "base_version": 1, "change": {"health": "YELLOW"}, "reason": "A goal outside the view"}, "Test data"),
         ]
         for command in writes:
             result = cls.store.write("chelsea", command)
@@ -178,7 +179,8 @@ class PrioritiesDefinitionTests(unittest.TestCase):
     def test_an_old_committed_date_is_a_slip(self) -> None:
         self.assertEqual(self.goals["XW-0090"]["dates"], [{"date": "2025-01-15", "kind": "Committed", "slipDays": days_since("2025-01-15")}])
 
-    def test_the_drafts_count_counts_drafts(self) -> None:
+    def test_the_drafts_count_counts_only_this_views_drafts(self) -> None:
+        # Review E20: DR-2 is on a goal the view does not show.
         self.assertEqual(self.body["summary"]["drafts"], 1)
 
 

@@ -128,8 +128,9 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
     return date?.slipDays !== undefined ? [{ goal: g.id, summary: g.summary, date: date.date, kind: date.kind as "Committed" | "Promotion Milestone", days: date.slipDays }] : [];
   });
   const count = (h: Health) => top.filter((g) => g.health === h).length;
-  // Until the Drafts slice, every stored Draft counts as open.
-  const drafts = (db.prepare("SELECT COUNT(*) AS n FROM draft").get() as { n: number }).n;
+  // Until the Drafts slice, every stored Draft counts as open. The count covers the goals this view shows.
+  const inThisView = new Set(tops.flat().flatMap(inView).map((g) => g.id));
+  const drafts = readAll(db, "draft").filter((d) => inThisView.has(d.entity)).length;
 
   let nextPromotion: ApiSummary["nextPromotion"];
   for (const goal of tops.flat().flatMap(inView)) {

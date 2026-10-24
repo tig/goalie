@@ -110,6 +110,8 @@ CREATE TABLE IF NOT EXISTS event (
   new TEXT,
   reason TEXT
 );
+-- One goal's Events, in order, without a scan of the log (review E21).
+CREATE INDEX IF NOT EXISTS event_by_entity ON event (entity_kind, entity, sequence);
 CREATE TRIGGER IF NOT EXISTS event_no_update BEFORE UPDATE ON event
 BEGIN SELECT RAISE(ABORT, 'the Event log is append-only'); END;
 CREATE TRIGGER IF NOT EXISTS event_no_delete BEFORE DELETE ON event
