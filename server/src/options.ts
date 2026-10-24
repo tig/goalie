@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
-import type { FormOptions, PlanMaturity, WorkItemStatus } from "./api.ts";
-import { DEFAULT_VISIBILITY } from "./goal.ts";
+import type { FormOptions, PlanMaturity } from "./api.ts";
+import { DEFAULT_VISIBILITY, WORK_ITEM_STATUSES } from "./goal.ts";
 import { actorsById, workItemsOn } from "./goalpage.ts";
 import { isCurrentPeriod } from "./priorities.ts";
 import { read, readAll } from "./read.ts";
@@ -15,7 +15,6 @@ const TYPES = ["Milestone (Commit)", "Milestone (Launch)", "Metric (Business)", 
 const SEVERITIES = ["sev1", "sev2", "sev3"];
 const LEVELS = ["Company", "Program or Function", "Team", "Individual"];
 const PLAN_MATURITIES: PlanMaturity[] = ["Watercolor", "Crayon", "Pencil"];
-const WORK_ITEM_STATUSES: WorkItemStatus[] = ["Backlog", "In Progress", "Completed", "Deleted"];
 
 /** Enough keys for a goal, its Promotion Milestone, and a form full of sub-goals and their own milestones. */
 const KEYS_AHEAD = 20;
@@ -46,7 +45,7 @@ export function formOptions(db: DatabaseSync, me: string, orgUnit: string, today
       // SPEC.md names no default plan maturity. The least firm is the honest start.
       plan_maturity: "Watercolor",
     },
-    choices: { type: TYPES, severity: SEVERITIES, level: LEVELS, plan_maturity: PLAN_MATURITIES, workItemStatus: WORK_ITEM_STATUSES },
+    choices: { type: TYPES, severity: SEVERITIES, level: LEVELS, plan_maturity: PLAN_MATURITIES, workItemStatus: [...WORK_ITEM_STATUSES] },
     workItems: workItemsOn(db),
   };
 }

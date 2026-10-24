@@ -55,6 +55,8 @@ export function eventStream(c: Context, db: DatabaseSync): Response {
           last = event.sequence;
           await stream.writeSSE({ id: String(event.sequence), data: JSON.stringify(event) });
         }
+        // An Event published during a write is already queued: send it now, do not sleep (Head of Engineering).
+        if (queued.length > 0) continue;
         await new Promise<void>((resolve) => (wake = resolve));
         wake = undefined;
       }

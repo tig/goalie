@@ -6,12 +6,13 @@ import http.client
 import json
 import queue
 import socket
+import subprocess
 import threading
 import time
 import unittest
 from typing import Any
 
-from goalie_cli import Store, update
+from goalie_cli import SERVER, Store, update
 from live_server import get, post, running_server, signed
 
 
@@ -55,6 +56,45 @@ class Stream:
             except OSError:
                 pass
         self.conn.close()
+
+
+# Publish one Event, let the stream start writing it, and publish a second during that write.
+RACE = """
+const { Hono } = await import("hono");
+const { DatabaseSync } = await import("node:sqlite");
+const { eventStream, publish } = await import("./src/live.ts");
+const db = new DatabaseSync(":memory:");
+const ev = (n) => ({ sequence: n, timestamp: "t", actor: "a", entity_kind: "goal", entity: "XW-0001", field: "comment", old: null, new: String(n), reason: "r" });
+// For each k, publish Event 2 k microtasks after Event 1, so one k lands while Event 1 is being written.
+const missed = [];
+for (let k = 0; k <= 30; k++) {
+  const app = new Hono();
+  app.get("/e", (c) => eventStream(c, db));
+  const reader = (await app.request("/e")).body.getReader();
+  await new Promise((r) => setTimeout(r, 5));
+  publish([ev(2 * k + 1)]);
+  for (let i = 0; i < k; i++) await null;
+  publish([ev(2 * k + 2)]);
+  let text = "";
+  const deadline = Date.now() + 200;
+  while (Date.now() < deadline && !text.includes(`id: ${2 * k + 2}\\n`)) {
+    const chunk = await Promise.race([reader.read(), new Promise((r) => setTimeout(() => r({}), 50))]);
+    if (chunk.value) text += new TextDecoder().decode(chunk.value);
+  }
+  if (!text.includes(`id: ${2 * k + 2}\\n`)) missed.push(k);
+  await reader.cancel();
+}
+process.stdout.write(JSON.stringify(missed));
+process.exit(0);
+"""
+
+
+class PublishRaceTests(unittest.TestCase):
+    def test_an_event_published_during_a_write_is_sent_at_once(self) -> None:
+        # Head of Engineering: it waited for the next write, with no deadline (ADR 0007).
+        proc = subprocess.run(["node", "--no-warnings", "--input-type=module", "-e", RACE], cwd=SERVER, capture_output=True, timeout=30)
+        self.assertEqual(proc.returncode, 0, proc.stderr.decode())
+        self.assertEqual(json.loads(proc.stdout), [], "the second Event waited after these microtask offsets")
 
 
 class EventsStreamTests(unittest.TestCase):

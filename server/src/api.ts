@@ -4,7 +4,7 @@
  * Dates are ISO strings (YYYY-MM-DD). Labels are made in the app.
  */
 
-import type { State } from "./goal.ts";
+import type { State, WORK_ITEM_STATUSES } from "./goal.ts";
 
 export type Health = "GREEN" | "YELLOW" | "RED" | null;
 
@@ -121,7 +121,7 @@ export type StoredGoal = GoalFields & {
 };
 
 /** Work-item status values (D8): SPEC.md §6.1 State words. */
-export type WorkItemStatus = "Backlog" | "In Progress" | "Completed" | "Deleted";
+export type WorkItemStatus = (typeof WORK_ITEM_STATUSES)[number];
 
 /** The writable fields of a work item (SPEC.md §6.7). `owner` may be an agent. `links` are plain URLs in the MLP. */
 export type WorkItemFields = { goal: string; title: string; owner: string; status: WorkItemStatus; due_date: string | null; links: string[] | null };

@@ -4,7 +4,7 @@
  */
 
 import { isDate } from "./dates.ts";
-import { COMPLETED_STATES, currentDate, DATE_TYPES, resolvedGoal, STATE_MOVES, type State } from "./goal.ts";
+import { closesAs, COMPLETED_STATES, currentDate, DATE_TYPES, resolvedGoal, STATE_MOVES, WORK_ITEM_STATUSES, type State } from "./goal.ts";
 
 export type Row = Record<string, unknown>;
 
@@ -105,9 +105,6 @@ function isPathToGreen(store: Lookup, value: unknown): boolean {
   return (ptg.steps as { text?: unknown; owner?: unknown; date?: unknown }[]).every(stepOk) && typeof ptg.criteria === "string" && ptg.criteria.trim() !== "";
 }
 
-/** Work-item status values (D8): SPEC.md §6.1 State words. */
-const WORK_ITEM_STATUSES = ["Backlog", "In Progress", "Completed", "Deleted"];
-
 /** The work-item extension (SPEC.md §6.7): on only by the owner setting work_items (D7). */
 function checkWorkItem(store: Lookup, item: Row): Violation[] {
   const settings = store.get("owner_settings", "owner")?.settings as Row | undefined;
@@ -115,7 +112,7 @@ function checkWorkItem(store: Lookup, item: Row): Violation[] {
     return [{ rule: "work-items-off", message: "work items are off for this deployment. The GOALIE owner turns them on (owner setting work_items)." }];
   }
   const found: Violation[] = [];
-  if (!WORK_ITEM_STATUSES.includes(item.status as string)) {
+  if (!(WORK_ITEM_STATUSES as readonly unknown[]).includes(item.status)) {
     found.push({ rule: "work-item-status", message: `${item.id}: status is one of ${WORK_ITEM_STATUSES.join(", ")}.`, field: "status" });
   }
   if (item.due_date != null && !isDate(item.due_date)) {
@@ -185,7 +182,7 @@ export function checkWrite(store: Lookup, kind: string, row: Row): Violation[] {
 }
 
 /** Transition rules: they compare the row before and after a write (SPEC.md §5, §7). `today` is the org's day, so the rule stays pure. */
-export function checkTransition(kind: string, before: Row | undefined, after: Row, today: string): Violation[] {
+export function checkTransition(kind: string, before: Row | undefined, after: Row, today: string, getGoal: (id: string) => Row | undefined): Violation[] {
   if (kind !== "goal" || before === undefined) return [];
   const found: Violation[] = [];
   const from = DATE_TYPES.indexOf(before.date_type as never);
@@ -201,14 +198,10 @@ export function checkTransition(kind: string, before: Row | undefined, after: Ro
     // SPEC.md §5: the milestone that promoted Fantasy to Ambition is met; Ambition needs the next one.
     found.push({ rule: "promotion-new-milestone", message: `${after.id}: a promotion to Ambition names a new Promotion Milestone.`, field: "promotion_milestone" });
   }
-  const original = after.original_committed_date;
-  if (before.state !== after.state && typeof original === "string") {
+  const expected = closesAs(resolvedGoal(after, getGoal), today);
+  if (before.state !== after.state && (COMPLETED_STATES as readonly unknown[]).includes(after.state) && expected !== null && after.state !== expected) {
     // SPEC.md §7.2: Completed is met on or before the Original Committed Date, Completed Late after it.
-    if (after.state === "Completed" && today > original) {
-      found.push({ rule: "completed-on-time", message: `${after.id}: met after ${original}, so it is Completed Late.`, field: "state" });
-    } else if (after.state === "Completed Late" && today <= original) {
-      found.push({ rule: "completed-on-time", message: `${after.id}: met on or before ${original}, so it is Completed.`, field: "state" });
-    }
+    found.push({ rule: "completed-on-time", message: `${after.id}: met ${expected === "Completed" ? "on time" : "late"}, so it is ${expected}.`, field: "state" });
   }
   const moves = STATE_MOVES[before.state as State];
   if (before.state !== after.state && moves !== undefined && !(moves as readonly unknown[]).includes(after.state)) {
