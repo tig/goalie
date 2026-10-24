@@ -9,7 +9,7 @@ import type { State } from "./goal.ts";
 export type Health = "GREEN" | "YELLOW" | "RED" | null;
 
 /** How firm a date is (SPEC.md §5). A Promotion Milestone date is a Committed date that backs another goal's uncommitted date. */
-export type DateKind = "Committed" | "Promotion Milestone" | "Ambition" | "Fantasy";
+type DateKind = "Committed" | "Promotion Milestone" | "Ambition" | "Fantasy";
 
 /** One date of a goal. `slipDays` is set when a Committed date has passed while the goal is open. */
 export type GoalDate = { date: string; kind: DateKind; slipDays?: number };

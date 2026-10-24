@@ -33,7 +33,7 @@ function isHuman(store: Lookup, id: unknown): boolean {
   return typeof id === "string" && store.get("actor", id)?.kind === "human";
 }
 
-export function checkGoal(store: Lookup, goal: Row): Violation[] {
+function checkGoal(store: Lookup, goal: Row): Violation[] {
   const found: Violation[] = [];
   const add = (rule: string, message: string) => found.push({ rule, message });
   if (!isHuman(store, goal.owner)) {
@@ -103,20 +103,20 @@ function hasContent(value: unknown): boolean {
   return true;
 }
 
-export function checkOrgUnit(store: Lookup, unit: Row): Violation[] {
+function checkOrgUnit(store: Lookup, unit: Row): Violation[] {
   return isHuman(store, unit.owner)
     ? []
     : [{ rule: "one-human-owner", message: `${unit.id}: the owner must be exactly one human actor.` }];
 }
 
-export function checkActor(store: Lookup, actor: Row): Violation[] {
+function checkActor(store: Lookup, actor: Row): Violation[] {
   const ok = actor.kind === "agent" ? isHuman(store, actor.operator) : actor.operator == null;
   return ok
     ? []
     : [{ rule: "agent-operator", message: `${actor.id}: an agent names a human operator, and a human has none.` }];
 }
 
-export function checkPriority(store: Lookup, priority: Row): Violation[] {
+function checkPriority(store: Lookup, priority: Row): Violation[] {
   if (priority.status !== "Current") return [];
   const tied = store
     .where("priority", "org_unit", priority.org_unit)

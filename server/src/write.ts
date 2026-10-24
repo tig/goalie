@@ -18,7 +18,7 @@ export type Command =
   | { op: "create"; kind: Kind; id?: string; fields: Row; reason?: string }
   | { op: "update"; kind: Kind; id: string; base_version: number; fields: Row; reason?: string };
 
-export type WriteResult =
+type WriteResult =
   | { ok: true; entity: Row; events: EventRow[] }
   | { ok: false; error: "stale"; current: Row }
   | { ok: false; error: "invalid"; violations: Violation[] }

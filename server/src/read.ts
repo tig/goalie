@@ -47,7 +47,7 @@ export function isKind(kind: unknown): kind is Kind {
   return typeof kind === "string" && Object.hasOwn(ENTITIES, kind);
 }
 
-export function isField(kind: Kind, field: string): boolean {
+function isField(kind: Kind, field: string): boolean {
   return (ENTITIES[kind].fields as readonly string[]).includes(field);
 }
 

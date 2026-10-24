@@ -15,7 +15,7 @@ import type { Row } from "./rules.ts";
  * The saved definition behind the screen. A stored view table is a later issue (#8, Epic 7).
  * The view opens on one org unit. It selects that unit's goals at that unit's level.
  */
-export const PRIORITIES_VIEW = {
+const PRIORITIES_VIEW = {
   name: "Priorities",
   select: { state: OPEN_STATES, period: "current" },
   sort: "rank",
@@ -23,7 +23,7 @@ export const PRIORITIES_VIEW = {
 } as const;
 
 /** A period is current when it names today's year ("2026") or quarter ("2026-Q4"). Calendar quarters are the default calendar (SPEC.md §12). */
-export function isCurrentPeriod(period: string, todayIso: string): boolean {
+function isCurrentPeriod(period: string, todayIso: string): boolean {
   const year = todayIso.slice(0, 4);
   const quarter = Math.floor((Number(todayIso.slice(5, 7)) - 1) / 3) + 1;
   return period === year || period === `${year}-Q${quarter}`;
