@@ -24,15 +24,14 @@ const oneOf = <T extends string>(list: readonly T[], value: string | null): T | 
 export function parseScreen(search: string): Screen {
   const params = new URLSearchParams(search);
   const q = params.get("q")?.replace(/\s+/g, " ").trim().slice(0, 100);
-  // A year outside 1970 to 9999 does not draw (review Q10).
+  // isDate refuses a year outside 1970 to 9999 (review Q10).
   const from = params.get("from");
-  const inRange = (d: string) => d >= "1970-01-01" && d <= "9999-12-31";
   const health = oneOf(HEALTHS, params.get("health"));
   return {
     ...(health ? { health } : {}),
     ...(q ? { q } : {}),
     zoom: oneOf(ZOOM_ORDER, params.get("zoom")) ?? "weeks",
-    ...(isDate(from) && inRange(from) ? { from } : {}),
+    ...(isDate(from) ? { from } : {}),
     view: oneOf(VIEWS, params.get("view")) ?? "timeline",
   };
 }
