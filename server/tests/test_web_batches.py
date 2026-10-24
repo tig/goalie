@@ -91,6 +91,22 @@ class WebBatchTests(unittest.TestCase):
         self.assertTrue(answer["ok"])
         self.assertIn("$goal", answer["ids"])
 
+    def test_a_create_check_lists_every_refusal_in_its_place(self) -> None:
+        options = self.read("/api/options")
+        form = {
+            "summary": "Run the spring offsite", "description": "", "owner": "chelsea", "priority": options["priorities"][0]["id"],
+            "due_date": "2027-04-01", "date_type": "Fantasy", "health": "YELLOW", "path_to_green": None, "plan": None, "plan_maturity": options["defaults"]["plan_maturity"],
+            "more": {k: options["defaults"][k] for k in ("type", "severity", "state", "origination", "level", "visibility", "org_unit")} | {"state": "In Progress"},
+            "milestone": None, "milestoneType": self.types()["milestone"], "subGoals": [], "workItems": [],
+        }
+        batch = build("return { ...commands.createBatch(form), check: true };", form=form)
+        reply = post(self.proc, self.port, "/api/commands", batch, self.auth)
+        answer = json.loads(reply.body)
+        self.assertEqual(reply.status, 422, answer)
+        found = build("return commands.refusals(answer, batch);", answer=answer, batch=batch)
+        self.assertEqual({v["place"] for v in found}, {"goal"})
+        self.assertGreaterEqual(len(found), 2, found)
+
     def test_health_with_a_path_to_green_is_stored(self) -> None:
         goal = self.read("/api/goals/XW-0003")["goal"]
         ptg = {"steps": [{"text": "Load the tree", "owner": "chelsea", "date": "2026-10-30"}], "criteria": "The tree is loaded", "trigger": "Not loaded by Nov 2"}

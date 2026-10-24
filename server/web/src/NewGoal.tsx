@@ -3,7 +3,7 @@ import type { ApiActor, ApiViolation, CommandsResponse, FormOptions, Health, Pat
 import { addDays, shortDate } from "../../src/dates.ts";
 import { postCommands, useJson } from "./data.ts";
 import { PtgFields } from "./GoalPanels.tsx";
-import { commandPlace, createBatch, goalTypes, type NewGoalForm, type NewMilestone, type SubGoalRow } from "./model/commands.ts";
+import { commandPlace, createBatch, goalTypes, refusals, type NewGoalForm, type NewMilestone, type SubGoalRow } from "./model/commands.ts";
 import { eventValue, fieldLabel } from "./model/goalpage.ts";
 import { backPath, goalPath } from "./model/route.ts";
 import { Avatar, HealthDot, Help } from "./parts.tsx";
@@ -132,13 +132,8 @@ function Form({ options, parent, back }: { options: FormOptions; parent?: string
   const [saving, setSaving] = useState(false);
   const shown = result ?? (asked ? check : null);
   const refused = shown && !shown.ok ? shown : null;
-  // Every refusal with its place on the form. A check run lists every refused command in `all` (Backend, after 9c17805); a save, the first.
   const batch = createBatch(sent);
-  const every: (ApiViolation & { place: string })[] = !refused
-    ? []
-    : refused.error !== "invalid"
-      ? [{ rule: refused.error, message: refused.error === "stale" ? "" : refused.message, place: commandPlace(batch, refused.at) }]
-      : ((refused as typeof refused & { all?: (ApiViolation & { at: number })[] }).all ?? refused.violations.map((v) => ({ ...v, at: refused.at }))).map((v) => ({ ...v, place: commandPlace(batch, v.at) }));
+  const every = refused ? refusals(refused, batch) : [];
   const violations: ApiViolation[] = every;
   const at = (where: string, field?: string) =>
     every

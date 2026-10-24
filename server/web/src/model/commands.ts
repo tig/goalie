@@ -1,4 +1,4 @@
-import type { ApiWorkItem, CommandsRequest, FormOptions, GoalFields, Health, PathToGreen, StoredGoal, WorkItemFields, WorkItemStatus } from "../../../src/api.ts";
+import type { ApiViolation, ApiWorkItem, CommandsRequest, CommandsResponse, FormOptions, GoalFields, Health, PathToGreen, StoredGoal, WorkItemFields, WorkItemStatus } from "../../../src/api.ts";
 
 /**
  * The goal page's panels as batches for POST /api/commands (docs/engineering/goal-page-and-create.md, Edits from the goal page).
@@ -219,4 +219,11 @@ export function commandPlace(batch: CommandsRequest, at: number): string {
     if (owner && owner.op === "create" && owner.ref) return `sub:${Number(owner.ref.slice(2)) - 1}`;
   }
   return "goal";
+}
+
+/** Every refusal in an answer, each with its place on the form. A check run lists every refused command in `all`; a save, the first. */
+export function refusals(answer: CommandsResponse, batch: CommandsRequest): (ApiViolation & { place: string })[] {
+  if (answer.ok) return [];
+  if (answer.error !== "invalid") return [{ rule: answer.error, message: answer.error === "stale" ? "" : answer.message, place: commandPlace(batch, answer.at) }];
+  return (answer.all ?? answer.violations.map((v) => ({ ...v, at: answer.at }))).map(({ at, ...v }) => ({ ...v, place: commandPlace(batch, at) }));
 }
