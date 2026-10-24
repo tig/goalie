@@ -535,7 +535,7 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 .dblabels>span.start{transform:none}
 .dblabels>span.end{transform:translateX(-100%)}
 .dblabels>span.low{top:16px}
-.datebar.two{margin-bottom:16px}
+.datebar.two{margin-bottom:24px}
 .dbstart{display:none}
 .created>summary{cursor:pointer;list-style:none}
 .created>summary::-webkit-details-marker{display:none}
