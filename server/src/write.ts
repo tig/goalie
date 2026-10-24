@@ -8,9 +8,6 @@ import { checkAuthor, checkTransition, checkWrite, REASONED, summaryLint, SYSTEM
  * A write appends its Events and updates the current row in one transaction, or does neither (ADR 0002).
  */
 
-/** Reads moved to read.ts. These names stay exported here until every caller imports read.ts. */
-export { isKind, read, readEvents, type EventRow, type Kind };
-
 /** Values a create fills when the command leaves them out (SPEC.md §6.1, §12). */
 const DEFAULTS: Partial<Record<Kind, Row>> = {
   goal: { description: "", visibility: DEFAULT_VISIBILITY },
@@ -27,13 +24,13 @@ export type WriteResult =
   | { ok: false; error: "invalid"; violations: Violation[] }
   | { ok: false; error: "unknown_actor" | "not_found" | "exists" | "bad_command"; message: string };
 
-/** The default goal key prefix. The GOALIE owner sets their own as `goal_key_prefix` in owner settings (SPEC.md §6.1, §12). */
-const GOAL_KEY_PREFIX = "GOAL";
-
-/** The next unused key. A goal key is the owner's prefix and a 4-digit number, e.g. XW-0012. */
+/**
+ * The next unused key. A goal key is the owner's prefix and a 4-digit number, e.g. XW-0012.
+ * The GOALIE owner sets the prefix as `goal_key_prefix` in owner settings (SPEC.md §6.1, §12). The default is the kind's prefix in read.ts.
+ */
 function nextId(db: DatabaseSync, kind: Kind): string {
   const settings = kind === "goal" ? (read(db, "owner_settings", "owner")?.settings as Row | undefined) : undefined;
-  const prefix = typeof settings?.goal_key_prefix === "string" ? settings.goal_key_prefix : kind === "goal" ? GOAL_KEY_PREFIX : ENTITIES[kind].prefix;
+  const prefix = typeof settings?.goal_key_prefix === "string" ? settings.goal_key_prefix : ENTITIES[kind].prefix;
   const { n } = db.prepare(`SELECT COUNT(*) AS n FROM ${kind}`).get() as { n: number };
   for (let i = n + 1; ; i++) {
     const id = `${prefix}-${kind === "goal" ? String(i).padStart(4, "0") : i}`;

@@ -3,7 +3,8 @@ import { configuredIssuers, resolveActor } from "./auth.ts";
 import { configuredDatabase } from "./config.ts";
 import { openStore } from "./store.ts";
 import { seed } from "./seed.ts";
-import { checkStore, isKind, read, readEvents, write, type Command } from "./write.ts";
+import { isKind, read, readEvents } from "./read.ts";
+import { checkStore, write, type Command } from "./write.ts";
 
 /**
  * A local tool against the GOALIE_DB file. It is not reachable over HTTP.
