@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import type { Health } from "../../src/api.ts";
-import { shortDate, weekday } from "../../src/dates.ts";
+import { monthYear, shortDate, weekday } from "../../src/dates.ts";
 import { isLit } from "./model/filter.ts";
 import { dateLabel, slipLabel } from "./model/labels.ts";
 import { dayChips, type CalendarDay, type CalendarMark, type CalendarMonth } from "./model/calendar.ts";
@@ -67,10 +67,13 @@ function Day({ d, today, lit }: { d: CalendarDay; today: string; lit: Lit }) {
 
 
 /** The Priorities as a month calendar, Monday first. Each goal date is a chip on its day. */
-export function CalendarView({ month, today, none, ...lit }: { month: CalendarMonth; today: string; none: boolean } & Lit) {
+export function CalendarView({ month, today, none, filtering, ...lit }: { month: CalendarMonth; today: string; none: boolean; filtering: boolean } & Lit) {
+  const empty = !month.weeks.some((w) => w.some((d) => d.inMonth && d.marks.length));
   return (
     <>
       {none && <p className="note muted">No goals match.</p>}
+      {/* On a phone the Calendar lists only days with dates, so an empty month says so. */}
+      {!none && empty && <p className="note muted calempty">{filtering ? "No goals match." : `No dates in ${monthYear(month.month)}.`}</p>}
       <div className="cal">
         <div className="calhead">
           {WEEKDAYS.map((w) => (

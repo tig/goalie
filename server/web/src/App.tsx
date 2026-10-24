@@ -13,6 +13,8 @@ import { Avatar, BRAND } from "./parts.tsx";
 import { Search } from "./Search.tsx";
 import { TimelineView } from "./TimelineView.tsx";
 import { usePhone, useScreen } from "./useScreen.ts";
+import { GoalPage } from "./GoalPage.tsx";
+import { rememberHome, useRoute } from "./router.tsx";
 
 /**
  * The Home screen (ADR 0010). It reads GET /api/priorities once and draws it. It holds no rule and writes nothing.
@@ -95,7 +97,7 @@ export function App() {
       (e: Error) => setLoaded({ state: "refused", status: 0, reason: e.message }),
     );
   }, []);
-  if (loaded.state === "ok") return <Home data={loaded.data} />;
+  if (loaded.state === "ok") return <Pages data={loaded.data} />;
   return (
     <>
       <TopBar />
@@ -112,8 +114,16 @@ export function App() {
 
 const VIEW_LABELS: Record<View, string> = { timeline: "Timeline", list: "List", calendar: "Calendar" };
 
+/** The page the URL names. Home stays the data source for every page until the goal API lands. */
+function Pages({ data }: { data: PrioritiesResponse }) {
+  const route = useRoute();
+  if (route.page === "goal") return <GoalPage data={data} goalKey={route.key} />;
+  return <Home data={data} />;
+}
+
 function Home({ data }: { data: PrioritiesResponse }) {
   const [screen, change] = useScreen();
+  rememberHome(location.search);
   const [hot, setHot] = useState<Health | undefined>();
   const [home, setHome] = useState(0);
   const phone = usePhone();
@@ -170,6 +180,8 @@ function Home({ data }: { data: PrioritiesResponse }) {
                 </button>
               ))}
             </span>
+            {/* When one row does not fit, a break puts the search box and the right cluster together on a second row (rule 25b). */}
+            <span className="tbreak" aria-hidden="true" />
             {search}
             <span className="tright">
               {view === "timeline" && (
@@ -205,7 +217,7 @@ function Home({ data }: { data: PrioritiesResponse }) {
           </div>
           {view === "timeline" && <TimelineView {...tree} window={window} home={home} onRange={setRange} />}
           {view === "list" && <ListView {...tree} columns={data.view.columns} />}
-          {view === "calendar" && <CalendarView month={month} today={data.today} none={filtering && !funded.length && !backlog.length} selected={screen.health} hot={hot} />}
+          {view === "calendar" && <CalendarView month={month} today={data.today} none={filtering && !funded.length && !backlog.length} filtering={filtering} selected={screen.health} hot={hot} />}
         </section>
       </main>
     </>

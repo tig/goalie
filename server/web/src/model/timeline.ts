@@ -151,14 +151,28 @@ export function placeLabel(atPx: number, widthPx: number, view: { left: number; 
 /** An edge label starts this far inside the edge, clear of the edge fade. */
 export const EDGE_INSET = 30;
 
-export type LaneMark = { key: string; atPx: number; text: string; outside: "before" | "after" | null };
+/** `band` is where the label sits: a tick's above the bar, an uncommitted date's below it. Labels in different bands cannot cover each other. */
+export type LaneMark = { key: string; atPx: number; text: string; outside: "before" | "after" | null; band?: "above" | "below" };
 
 /**
- * Where a lane's labels go, so no two overlap (rule 23).
- * Every mark past an edge of the screen joins one label at that edge, in date order. A mark whose own label could not clear that edge label, or fits on neither side of the mark, joins it too.
+ * Where a lane's labels go, so no two overlap (rule 23). Each band places its labels on its own.
+ * Every mark past an edge of the screen joins one label at that edge in its band, in date order. A mark whose own label could not clear that edge label, or fits on neither side of the mark, joins it too.
  * Each other mark labels to its right, else to its left.
  */
-export function placeLaneLabels(marks: LaneMark[], view: { left: number; right: number }): { before: string[]; after: string[]; inside: { key: string; side: "left" | "right" }[] } {
+export function placeLaneLabels(marks: LaneMark[], view: { left: number; right: number }): Placed {
+  const bands = [...new Set(marks.map((m) => m.band ?? "above"))].map((band) => placeBand(marks.filter((m) => (m.band ?? "above") === band), view));
+  const order = (keys: string[]) => [...marks].sort((a, b) => a.atPx - b.atPx).map((m) => m.key).filter((k) => keys.includes(k));
+  return {
+    before: order(bands.flatMap((b) => b.before)),
+    after: order(bands.flatMap((b) => b.after)),
+    inside: bands.flatMap((b) => b.inside).sort((a, b) => order([a.key, b.key])[0] === a.key ? -1 : 1),
+  };
+}
+
+type Placed = { before: string[]; after: string[]; inside: { key: string; side: "left" | "right" }[] };
+
+/** placeLaneLabels for the labels of one band. */
+function placeBand(marks: LaneMark[], view: { left: number; right: number }): Placed {
   const sorted = [...marks].sort((a, b) => a.atPx - b.atPx);
   const before = new Set(sorted.filter((m) => m.outside === "before" || (!m.outside && m.atPx < view.left)).map((m) => m.key));
   const after = new Set(sorted.filter((m) => m.outside === "after" || (!m.outside && m.atPx > view.right)).map((m) => m.key));

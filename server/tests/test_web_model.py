@@ -13,7 +13,7 @@ FIXTURE = Path(__file__).resolve().parents[1] / "web" / "fixtures" / "priorities
 
 def run(body: str) -> object:
     """Run an ES module that imports the model as `m` and the seed fixture as `api`, and return what it prints as JSON."""
-    imports = "".join(f'import * as {name} from "{(MODEL / f"{name}.ts").as_uri()}";\n' for name in ("query", "filter", "timeline", "calendar", "popover", "labels", "scroll"))
+    imports = "".join(f'import * as {name} from "{(MODEL / f"{name}.ts").as_uri()}";\n' for name in ("query", "filter", "timeline", "calendar", "popover", "labels", "scroll", "route"))
     script = f"""{imports}
 import {{ readFileSync }} from "node:fs";
 const api = JSON.parse(readFileSync({json.dumps(str(FIXTURE))}, "utf-8"));
@@ -219,6 +219,11 @@ class TimelineTests(unittest.TestCase):
         placed = self.lanes([{"key": "tick", "atPx": 1100, "text": "Promotion Milestone Nov 6", "outside": None}, {"key": "end", "atPx": 1400, "text": "Fantasy Nov 30", "outside": None}], {"left": 1000, "right": 1250})
         self.assertEqual(placed, {"before": [], "after": ["tick", "end"], "inside": []})
 
+    def test_labels_in_different_bands_never_join(self) -> None:
+        # A tick's label sits above the bar and an uncommitted date's below it, so they cannot cover each other: each keeps its own edge label.
+        placed = self.lanes([{"key": "tick", "atPx": 100, "text": "Committed Oct 1", "outside": None, "band": "above"}, {"key": "end", "atPx": 1050, "text": "Fantasy Nov 30", "outside": None, "band": "below"}])
+        self.assertEqual(placed, {"before": ["tick"], "after": [], "inside": [{"key": "end", "side": "right"}]})
+
     def test_a_mark_on_screen_keeps_its_own_label(self) -> None:
         placed = self.lanes([{"key": "tick", "atPx": 1200, "text": "Committed Nov 15", "outside": None}, {"key": "end", "atPx": 1790, "text": "Fantasy Nov 30", "outside": None}])
         self.assertEqual(placed, {"before": [], "after": [], "inside": [{"key": "tick", "side": "right"}, {"key": "end", "side": "left"}]})
@@ -336,6 +341,15 @@ class ScrollTests(unittest.TestCase):
 
     def test_a_drag_pans_once_it_passes_4_px(self) -> None:
         self.assertEqual(run("return [scroll.isDrag(3), scroll.isDrag(-5), scroll.dragLeft(500, 100, 160)];"), [False, True, 440])
+
+
+class RouteTests(unittest.TestCase):
+    def test_each_path_opens_its_page(self) -> None:
+        pages = run('return ["/", "/goals/XW-0003", "/goals/new", "/goals/new?parent=XW-0003", "/goals/xw-0003/", "/nowhere"].map((p) => { const u = new URL(p, "http://x"); return route.parseRoute(u.pathname, u.search); });')
+        self.assertEqual(pages, [{"page": "home"}, {"page": "goal", "key": "XW-0003"}, {"page": "new"}, {"page": "new", "parent": "XW-0003"}, {"page": "goal", "key": "XW-0003"}, {"page": "home"}])
+
+    def test_a_goal_link_and_the_back_link(self) -> None:
+        self.assertEqual(run('return [route.goalPath("XW-0003"), route.newGoalPath(), route.newGoalPath("XW-0003"), route.backPath("?view=list&health=RED"), route.backPath("")];'), ["/goals/XW-0003", "/goals/new", "/goals/new?parent=XW-0003", "/?view=list&health=RED", "/"])
 
 
 if __name__ == "__main__":
