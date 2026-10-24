@@ -89,7 +89,7 @@ At 1440 the board content is 1208 px. Column gap 12 px.
 | Promotion Milestone | 156 px | The Promotion Milestone's date only: "Nov 6". The column title names it, so the cell does not repeat it. |
 | Path to Green (PTG) | 0.6fr, at least 160 px | The PTG text and its owner, muted, on one line. A RED or YELLOW goal with none: "No Path to Green", muted. |
 
-At 1100 the same grid fits (Priority about 244 px, PTG 160 px).
+At 1100 the grid does not fit: the page keeps a 15 px scrollbar gutter, so the board's content is 981 px, and the grid needs 992. Under about 1000 px of content, Promotion Milestone and PTG drop to a second line in the row, each named (V2 as built).
 The date health is judged on is in `--ink`. The other date is in `--mute`. For goal 3 that is Promotion Milestone "Nov 6" dark and "Fantasy Nov 30" light (review X8).
 Only the title wraps, to two lines at most. Every other cell is one line; a cell that is too long ends in an ellipsis. A date never breaks (rule 14).
 
