@@ -45,6 +45,21 @@ const servesApi: Plugin = {
       const url = req.url ?? "";
       if (!url.startsWith("/api/")) return next();
       const fixture = fixtureFor(url);
+      // The event stream (ADR 0007) is piped through as it comes. With no server, it answers 204, so EventSource stops.
+      if (url.startsWith("/api/events")) {
+        if (!api) return send(res, 204, "");
+        const reply = await fetch(`${api}${url}`, { headers: { accept: "text/event-stream", ...(token ? { authorization: `Bearer ${token}` } : {}), ...(req.headers["last-event-id"] ? { "last-event-id": String(req.headers["last-event-id"]) } : {}) } }).catch(() => undefined);
+        if (!reply?.body) return send(res, 502, "");
+        res.writeHead(reply.status, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+        const reader = reply.body.getReader();
+        req.on("close", () => reader.cancel());
+        try {
+          for (let part = await reader.read(); !part.done; part = await reader.read()) res.write(part.value);
+        } catch {
+          // The browser left; the stream ends.
+        }
+        return res.end();
+      }
       if (api) {
         const reply = await fetch(`${api}${url}`, {
           method: req.method,

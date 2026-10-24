@@ -348,7 +348,7 @@ function SubGoal({ card, data }: { card: SubGoalCard; data: GoalPageResponse }) 
 }
 
 /** An owner with its kind: an agent's avatar has a dashed ring and the muted word "agent" (G23, SPEC.md §6.4). */
-function Owner({ actor, me }: { actor: ApiActor; me: string }) {
+export function Owner({ actor, me }: { actor: ApiActor; me: string }) {
   return (
     <span className={`wowner${actor.kind === "agent" ? " agent" : ""}`}>
       <Avatar actor={actor} mine={actor.id === me} />

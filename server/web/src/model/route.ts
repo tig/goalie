@@ -1,10 +1,14 @@
 /** The app's pages and their paths. The server answers index.html for every path that is not the API or an asset, so the app routes in the browser. */
 
-export type Route = { page: "home" } | { page: "goal"; key: string } | { page: "new"; parent?: string };
+export type Route = { page: "home" } | { page: "goal"; key: string } | { page: "new"; parent?: string } | { page: "work"; owner?: string };
 
 /** The page for a path. A goal key is written upper case. A path the app does not know opens Home. */
 export function parseRoute(pathname: string, search = ""): Route {
   const parts = pathname.split("/").filter(Boolean);
+  if (parts[0] === "work" && parts.length === 1) {
+    const owner = new URLSearchParams(search).get("owner");
+    return owner ? { page: "work", owner } : { page: "work" };
+  }
   if (parts[0] !== "goals" || parts.length !== 2) return { page: "home" };
   if (parts[1] === "new") {
     const parent = new URLSearchParams(search).get("parent")?.toUpperCase();
@@ -19,3 +23,6 @@ export const newGoalPath = (parent?: string) => (parent ? `/goals/new?parent=${e
 
 /** The back link to Home keeps the view's query: its filter, search, zoom, window, and view (rule G1). */
 export const backPath = (homeSearch: string) => `/${homeSearch}`;
+
+/** The work page: every queue, or one owner's (plan F6). */
+export const workPath = (owner?: string) => (owner ? `/work?owner=${encodeURIComponent(owner)}` : "/work");
