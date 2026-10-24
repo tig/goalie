@@ -218,6 +218,30 @@ class CommandsApiTests(unittest.TestCase):
         self.assertGreater(len(body["events"]), 20)
         self.assertEqual(len({e["timestamp"] for e in body["events"]}), 1)
 
+    def test_a_create_takes_the_defaults_the_form_shows(self) -> None:
+        # N-F4: one home for the create defaults, write.ts DEFAULTS, which GET /api/options shows.
+        options = json.loads(get(self.proc, self.port, "/api/options", self.auth).body)["defaults"]
+        # A Milestone (Commit) needs no Pencil plan (D1), so the Watercolor default is valid here.
+        fields = {k: v for k, v in SUB.items() if k not in ("severity", "state", "origination", "plan_maturity")} | {"type": "Milestone (Commit)"}
+        status, body = self.send([{"op": "create", "kind": "goal", "ref": "$g", "fields": fields, "reason": "Planned"}])
+        self.assertEqual(status, 200, body)
+        stored = self.store.read("goal", body["ids"]["$g"])
+        for field in ("severity", "state", "origination", "plan_maturity", "visibility", "description"):
+            self.assertEqual(stored[field], options[field], field)
+
+    def test_a_check_carries_the_lints_as_hints(self) -> None:
+        # NF2: the summary hint comes from the server, on an ok check and an invalid one, never on a save.
+        short = {**SUB, "summary": "Ship it"}
+        status, body = self.send([{"op": "create", "kind": "goal", "ref": "$g", "fields": short, "reason": "Planned"}], check=True)
+        self.assertEqual(status, 200, body)
+        self.assertIn({"at": 0, "field": "summary", "text": "A good summary has a verb and 5 words or more."}, body["hints"])
+        status, body = self.send([{"op": "create", "kind": "goal", "ref": "$g", "fields": {**short, "plan_maturity": "Crayon", "type": "Milestone (Launch)"}, "reason": "Planned"}], check=True)
+        self.assertEqual(status, 422, body)
+        self.assertIn("summary", [h["field"] for h in body["hints"] if h["at"] == 0])
+        status, body = self.send([{"op": "create", "kind": "goal", "ref": "$g", "fields": short, "reason": "Planned"}])
+        self.assertEqual(status, 200, body)
+        self.assertNotIn("hints", body)
+
     def test_a_comment_is_one_event_with_no_row_change(self) -> None:
         version = self.store.read("goal", "XW-0003")["version"]
         status, body = self.send([{"op": "comment", "kind": "goal", "id": "XW-0003", "text": "The spine is in."}])

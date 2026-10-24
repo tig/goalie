@@ -39,6 +39,8 @@ class OptionsApiTests(unittest.TestCase):
     def test_defaults_and_choices_come_from_spec_and_owner_settings(self) -> None:
         defaults = self.body["defaults"]
         self.assertEqual((defaults["org_unit"], defaults["level"], defaults["origination"], defaults["visibility"]), ("excaliwire", "Company", "New", "organization-wide"))
+        # NF8, N-F3: a new goal starts at Backlog.
+        self.assertEqual(defaults["state"], "Backlog")
         choices = self.body["choices"]
         self.assertEqual(choices["type"][0], "Milestone (Commit)")
         self.assertEqual(len(choices["type"]), 5)

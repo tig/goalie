@@ -268,7 +268,7 @@ const DESCRIPTION_PARTS: { words: RegExp; hint: string }[] = [
 export function goalLints(goal: Row): { field: string; text: string }[] {
   const hints: { field: string; text: string }[] = [];
   const words = String(goal.summary ?? "").trim().split(/\s+/).filter(Boolean).length;
-  if (words < 5) hints.push({ field: "summary", text: `The summary has ${words} words. Use 5 or more, starting with a verb.` });
+  if (words < 5) hints.push({ field: "summary", text: "A good summary has a verb and 5 words or more." });
   const description = String(goal.description ?? "");
   for (const part of DESCRIPTION_PARTS) if (!part.words.test(description)) hints.push({ field: "description", text: part.hint });
   const ptg = goal.path_to_green as { trigger?: unknown } | null;
