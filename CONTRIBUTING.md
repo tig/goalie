@@ -53,7 +53,7 @@ The default host is `127.0.0.1`.
 `GET /health` is the one path that needs no verified actor.
 `GET /api/priorities` answers the Priorities view as JSON for the verified actor. The shape is `PrioritiesResponse` in `server/src/api.ts`. The app filters and draws it.
 Every other `/api/` path answers 404. An `/api/` request with no verified token answers 401 with `{"error", "reason"}`.
-`GET /assets/*` answers a file of the build. Every other path answers the build's `index.html`, so the app routes in the browser.
+`GET /assets/*` answers a file of the build. Any other path that names a file, such as `/main.js`, answers 404. Every other path answers the build's `index.html`, so the app routes in the browser.
 A page or asset request with no verified token answers 401 with the sign-in page. The sign-in page loads the shared Excaliwire chrome from `/_xw/`. Host configuration serves `/_xw/`.
 With no build in `GOALIE_WEB_DIST`, a page request answers 503 with a plain message.
 `GOALIE_ORG_UNIT` names the org unit whose Priorities the API answers. The default is the root org unit.

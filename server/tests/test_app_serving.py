@@ -32,6 +32,7 @@ class AppServingTests(unittest.TestCase):
             cls.deep = get(proc, port, "/goals/XW-0001", auth)
             cls.script = get(proc, port, "/assets/app.js", auth)
             cls.missing_asset = get(proc, port, "/assets/nope.js", auth)
+            cls.missing_file = [get(proc, port, path, auth) for path in ("/main.js", "/favicon.ico", "/goals/app.css")]
             cls.escape = get(proc, port, "/assets/..%2f..%2fsecret.txt", auth)
             cls.unknown_api = get(proc, port, "/api/nope", auth)
             cls.anonymous_home = get(proc, port, "/")
@@ -62,6 +63,12 @@ class AppServingTests(unittest.TestCase):
 
     def test_a_missing_asset_is_404(self) -> None:
         self.assertEqual(self.missing_asset.status, 404)
+
+    def test_a_file_path_outside_assets_is_404_not_the_index(self) -> None:
+        # Review Q5: a missing script must not get index.html.
+        for reply in self.missing_file:
+            self.assertEqual(reply.status, 404)
+            self.assertNotEqual(reply.body, INDEX)
 
     def test_an_asset_path_must_not_leave_the_build(self) -> None:
         self.assertEqual(self.escape.status, 404)

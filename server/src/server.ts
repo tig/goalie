@@ -62,6 +62,8 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
     return body ? c.body(new Uint8Array(body), 200, { "Content-Type": TYPES[extname(c.req.path)] ?? "application/octet-stream" }) : c.text("Not Found", 404);
   });
   app.get("*", async (c) => {
+    // A path that names a file is not a page. A missing script must not get index.html.
+    if (extname(c.req.path) !== "") return c.text("Not Found", 404);
     const index = await built(webDist, "/index.html");
     return index ? c.html(index.toString("utf-8")) : c.text("The web app is not built. Run npm run build --prefix server.", 503);
   });
