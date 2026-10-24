@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { ApiActor, ApiEvent, ApiWorkItem, GoalDate, GoalPageResponse, Health, StoredGoal, SubGoalCard } from "./api.ts";
-import { toApiEvent, toApiWorkItem } from "./commands.ts";
+import { toApiWorkItem } from "./commands.ts";
+import { toApiEvent } from "./live.ts";
 import { day, daysBetween } from "./dates.ts";
 import { committedDate, currentDate, goalDates, isOpen, resolvedGoal, type State } from "./goal.ts";
 import { startedAll } from "./priorities.ts";

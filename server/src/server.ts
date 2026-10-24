@@ -7,6 +7,7 @@ import { pathToFileURL } from "node:url";
 import type { ActorRef, ApiError, CommandsResponse, FormOptions, GoalPageResponse, PrioritiesResponse, WorkResponse } from "./api.ts";
 import { runCommands } from "./commands.ts";
 import { goalPage } from "./goalpage.ts";
+import { eventStream } from "./live.ts";
 import { formOptions } from "./options.ts";
 import { configuredIssuers, resolveActor, type Issuer } from "./auth.ts";
 import { configuredDatabase, configuredOrgUnit, configuredSignInUrl, configuredTimeZone, configuredToday, configuredWebDist } from "./config.ts";
@@ -77,6 +78,7 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
   });
   app.get("/api/options", (c) => c.json<FormOptions>(formOptions(db, c.get("actor").id, unit(), configuredToday(db))));
   app.get("/api/work", (c) => c.json<WorkResponse>(workQueue(db, c.get("actor").id, configuredToday(db), c.req.query("owner"))));
+  app.get("/api/events", (c) => eventStream(c, db));
   app.post("/api/commands", async (c) => {
     const request: unknown = await c.req.json().catch(() => undefined);
     const answer = runCommands(db, c.get("actor").id, request, configuredToday(db));

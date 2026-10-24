@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { ApiEvent, ApiWorkItem, CommandsResponse, Ref, StoredGoal } from "./api.ts";
-import type { EventRow } from "./read.ts";
+import { publish, toApiEvent } from "./live.ts";
 import type { Row } from "./rules.ts";
 import { inTransaction, write, type Command, type WriteResult } from "./write.ts";
 
@@ -33,10 +33,6 @@ class Stop {
 
 const bad = (at: number, message: string): Stop => new Stop({ status: 400, body: { ok: false, at, error: "bad_command", message } });
 
-export function toApiEvent(event: EventRow): ApiEvent {
-  return { ...event, entity_kind: event.entity_kind as ApiEvent["entity_kind"] };
-}
-
 /** A stored work item, with `late` when it is open and its due date has passed. */
 export function toApiWorkItem(row: Row, today: string): ApiWorkItem {
   const open = row.status !== "Completed" && row.status !== "Deleted";
@@ -50,8 +46,9 @@ export function runCommands(db: DatabaseSync, actor: string, request: unknown, t
   }
   const commands = request.commands as unknown[];
   const check = request.check === true;
+  const outer = !db.isTransaction;
   try {
-    return inTransaction(db, (answer: CommandsAnswer) => answer.status === 200 && !check, () => {
+    const answer = inTransaction<CommandsAnswer>(db, (answer: CommandsAnswer) => answer.status === 200 && !check, () => {
       const ids: Record<Ref, string> = {};
       const events: ApiEvent[] = [];
       const run = (at: number, command: Command): Extract<WriteResult, { ok: true }> => {
@@ -75,6 +72,9 @@ export function runCommands(db: DatabaseSync, actor: string, request: unknown, t
       });
       return { status: 200, body: { ok: true, ids, events } };
     });
+    // ADR 0007: only a committed batch is sent, and only once the outer COMMIT is done.
+    if (outer && !check && answer.body.ok) publish(answer.body.events);
+    return answer;
   } catch (error) {
     if (error instanceof Stop) return error.answer;
     throw error;
