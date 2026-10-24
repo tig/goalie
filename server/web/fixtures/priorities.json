@@ -1,52 +1,238 @@
 {
-  "org": { "id": "excaliwire", "name": "Excaliwire", "level": "Company" },
-  "me": { "id": "chelsea", "name": "Chelsea" },
+  "org": {
+    "id": "excaliwire",
+    "name": "Excaliwire",
+    "level": "Company"
+  },
+  "me": {
+    "id": "chelsea",
+    "name": "Chelsea"
+  },
   "today": "2026-10-23",
-  "view": { "name": "Priorities", "columns": ["Summary", "Owner", "Health", "Date Type", "Promotion Milestone", "PTG"] },
+  "view": {
+    "name": "Priorities",
+    "columns": [
+      "Summary",
+      "Owner",
+      "Health",
+      "Date Type",
+      "Promotion Milestone",
+      "PTG"
+    ]
+  },
   "funded": [
     {
-      "id": "PRI-1", "rank": 1, "title": "Regenerate the E28 canon",
+      "id": "PRI-1",
+      "rank": 1,
+      "title": "Regenerate the E28 canon",
       "goals": [
         {
-          "id": "XW-0001", "summary": "Regenerate the E28 canon by Oct 1", "owner": { "id": "tig", "name": "Tig" },
-          "state": "In Progress", "health": "RED", "dates": [{ "date": "2026-10-01", "kind": "Committed", "slipDays": 22 }],
-          "started": "2026-10-23", "ptg": { "text": "Placeholder: Tig writes the Path to Green", "owner": { "id": "tig", "name": "Tig" }, "date": "2026-10-29" },
-          "children": []
-        }
-      ]
-    },
-    {
-      "id": "PRI-2", "rank": 2, "title": "Grow the XW team",
-      "goals": [
-        {
-          "id": "XW-0002", "summary": "Add two more humans to XW by Nov 15", "owner": { "id": "tig", "name": "Tig" },
-          "state": "In Progress", "health": "YELLOW", "dates": [{ "date": "2026-11-15", "kind": "Committed" }],
-          "started": "2026-10-23", "ptg": { "text": "Placeholder: Tig writes the Path to Green", "owner": { "id": "tig", "name": "Tig" }, "date": "2026-10-29" },
-          "children": []
-        }
-      ]
-    },
-    {
-      "id": "PRI-3", "rank": 3, "title": "Run Excaliwire on GOALIE",
-      "goals": [
-        {
-          "id": "XW-0003", "summary": "Tig, Chelsea, and agents use GOALIE to drive Excaliwire execution", "owner": { "id": "chelsea", "name": "Chelsea" },
-          "state": "In Progress", "health": "GREEN",
-          "dates": [{ "date": "2026-11-30", "kind": "Fantasy" }, { "date": "2026-11-06", "kind": "Promotion Milestone" }],
+          "id": "XW-0001",
+          "summary": "Regenerate the E28 canon by Oct 1",
+          "owner": {
+            "id": "tig",
+            "name": "Tig"
+          },
+          "state": "In Progress",
+          "health": "RED",
+          "dates": [
+            {
+              "date": "2026-10-01",
+              "kind": "Committed",
+              "slipDays": 22
+            }
+          ],
           "started": "2026-10-23",
+          "ptg": {
+            "text": "Placeholder: Tig writes the Path to Green",
+            "owner": {
+              "id": "tig",
+              "name": "Tig"
+            },
+            "date": "2026-10-29"
+          },
+          "counted": true,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "PRI-2",
+      "rank": 2,
+      "title": "Grow the XW team",
+      "goals": [
+        {
+          "id": "XW-0002",
+          "summary": "Add two more humans to XW by Nov 15",
+          "owner": {
+            "id": "tig",
+            "name": "Tig"
+          },
+          "state": "In Progress",
+          "health": "YELLOW",
+          "dates": [
+            {
+              "date": "2026-11-15",
+              "kind": "Committed"
+            }
+          ],
+          "started": "2026-10-23",
+          "ptg": {
+            "text": "Placeholder: Tig writes the Path to Green",
+            "owner": {
+              "id": "tig",
+              "name": "Tig"
+            },
+            "date": "2026-10-29"
+          },
+          "counted": true,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "PRI-3",
+      "rank": 3,
+      "title": "Run Excaliwire on GOALIE",
+      "goals": [
+        {
+          "id": "XW-0003",
+          "summary": "Tig, Chelsea, and agents use GOALIE to drive Excaliwire execution",
+          "owner": {
+            "id": "chelsea",
+            "name": "Chelsea"
+          },
+          "state": "In Progress",
+          "health": "GREEN",
+          "dates": [
+            {
+              "date": "2026-11-30",
+              "kind": "Fantasy"
+            },
+            {
+              "date": "2026-11-06",
+              "kind": "Promotion Milestone"
+            }
+          ],
+          "started": "2026-10-23",
+          "counted": true,
           "children": [
             {
-              "id": "XW-0004", "summary": "Run the MLP prototype at goalie.excaliwire.com with Excaliwire's real goals loaded", "owner": { "id": "chelsea", "name": "Chelsea" },
-              "state": "In Progress", "health": "GREEN", "dates": [{ "date": "2026-11-06", "kind": "Committed" }],
+              "id": "XW-0004",
+              "summary": "Run the MLP prototype at goalie.excaliwire.com with Excaliwire's real goals loaded",
+              "owner": {
+                "id": "chelsea",
+                "name": "Chelsea"
+              },
+              "state": "In Progress",
+              "health": "GREEN",
+              "dates": [
+                {
+                  "date": "2026-11-06",
+                  "kind": "Committed"
+                }
+              ],
               "started": "2026-10-23",
+              "counted": false,
               "children": [
-                { "id": "XW-0005", "summary": "Stand up the spine: store, rules, sign-in, event log", "owner": { "id": "chelsea", "name": "Chelsea" }, "state": "In Progress", "health": "GREEN", "dates": [], "started": "2026-10-23", "children": [] },
-                { "id": "XW-0006", "summary": "Show Priorities as Home, on a timeline", "owner": { "id": "chelsea", "name": "Chelsea" }, "state": "Backlog", "health": null, "dates": [], "started": "2026-10-23", "children": [] },
-                { "id": "XW-0007", "summary": "Open a goal and keep it true", "owner": { "id": "chelsea", "name": "Chelsea" }, "state": "Backlog", "health": null, "dates": [], "started": "2026-10-23", "children": [] },
-                { "id": "XW-0008", "summary": "Create a goal or a sub-goal", "owner": { "id": "chelsea", "name": "Chelsea" }, "state": "Backlog", "health": null, "dates": [], "started": "2026-10-23", "children": [] },
-                { "id": "XW-0009", "summary": "Let an agent work in GOALIE: API, MCP, Drafts", "owner": { "id": "chelsea", "name": "Chelsea" }, "state": "Backlog", "health": null, "dates": [], "started": "2026-10-23", "children": [] },
-                { "id": "XW-0010", "summary": "Draft health from GitHub with the evidence", "owner": { "id": "chelsea", "name": "Chelsea" }, "state": "Backlog", "health": null, "dates": [], "started": "2026-10-23", "children": [] },
-                { "id": "XW-0011", "summary": "Load Excaliwire's goals and release", "owner": { "id": "chelsea", "name": "Chelsea" }, "state": "Backlog", "health": null, "dates": [], "started": "2026-10-23", "children": [] }
+                {
+                  "id": "XW-0005",
+                  "summary": "Stand up the spine: store, rules, sign-in, event log",
+                  "owner": {
+                    "id": "chelsea",
+                    "name": "Chelsea"
+                  },
+                  "state": "In Progress",
+                  "health": "GREEN",
+                  "dates": [],
+                  "started": "2026-10-23",
+                  "counted": false,
+                  "children": []
+                },
+                {
+                  "id": "XW-0006",
+                  "summary": "Show Priorities as Home, on a timeline",
+                  "owner": {
+                    "id": "chelsea",
+                    "name": "Chelsea"
+                  },
+                  "state": "Backlog",
+                  "health": null,
+                  "dates": [],
+                  "started": "2026-10-23",
+                  "counted": false,
+                  "children": []
+                },
+                {
+                  "id": "XW-0007",
+                  "summary": "Open a goal and keep it true",
+                  "owner": {
+                    "id": "chelsea",
+                    "name": "Chelsea"
+                  },
+                  "state": "Backlog",
+                  "health": null,
+                  "dates": [],
+                  "started": "2026-10-23",
+                  "counted": false,
+                  "children": []
+                },
+                {
+                  "id": "XW-0008",
+                  "summary": "Create a goal or a sub-goal",
+                  "owner": {
+                    "id": "chelsea",
+                    "name": "Chelsea"
+                  },
+                  "state": "Backlog",
+                  "health": null,
+                  "dates": [],
+                  "started": "2026-10-23",
+                  "counted": false,
+                  "children": []
+                },
+                {
+                  "id": "XW-0009",
+                  "summary": "Let an agent work in GOALIE: API, MCP, Drafts",
+                  "owner": {
+                    "id": "chelsea",
+                    "name": "Chelsea"
+                  },
+                  "state": "Backlog",
+                  "health": null,
+                  "dates": [],
+                  "started": "2026-10-23",
+                  "counted": false,
+                  "children": []
+                },
+                {
+                  "id": "XW-0010",
+                  "summary": "Draft health from GitHub with the evidence",
+                  "owner": {
+                    "id": "chelsea",
+                    "name": "Chelsea"
+                  },
+                  "state": "Backlog",
+                  "health": null,
+                  "dates": [],
+                  "started": "2026-10-23",
+                  "counted": false,
+                  "children": []
+                },
+                {
+                  "id": "XW-0011",
+                  "summary": "Load Excaliwire's goals and release",
+                  "owner": {
+                    "id": "chelsea",
+                    "name": "Chelsea"
+                  },
+                  "state": "Backlog",
+                  "health": null,
+                  "dates": [],
+                  "started": "2026-10-23",
+                  "counted": false,
+                  "children": []
+                }
               ]
             }
           ]
@@ -56,10 +242,32 @@
   ],
   "backlog": [],
   "summary": {
-    "counts": { "RED": 1, "YELLOW": 1, "GREEN": 1 },
-    "healths": ["RED", "YELLOW", "GREEN"],
-    "slips": [{ "goal": "XW-0001", "summary": "Regenerate the E28 canon by Oct 1", "date": "2026-10-01", "kind": "Committed", "days": 22 }],
+    "counts": {
+      "RED": 1,
+      "YELLOW": 1,
+      "GREEN": 1
+    },
+    "healths": [
+      "RED",
+      "YELLOW",
+      "GREEN"
+    ],
+    "slips": [
+      {
+        "goal": "XW-0001",
+        "summary": "Regenerate the E28 canon by Oct 1",
+        "date": "2026-10-01",
+        "kind": "Committed",
+        "days": 22
+      }
+    ],
     "drafts": 0,
-    "nextPromotion": { "milestone": "XW-0004", "date": "2026-11-06", "days": 14, "goal": "XW-0003", "summary": "Tig, Chelsea, and agents use GOALIE to drive Excaliwire execution" }
+    "nextPromotion": {
+      "milestone": "XW-0004",
+      "date": "2026-11-06",
+      "days": 14,
+      "goal": "XW-0003",
+      "summary": "Tig, Chelsea, and agents use GOALIE to drive Excaliwire execution"
+    }
   }
 }
