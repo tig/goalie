@@ -175,6 +175,7 @@ One page at `/goals/new`, not a dialog, not a wizard (wireframe 05). The canvas 
 - **N13.** Cancel is a text link under the button. Leaving with typed text asks once: "Leave without creating?"
 - **N14.** On save, GOALIE opens the new goal's page. A Promotion Milestone made with it shows in the header as its judged date (G5), linked.
 - **N15.** On a phone, the cards stack full width in the same order, and every field stays a field (the Promotion Milestone too); the rail's checks move to the top of the page as a one-line count that opens the list; Create is a 48 px bar fixed at the bottom.
+- **N15a.** Under 960 px of page, New goal uses the phone layout of N15: the form takes the full width, the checks are a one-line count at the top, and Create is a 48 px bar fixed to the bottom. The rail does not shrink; a 410 px form beside a narrow rail breaks the three-field rows.
 - **N16.** Every date input writes the Date Type beside the date in the summary rail and in the preview (rule 14).
 
 ## How this answers the walk's six blocks
