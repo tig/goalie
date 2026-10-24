@@ -44,3 +44,12 @@ export function labelSizers(today: string): string[] {
     ...months.map((m) => monthYear(`${next + 1}-${m}-01`)),
   ];
 }
+
+/** New goal, before the server can check it (NG2): only what is still missing, in one sentence. Empty when nothing is. */
+export function stillMissing(form: { summary: string; due_date: string; date_type: string }): string {
+  const choose = [!form.due_date && "a date", !form.date_type && "a Date Type"].filter(Boolean).join(" and ");
+  const write = !form.summary.trim();
+  if (write && choose) return `Write a summary, and choose ${choose}.`;
+  if (write) return "Write a summary.";
+  return choose ? `Choose ${choose}.` : "";
+}

@@ -572,7 +572,9 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 .phone .top .org{display:none}
 .phone .toptabs .tab{height:32px;padding:0 12px;white-space:nowrap}
 .phone .top{gap:10px}
-.workhead .flabel{margin-left:8px}
+.workhead .wowner{display:inline-flex;align-items:center;gap:8px}
+.phone .workhead{gap:8px}
+.phone .wtitle{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .qdone{margin:0 0 8px}
 .qdone>.linkbtn{padding:4px 0}
 .wdue.today{color:var(--ink);font-weight:700}
