@@ -130,7 +130,7 @@ function Home({ data }: { data: PrioritiesResponse }) {
   const filter = { health: screen.health, q: screen.q };
   const filtering = isFiltering(filter);
   const funded = useMemo(() => filterPriorities(data.funded, { health: screen.health, q: screen.q }), [data, screen.health, screen.q]);
-  const backlog = useMemo(() => filterPriorities(data.backlog, { health: screen.health, q: screen.q }, { counted: false }), [data, screen.health, screen.q]);
+  const backlog = useMemo(() => filterPriorities(data.backlog, { health: screen.health, q: screen.q }), [data, screen.health, screen.q]);
   const all = useMemo(() => [...data.funded, ...data.backlog], [data]);
   const window = useMemo(() => timelineWindow(all, data.today, screen.zoom, screen.from), [all, data.today, screen.zoom, screen.from]);
   const [range, setRange] = useState({ first: window.first, last: window.last });

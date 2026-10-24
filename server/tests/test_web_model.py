@@ -98,7 +98,11 @@ class FilterTests(unittest.TestCase):
     def test_a_health_filter_selects_what_its_count_counts(self) -> None:
         # "1 GREEN" counts one top-level goal in progress above the cut line. Its GREEN sub-goals are not counted.
         self.assertEqual(titles(run('return filter.filterPriorities(api.funded, { health: "GREEN" });')), [["XW-0003", True]])
-        self.assertEqual(run('return filter.filterPriorities(api.funded, { health: "GREEN" }, { counted: false });'), [])
+
+    def test_the_server_says_what_the_count_counts(self) -> None:
+        # The app keeps no counting rule of its own (plan E-9): a goal the server marks counted is the one a health filter selects.
+        rows = run('const funded = structuredClone(api.funded); funded[2].goals[0].counted = false; funded[2].goals[0].children[0].counted = true; return filter.filterPriorities(funded, { health: "GREEN" });')
+        self.assertEqual(titles(rows), [["XW-0003", False], ["XW-0004", True]])
 
     def test_pointing_at_a_count_lights_what_it_counts(self) -> None:
         lit = run('return filter.flatten(filter.filterPriorities(api.funded, {}).flatMap((p) => p.goals)).filter((g) => filter.isLit(g, { hot: "GREEN" })).map((g) => g.id);')
