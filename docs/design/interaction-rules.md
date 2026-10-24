@@ -125,8 +125,9 @@ NG7. Under 960 px of page New goal takes the phone layout (N15a): the form full 
 
 W1. The top bar has two pages: Home and Work items. The page you are on is filled.
 W2. Work items lists one queue per owner (the team view, the org unit's name under "Owner") or one owner's queue (that owner's name), each by status: In Progress, then Backlog. Completed work is one muted line per owner, "5 completed", opening in place. People with work In Progress come first, then the signed-in actor. An agent owner carries the muted word "agent". Each row shows its goal, linked, and its due date, with "late" in --red-ink when it is past and "today" when it is today.
-W4. Each row has a status picker (Backlog, In Progress, Completed, Deleted); a new status opens the row's reason box, as the tick does (QA U6, product D8). On a phone the due date and the picker share a line. People keep the order they had when the page loaded until the next visit (QA U5).
 W3. The page updates live: a change to any work item, by anyone, reloads it (ADR 0007). Ticking a row asks for its reason, as on a goal page.
+W4. Each row has a status picker (Backlog, In Progress, Completed, Deleted); a new status opens the row's reason box, as the tick does (QA U6, product D8). On a phone the due date and the picker share a line. People keep the order they had when the page loaded until the next visit (QA U5).
+W5. Owner "Chelsea" shows her work and the work of every seat she operates; each seat's queue reads "Frontend Engineer agent, operated by Chelsea", with "operated by Chelsea" on its own line on a phone (QA U4). The server returns them; the page groups by each item's owner.
 
 ## Access
 

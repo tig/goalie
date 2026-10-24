@@ -91,7 +91,11 @@ function Queues({ work, reload, single }: { work: WorkResponse; reload: () => vo
       {list.map((q) => (
         <section key={q.owner.id} className="queue">
           <h2>
-            {single ? <Owner actor={q.owner} me={work.me.id} /> : <Link to={workPath(q.owner.id)} className="qowner"><Owner actor={q.owner} me={work.me.id} /></Link>}
+            <span className="qwho">
+              {single ? <Owner actor={q.owner} me={work.me.id} /> : <Link to={workPath(q.owner.id)} className="qowner"><Owner actor={q.owner} me={work.me.id} /></Link>}
+              {/* QA U4: a seat's queue names the human who operates it. */}
+              {q.owner.operator && <span className="qop"><span className="qcomma">,</span> operated by {work.actors[q.owner.operator]?.name ?? q.owner.operator}</span>}
+            </span>
             <span className="muted">{q.groups.reduce((n, g) => n + g.items.length, 0)}</span>
           </h2>
           {q.groups.map((g) => {
