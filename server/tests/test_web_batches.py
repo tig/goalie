@@ -59,12 +59,12 @@ class WebBatchTests(unittest.TestCase):
         return {"goal": options["defaults"]["type"], "milestone": options["promotionMilestoneType"]}
 
     def test_a_sub_goal_on_its_parents_date_is_stored(self) -> None:
-        parent = self.read("/api/goals/XW-0002")["goal"]
+        parent = self.read("/api/goals/XW-0004")["goal"]
         batch = build("return commands.subGoalBatch(parent, { summary: 'Interview two candidates', owner: 'chelsea' }, types);", parent=parent, types=self.types())
         self.assertTrue(self.send(batch)["ok"])
 
     def test_a_sub_goal_with_its_own_fantasy_date_and_milestone_is_stored(self) -> None:
-        parent = self.read("/api/goals/XW-0002")["goal"]
+        parent = self.read("/api/goals/XW-0004")["goal"]
         row = {"summary": "Hire a designer", "owner": "chelsea", "date": {"due_date": "2027-03-01", "date_type": "Fantasy"}, "milestone": {"summary": "Commit a hire date", "due_date": "2026-11-12", "owner": "chelsea"}}
         batch = build("return commands.subGoalBatch(parent, row, types);", parent=parent, row=row, types=self.types())
         self.assertTrue(self.send(batch)["ok"])
@@ -147,13 +147,25 @@ class WebBatchTests(unittest.TestCase):
         self.assertTrue(self.send(batch)["ok"])
 
     def test_a_panel_saved_with_no_reason_is_refused_at_the_reason(self) -> None:
-        goal = self.read("/api/goals/XW-0002")["goal"]
+        goal = self.read("/api/goals/XW-0004")["goal"]
         batch = build("return commands.fieldsBatch(goal, { severity: 'sev3' }, '');", goal=goal)
         reply = post(self.proc, self.port, "/api/commands", batch, self.auth)
         answer = json.loads(reply.body)
         self.assertEqual(reply.status, 422, answer)
         self.assertEqual([v["field"] for v in answer["violations"]], ["reason"])
 
+
+    def test_a_goal_chelsea_may_not_change_reads_only_and_refuses_her_save(self) -> None:
+        page = self.read("/api/goals/XW-0002")
+        self.assertFalse(page["mayChange"])
+        names = [page["actors"][c["actor"]]["name"] for c in page["changers"]]
+        self.assertIn("Tig", names)
+        reply = post(self.proc, self.port, "/api/commands", build("return commands.fieldsBatch(goal, { severity: 'sev3' }, 'Tidy');", goal=page["goal"]), self.auth)
+        answer = json.loads(reply.body)
+        self.assertEqual((reply.status, [v["rule"] for v in answer["violations"]]), (422, ["owners-change-goal"]))
+
+    def test_a_goal_chelsea_owns_lets_her_change_it(self) -> None:
+        self.assertTrue(self.read("/api/goals/XW-0004")["mayChange"])
 
 if __name__ == "__main__":
     unittest.main()

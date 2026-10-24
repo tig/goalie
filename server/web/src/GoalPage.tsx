@@ -5,7 +5,7 @@ import { postCommands, useJson } from "./data.ts";
 import { AddSubGoal, AddWorkItem, useTick } from "./GoalAdd.tsx";
 import { ClosePanel, DescriptionPanel, FieldsPanel, HealthPanel, PromotePanel, PursuePanel, SlipPanel, type PanelName } from "./GoalPanels.tsx";
 import { commentBatch } from "./model/commands.ts";
-import { comments, createdFields, historyNames, dateBar, labelRows, eventValue, fieldLabel, filterEvents, groupEvents, groupWorkItems, HISTORY_FILTERS, type EventGroup, type HistoryFilter, type Names } from "./model/goalpage.ts";
+import { changeParts, comments, createdFields, historyNames, dateBar, labelRows, eventValue, fieldLabel, filterEvents, groupEvents, groupWorkItems, HISTORY_FILTERS, type EventGroup, type HistoryFilter, type Names } from "./model/goalpage.ts";
 import { dateLabel, slipLabel } from "./model/labels.ts";
 import { backPath, goalPath } from "./model/route.ts";
 import { Avatar, HealthDot } from "./parts.tsx";
@@ -65,6 +65,8 @@ function Goal({ data, back, reload }: { data: GoalPageResponse; back: React.Reac
   const owner = actors[goal.owner] ?? { id: goal.owner, name: goal.owner, kind: "human" as const };
   const [judged, ...others] = data.dates;
   const open = goal.state === "In Progress";
+  // G25: the server says whether the signed-in actor may change this goal (owners-change-goal). Anyone else gets the same page, read-only.
+  const may = data.mayChange;
   const needs = [
     data.needsYou.lateWorkItems.length > 0 && `${data.needsYou.lateWorkItems.length} work item${data.needsYou.lateWorkItems.length === 1 ? "" : "s"} past its date`,
     data.needsYou.missingPtg && "a missing Path to Green",
@@ -94,10 +96,18 @@ function Goal({ data, back, reload }: { data: GoalPageResponse; back: React.Reac
                 </span>
               )}
             </p>
-            {needs.length > 0 && <p className="needs">! Needs you: {needs.join(" and ")}</p>}
+            {may && needs.length > 0 && <p className="needs">! Needs you: {needs.join(" and ")}</p>}
           </div>
           {/* A goal that is not In Progress shows no health control; its State word stands alone (G4). */}
-          {open && (
+          {open && !may && (
+            <div className="ghealth">
+              <span className="lbl">Health</span>
+              <span className="hread">
+                <HealthDot health={goal.health} word="shown" />
+              </span>
+            </div>
+          )}
+          {open && may && (
             <div className="ghealth" role="group" aria-label="Health">
               <span className="lbl">Health</span>
               <span className="hpick">
@@ -145,7 +155,9 @@ function Goal({ data, back, reload }: { data: GoalPageResponse; back: React.Reac
           </p>
         ))}
         {data.dates.length > 0 && <DateBar data={data} />}
+        {!may && <Changers data={data} />}
         {/* The actions name their object; one that does not apply is not drawn (G7). */}
+        {may && (
         <div className="gactions">
           {goal.state === "Backlog" && (
             <button type="button" className="btn" onClick={() => setPanel({ name: "pursue" })}>
@@ -168,6 +180,7 @@ function Goal({ data, back, reload }: { data: GoalPageResponse; back: React.Reac
             </button>
           )}
         </div>
+        )}
         {panel?.name === "health" && panel.health && <HealthPanel data={data} health={panel.health} onDone={done} />}
         {panel?.name === "slip" && <SlipPanel data={data} onDone={done} />}
         {panel?.name === "promote" && <PromotePanel data={data} onDone={done} />}
@@ -180,7 +193,7 @@ function Goal({ data, back, reload }: { data: GoalPageResponse; back: React.Reac
         <section className={`card gptg ${goal.health ?? ""}`}>
           <div className="lbl">
             Path to Green (PTG)
-            {open && goal.health && goal.health !== "GREEN" && <Pencil label="Edit Path to Green" onClick={() => setPanel({ name: "health", health: goal.health as "YELLOW" | "RED" })} />}
+            {may && open && goal.health && goal.health !== "GREEN" && <Pencil label="Edit Path to Green" onClick={() => setPanel({ name: "health", health: goal.health as "YELLOW" | "RED" })} />}
           </div>
           <table className="steps">
             <thead>
@@ -217,21 +230,23 @@ function Goal({ data, back, reload }: { data: GoalPageResponse; back: React.Reac
           <section className="card gdesc">
             <div className="lbl">
               Description
-              <Pencil label="Edit Description" onClick={() => setPanel({ name: "description" })} />
+              {may && <Pencil label="Edit Description" onClick={() => setPanel({ name: "description" })} />}
             </div>
             {goal.description ? goal.description.split(/\n{2,}/).map((p, i) => <p key={i}>{p}</p>) : <p className="muted">No description yet.</p>}
             {/* The missing parts read as one hint line, not as items (G18). */}
-            {data.hints.some((h) => h.field === "description") && <p className="hint">{data.hints.filter((h) => h.field === "description").map((h) => h.text).join(" · ")}</p>}
+            {may && data.hints.some((h) => h.field === "description") && <p className="hint">{data.hints.filter((h) => h.field === "description").map((h) => h.text).join(" · ")}</p>}
           </section>
         )}
-        {panel?.name === "fields" ? <FieldsPanel data={data} onDone={done} /> : <Fields data={data} onEdit={() => setPanel({ name: "fields" })} />}
+        {panel?.name === "fields" ? <FieldsPanel data={data} onDone={done} /> : <Fields data={data} onEdit={may ? () => setPanel({ name: "fields" }) : undefined} />}
       </div>
       <section className="gsubs">
         <h2>
           Sub-goals
-          <button type="button" className="btn primary" onClick={() => setPanel({ name: "subgoal" })}>
-            + Sub-goal
-          </button>
+          {may && (
+            <button type="button" className="btn primary" onClick={() => setPanel({ name: "subgoal" })}>
+              + Sub-goal
+            </button>
+          )}
         </h2>
         {panel?.name === "subgoal" && <AddSubGoal data={data} onDone={done} />}
         {data.subGoals.map((c) => (
@@ -243,6 +258,25 @@ function Goal({ data, back, reload }: { data: GoalPageResponse; back: React.Reac
       )}
       <Talk data={data} reload={reload} />
     </main>
+  );
+}
+
+/** G25: who may change this goal, for a viewer who may not. The server names them and says why; the tooltip writes it. */
+function Changers({ data }: { data: GoalPageResponse }) {
+  const why = (c: GoalPageResponse["changers"][number]) => (c.as === "goalie-owner" ? "GOALIE owner" : `Owner of ${c.goal}`);
+  return (
+    <p className="gwho small">
+      {changeParts(data.changers, data.moreChangers).map((part, i) =>
+        typeof part === "string" ? (
+          <span key={i}>{part}</span>
+        ) : (
+          <span key={i} className="gwhoname" title={why(part)}>
+            <Avatar actor={data.actors[part.actor] ?? { id: part.actor, name: part.actor }} mine={part.actor === data.me.id} /> {data.actors[part.actor]?.name ?? part.actor}
+          </span>
+        ),
+      )}{" "}
+      can change this goal. You can comment.
+    </p>
   );
 }
 
@@ -294,7 +328,7 @@ function Pencil({ label, onClick }: { label: string; onClick: () => void }) {
   );
 }
 
-function Fields({ data, onEdit }: { data: GoalPageResponse; onEdit: () => void }) {
+function Fields({ data, onEdit }: { data: GoalPageResponse; onEdit?: () => void }) {
   const { goal, today } = data;
   const none = <span className="muted">None</span>;
   const dateOr = (d: string | null) => (d ? <span className="date">{shortDate(d, today)}</span> : none);
@@ -316,7 +350,7 @@ function Fields({ data, onEdit }: { data: GoalPageResponse; onEdit: () => void }
     <section className="card gfields">
       <div className="lbl">
         Fields
-        <Pencil label="Edit Fields" onClick={onEdit} />
+        {onEdit && <Pencil label="Edit Fields" onClick={onEdit} />}
       </div>
       <dl>
         {rows.map(([field, value]) => (

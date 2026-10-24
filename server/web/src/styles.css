@@ -601,3 +601,7 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 .ngtopcount{display:block;margin:0 0 10px;color:var(--red-ink)}
 main.newgoal{padding-bottom:84px}
 .btn.create{position:fixed;left:16px;right:16px;bottom:12px;height:48px;z-index:40;box-shadow:0 6px 20px var(--tip-shadow)}}
+/* G25: read-only health is its shape and word (rule 10); the line names who may change the goal. */
+.hread{display:inline-flex;align-items:center;gap:6px;font-weight:700}
+.gwho{color:var(--mute);margin:10px 0 0;display:flex;flex-wrap:wrap;align-items:center;gap:0 2px}
+.gwhoname{display:inline-flex;align-items:center;gap:4px;color:var(--ink)}
