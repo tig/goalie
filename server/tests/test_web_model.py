@@ -429,6 +429,14 @@ class GoalPageTests(unittest.TestCase):
         rows = run(f"return goalpage.groupEvents({json.dumps(events)}).map((g) => [g.events.length, g.promoted]);")
         self.assertEqual(rows, [[5, {"milestone": "XW-0012"}], [1, None]])
 
+    def test_a_former_milestone_is_named_by_its_latest_summary(self) -> None:
+        events = [
+            {"sequence": 3, "entity": "XW-0012", "field": "summary", "old": "Commit", "new": "Commit a date"},
+            {"sequence": 2, "entity": "XW-0013", "field": "summary", "old": None, "new": "Ship it"},
+            {"sequence": 1, "entity": "XW-0012", "field": "summary", "old": None, "new": "Commit"},
+        ]
+        self.assertEqual(run(f"return goalpage.historyNames({json.dumps(events)});"), {"XW-0012": "Commit a date", "XW-0013": "Ship it"})
+
     def test_a_value_reads_as_names_and_dates(self) -> None:
         ctx = {"actors": {"tig": {"name": "Tig"}}, "names": {"PRI-3": "Priority 3 Run Excaliwire on GOALIE", "excaliwire": "Excaliwire"}}
         v = run(f'const c = {json.dumps(ctx)}; return [goalpage.eventValue("2026-11-30", "due_date", c), goalpage.eventValue("PRI-3", "priority", c), goalpage.eventValue("excaliwire", "org_unit", c), goalpage.eventValue("tig", "owner", c), goalpage.eventValue("organization-wide", "visibility", c)];')

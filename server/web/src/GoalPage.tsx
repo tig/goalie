@@ -5,7 +5,7 @@ import { postCommands, useJson } from "./data.ts";
 import { AddSubGoal, AddWorkItem, useTick } from "./GoalAdd.tsx";
 import { ClosePanel, DescriptionPanel, FieldsPanel, HealthPanel, PromotePanel, PursuePanel, SlipPanel, type PanelName } from "./GoalPanels.tsx";
 import { commentBatch } from "./model/commands.ts";
-import { comments, createdFields, dateBar, labelRows, eventValue, fieldLabel, filterEvents, groupEvents, groupWorkItems, HISTORY_FILTERS, type EventGroup, type HistoryFilter, type Names } from "./model/goalpage.ts";
+import { comments, createdFields, historyNames, dateBar, labelRows, eventValue, fieldLabel, filterEvents, groupEvents, groupWorkItems, HISTORY_FILTERS, type EventGroup, type HistoryFilter, type Names } from "./model/goalpage.ts";
 import { dateLabel, slipLabel } from "./model/labels.ts";
 import { backPath, goalPath } from "./model/route.ts";
 import { Avatar, HealthDot } from "./parts.tsx";
@@ -420,6 +420,7 @@ function EventRow({ group, data }: { group: EventGroup; data: GoalPageResponse }
   const names: Names = {
     actors: data.actors,
     names: {
+      ...historyNames(data.events),
       ...(data.priority ? { [data.priority.id]: `Priority ${data.priority.rank} ${data.priority.title}` } : {}),
       [data.orgUnit.id]: data.orgUnit.name,
       ...(data.parent ? { [data.parent.id]: data.parent.summary } : {}),

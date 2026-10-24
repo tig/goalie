@@ -91,6 +91,13 @@ export function createdFields(events: ApiEvent[]): ApiEvent[] {
   });
 }
 
+/** Each goal in the History by its latest summary, so a former Promotion Milestone reads as its name, not its key (GP7). Events are newest first. */
+export function historyNames(events: ApiEvent[]): Record<string, string> {
+  const names: Record<string, string> = {};
+  for (const e of events) if (e.field === "summary" && typeof e.new === "string" && !(e.entity in names)) names[e.entity] = e.new;
+  return names;
+}
+
 /** The actors who may own a goal or a Path to Green step: the humans. */
 export const humans = (actors: Record<string, ApiActor> | ApiActor[]) => Object.values(actors).filter((a) => a.kind === "human");
 
