@@ -1,4 +1,4 @@
-import type { ApiWorkItem, CommandsRequest, GoalFields, Health, PathToGreen, StoredGoal, WorkItemFields, WorkItemStatus } from "../../../src/api.ts";
+import type { ApiWorkItem, CommandsRequest, FormOptions, GoalFields, Health, PathToGreen, StoredGoal, WorkItemFields, WorkItemStatus } from "../../../src/api.ts";
 
 /**
  * The goal page's panels as batches for POST /api/commands (docs/engineering/goal-page-and-create.md, Edits from the goal page).
@@ -29,21 +29,28 @@ export function slipBatch(goal: StoredGoal, changedDueDate: string, health: Excl
 
 export type NewMilestone = { summary: string; due_date: string; owner: string };
 
-/**
- * Promote date (G14). Fantasy to Ambition makes the next Promotion Milestone first ($m), then points the goal at it.
- * Ambition to Committed drops the milestone. The new date is sent only when it differs.
- */
-export function promoteBatch(goal: StoredGoal, milestone: NewMilestone | null, newDate: string, reason: string): CommandsRequest {
+/** Promote date (G14), Fantasy to Ambition: the met milestone is completed, the next Promotion Milestone is made ($m), then the goal points at it. The new date is sent only when it differs. */
+export function promoteToAmbition(goal: StoredGoal, milestone: NewMilestone, newDate: string, reason: string, milestoneType: string, met?: { id: string; version: number }): CommandsRequest {
   const date = newDate !== goal.due_date ? { due_date: newDate } : {};
-  if (goal.date_type === "Fantasy" && milestone) {
-    return {
-      commands: [
-        { op: "create", kind: "goal", ref: "$m", fields: { ...milestone, type: "Milestone (Commit)", date_type: "Committed", org_unit: goal.org_unit, level: goal.level, ...kept(goal), state: "Backlog" }, reason },
-        { op: "update", kind: "goal", id: goal.id, base_version: goal.version, fields: { date_type: "Ambition", promotion_milestone: "$m", ...date }, reason },
-      ],
-    };
-  }
-  return update(goal, { date_type: "Committed", promotion_milestone: null, ...date }, reason);
+  return {
+    commands: [
+      // The milestone that was met is completed first (G14).
+      ...(met ? [{ op: "update" as const, kind: "goal" as const, id: met.id, base_version: met.version, fields: { state: "Completed" as const }, reason }] : []),
+      { op: "create", kind: "goal", ref: "$m", fields: { ...milestone, type: milestoneType, date_type: "Committed", org_unit: goal.org_unit, level: goal.level, ...kept(goal), state: "Backlog" }, reason },
+      { op: "update", kind: "goal", id: goal.id, base_version: goal.version, fields: { date_type: "Ambition", promotion_milestone: "$m", ...date }, reason },
+    ],
+  };
+}
+
+/** Promote date (G14), Ambition to Committed: the Promotion Milestone is completed first, then the goal is Committed and drops it. */
+export function promoteToCommitted(goal: StoredGoal, milestone: { id: string; version: number }, newDate: string, reason: string): CommandsRequest {
+  const date = newDate !== goal.due_date ? { due_date: newDate } : {};
+  return {
+    commands: [
+      { op: "update", kind: "goal", id: milestone.id, base_version: milestone.version, fields: { state: "Completed" }, reason },
+      { op: "update", kind: "goal", id: goal.id, base_version: goal.version, fields: { date_type: "Committed", promotion_milestone: null, ...date }, reason },
+    ],
+  };
 }
 
 /** Close goal (G15): the state the close records, with a reason. */
@@ -72,6 +79,12 @@ export function staleMerge(typed: Record<string, unknown>, current: { version: n
   return { base_version: current.version, current: Object.fromEntries(Object.keys(typed).map((k) => [k, current[k]])) };
 }
 
+/** The type names from GET /api/options: a new goal's default type, and the Promotion Milestone type (§6.1, D1). The app writes no type name. */
+export const goalTypes = (options: FormOptions): GoalTypes => ({ goal: options.defaults.type, milestone: options.promotionMilestoneType });
+
+/** The type names the server's options give: a new goal's default type, and the type of a Promotion Milestone (§6.1, D1). */
+export type GoalTypes = { goal: string; milestone: string };
+
 export type SubGoalRow = {
   summary: string;
   owner: string;
@@ -85,14 +98,14 @@ export type SubGoalRow = {
  * + Sub-goal (G20): step 4 of the create order, with the page's goal as parent. It starts in Backlog.
  * A sub-goal with its own uncommitted date brings its milestone first ($m1), and the milestone then joins it as a sub-goal (steps 1 and 3).
  */
-export function subGoalBatch(parent: StoredGoal, row: SubGoalRow): CommandsRequest {
+export function subGoalBatch(parent: StoredGoal, row: SubGoalRow, types: GoalTypes): CommandsRequest {
   const reason = `Sub-goal of ${parent.id}`;
-  const base = { summary: row.summary, owner: row.owner, parent: parent.id, org_unit: parent.org_unit, level: parent.level, ...kept(parent), state: "Backlog" as const };
+  const base = { summary: row.summary, owner: row.owner, parent: parent.id, type: types.goal, org_unit: parent.org_unit, level: parent.level, ...kept(parent), state: "Backlog" as const };
   if (!row.date) return { commands: [{ op: "create", kind: "goal", ref: "$s1", fields: base, reason }] };
   if (row.date.date_type === "Committed" || !row.milestone) return { commands: [{ op: "create", kind: "goal", ref: "$s1", fields: { ...base, ...row.date }, reason }] };
   return {
     commands: [
-      { op: "create", kind: "goal", ref: "$m1", fields: { ...row.milestone, type: "Milestone (Commit)", date_type: "Committed", org_unit: parent.org_unit, level: parent.level, ...kept(parent), state: "Backlog" }, reason },
+      { op: "create", kind: "goal", ref: "$m1", fields: { ...row.milestone, type: types.milestone, date_type: "Committed", org_unit: parent.org_unit, level: parent.level, ...kept(parent), state: "Backlog" }, reason },
       { op: "create", kind: "goal", ref: "$s1", fields: { ...base, ...row.date, promotion_milestone: "$m1" }, reason },
       { op: "update", kind: "goal", id: "$m1", base_version: 1, fields: { parent: "$s1" }, reason },
     ],
@@ -123,6 +136,8 @@ export type NewGoalForm = {
   plan_maturity: GoalFields["plan_maturity"];
   more: Pick<GoalFields, "type" | "severity" | "state" | "origination" | "level" | "visibility" | "org_unit">;
   milestone: NewMilestone | null;
+  /** The type of a Promotion Milestone, from the server's options. */
+  milestoneType: string;
   /** Set when the form opens from a goal page's + Sub-goal (N2). */
   parent?: string | null;
   subGoals: SubGoalRow[];
@@ -138,7 +153,7 @@ export function createBatch(form: NewGoalForm, check = false): CommandsRequest {
   const where = { org_unit: form.more.org_unit, level: form.more.level };
   // Milestones and sub-goals start in Backlog and carry the form's required fields (severity, origination, visibility, plan maturity).
   const carried = kept({ ...form.more, plan_maturity: form.plan_maturity });
-  const milestone = (m: NewMilestone) => ({ ...m, type: "Milestone (Commit)", date_type: "Committed" as const, ...where, ...carried, state: "Backlog" as const });
+  const milestone = (m: NewMilestone) => ({ ...m, type: form.milestoneType, date_type: "Committed" as const, ...where, ...carried, state: "Backlog" as const });
   const uncommitted = form.date_type !== "Committed" && form.milestone;
   // A sub-goal with its own uncommitted date and milestone gets the next milestone ref: $m1, $m2, ...
   let n = 0;

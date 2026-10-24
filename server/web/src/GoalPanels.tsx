@@ -2,8 +2,8 @@ import { useState, type ReactNode } from "react";
 import type { ApiActor, ApiViolation, CommandsRequest, FormOptions, GoalFields, GoalPageResponse, Health, PathToGreen, StoredGoal } from "../../src/api.ts";
 import { addDays, shortDate } from "../../src/dates.ts";
 import { postCommands, useJson } from "./data.ts";
-import { closeBatch, fieldsBatch, healthBatch, promoteBatch, pursueBatch, slipBatch, staleMerge } from "./model/commands.ts";
-import { eventValue, fieldLabel } from "./model/goalpage.ts";
+import { closeBatch, fieldsBatch, goalTypes, healthBatch, promoteToAmbition, promoteToCommitted, pursueBatch, slipBatch, staleMerge } from "./model/commands.ts";
+import { eventValue, fieldLabel, humans } from "./model/goalpage.ts";
 import { HealthDot } from "./parts.tsx";
 
 /**
@@ -50,7 +50,7 @@ function Current({ saved, field, data }: { saved: Saved; field: string; data: Go
   return <p className="fcurrent">Now: {eventValue(saved.stale.current[field], field, data.actors)}</p>;
 }
 
-function Shell({ title, tone, saved, fields, onSave, onCancel, saveLabel = "Save", children }: { title: string; tone?: string; saved: Saved; fields: string[]; onSave: () => void; onCancel: () => void; saveLabel?: string; children: ReactNode }) {
+function Shell({ title, tone, saved, fields, onSave, onCancel, saveLabel = "Save", note, children }: { title: string; tone?: string; saved: Saved; fields: string[]; onSave: () => void; onCancel: () => void; saveLabel?: string; note?: string; children: ReactNode }) {
   const loose = saved.violations.filter((v) => !v.field || !fields.includes(v.field));
   return (
     <section className={`panel${tone ? ` ${tone}` : ""}`} aria-label={title}>
@@ -64,11 +64,12 @@ function Shell({ title, tone, saved, fields, onSave, onCancel, saveLabel = "Save
       ))}
       {children}
       <div className="pactions">
-        <button type="button" className="btn primary" onClick={onSave} disabled={saved.saving} aria-busy={saved.saving}>
-          {saved.saving ? "…" : saveLabel}
-        </button>
+        {note && <span className="small">{note}</span>}
         <button type="button" className="btn" onClick={onCancel}>
           Cancel
+        </button>
+        <button type="button" className="btn primary" onClick={onSave} disabled={saved.saving} aria-busy={saved.saving}>
+          {saved.saving ? "…" : saveLabel}
         </button>
       </div>
     </section>
@@ -79,16 +80,16 @@ function Reason({ value, onChange, saved }: { value: string; onChange: (v: strin
   return (
     <label className="field">
       <span className="flabel">Reason</span>
-      <textarea rows={2} value={value} onChange={(e) => onChange(e.target.value)} />
+      <textarea rows={2} value={value} placeholder="Why it changed" onChange={(e) => onChange(e.target.value)} />
       <FieldError saved={saved} field="reason" />
     </label>
   );
 }
 
-const humans = (data: GoalPageResponse) => Object.values(data.actors).filter((a) => a.kind === "human");
+const people = (data: GoalPageResponse) => humans(data.actors);
 
 /** The Path to Green editor (G10, N5a): steps with an owner and a date, criteria for GREEN, and for YELLOW the trigger for RED. */
-export function PtgFields({ value, onChange, health, people, me, today, error }: { value: PathToGreen; onChange: (v: PathToGreen) => void; health: Health; people: ApiActor[]; me: string; today: string; error?: ReactNode }) {
+export function PtgFields({ value, onChange, health, people, me, error }: { value: PathToGreen; onChange: (v: PathToGreen) => void; health: Health; people: ApiActor[]; me: string; error?: ReactNode }) {
   const step = (i: number, part: Partial<PathToGreen["steps"][number]>) => onChange({ ...value, steps: value.steps.map((s, j) => (j === i ? { ...s, ...part } : s)) });
   return (
     <div className="ptgedit">
@@ -104,7 +105,7 @@ export function PtgFields({ value, onChange, health, people, me, today, error }:
           {value.steps.map((s, i) => (
             <tr key={i}>
               <td>
-                <input value={s.text} onChange={(e) => step(i, { text: e.target.value })} aria-label="Step" />
+                <input value={s.text} placeholder="What will be done" onChange={(e) => step(i, { text: e.target.value })} aria-label="Step" />
               </td>
               <td>
                 <select value={s.owner} onChange={(e) => step(i, { owner: e.target.value })} aria-label="Owner">
@@ -122,19 +123,18 @@ export function PtgFields({ value, onChange, health, people, me, today, error }:
           ))}
         </tbody>
       </table>
-      <button type="button" className="linkbtn" onClick={() => onChange({ ...value, steps: [...value.steps, { text: "", owner: me, date: today }] })}>
+      <button type="button" className="linkbtn" onClick={() => onChange({ ...value, steps: [...value.steps, { text: "", owner: me, date: "" }] })}>
         + Step
       </button>
       {error}
       <label className="field">
         <span className="flabel">Criteria for GREEN</span>
-        <textarea rows={2} value={value.criteria} onChange={(e) => onChange({ ...value, criteria: e.target.value })} />
+        <textarea rows={2} value={value.criteria} placeholder="Testable without debate" onChange={(e) => onChange({ ...value, criteria: e.target.value })} />
       </label>
       {health === "YELLOW" && (
         <label className="field">
           <span className="flabel">Trigger for RED</span>
-          <textarea rows={2} value={value.trigger ?? ""} onChange={(e) => onChange({ ...value, trigger: e.target.value })} />
-          {!value.trigger && <p className="hint">Name what would turn this RED.</p>}
+          <textarea rows={2} value={value.trigger ?? ""} placeholder="What turns it RED, and what happens then" onChange={(e) => onChange({ ...value, trigger: e.target.value })} />
         </label>
       )}
     </div>
@@ -143,10 +143,11 @@ export function PtgFields({ value, onChange, health, people, me, today, error }:
 
 /** The goal page's use of the editor: its people, and the rule's message at path_to_green. */
 const PtgEditor = ({ value, onChange, health, data, saved }: { value: PathToGreen; onChange: (v: PathToGreen) => void; health: Health; data: GoalPageResponse; saved: Saved }) => (
-  <PtgFields value={value} onChange={onChange} health={health} people={humans(data)} me={data.me.id} today={data.today} error={<FieldError saved={saved} field="path_to_green" />} />
+  <PtgFields value={value} onChange={onChange} health={health} people={people(data)} me={data.me.id} error={<FieldError saved={saved} field="path_to_green" />} />
 );
 
-const emptyPtg = (data: GoalPageResponse): PathToGreen => data.goal.path_to_green ?? { steps: [{ text: "", owner: data.goal.owner, date: data.today }], criteria: "" };
+/** A new Path to Green starts with one step and no date, so no date is picked for you. */
+const emptyPtg = (data: GoalPageResponse): PathToGreen => data.goal.path_to_green ?? { steps: [{ text: "", owner: data.goal.owner, date: "" }], criteria: "" };
 
 /** G9 to G11: health, with the Path to Green when YELLOW or RED. GREEN from YELLOW or RED asks only for a reason. */
 export function HealthPanel({ data, health, onDone }: { data: GoalPageResponse; health: Exclude<Health, null>; onDone: (saved: boolean) => void }) {
@@ -160,6 +161,7 @@ export function HealthPanel({ data, health, onDone }: { data: GoalPageResponse; 
       tone={health}
       saved={saved}
       fields={["path_to_green", "reason", "health"]}
+      note={health === "GREEN" ? undefined : "One save writes health, the PTG, and the reason."}
       onSave={() => saved.save((g) => healthBatch(g, health, ptg, reason), typed)}
       onCancel={() => onDone(false)}
     >
@@ -219,14 +221,19 @@ export function PromotePanel({ data, onDone }: { data: GoalPageResponse; onDone:
   const [date, setDate] = useState(goal.due_date ?? today);
   const [reason, setReason] = useState("");
   const saved = useSave(goal, () => onDone(true));
+  const [options] = useJson<FormOptions>("/api/options");
+  const milestoneType = options.state === "ok" ? goalTypes(options.data).milestone : "";
   const pm = data.promotionMilestone;
+  const met = pm ? { id: pm.id, version: pm.version } : undefined;
+  const next = fantasy ? "Ambition" : "Committed";
   return (
     <Shell
-      title={`Promote date to ${fantasy ? "Ambition" : "Committed"}`}
+      title={`Promote date to ${next}`}
       saved={saved}
-      fields={["due_date", "promotion_milestone", "plan_maturity", "reason"]}
+      // A message for a field the panel does not draw shows at its top, never dropped.
+      fields={fantasy ? ["due_date", "promotion_milestone", "reason"] : ["due_date", "plan_maturity", "reason"]}
       saveLabel="Promote date"
-      onSave={() => saved.save((g) => promoteBatch(g, fantasy ? ms : null, date, reason), { date_type: fantasy ? "Ambition" : "Committed", due_date: date })}
+      onSave={() => saved.save((g) => (fantasy ? promoteToAmbition(g, ms, date, reason, milestoneType, met) : promoteToCommitted(g, met ?? { id: "", version: 1 }, date, reason)), { date_type: next, due_date: date })}
       onCancel={() => onDone(false)}
     >
       {pm && (pm.openSubGoals > 0 || pm.openWorkItems > 0) && (
@@ -237,7 +244,7 @@ export function PromotePanel({ data, onDone }: { data: GoalPageResponse; onDone:
         </p>
       )}
       <p className="note">
-        New Date Type: <b>{fantasy ? "Ambition" : "Committed"}</b>
+        New Date Type: <b>{next}</b>
       </p>
       <label className="field">
         <span className="flabel">Due Date</span>
@@ -247,7 +254,9 @@ export function PromotePanel({ data, onDone }: { data: GoalPageResponse; onDone:
       </label>
       {fantasy ? (
         <div className="pmbox">
-          <p className="small">A Committed date by which this date moves up to Ambition. Health is judged against it.</p>
+          {/* The next milestone moves the date from Ambition up to Committed (§5). */}
+          <h4>Next Promotion Milestone · Ambition → Committed</h4>
+          <p className="small">A Committed date by which this date moves up to Committed. Health is judged against it.</p>
           <label className="field">
             <span className="flabel">Promotion Milestone</span>
             <input value={ms.summary} onChange={(e) => setMs({ ...ms, summary: e.target.value })} />
@@ -259,7 +268,7 @@ export function PromotePanel({ data, onDone }: { data: GoalPageResponse; onDone:
           <label className="field">
             <span className="flabel">Owner</span>
             <select value={ms.owner} onChange={(e) => setMs({ ...ms, owner: e.target.value })}>
-              {humans(data).map((a) => (
+              {people(data).map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name}
                 </option>
@@ -274,6 +283,15 @@ export function PromotePanel({ data, onDone }: { data: GoalPageResponse; onDone:
           <FieldError saved={saved} field="plan_maturity" />
         </p>
       )}
+      {/* What the save does, said before it is done (G14). */}
+      <div className="willdo">
+        <b>On Promote, GOALIE will:</b>
+        <ul>
+          {pm && <li>complete {pm.id}</li>}
+          <li>set the Date Type to {next}</li>
+          {fantasy ? <li>create the next Promotion Milestone and link it</li> : <li>record the Original Committed Date and pin the plan version</li>}
+        </ul>
+      </div>
       <Reason value={reason} onChange={setReason} saved={saved} />
     </Shell>
   );

@@ -3,7 +3,7 @@ import type { ApiActor, ApiViolation, CommandsResponse, FormOptions, Health, Pat
 import { addDays, shortDate } from "../../src/dates.ts";
 import { postCommands, useJson } from "./data.ts";
 import { PtgFields } from "./GoalPanels.tsx";
-import { commandPlace, createBatch, type NewGoalForm, type NewMilestone, type SubGoalRow } from "./model/commands.ts";
+import { commandPlace, createBatch, goalTypes, type NewGoalForm, type NewMilestone, type SubGoalRow } from "./model/commands.ts";
 import { fieldLabel } from "./model/goalpage.ts";
 import { backPath, goalPath } from "./model/route.ts";
 import { Avatar, HealthDot } from "./parts.tsx";
@@ -68,7 +68,7 @@ function Form({ options, parent, back }: { options: FormOptions; parent?: string
     due_date: "",
     date_type: "" as DateType,
     health: null,
-    path_to_green: { steps: [{ text: "", owner: me.id, date: today }], criteria: "" },
+    path_to_green: { steps: [{ text: "", owner: me.id, date: "" }], criteria: "" },
     plan: null,
     plan_maturity: options.defaults.plan_maturity,
     more: {
@@ -81,6 +81,7 @@ function Form({ options, parent, back }: { options: FormOptions; parent?: string
       org_unit: options.defaults.org_unit,
     },
     milestone: null,
+    milestoneType: goalTypes(options).milestone,
     parent: parent ?? null,
     subGoals: [],
     workItems: [],
@@ -309,7 +310,6 @@ function Form({ options, parent, back }: { options: FormOptions; parent?: string
                 health={form.health}
                 people={humans}
                 me={me.id}
-                today={today}
                 error={at("goal", "path_to_green")}
               />
             )}

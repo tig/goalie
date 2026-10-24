@@ -105,6 +105,10 @@ GP3. One panel is open at a time, in place (G9). Each Save is one batch to the s
 GP4. Choosing a health that is not saved outlines it in its color; the saved health is filled (G4).
 GP5. + Sub-goal and + Work item open one add row in place (G20, G22). A sub-goal takes this goal's date, written out, unless it is given its own; its own Ambition or Fantasy date opens its own Promotion Milestone.
 GP6. Ticking a work item asks for its reason in the row; Enter saves and Escape undoes the tick (G24).
+GP7. History shows one row per write: the Events of one save (same actor, time, and reason). A create reads "Created" with its date and health, and opens to list its fields. Values are names and dates with their year, never ids.
+GP8. Dates on the goal page header carry their year: "Nov 6, 2026". The goal's own date reads "Nov 30, 2026 Fantasy · this goal's date". Each mark on the date bar is labelled under it.
+GP9. A panel's buttons sit at its right, Cancel then Save. A new Path to Green step has no date until one is picked. Panel tints are light (--yellow-tint, --red-tint, --green-tint) with the health's -bg border.
+GP10. Description and Fields stack under 900 px of page.
 NG1. New goal is a filled 32 px button, last in the toolbar's right cluster in every view, so it never moves (rule 25c). On a phone it is a 40 px button after the view tabs.
 NG2. The New goal page is one form of five numbered cards and a rail (N1). The rail asks the server to check the save 400 ms after the last change and shows its answer: the keys it would make, or what it refuses. The browser checks no rule (ADR 0010). The Create button names the goal's key from that answer.
 NG3. A refusal shows at the card and field it names. Typing again clears it until the next check.

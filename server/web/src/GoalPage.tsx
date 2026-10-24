@@ -1,11 +1,11 @@
 import { useState, type CSSProperties } from "react";
-import type { ApiActor, ApiEvent, ApiWorkItem, GoalPageResponse, Health, SubGoalCard } from "../../src/api.ts";
+import type { ApiActor, ApiWorkItem, GoalPageResponse, Health, SubGoalCard } from "../../src/api.ts";
 import { shortDate } from "../../src/dates.ts";
 import { postCommands, useJson } from "./data.ts";
 import { AddSubGoal, AddWorkItem, useTick } from "./GoalAdd.tsx";
 import { ClosePanel, DescriptionPanel, FieldsPanel, HealthPanel, PromotePanel, PursuePanel, SlipPanel, type PanelName } from "./GoalPanels.tsx";
 import { commentBatch } from "./model/commands.ts";
-import { comments, dateBar, eventValue, fieldLabel, filterEvents, groupWorkItems, HISTORY_FILTERS, type HistoryFilter } from "./model/goalpage.ts";
+import { comments, dateBar, eventValue, fieldLabel, filterEvents, groupEvents, groupWorkItems, HISTORY_FILTERS, type EventGroup, type HistoryFilter, type Names } from "./model/goalpage.ts";
 import { dateLabel, slipLabel } from "./model/labels.ts";
 import { backPath, goalPath } from "./model/route.ts";
 import { Avatar, HealthDot } from "./parts.tsx";
@@ -47,6 +47,9 @@ export function GoalPage({ goalKey, viewName }: { goalKey: string; viewName: str
   return <Goal key={`${loaded.data.goal.id}-${loaded.data.goal.version}-${loaded.data.events.length}`} data={loaded.data} back={back} reload={reload} />;
 }
 
+/** A date with its year, as on the goal page's header (design check: rule 14). */
+const yearDate = (date: string) => eventValue(date, "due_date");
+
 const time = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const when = (ts: string) => time.format(new Date(ts));
 
@@ -62,7 +65,6 @@ function Goal({ data, back, reload }: { data: GoalPageResponse; back: React.Reac
   const owner = actors[goal.owner] ?? { id: goal.owner, name: goal.owner, kind: "human" as const };
   const [judged, ...others] = data.dates;
   const open = goal.state === "In Progress";
-  const hint = (field: string) => data.hints.filter((h) => h.field === field).map((h) => <p key={h.text} className="hint">{h.text}</p>);
   const needs = [
     data.needsYou.lateWorkItems.length > 0 && `${data.needsYou.lateWorkItems.length} work item${data.needsYou.lateWorkItems.length === 1 ? "" : "s"} past its date`,
     data.needsYou.missingPtg && "a missing Path to Green",
@@ -82,9 +84,9 @@ function Goal({ data, back, reload }: { data: GoalPageResponse; back: React.Reac
               </span>
               <span>{goal.state}</span>
               {data.priority && (
-                <span>
+                <Link to={backPath(homeSearch())}>
                   Priority {data.priority.rank} {data.priority.title}
-                </span>
+                </Link>
               )}
               {data.parent && (
                 <span>
@@ -123,7 +125,8 @@ function Goal({ data, back, reload }: { data: GoalPageResponse; back: React.Reac
           <div className="gjudged">
             <span className="lbl">Health is judged on</span>
             <p className="gdate">
-              <span className="date">{goal.changed_due_date && judged.kind === "Committed" ? shortDate(goal.changed_due_date, today) : shortDate(judged.date, today)}</span>
+              {/* The server sends the judged date first, a slip already applied (goal.ts currentDate). */}
+              <span className="date">{yearDate(judged.date)}</span>
               <span className="gkind">{judged.kind === "Promotion Milestone" ? "Committed · Promotion Milestone" : judged.kind}</span>
               {judged.slipDays !== undefined && <span className="late"> · {slipLabel(judged.slipDays)}</span>}
             </p>
@@ -132,13 +135,13 @@ function Goal({ data, back, reload }: { data: GoalPageResponse; back: React.Reac
                 {data.promotionMilestone.summary} ›
               </Link>
             )}
-            {goal.original_committed_date && <p className="small">Original Committed Date {shortDate(goal.original_committed_date, today)}</p>}
+            {goal.original_committed_date && <p className="small">Original Committed Date {yearDate(goal.original_committed_date)}</p>}
             {data.inherited && <p className="small">The parent's date</p>}
           </div>
         )}
         {others.map((d) => (
           <p key={d.kind} className="gother">
-            <span className="date">{dateLabel(d, today)}</span>
+            <span className="date">{yearDate(d.date)}</span> {d.kind} <span className="muted">· this goal's date</span>
           </p>
         ))}
         {data.dates.length > 0 && <DateBar data={data} />}
@@ -216,8 +219,9 @@ function Goal({ data, back, reload }: { data: GoalPageResponse; back: React.Reac
               Description
               <Pencil label="Edit Description" onClick={() => setPanel({ name: "description" })} />
             </div>
-            {goal.description ? goal.description.split(/\n{2,}/).map((p, i) => <p key={i}>{p}</p>) : <p className="muted">None</p>}
-            {hint("description")}
+            {goal.description ? goal.description.split(/\n{2,}/).map((p, i) => <p key={i}>{p}</p>) : <p className="muted">No description yet.</p>}
+            {/* The missing parts read as one hint line, not as items (G18). */}
+            {data.hints.some((h) => h.field === "description") && <p className="hint">{data.hints.filter((h) => h.field === "description").map((h) => h.text).join(" · ")}</p>}
           </section>
         )}
         {panel?.name === "fields" ? <FieldsPanel data={data} onDone={done} /> : <Fields data={data} onEdit={() => setPanel({ name: "fields" })} />}
@@ -250,9 +254,18 @@ function DateBar({ data }: { data: GoalPageResponse }) {
       <span className="dbfill" style={{ left: `${bar.start}%`, width: `${Math.max(0, bar.today - bar.start)}%` }} />
       <span className="dbtoday" style={{ left: `${bar.today}%` }} />
       {bar.marks.map((m) => (
-        <span key={m.kind} className={`dbmark ${m.kind === "Promotion Milestone" ? "pm" : m.kind}`} style={{ left: `${m.at}%` }} title={dateLabel({ date: m.date, kind: m.kind as "Committed" }, data.today)} />
+        <span key={m.kind} className={`dbmark ${m.kind === "Promotion Milestone" ? "pm" : m.kind}`} style={{ left: `${m.at}%` }} />
       ))}
-      <span className="dbstart small">In Progress since {shortDate(data.started, data.today)}</span>
+      {/* Each mark is labelled under it: the start, Today, and each date (design check: G6). */}
+      <span className="dblabels small">
+        <span style={{ left: `${bar.start}%` }}>In Progress since {shortDate(data.started, data.today)}</span>
+        {Math.abs(bar.today - bar.start) > 12 && <span style={{ left: `${bar.today}%` }}>Today</span>}
+        {bar.marks.map((m) => (
+          <span key={m.kind} className={m.at > 85 ? "end" : ""} style={{ left: `${m.at}%` }}>
+            {shortDate(m.date, data.today)}
+          </span>
+        ))}
+      </span>
     </div>
   );
 }
@@ -277,12 +290,12 @@ function Fields({ data, onEdit }: { data: GoalPageResponse; onEdit: () => void }
     ["level", goal.level],
     ["org_unit", data.orgUnit.name],
     ["severity", goal.severity],
-    ["plan", goal.plan ?? none],
+    ["plan", goal.plan ? /^https?:\/\//.test(goal.plan) ? <a href={goal.plan} target="_blank" rel="noreferrer">{goal.plan}</a> : goal.plan : none],
     ["plan_maturity", goal.plan_maturity],
     ["work_product", goal.work_product?.length ? goal.work_product.map((w) => Object.values(w).join(" ")).join(", ") : none],
     ["parent", data.parent ? <Link to={goalPath(data.parent.id)}>{data.parent.summary}</Link> : none],
     ["origination", goal.origination],
-    ["visibility", goal.visibility],
+    ["visibility", eventValue(goal.visibility, "visibility")],
     ["original_committed_date", dateOr(goal.original_committed_date)],
     ["changed_due_date", dateOr(goal.changed_due_date)],
   ];
@@ -357,6 +370,7 @@ function WorkItems({ items, data, adding, onAdd, onDone, reload }: { items: ApiW
           + Work item
         </button>
       </h2>
+      {live.length === 0 && !adding && <p className="muted note">No work items yet.</p>}
       {adding && <AddWorkItem data={data} statuses={["Backlog", "In Progress", "Completed", "Deleted"]} onDone={onDone} />}
       {groupWorkItems(live).map((g) => (
         <div key={g.status} className="wgroup">
@@ -386,8 +400,21 @@ function WorkItems({ items, data, adding, onAdd, onDone, reload }: { items: ApiW
   );
 }
 
-function EventRow({ e, data }: { e: ApiEvent; data: GoalPageResponse }) {
+/** One History row: one write (design check). A create opens to list its fields; a change lists each field, old to new, with names for ids. */
+function EventRow({ group, data }: { group: EventGroup; data: GoalPageResponse }) {
+  const e = group.events[0];
   const actor = data.actors[e.actor] ?? { id: e.actor, name: e.actor };
+  const names: Names = {
+    actors: data.actors,
+    names: {
+      ...(data.priority ? { [data.priority.id]: `Priority ${data.priority.rank} ${data.priority.title}` } : {}),
+      [data.orgUnit.id]: data.orgUnit.name,
+      ...(data.parent ? { [data.parent.id]: data.parent.summary } : {}),
+      ...(data.promotionMilestone ? { [data.promotionMilestone.id]: data.promotionMilestone.summary } : {}),
+    },
+  };
+  const value = (v: unknown, field: string) => eventValue(v, field, names);
+  const find = (field: string) => group.events.find((x) => x.field === field)?.new;
   return (
     <li className="erow">
       <Avatar actor={actor} mine={actor.id === data.me.id} />
@@ -398,11 +425,33 @@ function EventRow({ e, data }: { e: ApiEvent; data: GoalPageResponse }) {
         </p>
         {e.field === "comment" ? (
           <p>{String(e.new)}</p>
+        ) : group.created ? (
+          <details className="created">
+            <summary>
+              Created
+              {find("date_type") !== undefined && ` · ${value(find("date_type"), "date_type")} ${value(find("due_date"), "due_date")}`}
+              {find("health") ? ` · ${value(find("health"), "health")}` : ""}
+              {e.reason && <span className="muted"> “{e.reason}”</span>}
+            </summary>
+            <ul>
+              {group.events
+                .filter((x) => x.new !== null && x.new !== "")
+                .map((x) => (
+                  <li key={x.sequence}>
+                    {fieldLabel(x.field)}: {value(x.new, x.field)}
+                  </li>
+                ))}
+            </ul>
+          </details>
         ) : (
-          <p>
-            {fieldLabel(e.field)}: {eventValue(e.old, e.field, data.actors)} → {eventValue(e.new, e.field, data.actors)}
-            {e.reason && <span className="muted"> “{e.reason}”</span>}
-          </p>
+          <>
+            {group.events.map((x) => (
+              <p key={x.sequence}>
+                {fieldLabel(x.field)}: {value(x.old, x.field)} → {value(x.new, x.field)}
+              </p>
+            ))}
+            {e.reason && <p className="muted">“{e.reason}”</p>}
+          </>
         )}
       </div>
     </li>
@@ -447,16 +496,17 @@ function Talk({ data, reload }: { data: GoalPageResponse; reload: () => void }) 
             } else setError(body.error === "invalid" ? body.violations.map((v) => v.message).join(" ") : body.error === "stale" ? "" : body.message);
           }}
         >
-          <textarea rows={3} value={text} onChange={(e) => setText(e.target.value)} aria-label="Comment" />
+          <textarea rows={3} value={text} placeholder="Comment" onChange={(e) => setText(e.target.value)} aria-label="Comment" />
           {error && <p className="ferror">{error}</p>}
           <button type="submit" className="btn primary">
             Comment
           </button>
         </form>
       )}
+      {tab === "Comments" && said.length === 0 && <p className="muted note">No comments yet.</p>}
       <ul className="events" style={{ "--n": shown.length } as CSSProperties}>
-        {shown.map((e) => (
-          <EventRow key={e.sequence} e={e} data={data} />
+        {groupEvents(shown).map((g) => (
+          <EventRow key={g.events[0].sequence} group={g} data={data} />
         ))}
       </ul>
     </section>
