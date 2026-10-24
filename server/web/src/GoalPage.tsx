@@ -1,11 +1,11 @@
-import { useState, type CSSProperties } from "react";
+import { useCallback, useState, type CSSProperties } from "react";
 import type { ApiActor, ApiWorkItem, GoalPageResponse, Health, SubGoalCard } from "../../src/api.ts";
 import { shortDate } from "../../src/dates.ts";
 import { postCommands, useJson } from "./data.ts";
 import { AddSubGoal, AddWorkItem, useTick } from "./GoalAdd.tsx";
 import { ClosePanel, DescriptionPanel, FieldsPanel, HealthPanel, PromotePanel, PursuePanel, SlipPanel, type PanelName } from "./GoalPanels.tsx";
 import { commentBatch } from "./model/commands.ts";
-import { comments, dateBar, eventValue, fieldLabel, filterEvents, groupEvents, groupWorkItems, HISTORY_FILTERS, type EventGroup, type HistoryFilter, type Names } from "./model/goalpage.ts";
+import { comments, dateBar, labelRows, eventValue, fieldLabel, filterEvents, groupEvents, groupWorkItems, HISTORY_FILTERS, type EventGroup, type HistoryFilter, type Names } from "./model/goalpage.ts";
 import { dateLabel, slipLabel } from "./model/labels.ts";
 import { backPath, goalPath } from "./model/route.ts";
 import { Avatar, HealthDot } from "./parts.tsx";
@@ -248,21 +248,34 @@ function Goal({ data, back, reload }: { data: GoalPageResponse; back: React.Reac
 
 function DateBar({ data }: { data: GoalPageResponse }) {
   const bar = dateBar(data.started, data.today, data.dates);
+  const [width, setWidth] = useState(0);
+  // The bar's width decides which labels would touch; a label that would drops to a second row (labelRows).
+  const measured = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return;
+    setWidth(el.clientWidth);
+    const resized = new ResizeObserver(() => setWidth(el.clientWidth));
+    resized.observe(el);
+    return () => resized.disconnect();
+  }, []);
+  // Each mark is labelled under it: the start, Today, and each date (design check: G6).
+  const labels = [
+    { key: "start", at: bar.start, text: `In Progress since ${shortDate(data.started, data.today)}`, align: "start" as const },
+    ...(Math.abs(bar.today - bar.start) > 12 ? [{ key: "today", at: bar.today, text: "Today", align: "center" as const }] : []),
+    ...bar.marks.map((m) => ({ key: m.kind, at: m.at, text: shortDate(m.date, data.today), align: m.at > 85 ? ("end" as const) : ("center" as const) })),
+  ];
+  const rows = labelRows(labels, width || 1000);
   return (
-    <div className="datebar" aria-hidden="true">
+    <div className={`datebar${rows.includes(1) ? " two" : ""}`} aria-hidden="true" ref={measured}>
       <span className="dbtrack" />
       <span className="dbfill" style={{ left: `${bar.start}%`, width: `${Math.max(0, bar.today - bar.start)}%` }} />
       <span className="dbtoday" style={{ left: `${bar.today}%` }} />
       {bar.marks.map((m) => (
         <span key={m.kind} className={`dbmark ${m.kind === "Promotion Milestone" ? "pm" : m.kind}`} style={{ left: `${m.at}%` }} />
       ))}
-      {/* Each mark is labelled under it: the start, Today, and each date (design check: G6). */}
       <span className="dblabels small">
-        <span style={{ left: `${bar.start}%` }}>In Progress since {shortDate(data.started, data.today)}</span>
-        {Math.abs(bar.today - bar.start) > 12 && <span style={{ left: `${bar.today}%` }}>Today</span>}
-        {bar.marks.map((m) => (
-          <span key={m.kind} className={m.at > 85 ? "end" : ""} style={{ left: `${m.at}%` }}>
-            {shortDate(m.date, data.today)}
+        {labels.map((l, i) => (
+          <span key={l.key} className={`${l.align}${rows[i] ? " low" : ""}`} style={{ left: `${l.at}%` }}>
+            {l.text}
           </span>
         ))}
       </span>

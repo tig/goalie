@@ -376,6 +376,11 @@ class GoalPageTests(unittest.TestCase):
         self.assertEqual(bar["today"], 0)  # type: ignore[index]
         self.assertEqual([round(m["at"]) for m in bar["marks"]], [37, 100])  # type: ignore[index]
 
+    def test_date_bar_labels_that_would_touch_drop_to_a_second_row(self) -> None:
+        labels = '[{ at: 0, text: "In Progress since Oct 24", align: "start" }, { at: 37, text: "Nov 6", align: "center" }, { at: 100, text: "Nov 30", align: "end" }]'
+        self.assertEqual(run(f"return goalpage.labelRows({labels}, 310);"), [0, 1, 0])  # a phone
+        self.assertEqual(run(f"return goalpage.labelRows({labels}, 990);"), [0, 0, 0])  # 1440
+
     def test_a_date_before_the_start_widens_the_bar(self) -> None:
         bar = run('return goalpage.dateBar("2026-10-23", "2026-10-23", [{ date: "2026-10-01", kind: "Committed" }]);')
         self.assertEqual((bar["marks"][0]["at"], bar["start"], bar["today"]), (0, 100, 100))  # type: ignore[index]
