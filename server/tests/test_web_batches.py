@@ -155,5 +155,17 @@ class WebBatchTests(unittest.TestCase):
         self.assertEqual([v["field"] for v in answer["violations"]], ["reason"])
 
 
+    def test_a_goal_chelsea_may_not_change_reads_only_and_refuses_her_save(self) -> None:
+        page = self.read("/api/goals/XW-0002")
+        self.assertFalse(page["mayChange"])
+        names = [page["actors"][c["actor"]]["name"] for c in page["changers"]]
+        self.assertIn("Tig", names)
+        reply = post(self.proc, self.port, "/api/commands", build("return commands.fieldsBatch(goal, { severity: 'sev3' }, 'Tidy');", goal=page["goal"]), self.auth)
+        answer = json.loads(reply.body)
+        self.assertEqual((reply.status, [v["rule"] for v in answer["violations"]]), (422, ["owners-change-goal"]))
+
+    def test_a_goal_chelsea_owns_lets_her_change_it(self) -> None:
+        self.assertTrue(self.read("/api/goals/XW-0004")["mayChange"])
+
 if __name__ == "__main__":
     unittest.main()
