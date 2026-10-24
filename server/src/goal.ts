@@ -118,3 +118,13 @@ export function closesAs(goal: Row, today: string): "Completed" | "Completed Lat
   if (goal.date_type !== "Committed" || typeof original !== "string") return null;
   return today <= original ? "Completed" : "Completed Late";
 }
+
+/**
+ * G15 Promote and close: the state an In Progress Ambition goal would close as, once promoted to Committed on its own date.
+ * The promotion records that date as the Original Committed Date (write.ts applySystemFields), so this is closesAs on that goal.
+ * Null for any other goal, including a sub-goal that takes its parent's Ambition date.
+ */
+export function closesAsPromoted(goal: Row, today: string): "Completed" | "Completed Late" | null {
+  if (goal.state !== "In Progress" || goal.date_type !== "Ambition") return null;
+  return closesAs({ ...goal, date_type: "Committed", original_committed_date: goal.due_date }, today);
+}

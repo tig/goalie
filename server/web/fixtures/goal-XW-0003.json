@@ -45,6 +45,7 @@
   "inherited": false,
   "started": "2026-10-23",
   "closesAs": null,
+  "closesAsPromoted": null,
   "promotionMilestone": {
     "id": "XW-0004",
     "summary": "Run the MLP prototype at goalie.excaliwire.com with Excaliwire's real goals loaded",
