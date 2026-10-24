@@ -117,14 +117,14 @@
   ],
   "defaults": {
     "description": "",
-    "org_unit": "excaliwire",
-    "level": "Company",
+    "visibility": "organization-wide",
     "type": "Milestone (Launch)",
     "severity": "sev2",
-    "state": "In Progress",
+    "state": "Backlog",
     "origination": "New",
-    "visibility": "organization-wide",
-    "plan_maturity": "Watercolor"
+    "plan_maturity": "Watercolor",
+    "org_unit": "excaliwire",
+    "level": "Company"
   },
   "choices": {
     "type": [

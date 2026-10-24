@@ -354,7 +354,8 @@ class WritePathTests(unittest.TestCase):
         messages = " ".join(v["message"] for v in result["violations"])
         # Codebase QA: people read this message, so it names the field in SPEC words; `field` keeps the key.
         self.assertIn("Summary is required.", messages)
-        self.assertIn("Plan Maturity is required.", messages)
+        # Plan Maturity now has a default (N-F4); Org Unit still has none.
+        self.assertIn("Org Unit is required.", messages)
         self.assertNotIn("goal.", messages)
         self.assertNotIn("constraint failed", messages)
 
