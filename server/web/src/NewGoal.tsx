@@ -153,7 +153,7 @@ function Form({ options, parent, under, back }: { options: FormOptions; parent?:
   // NF2: the summary hint is the server's lint for this goal, shown once the person leaves the field. It never blocks.
   const [leftSummary, setLeftSummary] = useState(false);
   const goalAt = batch.commands.findIndex((c) => c.op === "create" && c.kind === "goal" && c.ref === "$goal");
-  const hints = (check as (CommandsResponse & { hints?: { at: number; field: string; text: string }[] }) | null)?.hints ?? [];
+  const hints = (check && "hints" in check ? check.hints : undefined) ?? [];
   const summaryHint = leftSummary && form.summary.trim() ? hints.find((h) => h.at === goalAt && h.field === "summary")?.text : undefined;
 
   const typed = form.summary || form.description || form.subGoals.length > 0;
