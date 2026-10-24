@@ -1,6 +1,6 @@
 # Home toolbar and List
 
-**Status:** Proposed, for Chelsea (gate B)
+**Status:** Approved 2026-10-23 on the recommendations below; in build
 
 **Date:** 2026-10-23
 
@@ -152,7 +152,7 @@ These replace the rule of the same number in [interaction-rules.md](interaction-
 - **V4.** The Timeline draws zoom, the date range, and Today. The Calendar draws the date range, which names the month, and Today; Earlier and Later move one month. The List draws no time control. The legend is in the board footer in the Timeline and the Calendar.
 - **34.** On a phone the toolbar takes two rows: Priorities and the view tabs, then the search box, full width, 40 px. The Calendar adds a third row: the date range and Today.
 
-## Decisions for Chelsea
+## Decisions (approved as recommended)
 
 1. **YELLOW becomes a triangle.** Today YELLOW and a Promotion Milestone are both diamonds, side by side on the timeline and in the Calendar. Recommend: the triangle. It reads as a warning, and the diamond keeps one meaning.
 2. **Titles in the List take a second line only when they need one.** Recommend: yes. One line per title, as in Linear, cuts 2 of 6 titles at 1440 and 5 of 6 at 1100 (measured on the canvas), and the goal page that would show the whole title is not built yet. With two lines, no title is cut at 1440, and rows are 40 px, or 49 px when a title takes two lines.
