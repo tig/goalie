@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import type { ApiActor, ApiViolation, CommandsRequest, FormOptions, GoalFields, GoalPageResponse, Health, PathToGreen, StoredGoal } from "../../src/api.ts";
 import { addDays, shortDate } from "../../src/dates.ts";
 import { postCommands, useJson } from "./data.ts";
-import { closeBatch, fieldsBatch, goalTypes, healthBatch, promoteToAmbition, promoteToCommitted, pursueBatch, slipBatch, staleMerge } from "./model/commands.ts";
+import { closeBatch, fieldsBatch, goalTypes, healthBatch, promoteAndClose, promoteToAmbition, promoteToCommitted, pursueBatch, slipBatch, staleMerge } from "./model/commands.ts";
 import { eventValue, fieldLabel, humans } from "./model/goalpage.ts";
 import { HealthDot } from "./parts.tsx";
 
@@ -225,7 +225,7 @@ export function PromotePanel({ data, onDone }: { data: GoalPageResponse; onDone:
   const [options] = useJson<FormOptions>("/api/options");
   const milestoneType = options.state === "ok" ? goalTypes(options.data).milestone : "";
   const pm = data.promotionMilestone;
-  const met = pm ? { id: pm.id, version: pm.version } : undefined;
+  const met = pm ? { id: pm.id, version: pm.version, state: pm.state } : undefined;
   const next = fantasy ? "Ambition" : "Committed";
   return (
     <Shell
@@ -234,7 +234,7 @@ export function PromotePanel({ data, onDone }: { data: GoalPageResponse; onDone:
       // A message for a field the panel does not draw shows at its top, never dropped.
       fields={fantasy ? ["due_date", "promotion_milestone", "reason"] : ["due_date", "plan_maturity", "reason"]}
       saveLabel="Promote date"
-      onSave={() => saved.save((g) => (fantasy ? promoteToAmbition(g, ms, date, reason, milestoneType, met) : promoteToCommitted(g, met ?? { id: "", version: 1 }, date, reason)), { date_type: next, due_date: date })}
+      onSave={() => saved.save((g) => (fantasy ? promoteToAmbition(g, ms, date, reason, milestoneType, met) : promoteToCommitted(g, met ?? { id: "", version: 1, state: "In Progress" }, date, reason)), { date_type: next, due_date: date })}
       onCancel={() => onDone(false)}
     >
       {pm && (pm.openSubGoals > 0 || pm.openWorkItems > 0) && (
@@ -300,26 +300,41 @@ export function PromotePanel({ data, onDone }: { data: GoalPageResponse; onDone:
 
 /** G15: Close goal. Completed or Completed Late is computed by the server and shown, not chosen. */
 export function ClosePanel({ data, onDone }: { data: GoalPageResponse; onDone: (saved: boolean) => void }) {
-  const choices = [data.closesAs, "Did Not Meet", "Deleted"].filter(Boolean) as StoredGoal["state"][];
-  const [state, setState] = useState<StoredGoal["state"]>(choices[0]);
+  const { goal, promotionMilestone: pm } = data;
+  // G15: an Ambition goal can be promoted and closed in one step. The server computes the state it closes as (closesAsPromoted).
+  const promoted = (data as GoalPageResponse & { closesAsPromoted?: StoredGoal["state"] | null }).closesAsPromoted ?? null;
+  const both = goal.date_type === "Ambition" && pm && promoted ? PROMOTE_AND_CLOSE : null;
+  const choices = [data.closesAs, both, "Did Not Meet", "Deleted"].filter(Boolean) as string[];
+  const [choice, setChoice] = useState(choices[0]);
   const [reason, setReason] = useState("");
-  const saved = useSave(data.goal, () => onDone(true));
+  const saved = useSave(goal, () => onDone(true));
+  const state = (choice === PROMOTE_AND_CLOSE ? promoted : choice) as StoredGoal["state"];
+  const build = (g: StoredGoal) => (choice === PROMOTE_AND_CLOSE && pm ? promoteAndClose(g, { id: pm.id, version: pm.version, state: pm.state }, state, reason) : closeBatch(g, state, reason));
   return (
-    <Shell title="Close goal" saved={saved} fields={["state", "reason"]} saveLabel="Close goal" onSave={() => saved.save((g) => closeBatch(g, state, reason), { state })} onCancel={() => onDone(false)}>
+    <Shell title="Close goal" saved={saved} fields={["state", "plan_maturity", "reason"]} saveLabel={choice === PROMOTE_AND_CLOSE ? PROMOTE_AND_CLOSE : "Close goal"} onSave={() => saved.save(build, { state })} onCancel={() => onDone(false)}>
       <div className="radios" role="radiogroup" aria-label="State">
         {choices.map((c) => (
-          <label key={c} className={`radio${state === c ? " on" : ""}`}>
-            <input type="radio" name="close" checked={state === c} onChange={() => setState(c)} />
+          <label key={c} className={`radio${choice === c ? " on" : ""}`}>
+            <input type="radio" name="close" checked={choice === c} onChange={() => setChoice(c)} />
             {c}
           </label>
         ))}
       </div>
+      {choice === PROMOTE_AND_CLOSE && pm && (
+        <p className="small">
+          Completes {pm.id}, makes {shortDate(goal.due_date ?? "", data.today)} Committed, and closes this goal as <b>{promoted}</b>.
+        </p>
+      )}
+      {goal.date_type === "Fantasy" && <p className="small">Promote to Ambition first to close as Completed.</p>}
       <FieldError saved={saved} field="state" />
+      <FieldError saved={saved} field="plan_maturity" />
       <Current saved={saved} field="state" data={data} />
       <Reason value={reason} onChange={setReason} saved={saved} />
     </Shell>
   );
 }
+
+const PROMOTE_AND_CLOSE = "Promote and close";
 
 /** G16: Pursue moves a Backlog goal to In Progress, with a health (GREEN by default). */
 export function PursuePanel({ data, onDone }: { data: GoalPageResponse; onDone: (saved: boolean) => void }) {

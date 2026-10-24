@@ -117,9 +117,26 @@ class WebBatchTests(unittest.TestCase):
         page = self.read("/api/goals/XW-0003")
         pm = page["promotionMilestone"]
         ms = {"summary": "Commit a date for the MLP release", "due_date": "2026-11-20", "owner": "chelsea"}
-        batch = build("return { ...commands.promoteToAmbition(goal, ms, '2026-11-30', 'Milestone met', type, met), check: true };", goal=page["goal"], ms=ms, type=self.types()["milestone"], met={"id": pm["id"], "version": pm["version"]})
+        batch = build("return { ...commands.promoteToAmbition(goal, ms, '2026-11-30', 'Milestone met', type, met), check: true };", goal=page["goal"], ms=ms, type=self.types()["milestone"], met={k: pm[k] for k in ("id", "version", "state")})
         self.assertTrue(self.send(batch)["ok"])
 
+
+    def test_promote_and_close_completes_an_ambition_goal_in_one_batch(self) -> None:
+        options = self.read("/api/options")
+        form = {
+            "summary": "Ship the export", "description": "", "owner": "chelsea", "priority": options["priorities"][0]["id"],
+            "due_date": "2027-03-01", "date_type": "Ambition", "health": "GREEN", "path_to_green": None, "plan": "https://docs.example/export", "plan_maturity": "Pencil",
+            "more": {k: options["defaults"][k] for k in ("type", "severity", "state", "origination", "level", "visibility", "org_unit")} | {"state": "In Progress"},
+            "milestone": {"summary": "Commit a date for the export", "due_date": "2026-12-01", "owner": "chelsea"},
+            "milestoneType": self.types()["milestone"], "subGoals": [], "workItems": [],
+        }
+        key = self.send(build("return commands.createBatch(form);", form=form))["ids"]["$goal"]
+        page = self.read(f"/api/goals/{key}")
+        pm = page["promotionMilestone"]
+        batch = build("return commands.promoteAndClose(goal, met, 'Completed', 'Shipped');", goal=page["goal"], met={k: pm[k] for k in ("id", "version", "state")})
+        self.assertTrue(self.send(batch)["ok"])
+        goal = self.read(f"/api/goals/{key}")["goal"]
+        self.assertEqual((goal["date_type"], goal["state"], goal["promotion_milestone"]), ("Committed", "Completed", None))
 
     def test_the_fields_and_description_panels_save_with_a_reason(self) -> None:
         goal = self.read("/api/goals/XW-0004")["goal"]
