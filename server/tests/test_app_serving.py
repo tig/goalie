@@ -68,6 +68,12 @@ class AppServingTests(unittest.TestCase):
         head = page.split("<!doctype html><head>", 1)[1].split("</head>", 1)[0]
         self.assertIn(head, self.anonymous_home.body.decode("utf-8"))
 
+    def test_the_app_source_carries_the_brand_slot(self) -> None:
+        # Without the slot the built page has no brand and no shared chrome.
+        source = (SERVER / "web" / "index.html").read_text(encoding="utf-8")
+        self.assertIn("<!--goalie:brand-->", source)
+        self.assertNotIn("<title>", source)
+
     def test_the_brand_has_one_home_on_the_server(self) -> None:
         sources = [p for p in (SERVER / "src").glob("*.ts") if '"Goalie"' in p.read_text(encoding="utf-8")]
         self.assertEqual([p.name for p in sources], ["brand.ts"])
