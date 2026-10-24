@@ -239,11 +239,6 @@ export function checkAuthor(actor: Row, owner: string | undefined, kind: string,
   return [];
 }
 
-/** Lint from SPEC.md §6.1: a summary has 5 words or more. It flags, it does not block. */
-export function summaryLint(goal: Row): string | undefined {
-  const words = String(goal.summary ?? "").trim().split(/\s+/).filter(Boolean);
-  return words.length >= 5 ? undefined : `${goal.id}: the summary has ${words.length} words; it needs 5 or more.`;
-}
 
 /** The §6.1 description parts, each with words that show it is there. A heuristic: it flags, it does not block. */
 const DESCRIPTION_PARTS: { words: RegExp; hint: string }[] = [
