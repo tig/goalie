@@ -39,8 +39,10 @@ export function checkGoal(store: Lookup, goal: Row): Violation[] {
   if (!isHuman(store, goal.owner)) {
     add("one-human-owner", `${goal.id}: the owner must be exactly one human actor.`);
   }
-  if (!isDate(goal.due_date) || !(DATE_TYPES as readonly unknown[]).includes(goal.date_type)) {
+  if (goal.due_date == null || !(DATE_TYPES as readonly unknown[]).includes(goal.date_type)) {
     add("date-and-date-type", `${goal.id}: every goal has a date and a Date Type.`);
+  } else if (!isDate(goal.due_date)) {
+    add("real-date", `${goal.id}: due_date ${String(goal.due_date)} is not a calendar date.`);
   }
   if (goal.date_type === "Committed") {
     if (goal.promotion_milestone != null) {
@@ -66,7 +68,7 @@ export function checkGoal(store: Lookup, goal: Row): Violation[] {
     }
   }
   if (goal.changed_due_date != null && !isDate(goal.changed_due_date)) {
-    add("field-value", `${goal.id}: changed_due_date ${String(goal.changed_due_date)} is not a calendar date.`);
+    add("real-date", `${goal.id}: changed_due_date ${String(goal.changed_due_date)} is not a calendar date.`);
   }
   if ((COMPLETED_STATES as readonly unknown[]).includes(goal.state) && goal.date_type !== "Committed") {
     add("completed-needs-committed", `${goal.id}: a ${goal.state} goal has a Committed date.`);
@@ -155,6 +157,9 @@ export function checkTransition(kind: string, before: Row | undefined, after: Ro
   const to = DATE_TYPES.indexOf(after.date_type as never);
   if (before.date_type === "Committed" && after.date_type !== "Committed") {
     found.push({ rule: "committed-not-demotable", message: `${after.id}: a Committed date can't be demoted. A missed date is a slip.` });
+  } else if (before.date_type === "Committed" && before.due_date !== after.due_date) {
+    // SPEC.md §6.1: no silent re-baselines. Rewriting due_date would erase the slip.
+    found.push({ rule: "no-silent-re-baseline", message: `${after.id}: a Committed date moves only as a slip: set changed_due_date, with a reason.` });
   } else if (from !== -1 && to - from > 1) {
     found.push({ rule: "date-lifecycle", message: `${after.id}: a ${before.date_type} date is promoted one step, to ${DATE_TYPES[from + 1]}.` });
   }

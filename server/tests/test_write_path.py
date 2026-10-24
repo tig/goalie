@@ -143,7 +143,7 @@ class WritePathTests(unittest.TestCase):
 
     def test_a_value_the_schema_rejects_is_a_named_rejection(self) -> None:
         self.rejected(update("goal", "GOAL-57", 1, {"state": "Done"}, "Shipped"), "field-value")
-        self.rejected(create("goal", "GOAL-60", {"owner": JANE}, "Planned"), "field-value")
+        self.rejected(create("goal", "GOAL-60", {"owner": JANE}, "Planned"), "required-field")
 
     def test_agent_names_a_human_operator(self) -> None:
         self.rejected(create("actor", "bot", {"kind": "agent", "display_name": "Bot"}), "agent-operator")
@@ -201,9 +201,38 @@ class WritePathTests(unittest.TestCase):
 
 
     def test_a_date_must_be_a_real_calendar_date(self) -> None:
-        self.rejected(create("goal", "GOAL-42", {**EXAMPLE, "due_date": "2026-13-45"}, "Planned"), "date-and-date-type")
-        self.rejected(create("goal", "GOAL-43", {**EXAMPLE, "due_date": "2027-02-29"}, "Planned"), "date-and-date-type")
-        self.rejected(update("goal", "GOAL-57", 1, {"changed_due_date": "2026-11-31"}, "Slip"), "field-value")
+        # Review Q7: a date that is not on the calendar is named as such, not as a missing date.
+        for entity, date in (("GOAL-42", "2026-13-45"), ("GOAL-43", "2027-02-29")):
+            result = self.rejected(create("goal", entity, {**EXAMPLE, "due_date": date}, "Planned"), "real-date")
+            self.assertNotIn("date-and-date-type", [v["rule"] for v in result["violations"]])
+            self.assertIn(date, result["violations"][0]["message"])
+        self.rejected(update("goal", "GOAL-57", 1, {"changed_due_date": "2026-11-31"}, "Slip"), "real-date")
+
+    def test_a_committed_date_moves_only_by_a_slip(self) -> None:
+        # Review Q1: rewriting due_date in place would erase the slip (SPEC.md §6.1: no silent re-baselines).
+        result = self.rejected(update("goal", "GOAL-57", 1, {"due_date": "2026-12-15"}, "New date"), "no-silent-re-baseline")
+        self.assertIn("changed_due_date", result["violations"][-1]["message"])
+        self.assertEqual(self.store.read("goal", "GOAL-57")["due_date"], "2026-11-15")
+        self.ok(update("goal", "GOAL-57", 1, {"changed_due_date": "2026-12-15"}, "Vendor slipped"))
+
+    def test_an_uncommitted_date_can_move_and_be_committed_with_a_new_date(self) -> None:
+        self.ok(create("goal", "GOAL-42", EXAMPLE, "Planned"))
+        self.ok(update("goal", "GOAL-42", 1, {"due_date": "2027-02-28"}, "Sooner"))
+        committed = self.ok(update("goal", "GOAL-42", 2, {"date_type": "Committed", "promotion_milestone": None, "plan_maturity": "Pencil", "due_date": "2027-01-31"}, "Committed in the 5Ps"))
+        self.assertEqual(committed["entity"]["original_committed_date"], "2027-01-31")
+
+    def test_a_create_names_each_missing_required_field(self) -> None:
+        # Review Q8: no raw SQLite text.
+        result = self.rejected(create("goal", "GOAL-60", {}, "Planned"), "required-field")
+        messages = " ".join(v["message"] for v in result["violations"])
+        self.assertIn("goal.summary is required", messages)
+        self.assertNotIn("constraint failed", messages)
+
+    def test_a_base_version_must_be_a_number(self) -> None:
+        # Review Q9: a string base_version is a bad command, not a stale write.
+        result = self.write(update("goal", "GOAL-57", "1", {"health": "YELLOW"}, "Risk"))
+        self.assertEqual(result["error"], "bad_command", result)
+        self.assertIn("base_version", result["message"])
 
     def test_a_slip_changes_the_date_and_keeps_the_original_committed_date(self) -> None:
         self.rejected(update("goal", "GOAL-57", 1, {"changed_due_date": "2026-11-30"}), "reason-required")

@@ -82,6 +82,8 @@ export function write(db: DatabaseSync, actor: string, command: Command): WriteR
     return { ok: false, error: "invalid", violations: system.map((f) => ({ rule: "system-field", message: `${f} is set by the system.` })) };
   }
 
+  if (command.op === "update" && !Number.isInteger(command.base_version)) return badCommand("base_version must be a whole number");
+
   const typed = wrongTypes(kind, fields);
   if (typed.length > 0) return { ok: false, error: "invalid", violations: typed };
 
@@ -129,6 +131,10 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
     return badCommand("op must be create or update");
   }
   applySystemFields(db, kind, after);
+  const missing = requiredFields(db, kind).filter((f) => after[f] == null);
+  if (missing.length > 0) {
+    return { ok: false, error: "invalid", violations: missing.map((f) => ({ rule: "required-field", message: `${kind}.${f} is required.` })) };
+  }
 
   const changed = spec.fields.filter((f) => !same(before?.[f], after[f]));
   if (before !== undefined && changed.length === 0) return { ok: true, entity: before, events: [] };
@@ -175,6 +181,12 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
     if (first === 0) first = Number(lastInsertRowid) - 1;
   }
   return { ok: true, entity: read(db, kind, id) as Row, events: readEvents(db, first) };
+}
+
+/** The fields the schema holds NOT NULL with no default. A row without one is a named rejection, not SQLite's text. */
+function requiredFields(db: DatabaseSync, kind: Kind): string[] {
+  const columns = db.prepare(`PRAGMA table_info(${kind})`).all() as { name: string; notnull: number; dflt_value: unknown; pk: number }[];
+  return columns.filter((c) => c.notnull === 1 && c.dflt_value === null && c.pk === 0 && c.name !== "version").map((c) => c.name);
 }
 
 /** Foreign keys are deferred inside the transaction, so a missing reference becomes a named violation. Only the written row is checked. */
