@@ -128,3 +128,43 @@ export function closesAsPromoted(goal: Row, today: string): "Completed" | "Compl
   if (goal.state !== "In Progress" || goal.date_type !== "Ambition") return null;
   return closesAs({ ...goal, date_type: "Committed", original_committed_date: goal.due_date }, today);
 }
+
+/** The goals above this one through parent, nearest first, each with its owner. Stops at a cycle. */
+export function above(goal: Row, getGoal: (id: string) => Row | undefined): { id: string; owner: string }[] {
+  const chain: { id: string; owner: string }[] = [];
+  const seen = new Set<unknown>([goal.id]);
+  for (let at = typeof goal.parent === "string" ? getGoal(goal.parent) : undefined; at !== undefined && !seen.has(at.id); at = typeof at.parent === "string" ? getGoal(at.parent) : undefined) {
+    seen.add(at.id);
+    chain.push({ id: at.id as string, owner: at.owner as string });
+  }
+  return chain;
+}
+
+/**
+ * Rule owners-change-goal (SPEC.md §6.1): the goal's owner, the owner of any goal above it, and the GOALIE owner may change it.
+ * The one home of the rule: rules.ts checks a write with it, and the goal page sends it as mayChange.
+ */
+export function mayChangeGoal(actor: string, goalieOwner: string | undefined, goal: Row, getGoal: (id: string) => Row | undefined): boolean {
+  return actor === goalieOwner || actor === goal.owner || above(goal, getGoal).some((a) => a.owner === actor);
+}
+
+export type Changer = { actor: string; as: "owner" | "above" | "goalie-owner"; goal: string | null };
+
+/**
+ * Who may change a goal, for the line on its page (product check 42): at most three, with no actor twice.
+ * The owner first, then owners above, nearest first, then the GOALIE owner in the last slot, unless already listed.
+ * `more` is true when someone who may change the goal is left out.
+ */
+export function changers(goal: Row, goalieOwner: string | undefined, getGoal: (id: string) => Row | undefined): { list: Changer[]; more: boolean } {
+  const chain: Changer[] = [{ actor: goal.owner as string, as: "owner", goal: goal.id as string }, ...above(goal, getGoal).map((a) => ({ actor: a.owner, as: "above" as const, goal: a.id }))];
+  const distinct = chain.filter((c, i) => chain.findIndex((d) => d.actor === c.actor) === i);
+  const list: Changer[] = [];
+  for (const c of distinct) {
+    const limit = goalieOwner === undefined || list.some((p) => p.actor === goalieOwner) || c.actor === goalieOwner ? 3 : 2;
+    if (list.length >= limit) break;
+    list.push(c);
+  }
+  if (goalieOwner !== undefined && !list.some((p) => p.actor === goalieOwner) && list.length < 3) list.push({ actor: goalieOwner, as: "goalie-owner", goal: null });
+  const everyone = new Set([...distinct.map((c) => c.actor), ...(goalieOwner ? [goalieOwner] : [])]);
+  return { list, more: everyone.size > list.length };
+}

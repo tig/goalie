@@ -2,9 +2,9 @@ import type { DatabaseSync } from "node:sqlite";
 import type { ApiEvent, ApiWorkItem, GoalDate, GoalPageResponse, Health, StoredGoal, SubGoalCard } from "./api.ts";
 import { toApiEvent } from "./live.ts";
 import { toApiWorkItem } from "./work.ts";
-import { closesAs, closesAsPromoted, currentDate, goalDates, isOpen, judgedDate, resolvedGoal, uncommittedDate, type State } from "./goal.ts";
+import { above, changers, closesAs, closesAsPromoted, currentDate, mayChangeGoal, goalDates, isOpen, judgedDate, resolvedGoal, uncommittedDate, type State } from "./goal.ts";
 import { startedOf } from "./priorities.ts";
-import { actorsById, read, readAll, readEntityEvents, workItemsOn } from "./read.ts";
+import { actorsById, goalieOwner, read, readAll, readEntityEvents, workItemsOn } from "./read.ts";
 import { goalLints, type Row } from "./rules.ts";
 
 /**
@@ -82,6 +82,7 @@ export function goalPage(db: DatabaseSync, id: string, me: string, today: string
   const priority = typeof stored.priority === "string" ? read(db, "priority", stored.priority) : undefined;
   const parent = typeof stored.parent === "string" ? goals.get(stored.parent) : undefined;
   const health = (stored.health as Health) ?? null;
+  const who = changers(stored, goalieOwner(db), getGoal);
   return {
     me: actors[me],
     today,
@@ -91,6 +92,10 @@ export function goalPage(db: DatabaseSync, id: string, me: string, today: string
     started: startedOf(db, id, timeZone) ?? today,
     closesAs: closing,
     closesAsPromoted: closesAsPromoted(stored, today),
+    mayChange: mayChangeGoal(me, goalieOwner(db), stored, getGoal),
+    above: above(stored, getGoal),
+    changers: who.list,
+    moreChangers: who.more,
     promotionMilestone: promotionMilestone ?? null,
     parent: parent ? { id: parent.id as string, summary: parent.summary as string } : null,
     priority: priority ? { id: priority.id as string, rank: priority.rank as number, title: priority.title as string } : null,

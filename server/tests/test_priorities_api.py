@@ -153,6 +153,8 @@ class PrioritiesDefinitionTests(unittest.TestCase):
         owner_writes = [
             create("org_unit", "xw-team", {"name": "XW Team", "level": "Team", "parent": "excaliwire", "owner": "tig"}, "Test data"),
             create("actor", "bot", {"kind": "agent", "display_name": "Bot", "operator": "tig"}),
+            # owners-change-goal: a sub-goal of Tig's XW-0002 is made by Tig.
+            create("goal", "XW-0094", {**OLD_GOAL, "summary": "Write the plan for the next hire", "priority": "PRI-2", "parent": "XW-0002", "due_date": None, "date_type": None, "plan": None, "plan_maturity": "Crayon", "health": "GREEN", "path_to_green": None}, "Test data"),
         ]
         for command in owner_writes:
             result = cls.store.write("tig", command)
@@ -164,7 +166,6 @@ class PrioritiesDefinitionTests(unittest.TestCase):
             create("goal", "XW-0091", {**OLD_GOAL, "summary": "A Team goal on a company Priority", "priority": "PRI-1", "org_unit": "xw-team", "level": "Team"}, "Test data"),
             create("priority", "PRI-5", {"org_unit": "excaliwire", "period": period, "rank": 5, "title": "A Priority below the cut line", "status": "Current"}, "Test data"),
             create("goal", "XW-0093", {**OLD_GOAL, "summary": "An In Progress goal below the cut line", "priority": "PRI-5"}, "Test data"),
-            create("goal", "XW-0094", {**OLD_GOAL, "summary": "Write the plan for the next hire", "priority": "PRI-2", "parent": "XW-0002", "due_date": None, "date_type": None, "plan": None, "plan_maturity": "Crayon", "health": "GREEN", "path_to_green": None}, "Test data"),
             create("goal", "XW-0092", {**OLD_GOAL, "summary": "A Completed goal", "priority": "PRI-2", "state": "Completed", "health": None, "path_to_green": None}, "Test data"),
         ]
         drafts = [
