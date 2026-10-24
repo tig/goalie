@@ -48,10 +48,11 @@
   "promotionMilestone": {
     "id": "XW-0004",
     "summary": "Run the MLP prototype at goalie.excaliwire.com with Excaliwire's real goals loaded",
+    "version": 2,
     "state": "In Progress",
     "date": "2026-11-06",
     "openSubGoals": 7,
-    "openWorkItems": 9
+    "openWorkItems": 10
   },
   "parent": null,
   "priority": {
@@ -317,9 +318,19 @@
       "name": "Chief of Staff",
       "kind": "agent"
     },
+    "codebase-qa": {
+      "id": "codebase-qa",
+      "name": "Codebase QA",
+      "kind": "agent"
+    },
     "frontend-engineer": {
       "id": "frontend-engineer",
       "name": "Frontend Engineer",
+      "kind": "agent"
+    },
+    "frontend-qa": {
+      "id": "frontend-qa",
+      "name": "Frontend QA",
       "kind": "agent"
     },
     "head-of-engineering": {
@@ -335,11 +346,6 @@
     "product-manager": {
       "id": "product-manager",
       "name": "Product Manager",
-      "kind": "agent"
-    },
-    "qa": {
-      "id": "qa",
-      "name": "QA",
       "kind": "agent"
     },
     "tig": {

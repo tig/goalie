@@ -47,6 +47,7 @@ class OptionsApiTests(unittest.TestCase):
         self.assertEqual(choices["workItemStatus"], ["Backlog", "In Progress", "Completed", "Deleted"])
         self.assertIn(defaults["type"], choices["type"])
         self.assertTrue(self.body["workItems"])
+        self.assertEqual(self.body["promotionMilestoneType"], "Milestone (Commit)")
 
 
 if __name__ == "__main__":

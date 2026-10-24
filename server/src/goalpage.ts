@@ -3,7 +3,7 @@ import type { ApiActor, ApiEvent, ApiWorkItem, GoalDate, GoalPageResponse, Healt
 import { toApiWorkItem } from "./commands.ts";
 import { toApiEvent } from "./live.ts";
 import { day, daysBetween } from "./dates.ts";
-import { committedDate, currentDate, goalDates, isOpen, resolvedGoal, type State } from "./goal.ts";
+import { closesAs, committedDate, currentDate, goalDates, isOpen, resolvedGoal, type State } from "./goal.ts";
 import { startedAll } from "./priorities.ts";
 import { read, readAll, type EventRow } from "./read.ts";
 import { goalLints, type Row } from "./rules.ts";
@@ -48,15 +48,15 @@ export function goalPage(db: DatabaseSync, id: string, me: string, today: string
   }
   if (goal.date_type === "Ambition" || goal.date_type === "Fantasy") dates.push({ date: goal.due_date as string, kind: goal.date_type });
 
-  // G15: Completed on or before the Original Committed Date, Completed Late after it.
-  const original = goal.original_committed_date ?? goal.due_date;
-  const closesAs = stored.state === "In Progress" && goal.date_type === "Committed" && typeof original === "string" ? (today <= original ? "Completed" : "Completed Late") : null;
+  // G15: the state a close records now. One home: goal.ts closesAs, which rules.ts checks too.
+  const closing = stored.state === "In Progress" ? closesAs(goal, today) : null;
 
   const pmId = goal.promotion_milestone;
   const pm = typeof pmId === "string" ? goals.get(pmId) : undefined;
   const promotionMilestone = pm && {
     id: pm.id as string,
     summary: pm.summary as string,
+    version: pm.version as number,
     state: pm.state as State,
     date: currentDate(pm) as string,
     openSubGoals: childrenOf(pm.id as string).filter(isOpen).length,
@@ -101,7 +101,7 @@ export function goalPage(db: DatabaseSync, id: string, me: string, today: string
     dates,
     inherited: goal.inherited,
     started: startedAll(db, timeZone).get(id) ?? today,
-    closesAs,
+    closesAs: closing,
     promotionMilestone: promotionMilestone ?? null,
     parent: parent ? { id: parent.id as string, summary: parent.summary as string } : null,
     priority: priority ? { id: priority.id as string, rank: priority.rank as number, title: priority.title as string } : null,

@@ -35,14 +35,21 @@ export function configuredTimeZone(db: DatabaseSync): string {
   return knownZone(settings?.time_zone) ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
-/** Today in the org's time zone. GOALIE_TODAY (YYYY-MM-DD) pins it, for tests. */
-export function configuredToday(db: DatabaseSync): string {
+/** GOALIE_TODAY (YYYY-MM-DD) pins today, for tests. The process checks it once at start (checkConfiguration). */
+function pinnedToday(): string | undefined {
   const pinned = process.env.GOALIE_TODAY;
-  if (pinned) {
-    if (!isDate(pinned)) throw new Error("GOALIE_TODAY must be a date written YYYY-MM-DD");
-    return pinned;
-  }
-  return dateIn(Date.now(), configuredTimeZone(db));
+  if (pinned && !isDate(pinned)) throw new Error(`GOALIE_TODAY must be a date written YYYY-MM-DD, not ${pinned}`);
+  return pinned || undefined;
+}
+
+/** Today in the org's time zone, from configuredTimeZone(db). A request reads the zone once and passes it here. */
+export function configuredToday(timeZone: string): string {
+  return pinnedToday() ?? dateIn(Date.now(), timeZone);
+}
+
+/** Fail fast at start on configuration a request would trip over. */
+export function checkConfiguration(): void {
+  pinnedToday();
 }
 
 /** GOALIE_SIGN_IN_URL is the host's login route. The default is oauth2-proxy's /oauth2/start. */

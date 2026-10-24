@@ -4,7 +4,7 @@
  * Dates are ISO strings (YYYY-MM-DD). Labels are made in the app.
  */
 
-import type { State } from "./goal.ts";
+import type { State, WORK_ITEM_STATUSES } from "./goal.ts";
 
 export type Health = "GREEN" | "YELLOW" | "RED" | null;
 
@@ -121,7 +121,7 @@ export type StoredGoal = GoalFields & {
 };
 
 /** Work-item status values (D8): SPEC.md §6.1 State words. */
-export type WorkItemStatus = "Backlog" | "In Progress" | "Completed" | "Deleted";
+export type WorkItemStatus = (typeof WORK_ITEM_STATUSES)[number];
 
 /** The writable fields of a work item (SPEC.md §6.7). `owner` may be an agent. `links` are plain URLs in the MLP. */
 export type WorkItemFields = { goal: string; title: string; owner: string; status: WorkItemStatus; due_date: string | null; links: string[] | null };
@@ -170,7 +170,7 @@ export type GoalPageResponse = {
   /** The state a Close would record now: Completed, or Completed Late against original_committed_date (G15). Null when the goal cannot be completed. */
   closesAs: "Completed" | "Completed Late" | null;
   /** The goal's Promotion Milestone, and what is still open under it (G14). */
-  promotionMilestone: (GoalRef & { state: State; date: string; openSubGoals: number; openWorkItems: number }) | null;
+  promotionMilestone: (GoalRef & { version: number; state: State; date: string; openSubGoals: number; openWorkItems: number }) | null;
   parent: GoalRef | null;
   priority: { id: string; rank: number; title: string } | null;
   orgUnit: { id: string; name: string; level: string };
@@ -201,6 +201,8 @@ export type FormOptions = {
   choices: { type: string[]; severity: string[]; level: string[]; plan_maturity: PlanMaturity[]; workItemStatus: WorkItemStatus[] };
   /** The owner setting work_items (D7). */
   workItems: boolean;
+  /** The goal type every Promotion Milestone has (SPEC.md §6.1). */
+  promotionMilestoneType: string;
 };
 
 /** A name for an entity a batch creates, written "$" and a word. A later command uses it as an id or a field value, and the server puts the key there. */

@@ -64,6 +64,8 @@ class GoalPageApiTests(unittest.TestCase):
         open_items = [w for w in self.pages["XW-0007"]["workItems"] if w["status"] not in ("Completed", "Deleted")]
         self.assertGreaterEqual(milestone["openWorkItems"], len(open_items))
         self.assertIsNone(self.pages["XW-0001"]["promotionMilestone"])
+        # G14: Promote completes the milestone in the same batch, so the page names its version.
+        self.assertEqual(milestone["version"], self.store.read("goal", "XW-0004")["version"])
 
     def test_the_page_links_up_and_names_its_priority_and_org_unit(self) -> None:
         self.assertEqual(self.pages["XW-0004"]["parent"]["id"], "XW-0003")

@@ -13,6 +13,12 @@ export const DATE_TYPES = ["Fantasy", "Ambition", "Committed"] as const;
 /** The states (SPEC.md §7.2). */
 export type State = "Backlog" | "In Progress" | "Completed" | "Completed Late" | "Did Not Meet" | "Deleted";
 
+/** The goal type a Promotion Milestone has (SPEC.md §6.1 type). The one home: rules.ts checks it, and FormOptions sends it to the app. */
+export const PROMOTION_MILESTONE_TYPE = "Milestone (Commit)";
+
+/** Work-item status values (D8): SPEC.md §6.1 State words. The one home: rules.ts checks them, options.ts offers them. */
+export const WORK_ITEM_STATUSES = ["Backlog", "In Progress", "Completed", "Deleted"] as const;
+
 /** States in which a goal is still open: not yet closed out. */
 export const OPEN_STATES: readonly State[] = ["Backlog", "In Progress"];
 
@@ -90,4 +96,15 @@ export function goalDates(goal: Row, own: boolean, getGoal: (id: string) => Row 
   if (own && (goal.date_type === "Ambition" || goal.date_type === "Fantasy")) dates.push({ date: goal.due_date as string, kind: goal.date_type });
   if (committed?.kind === "Promotion Milestone" && (own || slipDays !== undefined)) dates.push(withSlip(committed));
   return dates;
+}
+
+/**
+ * The state a close records now (SPEC.md §7.2): Completed on or before the Original Committed Date, Completed Late after it.
+ * Null when the goal has no Committed date. `goal` is resolved, so a sub-goal closes against its parent's date (D2).
+ * The one home of this rule: rules.ts checks it, and the goal page shows it (G15).
+ */
+export function closesAs(goal: Row, today: string): "Completed" | "Completed Late" | null {
+  const original = goal.original_committed_date;
+  if (goal.date_type !== "Committed" || typeof original !== "string") return null;
+  return today <= original ? "Completed" : "Completed Late";
 }

@@ -17,6 +17,13 @@ class HealthTests(unittest.TestCase):
         self.assertEqual(reply.status, 200)
         self.assertEqual(reply.body, b"ok")
 
+    def test_a_bad_goalie_today_stops_the_process_at_start(self) -> None:
+        # Codebase QA: it threw on every request instead.
+        with running_server(extra_env={"GOALIE_TODAY": "tomorrow"}) as (proc, port):
+            proc.wait(timeout=10)
+            self.assertNotEqual(proc.returncode, 0)
+            self.assertIn("GOALIE_TODAY", read_stderr(proc))
+
     def test_reading_stderr_stops_a_live_process(self) -> None:
         proc = subprocess.Popen(
             [sys.executable, "-c", "import time; time.sleep(30)"],

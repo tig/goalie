@@ -10,6 +10,28 @@
       "id": "WI-0001",
       "version": 1,
       "goal": "XW-0007",
+      "title": "Merge B0 to B5 and F0 to F3 into chelsea/mlp",
+      "owner": "chief-of-staff",
+      "status": "Completed",
+      "due_date": "2026-10-24",
+      "links": null,
+      "late": false
+    },
+    {
+      "id": "WI-0002",
+      "version": 1,
+      "goal": "XW-0007",
+      "title": "Run gate D for the goal page and New goal",
+      "owner": "chief-of-staff",
+      "status": "Backlog",
+      "due_date": "2026-11-03",
+      "links": null,
+      "late": false
+    },
+    {
+      "id": "WI-0003",
+      "version": 1,
+      "goal": "XW-0007",
       "title": "Product spec: goal page and goal creation",
       "owner": "product-manager",
       "status": "Completed",
@@ -18,7 +40,7 @@
       "late": false
     },
     {
-      "id": "WI-0002",
+      "id": "WI-0004",
       "version": 1,
       "goal": "XW-0007",
       "title": "Design: the goal page and New goal",
@@ -29,7 +51,18 @@
       "late": false
     },
     {
-      "id": "WI-0003",
+      "id": "WI-0005",
+      "version": 1,
+      "goal": "XW-0008",
+      "title": "Drop the sub-goal date check from the New goal rail (N11)",
+      "owner": "product-designer",
+      "status": "Backlog",
+      "due_date": "2026-10-28",
+      "links": null,
+      "late": false
+    },
+    {
+      "id": "WI-0006",
       "version": 1,
       "goal": "XW-0007",
       "title": "Engineering plan: goal page and goal creation",
@@ -40,46 +73,13 @@
       "late": false
     },
     {
-      "id": "WI-0004",
-      "version": 1,
-      "goal": "XW-0007",
-      "title": "B1: the write route, POST /api/commands",
-      "owner": "backend-engineer",
-      "status": "Completed",
-      "due_date": "2026-10-24",
-      "links": null,
-      "late": false
-    },
-    {
-      "id": "WI-0005",
-      "version": 1,
-      "goal": "XW-0007",
-      "title": "B3: the goal page and form option routes",
-      "owner": "backend-engineer",
-      "status": "In Progress",
-      "due_date": "2026-10-26",
-      "links": null,
-      "late": false
-    },
-    {
-      "id": "WI-0006",
-      "version": 1,
-      "goal": "XW-0009",
-      "title": "B4: the build team's queues, GET /api/work",
-      "owner": "backend-engineer",
-      "status": "In Progress",
-      "due_date": "2026-10-27",
-      "links": null,
-      "late": false
-    },
-    {
       "id": "WI-0007",
       "version": 1,
-      "goal": "XW-0009",
-      "title": "B5: live updates over Server-Sent Events",
-      "owner": "backend-engineer",
-      "status": "Backlog",
-      "due_date": "2026-10-30",
+      "goal": "XW-0007",
+      "title": "Structure check of the server at 5087caa",
+      "owner": "head-of-engineering",
+      "status": "Completed",
+      "due_date": "2026-10-24",
       "links": null,
       "late": false
     },
@@ -100,13 +100,24 @@
       "goal": "XW-0007",
       "title": "F3: the goal page panels save as batches",
       "owner": "frontend-engineer",
+      "status": "Completed",
+      "due_date": "2026-10-24",
+      "links": null,
+      "late": false
+    },
+    {
+      "id": "WI-0010",
+      "version": 1,
+      "goal": "XW-0007",
+      "title": "F4: + Sub-goal and + Work item",
+      "owner": "frontend-engineer",
       "status": "In Progress",
       "due_date": "2026-10-27",
       "links": null,
       "late": false
     },
     {
-      "id": "WI-0010",
+      "id": "WI-0011",
       "version": 1,
       "goal": "XW-0008",
       "title": "F5: New goal and its sub-goals",
@@ -117,7 +128,7 @@
       "late": false
     },
     {
-      "id": "WI-0011",
+      "id": "WI-0012",
       "version": 1,
       "goal": "XW-0009",
       "title": "F6: My work and the team view",
@@ -128,35 +139,90 @@
       "late": false
     },
     {
-      "id": "WI-0012",
-      "version": 1,
-      "goal": "XW-0007",
-      "title": "Review the goal page build",
-      "owner": "qa",
-      "status": "Backlog",
-      "due_date": "2026-10-29",
-      "links": null,
-      "late": false
-    },
-    {
       "id": "WI-0013",
       "version": 1,
-      "goal": "XW-0008",
-      "title": "Walk New goal as Galahad",
-      "owner": "user-researcher",
-      "status": "Backlog",
-      "due_date": "2026-11-02",
+      "goal": "XW-0007",
+      "title": "B0 to B3: the write route, the rules, and the goal page routes",
+      "owner": "backend-engineer",
+      "status": "Completed",
+      "due_date": "2026-10-24",
       "links": null,
       "late": false
     },
     {
       "id": "WI-0014",
       "version": 1,
+      "goal": "XW-0009",
+      "title": "B4 and B5: the queues and live updates",
+      "owner": "backend-engineer",
+      "status": "Completed",
+      "due_date": "2026-10-24",
+      "links": null,
+      "late": false
+    },
+    {
+      "id": "WI-0015",
+      "version": 1,
+      "goal": "XW-0009",
+      "title": "Load the build team into GOALIE",
+      "owner": "backend-engineer",
+      "status": "In Progress",
+      "due_date": "2026-10-25",
+      "links": null,
+      "late": false
+    },
+    {
+      "id": "WI-0016",
+      "version": 1,
       "goal": "XW-0007",
-      "title": "Run gate D for the goal page",
-      "owner": "chief-of-staff",
+      "title": "Fix the Head of Engineering's open items from the 5087caa check",
+      "owner": "backend-engineer",
       "status": "Backlog",
-      "due_date": "2026-11-03",
+      "due_date": "2026-10-27",
+      "links": null,
+      "late": false
+    },
+    {
+      "id": "WI-0017",
+      "version": 1,
+      "goal": "XW-0007",
+      "title": "Review the server at c22d40a",
+      "owner": "codebase-qa",
+      "status": "Completed",
+      "due_date": "2026-10-24",
+      "links": null,
+      "late": false
+    },
+    {
+      "id": "WI-0018",
+      "version": 1,
+      "goal": "XW-0007",
+      "title": "Review the goal page build, server side",
+      "owner": "codebase-qa",
+      "status": "Backlog",
+      "due_date": "2026-10-29",
+      "links": null,
+      "late": false
+    },
+    {
+      "id": "WI-0019",
+      "version": 1,
+      "goal": "XW-0007",
+      "title": "Check the goal page screens at 1440, 1100, and 390 px",
+      "owner": "frontend-qa",
+      "status": "Backlog",
+      "due_date": "2026-10-29",
+      "links": null,
+      "late": false
+    },
+    {
+      "id": "WI-0020",
+      "version": 1,
+      "goal": "XW-0008",
+      "title": "Walk New goal as Galahad",
+      "owner": "user-researcher",
+      "status": "Backlog",
+      "due_date": "2026-11-02",
       "links": null,
       "late": false
     }
@@ -191,9 +257,19 @@
       "name": "Chief of Staff",
       "kind": "agent"
     },
+    "codebase-qa": {
+      "id": "codebase-qa",
+      "name": "Codebase QA",
+      "kind": "agent"
+    },
     "frontend-engineer": {
       "id": "frontend-engineer",
       "name": "Frontend Engineer",
+      "kind": "agent"
+    },
+    "frontend-qa": {
+      "id": "frontend-qa",
+      "name": "Frontend QA",
       "kind": "agent"
     },
     "head-of-engineering": {
@@ -209,11 +285,6 @@
     "product-manager": {
       "id": "product-manager",
       "name": "Product Manager",
-      "kind": "agent"
-    },
-    "qa": {
-      "id": "qa",
-      "name": "QA",
       "kind": "agent"
     },
     "tig": {

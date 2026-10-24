@@ -285,6 +285,14 @@ class WritePathTests(unittest.TestCase):
         self.assertEqual(result["violations"][-1]["field"], "state")
         self.ok(update("goal", "GOAL-58", 1, {"state": "Completed Late", "health": None}, "Done"))
 
+    def test_a_sub_goal_closes_on_time_against_its_parents_date(self) -> None:
+        # Head of Engineering: the rule and the goal page each had a copy, and they differed for a sub-goal with its parent's date.
+        self.ok(create("goal", "GOAL-58", committed_milestone(type="Milestone (Launch)", due_date="2026-10-01"), "Planned"))
+        inherit = {**committed_milestone(type="Milestone (Launch)", summary="Write the release notes for launch", parent="GOAL-58"), "due_date": None, "date_type": None, "plan": None}
+        self.ok(create("goal", "GOAL-60", inherit, "Planned"))
+        self.rejected(update("goal", "GOAL-60", 1, {"state": "Completed", "health": None}, "Done"), "completed-on-time")
+        self.ok(update("goal", "GOAL-60", 1, {"state": "Completed Late", "health": None}, "Done"))
+
     def test_a_promotion_to_ambition_needs_a_new_milestone(self) -> None:
         # §5: promotion-new-milestone.
         self.ok(create("goal", "GOAL-42", {**EXAMPLE, "date_type": "Fantasy"}, "Planned"))

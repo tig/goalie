@@ -1,5 +1,6 @@
 import { serve } from "@hono/node-server";
 import { Hono, type Context } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
@@ -10,7 +11,7 @@ import { goalPage } from "./goalpage.ts";
 import { eventStream } from "./live.ts";
 import { formOptions } from "./options.ts";
 import { configuredIssuers, resolveActor, type Issuer } from "./auth.ts";
-import { configuredDatabase, configuredOrgUnit, configuredSignInUrl, configuredTimeZone, configuredToday, configuredWebDist } from "./config.ts";
+import { checkConfiguration, configuredDatabase, configuredOrgUnit, configuredSignInUrl, configuredTimeZone, configuredToday, configuredWebDist } from "./config.ts";
 import { prioritiesView } from "./priorities.ts";
 import { BRAND_SLOT, brandHead } from "./brand.ts";
 import { signInPage } from "./signin.ts";
@@ -33,7 +34,18 @@ const TYPES: Record<string, string> = {
 /** The verified actor rides on each request after sign-in. */
 type Env = { Variables: { actor: ActorRef } };
 
-const refuse = (c: Context<Env>, status: 401 | 404, error: string, reason: string) => c.json<ApiError>({ error, reason }, status);
+/** The largest write body: a batch of goals, sub-goals, and work items fits many times over. */
+const MAX_BODY = 256 * 1024;
+
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).host;
+  } catch {
+    return undefined;
+  }
+};
+
+const refuse = (c: Context<Env>, status: 401 | 403 | 404 | 413 | 415, error: string, reason: string) => c.json<ApiError>({ error, reason }, status);
 
 /** The file under dist that path names, or undefined when there is none or the path leaves dist. */
 async function built(dist: string, path: string): Promise<Buffer | undefined> {
@@ -47,6 +59,14 @@ async function built(dist: string, path: string): Promise<Buffer | undefined> {
   if (!file.startsWith(root + sep)) return undefined;
   return readFile(file).catch(() => undefined);
 }
+
+/** Today and the org's time zone, with one owner-settings read (Codebase QA). */
+function todayAndZone(db: DatabaseSync): [string, string] {
+  const zone = configuredTimeZone(db);
+  return [configuredToday(zone), zone];
+}
+
+const todayIn = (db: DatabaseSync) => todayAndZone(db)[0];
 
 /** The host's login route, with the page to return to after sign-in. */
 function signInHref(url: string): string {
@@ -71,17 +91,30 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
   // Resolve the org unit once (review E22). An empty store has none yet, so try again until it does.
   let orgUnit = "";
   const unit = () => (orgUnit ||= configuredOrgUnit(db));
-  app.get("/api/priorities", (c) => c.json<PrioritiesResponse>({ ...prioritiesView(db, unit(), configuredToday(db), configuredTimeZone(db)), me: c.get("actor") }));
+  app.get("/api/priorities", (c) => c.json<PrioritiesResponse>({ ...prioritiesView(db, unit(), ...todayAndZone(db)), me: c.get("actor") }));
   app.get("/api/goals/:id", (c) => {
-    const page = goalPage(db, c.req.param("id"), c.get("actor").id, configuredToday(db), configuredTimeZone(db));
+    const page = goalPage(db, c.req.param("id"), c.get("actor").id, ...todayAndZone(db));
     return page ? c.json<GoalPageResponse>(page) : refuse(c, 404, "not_found", `no goal ${c.req.param("id")}`);
   });
-  app.get("/api/options", (c) => c.json<FormOptions>(formOptions(db, c.get("actor").id, unit(), configuredToday(db))));
-  app.get("/api/work", (c) => c.json<WorkResponse>(workQueue(db, c.get("actor").id, configuredToday(db), c.req.query("owner"))));
+  app.get("/api/options", (c) => c.json<FormOptions>(formOptions(db, c.get("actor").id, unit(), todayIn(db))));
+  app.get("/api/work", (c) => c.json<WorkResponse>(workQueue(db, c.get("actor").id, todayIn(db), c.req.query("owner"))));
   app.get("/api/events", (c) => eventStream(c, db));
+  // A write is JSON from the app's own origin. A cross-site form can send neither (Codebase QA). The body is capped.
+  app.post(
+    "/api/commands",
+    async (c, next) => {
+      if (!(c.req.header("Content-Type") ?? "").toLowerCase().startsWith("application/json")) return refuse(c, 415, "bad_command", "a write is sent as application/json");
+      const origin = c.req.header("Origin");
+      const host = c.req.header("X-Forwarded-Host") ?? c.req.header("Host");
+      if (origin !== undefined && origin !== "null" && hostOf(origin) !== host) return refuse(c, 403, "forbidden", `a write from ${origin} is refused`);
+      if (origin === "null") return refuse(c, 403, "forbidden", "a write from an opaque origin is refused");
+      await next();
+    },
+    bodyLimit({ maxSize: MAX_BODY, onError: (c) => refuse(c, 413, "bad_command", `a request body is at most ${MAX_BODY / 1024} KB`) }),
+  );
   app.post("/api/commands", async (c) => {
     const request: unknown = await c.req.json().catch(() => undefined);
-    const answer = runCommands(db, c.get("actor").id, request, configuredToday(db));
+    const answer = runCommands(db, c.get("actor").id, request, todayIn(db));
     return c.json<CommandsResponse>(answer.body, answer.status);
   });
   app.all("/api/*", (c) => refuse(c, 404, "not_found", `no API route ${c.req.method} ${c.req.path}`));
@@ -121,5 +154,11 @@ function startedAsMain(): boolean {
 }
 
 if (startedAsMain()) {
+  try {
+    checkConfiguration();
+  } catch (error) {
+    process.stderr.write(`${(error as Error).message}\n`);
+    process.exit(1);
+  }
   listen(createApp(openStore(configuredDatabase()), configuredIssuers()), configuredPort(), process.env.HOST);
 }

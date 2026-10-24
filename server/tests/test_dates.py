@@ -22,7 +22,14 @@ const out = {
   shortDate: [d.shortDate("2026-10-01", "2026-10-23"), d.shortDate("2027-03-31", "2026-10-23")],
   monthLabel: [d.monthLabel("2026-10-05"), d.monthLabel("2027-01-04")],
   monthYear: d.monthYear("2026-10-23"),
+  dateIn: [d.dateIn(Date.UTC(2026, 9, 24, 3, 0), "America/Denver"), d.dateIn(Date.UTC(2026, 9, 24, 3, 0), "UTC")],
 };
+// Codebase QA: dateIn builds one formatter per time zone, not one per call.
+const Real = Intl.DateTimeFormat;
+let built = 0;
+Intl.DateTimeFormat = function (...args) { built += 1; return new Real(...args); };
+for (let i = 0; i < 100; i++) d.dateIn(Date.UTC(2026, 9, 23) + i * 86400000, "Pacific/Kiritimati");
+out.formattersFor100Calls = built;
 process.stdout.write(JSON.stringify(out));
 """
 
@@ -58,6 +65,12 @@ class DatesTests(unittest.TestCase):
         self.assertEqual(self.out["shortDate"], ["Oct 1", "Mar 31, 2027"])
         self.assertEqual(self.out["monthLabel"], ["Oct", "Jan 2027"])
         self.assertEqual(self.out["monthYear"], "October 2026")
+
+    def test_date_in_reads_the_day_in_a_time_zone(self) -> None:
+        self.assertEqual(self.out["dateIn"], ["2026-10-23", "2026-10-24"])
+
+    def test_date_in_builds_one_formatter_per_time_zone(self) -> None:
+        self.assertLessEqual(self.out["formattersFor100Calls"], 1)
 
     def test_the_module_runs_in_a_browser(self) -> None:
         text = (SERVER / "src" / "dates.ts").read_text(encoding="utf-8")
