@@ -13,6 +13,9 @@ export const DATE_TYPES = ["Fantasy", "Ambition", "Committed"] as const;
 /** The states (SPEC.md §7.2). */
 export type State = "Backlog" | "In Progress" | "Completed" | "Completed Late" | "Did Not Meet" | "Deleted";
 
+/** The goal type a Promotion Milestone has (SPEC.md §6.1 type). The one home: rules.ts checks it, and FormOptions sends it to the app. */
+export const PROMOTION_MILESTONE_TYPE = "Milestone (Commit)";
+
 /** Work-item status values (D8): SPEC.md §6.1 State words. The one home: rules.ts checks them, options.ts offers them. */
 export const WORK_ITEM_STATUSES = ["Backlog", "In Progress", "Completed", "Deleted"] as const;
 

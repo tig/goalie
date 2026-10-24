@@ -48,6 +48,7 @@
   "promotionMilestone": {
     "id": "XW-0004",
     "summary": "Run the MLP prototype at goalie.excaliwire.com with Excaliwire's real goals loaded",
+    "version": 2,
     "state": "In Progress",
     "date": "2026-11-06",
     "openSubGoals": 7,

@@ -115,6 +115,27 @@ class CommandsApiTests(unittest.TestCase):
         reply = post(self.proc, self.port, "/api/commands", {"commands": []}, self.auth)
         self.assertEqual(reply.status, 400)
 
+    def test_a_write_must_be_json(self) -> None:
+        # Codebase QA: a text/plain or form body is what a cross-site form can send.
+        body = json.dumps({"commands": [{"op": "comment", "kind": "goal", "id": "XW-0001", "text": "From a form"}]}).encode()
+        for content_type in ("text/plain", "application/x-www-form-urlencoded"):
+            reply = post(self.proc, self.port, "/api/commands", body, {**self.auth, "Content-Type": content_type})
+            self.assertEqual(reply.status, 415, content_type)
+        self.assertNotIn("From a form", [e["new"] for e in self.store.events()])
+
+    def test_a_write_from_another_site_is_refused(self) -> None:
+        commands = {"commands": [{"op": "comment", "kind": "goal", "id": "XW-0001", "text": "From evil"}]}
+        reply = post(self.proc, self.port, "/api/commands", commands, {**self.auth, "Origin": "https://evil.example"})
+        self.assertEqual(reply.status, 403)
+        reply = post(self.proc, self.port, "/api/commands", commands, {**self.auth, "Origin": f"http://127.0.0.1:{self.port}"})
+        self.assertEqual(reply.status, 200, reply.body)
+
+    def test_a_body_and_a_comment_have_a_size_cap(self) -> None:
+        reply = post(self.proc, self.port, "/api/commands", {"commands": [{"op": "comment", "kind": "goal", "id": "XW-0001", "text": "x" * 300_000}]}, self.auth)
+        self.assertEqual(reply.status, 413)
+        status, body = self.send([{"op": "comment", "kind": "goal", "id": "XW-0001", "text": "x" * 10_001}])
+        self.assertEqual((status, body["violations"][0]["rule"]), (422, "comment-text"))
+
     def test_writes_need_a_verified_actor(self) -> None:
         reply = post(self.proc, self.port, "/api/commands", {"commands": create_batch()})
         self.assertEqual(reply.status, 401)

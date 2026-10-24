@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { FormOptions, PlanMaturity } from "./api.ts";
-import { DEFAULT_VISIBILITY, WORK_ITEM_STATUSES } from "./goal.ts";
+import { DEFAULT_VISIBILITY, PROMOTION_MILESTONE_TYPE, WORK_ITEM_STATUSES } from "./goal.ts";
 import { actorsById, workItemsOn } from "./goalpage.ts";
 import { isCurrentPeriod } from "./priorities.ts";
 import { read, readAll } from "./read.ts";
@@ -11,7 +11,7 @@ import { nextIds } from "./write.ts";
  * Choices are the SPEC.md §6.1 and §12 defaults until owner settings name others.
  */
 
-const TYPES = ["Milestone (Commit)", "Milestone (Launch)", "Metric (Business)", "Metric (Customer)", "Metric (Operational Excellence)"];
+const TYPES = [PROMOTION_MILESTONE_TYPE, "Milestone (Launch)", "Metric (Business)", "Metric (Customer)", "Metric (Operational Excellence)"];
 const SEVERITIES = ["sev1", "sev2", "sev3"];
 const LEVELS = ["Company", "Program or Function", "Team", "Individual"];
 const PLAN_MATURITIES: PlanMaturity[] = ["Watercolor", "Crayon", "Pencil"];
@@ -47,5 +47,6 @@ export function formOptions(db: DatabaseSync, me: string, orgUnit: string, today
     },
     choices: { type: TYPES, severity: SEVERITIES, level: LEVELS, plan_maturity: PLAN_MATURITIES, workItemStatus: [...WORK_ITEM_STATUSES] },
     workItems: workItemsOn(db),
+    promotionMilestoneType: PROMOTION_MILESTONE_TYPE,
   };
 }

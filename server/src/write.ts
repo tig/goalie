@@ -200,12 +200,15 @@ function requiredFields(db: DatabaseSync, kind: Kind): string[] {
   return columns.filter((c) => c.notnull === 1 && c.dflt_value === null && c.pk === 0 && c.name !== "version").map((c) => c.name);
 }
 
+/** A comment is read on every page load and sent over every open stream (Codebase QA). */
+const MAX_COMMENT = 10_000;
+
 /** A comment is one Event on its entity: field "comment", old null, the text as new and as reason. No row changes (SPEC.md §6.6, plan E-4). */
 function comment(db: DatabaseSync, actor: string, kind: Kind, id: string, text: unknown): WriteResult {
   if (read(db, "actor", actor) === undefined) return { ok: false, error: "unknown_actor", message: `no actor ${actor}` };
   if (typeof id !== "string" || read(db, kind, id) === undefined) return { ok: false, error: "not_found", message: `no ${kind} ${String(id)}` };
-  if (typeof text !== "string" || text.trim() === "") {
-    return { ok: false, error: "invalid", violations: [{ rule: "comment-text", message: "a comment has text.", field: "text" }] };
+  if (typeof text !== "string" || text.trim() === "" || text.length > MAX_COMMENT) {
+    return { ok: false, error: "invalid", violations: [{ rule: "comment-text", message: `a comment has text, at most ${MAX_COMMENT} characters.`, field: "text" }] };
   }
   const body = text.trim();
   const { lastInsertRowid } = db

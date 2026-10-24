@@ -56,6 +56,7 @@ export function goalPage(db: DatabaseSync, id: string, me: string, today: string
   const promotionMilestone = pm && {
     id: pm.id as string,
     summary: pm.summary as string,
+    version: pm.version as number,
     state: pm.state as State,
     date: currentDate(pm) as string,
     openSubGoals: childrenOf(pm.id as string).filter(isOpen).length,
