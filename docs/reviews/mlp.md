@@ -1,98 +1,109 @@
 # MLP review
 
-**Status:** Round 1 fixed. Round 2 not run yet
+**Status:** Round 2, fixes in progress
 
-**Date:** 2026-10-22
+**Date:** 2026-10-23
 
 **Owner:** Chelsea
 
 This is the review list for pull request #52 (XW-0003 MLP). It is overwritten each round.
-Reviewers: QA, Head of Engineering, and the Experience pair (User and UI/UX designer). Round 1 read commit 05ff75b. The fixes are in 285cf8f.
+Round 1 (2026-10-22) read the server-drawn Home at 05ff75b. Its 50 findings are fixed. QA re-checked them in round 2 and they hold.
+Round 2 read the React app at e147b21: QA, Head of Engineering, and the Experience pair (User and UI/UX designer).
 Status words: **blocks** stops the merge, **open** is a real problem with a clear fix, **yours** is Chelsea's call, **Tig** is a word or decision for Tig, **fixed** is done.
 
 ## Summary
 
 | Status | Count |
 | --- | --- |
-| blocks | 0 |
-| open | 0 |
-| decided | 1 |
-| Tig | 4 |
-| fixed | 50 |
+| blocks | 6 |
+| open | 46 |
+| yours | 3 |
+| Tig | 2 |
+| fixed | 2 |
 
-The one-minute test (release plan §1), User as Tig: Q1 "Are we keeping our commitments?" yes, about 15 s. Q2 "What needs me?" no. Q3 "What is next?" partly, about 20 s, no owner names. The test fails. Round 2 runs it again.
+The one-minute test (release plan §1), User as Tig, desktop: Q1 yes, 10 s. Q2 "What needs me?" no. Q3 yes. About 25 s for 2 of 3. Phone: Q1 took 30 s, because the Committed dates card sits below every goal.
+
+## Chelsea's notes
+
+| # | Status | Finding | Fix |
+| --- | --- | --- | --- |
+| C1 | fixed | The board controls moved sideways when the date label changed width | The date label has a fixed width. Every pill keeps its x in 8 states (13413dd) |
+| C2 | fixed | The timeline scrollbar | No scrollbar. Wheel, shift and wheel, drag, arrow keys, Earlier, Later, Today, and edge fades (13413dd) |
 
 ## Code: QA
 
 | # | Status | Where | Finding | Fix |
 | --- | --- | --- | --- | --- |
-| Q1 | fixed | write.ts | An agent's write to a goal takes effect with no human approval (SPEC §6.9, §10, §13.22) | Reject goal and priority writes from an agent: rule `agent-writes-a-draft` |
-| Q2 | fixed | rules.ts | Dates are checked by pattern only. "2026-13-45" is accepted, and one such goal breaks Home for everyone | Parse dates as real calendar dates |
-| Q3 | fixed | rules.ts | A goal can be its own ancestor. Home then fails for everyone | Rule `parent-not-cycle` |
-| Q4 | fixed | tests | No test for the real Entra key path, key refetch, nbf, a malformed token, a slip, a Promotion Milestone due, or an empty Priority | Add the tests |
-| Q5 | fixed | auth.ts | A failed key fetch crashes instead of refusing | Catch and refuse |
-| Q6 | fixed | auth.ts | Any caller can make the server refetch Entra keys on every request | One refetch per issuer per 5 minutes |
-| Q7 | fixed | priorities.ts | One old goal anywhere pushes today off the timeline | Scope to the view's goals; keep today inside the window |
-| Q8 | fixed | priorities.ts | Home ignores the saved view definition: Completed and Team goals show | Apply the definition |
-| Q9 | fixed | rules.ts | Fantasy to Committed in one step, Completed with a Fantasy date, and Completed back to Backlog are accepted (SPEC §5, §7) | Add the §7.1 and §7.2 transitions |
-| Q10 | fixed | server.ts | The sign-in page drops the reason ("no human actor for this token") | Show the reason |
-| Q11 | fixed | write.ts | A wrong-typed value crashes the write path | Rule `field-value` |
-| Q12 | fixed | seed.ts | The seed is not one transaction | One transaction |
+| Q1 | blocks | rules.ts | A Committed goal's due_date can be rewritten in place, which erases its slip (SPEC §6.1, §7.1: no silent re-baselines) | Once Committed, the date moves only through changed_due_date with a reason |
+| Q2 | open | model/timeline.ts | At Quarters zoom the board cannot open two weeks before today | Fill the board at every zoom, or clamp the open week |
+| Q3 | open | App.tsx | The range label drops the year on the first date | Write the year on both dates when they differ |
+| Q4 | open | model/filter.ts | "1 GREEN" lights 3 rows | The filter selects what the count counts |
+| Q5 | open | server.ts | A missing script URL gets index.html, not 404 | 404 for a file path outside /assets/ |
+| Q6 | open | model/timeline.ts | The RED goal draws no health bar when it started after its date | Start the bar at the earlier of the two |
+| Q7 | open | rules.ts | A date that is not on the calendar is rejected with the wrong message | Rule `real-date` |
+| Q8 | open | write.ts | A create with no fields returns raw SQLite text | Rule `required-field` |
+| Q9 | open | write.ts | A string base_version answers "stale" | Reject as bad_command |
+| Q10 | open | model/calendar.ts | Years below 100 and above 9999 break the calendar and the timeline | Bound `from` to 1970 to 9999 |
+| Q11 | open | cli.ts | `write` with bad JSON crashes | A named rejection |
 
 ## Code: Head of Engineering
 
 | # | Status | Where | Finding | Fix |
 | --- | --- | --- | --- | --- |
-| E1 | fixed | write.ts, seed.ts | Owner settings and user settings accept writes from anyone (ADR 0011). The seed writes owner settings as Chelsea | Settings write rules; seed owner settings as Tig |
-| E2 | fixed | priorities.ts | The screen is not drawn from its saved definition (ADR 0010) | Drive select, states, and sort from the definition |
-| E3 | fixed | priorities.ts, rules.ts | "The date a goal is judged against" is written four times | One domain module for goal rules |
-| E4 | fixed | home.ts | "/ Excaliwire" typed into the top bar | Use the org unit's name |
-| E5 | fixed | home.ts | One named person has their own avatar color in CSS | Color from a token palette by actor id |
-| E6 | fixed | home.ts | Brand literals (title, logo, chrome, font) in code | One brand object |
-| E7 | fixed | home.ts | Raw colors outside the tokens | Make each a token |
-| E8 | fixed | home.ts | "Company goals" and the level "Company" are literals | Read from the org unit |
-| E9 | fixed | config.ts, cli.ts | Defaults name one deployment ("excaliwire", "chelsea") | Default to the root org unit and the GOALIE owner |
-| E10 | fixed | write.ts | Visibility default is a literal | One home for the default |
-| E11 | fixed | write.ts, seed.ts | New goals get GOAL-n, seeded goals are XW-n | Key prefix as an owner setting |
-| E12 | fixed | priorities.ts | 4 to 6 queries per goal row | Load once, build from memory |
-| E13 | fixed | write.ts | The store check reads 1+N rows per kind | Read once |
-| E14 | fixed | write.ts | The foreign-key check scans the whole table on every write. Not measured | Check the written row only |
-| E15 | fixed | write.ts, auth.ts | Reads live in the write module; auth has a third read path | Move reads to one read module |
-| E16 | fixed | priorities.ts | The open Drafts count can never change | Count Drafts until the Drafts slice |
-| E17 | fixed | store.ts, seed.ts | The cut line is text holding "true" | One type |
-| E18 | fixed | priorities.ts | No period filter | Filter on the current period |
-| E19 | fixed | priorities.ts | State lists repeated as literals | Name them once |
-| E20 | fixed | home.ts | Rank badge drawn twice | One component |
-| E21 | fixed | home.ts | Home and sign-in repeat the page shell | One layout |
-| E22 | fixed | home.ts | CSS in the page logic file | Its own module |
-| E23 | fixed | priorities.ts | English month table, fixed window | Use Intl for labels |
+| E1 | blocks | web model/dates.ts, goal.ts, priorities.ts | The date helpers (isDate, day) are copied on the server and in the app | One server/src/dates.ts that both import |
+| E2 | open | web | "slip N days" is built in 5 places | One slipLabel |
+| E3 | open | Cards.tsx, api.ts | The app walks the tree for a slip's Date Type | Put kind on the summary's slips |
+| E4 | open | signin.ts, parts.tsx, index.html | The brand is in 3 places | One brand source on the server |
+| E5 | open | App.tsx | The 401 screen copies the sign-in text | Reload and let the server answer |
+| E6 | open | index.html | The font comes from Google Fonts, hard-coded | Serve it with the app, named only by a token |
+| E7 | open | seed.ts | Excaliwire's data is code shipped to every deployment | A data file outside src/ |
+| E8 | open | CONTRIBUTING.md | Names the Excaliwire Entra tenant | Move it to excaliwire/operations |
+| E9 | open | fixtures/priorities.json | Nothing ties the fixture to the API | A test that compares them |
+| E10 | open | App.tsx | "Priorities" is a literal | Draw the view's name |
+| E11 | open | App.tsx, styles.css | The phone width is in two places | One home |
+| E12 | open | TimelineView, CalendarView | The legend is copied | One Legend |
+| E13 | open | GoalTree, CalendarView | The highlight test is copied | One isLit |
+| E14 | open | parts.tsx, popover.ts | Popover sizes are copied | Export them |
+| E15 | open | CalendarView, dates.ts | The Monday-first formula is copied | One weekday |
+| E16 | open | GoalTree.tsx | The rank column width is hard-coded | Read the CSS variable |
+| E17 | open | write.ts | A re-export shim is left over | Delete it |
+| E18 | open | write.ts, read.ts | The goal key prefix is in two places | One home |
+| E19 | open | priorities.ts | Calendar quarters are hard-coded | Read the calendar from owner settings, quarters as default |
+| E20 | open | priorities.ts | The Drafts count covers the whole store | Count this view's Drafts |
+| E21 | open | priorities.ts, store.ts | A subquery per goal and no index on the Event log | Index event(entity_kind, entity, sequence) |
+| E22 | open | server.ts | The org unit is resolved on every request | Resolve it once |
+| E23 | open | api.ts | ApiGoal.state is a plain string | Type it State |
+| E24 | open | web tsconfig | Browser code can call Node APIs and still typecheck | DOM types only for the app |
+
+Head of Engineering: keep the app inside the server component. It imports api.ts and ships in the same publish.
 
 ## Experience: User and UI/UX designer
 
 | # | Status | Who hit it | Finding | Fix |
 | --- | --- | --- | --- | --- |
-| X1 | fixed | Design, Galahad | "Company goals" and "sub-goal" are not spec words | Title from the org unit's name; drop the count word until Tig picks one |
-| X2 | fixed | Tig | At phone width a date wraps ("Fantasy Nov" / "30") | No wrap inside a date |
-| X3 | fixed | Tig, Chelsea | Titles are cut with "…" | Wrap to two lines. A title longer than two lines still ends in "…", with the full title on hover |
-| X4 | fixed | Tig | "What needs me?" can't be answered: XW-0001 is RED and no Path to Green or decision shows | Show the PTG line under RED and YELLOW rows |
-| X5 | fixed | Tig | Health isn't the color of the bars | Tint each bar with its health |
-| X6 | fixed | Galahad, Tig | "1 of 3 GREEN" over a red, yellow, green meter reads as a contradiction | "1 RED · 1 YELLOW · 1 GREEN" |
-| X7 | fixed | Galahad, Tig | Owners are a bare letter | Show the owner's name |
-| X8 | fixed | Galahad, Chelsea | "Backlog" is both a grey pill and the cut line | No pill for a goal with no health |
-| X9 | fixed | Chelsea | Eight identical "Committed Nov 6" bars | Draw a sub-goal's date only when it differs from its parent's |
-| X10 | fixed | Galahad | "Promotion Milestone" has no explanation | One plain sentence on the card; a short legend note |
-| X11 | fixed | Design | Two text colors below 4.5:1 contrast | Darken; 12 px minimum |
-| X12 | fixed | Design | Some colors not tokens | Tokens |
-| X13 | fixed | Chelsea | Expand arrow is 26 px, needs 44; no keyboard focus ring | Whole row is the target; focus ring |
-| X14 | fixed | Tig | On a phone Tig scrolls a full screen before goal 1 | Priorities first, compact cards |
-| X15 | decided | Galahad | Nothing to click | Recommendation: no "New goal" button until creating a goal works. A dead button is worse |
-| X16 | fixed | Galahad | No mark for "my goals" | Recommendation: outline the viewer's own avatar |
-| X17 | Tig | Chelsea | XW-0003 doesn't say which date is its own | Recommendation: wait for Tig's word |
+| X1 | blocks | Tig, Design | Labels at the right edge are cut off ("Com", "Fantasy Nov"), against rule 23 | Keep the whole label inside the window, or the edge arrow |
+| X2 | blocks | Tig | Once, the first load opened on Nov 30 – Feb 5 with no Today line | Set the scroll after layout and fonts; a test that opens late |
+| X3 | blocks | Galahad | On a phone, health is a dot only. A color-blind person cannot tell RED from GREEN | A shape per health on every screen, and the word on the phone |
+| X4 | blocks | Design | Months and quarters labels are 10.5 px, under the 11 px floor (rule 28) | 11 px; drop alternate labels if they crowd |
+| X5 | open | Tig | On a phone the health counts sit 1300 px down | A one-line health summary above Priorities |
+| X6 | open | Chelsea | Sub-goals with no date show nothing | Say there is no date, in muted text |
+| X7 | open | Tig | The List's PTG cell shows seed placeholder text, and "PTG" is never spelled out | "Path to Green (PTG)" once; an empty state |
+| X8 | open | Tig | The List does not say which date health is judged on | The judged date first, the uncommitted date second and light |
+| X9 | open | Tig | Calendar chips cut the title and carry no Date Type word | Wider chips, two lines, the Date Type in the label for a screen reader |
+| X10 | open | Tig | The Committed dates help opens over the filter chip | Open it beside the icon |
+| X11 | open | Chelsea | The range label disagrees with the visible axis | Follow the scroll exactly |
+| X12 | open | Chelsea | A parent and a child bar both end Nov 6 and the child's own date is lost | Tell the two marks apart |
+| X13 | open | Design | Sub-goal titles cut at two lines on a phone | Three lines on a phone |
+| X14 | open | Galahad | Nothing says the 1, 2, 3 are ranks | A "Priority" column title in the List |
+| X15 | open | Design | At 1100 px the cards differ in height and the Promotions due line wraps | One min-height; one alignment |
+| X16 | yours | Design | Rule 25b says 36 px pills and rule 29 says 44 px to tap | Recommend: a 36 px pill with a 44 px hit area on touch |
+| X17 | yours | Tig | Priorities before the cards costs Tig 20 s on a phone | Recommend: keep rule 32 and add X5 |
+| X18 | yours | Design | Polish | Recommend: 16 px card radius, a soft hover lift on cards, a loading skeleton |
+| X19 | open | Galahad | No way to add a goal from Home | A New goal button when creating a goal works (MLP 4) |
 
 ## For Tig
 
 | # | Question |
 | --- | --- |
-| T1 | The word for a goal under another goal. The canvas and #47 say "sub-goal". SPEC.md says only "parent". |
-| T2 | The title of Home. The Experience pair recommends the org unit's name. |
-| T3 | A line that names a goal's own date when it also has a Promotion Milestone. |
+| T1 | A word for "What needs me?": goals a human owns that are RED or YELLOW, and the Drafts waiting on them. |
+| T2 | The view names Timeline, List, Calendar, the calendar day names, and "+N" for more chips. |
