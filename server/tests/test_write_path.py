@@ -107,7 +107,7 @@ class WritePathTests(unittest.TestCase):
         self.assertGreater(health["sequence"], before)
 
     def test_stale_write_is_rejected_with_the_current_state(self) -> None:
-        self.ok(update("goal", "GOAL-57", 1, {"summary": "Commit the self-serve launch date this fall"}))
+        self.ok(update("goal", "GOAL-57", 1, {"summary": "Commit the self-serve launch date this fall"}, "Clearer"))
         result = self.write(update("goal", "GOAL-57", 1, {"severity": "sev1"}))
         self.assertFalse(result["ok"])
         self.assertEqual(result["error"], "stale")
@@ -162,6 +162,27 @@ class WritePathTests(unittest.TestCase):
         self.rejected(create("goal", "GOAL-42", EXAMPLE), "reason-required")
         self.rejected(update("goal", "GOAL-57", 1, {"state": "Completed"}), "reason-required")
         self.rejected(update("goal", "GOAL-57", 1, {"due_date": "2026-11-14"}), "reason-required")
+
+    def test_every_change_to_a_goal_needs_a_reason(self) -> None:
+        # Codebase QA, SPEC.md §13 item 24: every change to a goal, a work item, or a priority is an Event with a reason.
+        for change in ({"description": "A new description."}, {"plan_maturity": "Crayon", "type": "Metric (Business)"}, {"summary": "Commit the self-serve launch date now"}):
+            result = self.rejected(update("goal", "GOAL-57", 1, change), "reason-required")
+            self.assertEqual(next(v for v in result["violations"] if v["rule"] == "reason-required")["field"], "reason")
+        self.rejected(create("goal", "GOAL-42", EXAMPLE), "reason-required")
+        self.rejected(update("priority", "PRI-3", 1, {"title": "Cut time to value"}), "reason-required")
+        self.ok(update("goal", "GOAL-57", 1, {"description": "A new description."}, "Clearer"))
+
+    def test_a_slip_moves_the_date_later(self) -> None:
+        # Codebase QA: a changed_due_date on or before the current date is not a slip.
+        for date in ("2026-11-15", "2026-11-01"):
+            result = self.rejected(update("goal", "GOAL-57", 1, {"changed_due_date": date}, "Slip"), "slip-moves-later")
+            self.assertEqual(result["violations"][-1]["field"], "changed_due_date")
+        self.ok(update("goal", "GOAL-57", 1, {"changed_due_date": "2026-11-30"}, "Slip"))
+        self.rejected(update("goal", "GOAL-57", 2, {"changed_due_date": "2026-11-20"}, "Slip back"), "slip-moves-later")
+
+    def test_a_blank_required_text_is_missing(self) -> None:
+        result = self.rejected(create("goal", "GOAL-42", {**EXAMPLE, "summary": "   "}, "Planned"), "required-field")
+        self.assertEqual(result["violations"][0]["field"], "summary")
 
     def test_rank_change_needs_a_reason(self) -> None:
         self.rejected(update("priority", "PRI-3", 1, {"rank": 2}), "reason-required")
@@ -316,7 +337,10 @@ class WritePathTests(unittest.TestCase):
         # Review Q8: no raw SQLite text.
         result = self.rejected(create("goal", "GOAL-60", {}, "Planned"), "required-field")
         messages = " ".join(v["message"] for v in result["violations"])
-        self.assertIn("goal.summary is required", messages)
+        # Codebase QA: people read this message, so it names the field in SPEC words; `field` keeps the key.
+        self.assertIn("Summary is required.", messages)
+        self.assertIn("Plan Maturity is required.", messages)
+        self.assertNotIn("goal.", messages)
         self.assertNotIn("constraint failed", messages)
 
     def test_a_base_version_must_be_a_number(self) -> None:
@@ -333,7 +357,7 @@ class WritePathTests(unittest.TestCase):
 
     def test_a_goal_cannot_be_its_own_ancestor(self) -> None:
         self.rejected(update("goal", "GOAL-7", 1, {"parent": "GOAL-7"}), "parent-not-cycle")
-        self.ok(update("goal", "GOAL-57", 1, {"parent": "GOAL-7"}))
+        self.ok(update("goal", "GOAL-57", 1, {"parent": "GOAL-7"}, "Serves the annual goal"))
         self.rejected(update("goal", "GOAL-7", 1, {"parent": "GOAL-57"}), "parent-not-cycle")
 
     def test_fantasy_is_promoted_one_step_at_a_time(self) -> None:
@@ -447,6 +471,9 @@ class WorkItemTests(unittest.TestCase):
 
     def test_status_is_a_state_word(self) -> None:
         self.refused(JANE, create("work_item", "WI-0001", {**self.item, "status": "Done"}, "Filed"), "work-item-status", "status")
+
+    def test_a_blank_title_is_missing(self) -> None:
+        self.refused(JANE, create("work_item", "WI-0001", {**self.item, "title": " "}, "Filed"), "required-field", "title")
 
     def test_a_due_date_is_a_real_date(self) -> None:
         self.refused(JANE, create("work_item", "WI-0001", {**self.item, "due_date": "2026-02-30"}, "Filed"), "real-date", "due_date")

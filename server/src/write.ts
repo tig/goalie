@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { ENTITIES, encode, goalieOwner, isKind, lookup, memoryLookup, read, readAll, readEvents, type EventRow, type Kind } from "./read.ts";
 import { DEFAULT_VISIBILITY } from "./goal.ts";
-import { checkAuthor, checkTransition, checkWrite, goalLints, REASONED, SYSTEM_FIELDS, type Row, type Violation } from "./rules.ts";
+import { checkAuthor, checkTransition, checkWrite, goalLints, REASONED_KINDS, SYSTEM_FIELDS, type Row, type Violation } from "./rules.ts";
 
 /**
  * The one write path. The API, the MCP server, the app, and the seed call write(). Nothing else writes.
@@ -142,9 +142,10 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
     return badCommand("op must be create or update");
   }
   applySystemFields(db, kind, after);
-  const missing = requiredFields(db, kind).filter((f) => after[f] == null);
+  // A blank text is missing too (Codebase QA).
+  const missing = requiredFields(db, kind).filter((f) => after[f] == null || (typeof after[f] === "string" && (after[f] as string).trim() === "" && f !== "description"));
   if (missing.length > 0) {
-    return { ok: false, error: "invalid", violations: missing.map((f) => ({ rule: "required-field", message: `${kind}.${f} is required.`, field: f })) };
+    return { ok: false, error: "invalid", violations: missing.map((f) => ({ rule: "required-field", message: `${fieldWords(f)} is required.`, field: f })) };
   }
 
   const changed = spec.fields.filter((f) => !same(before?.[f], after[f]));
@@ -152,7 +153,7 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
 
   const reason = command.reason?.trim() || null;
   const violations: Violation[] = [...(author ? checkAuthor(author, goalieOwner(db), kind, before, after) : []), ...checkTransition(kind, before, after, today, (id) => read(db, "goal", id))];
-  const needReason = changed.filter((f) => (REASONED[kind] ?? []).includes(f));
+  const needReason = REASONED_KINDS.includes(kind) ? changed : [];
   if (needReason.length > 0 && reason === null) {
     violations.push({ rule: "reason-required", message: `a change to ${needReason.join(", ")} needs a reason.`, field: "reason" });
   }
@@ -193,6 +194,9 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
   }
   return { ok: true, entity: read(db, kind, id) as Row, events: readEvents(db, first) };
 }
+
+/** A field key in SPEC.md words, for a message people read: plan_maturity is "Plan Maturity". */
+const fieldWords = (field: string) => field.split("_").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
 
 /** The fields the schema holds NOT NULL with no default. A row without one is a named rejection, not SQLite's text. */
 function requiredFields(db: DatabaseSync, kind: Kind): string[] {
