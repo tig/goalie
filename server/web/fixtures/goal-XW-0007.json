@@ -41,6 +41,7 @@
   "inherited": false,
   "started": "2026-10-23",
   "closesAs": null,
+  "closesAsPromoted": null,
   "promotionMilestone": null,
   "parent": {
     "id": "XW-0004",
