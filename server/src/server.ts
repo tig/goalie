@@ -8,6 +8,7 @@ import type { ActorRef, ApiError, PrioritiesResponse } from "./api.ts";
 import { configuredIssuers, resolveActor, type Issuer } from "./auth.ts";
 import { configuredDatabase, configuredOrgUnit, configuredWebDist } from "./config.ts";
 import { prioritiesView } from "./priorities.ts";
+import { BRAND_SLOT, brandHead } from "./brand.ts";
 import { signInPage } from "./signin.ts";
 import { openStore } from "./store.ts";
 
@@ -68,7 +69,7 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
     // A path that names a file is not a page. A missing script must not get index.html.
     if (extname(c.req.path) !== "") return c.text("Not Found", 404);
     const index = await built(webDist, "/index.html");
-    return index ? c.html(index.toString("utf-8")) : c.text("The web app is not built. Run npm run build --prefix server.", 503);
+    return index ? c.html(index.toString("utf-8").replace(BRAND_SLOT, brandHead())) : c.text("The web app is not built. Run npm run build --prefix server.", 503);
   });
   return app;
 }

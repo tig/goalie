@@ -7,10 +7,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from goalie_cli import Store, create
+from goalie_cli import SERVER, Store, create
 from live_server import get, running_server, signed
 
-INDEX = b"<!doctype html><title>Goalie</title><div id=root></div><!-- stub build -->"
+INDEX = b"<!doctype html><head><!--goalie:brand--></head><div id=root></div><!-- stub build -->"
 SCRIPT = b"console.log('stub');"
 
 
@@ -50,11 +50,27 @@ class AppServingTests(unittest.TestCase):
     def test_home_is_the_built_index(self) -> None:
         self.assertEqual(self.home.status, 200)
         self.assertTrue(self.home.content_type.startswith("text/html"), self.home.content_type)
-        self.assertEqual(self.home.body, INDEX)
+        self.assertIn(b"<div id=root></div><!-- stub build -->", self.home.body)
 
     def test_any_page_path_is_the_built_index(self) -> None:
         self.assertEqual(self.deep.status, 200)
-        self.assertEqual(self.deep.body, INDEX)
+        self.assertEqual(self.deep.body, self.home.body)
+
+    def test_the_server_writes_the_brand_into_the_index(self) -> None:
+        # Review E4: one brand source, server/src/brand.ts, for the app and the sign-in page.
+        page = self.home.body.decode("utf-8")
+        self.assertNotIn("<!--goalie:brand-->", page)
+        self.assertIn("<title>Goalie</title>", page)
+        self.assertIn('<link rel="stylesheet" href="/_xw/chrome.css">', page)
+        self.assertIn('<meta name="xw-app" content="Goalie">', page)
+        brand = json.loads(page.split('<script id="goalie-brand" type="application/json">', 1)[1].split("</script>", 1)[0])
+        self.assertEqual(brand, {"app": "Goalie", "mark": "G"})
+        head = page.split("<!doctype html><head>", 1)[1].split("</head>", 1)[0]
+        self.assertIn(head, self.anonymous_home.body.decode("utf-8"))
+
+    def test_the_brand_has_one_home_on_the_server(self) -> None:
+        sources = [p for p in (SERVER / "src").glob("*.ts") if '"Goalie"' in p.read_text(encoding="utf-8")]
+        self.assertEqual([p.name for p in sources], ["brand.ts"])
 
     def test_assets_are_the_built_files(self) -> None:
         self.assertEqual(self.script.status, 200)
@@ -68,7 +84,7 @@ class AppServingTests(unittest.TestCase):
         # Review Q5: a missing script must not get index.html.
         for reply in self.missing_file:
             self.assertEqual(reply.status, 404)
-            self.assertNotEqual(reply.body, INDEX)
+            self.assertNotIn(b"stub build", reply.body)
 
     def test_an_asset_path_must_not_leave_the_build(self) -> None:
         self.assertEqual(self.escape.status, 404)
