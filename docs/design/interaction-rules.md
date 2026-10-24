@@ -116,6 +116,7 @@ NG3. A refusal shows at the card and field it names, and the rail lists every re
 NG4. "Create will make" names each key with what it is: "XW-0013 this goal", "XW-0012 its Promotion Milestone". The server gives keys in its create order, so the milestone may take the lower key. A sub-goal on an uncommitted goal's date says "· this goal's date · shares XW-0012", and the rail says how many share it.
 NG5. More fields is one row of chips, each a field, its default as a small picker, and a ? with its §6.1 meaning; Work Product is among them (N8). The preview leads with the judged date.
 NG6. On a phone the checks are a one-line count at the top, and Create is a 48 px bar fixed to the bottom of the screen (N15). On touch every field is 44 px tall, and a Priority row is its own tap target.
+NG7. Under 960 px of page the rail is 260 px wide, so the form keeps most of the width at 768.
 
 ## Work items page
 
