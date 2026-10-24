@@ -1,13 +1,29 @@
-import { day, monthYear, shortDate } from "./dates.ts";
+import type { GoalDate } from "../../../src/api.ts";
+import { day, monthYear, shortDate } from "../../../src/dates.ts";
 
-/** The date pill's labels, and the longest forms it can take, so the pill keeps one width and no control beside it moves. */
+/** The app's words for dates: a date with its Date Type, a slip, and the date pill. The date math is server/src/dates.ts. */
 
 const MONTH_DAY = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", timeZone: "UTC" });
 
-/** "Sep 28 – Dec 4". A year is named only outside the current one, and once when both ends share it. */
+/** A goal date as text, with its Date Type: "Committed Oct 1". */
+export const dateLabel = (date: GoalDate, today: string) => `${date.kind} ${shortDate(date.date, today)}`;
+
+/** "slip 22 days". The one place a slip is written. */
+export const slipLabel = (days: number) => `slip ${days} ${days === 1 ? "day" : "days"}`;
+
+/** A committed date: the goal's own Committed date or its Promotion Milestone's. Health is judged against it. */
+export const isCommitted = (date: GoalDate) => date.kind === "Committed" || date.kind === "Promotion Milestone";
+
+/**
+ * "Sep 28 – Dec 4". A year is named only outside the current one. When the two ends are in different years, both name it.
+ * When both ends share a year that is not the current one, it is named once, at the end.
+ */
 export function rangeLabel(first: string, last: string, today: string): string {
-  const year = first.slice(0, 4);
-  if (year === last.slice(0, 4) && year !== today.slice(0, 4)) return `${MONTH_DAY.format(day(first))} – ${shortDate(last, today)}`;
+  const a = first.slice(0, 4);
+  const b = last.slice(0, 4);
+  const thisYear = today.slice(0, 4);
+  if (a !== b) return `${MONTH_DAY.format(day(first))}, ${a} – ${MONTH_DAY.format(day(last))}, ${b}`;
+  if (a !== thisYear) return `${MONTH_DAY.format(day(first))} – ${shortDate(last, today)}`;
   return `${shortDate(first, today)} – ${shortDate(last, today)}`;
 }
 
@@ -16,7 +32,7 @@ export function labelSizers(today: string): string[] {
   const next = Number(today.slice(0, 4)) + 1;
   const months = Array.from({ length: 12 }, (_, m) => `${String(m + 1).padStart(2, "0")}`);
   return [
-    ...months.map((m) => `${shortDate(`${next}-${m}-28`, today)} – ${shortDate(`${next + 1}-${m}-28`, today)}`),
+    ...months.map((m) => rangeLabel(`${next}-${m}-28`, `${next + 1}-${m}-28`, today)),
     ...months.map((m) => monthYear(`${next + 1}-${m}-01`)),
   ];
 }

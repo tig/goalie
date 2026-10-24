@@ -58,7 +58,7 @@
   "summary": {
     "counts": { "RED": 1, "YELLOW": 1, "GREEN": 1 },
     "healths": ["RED", "YELLOW", "GREEN"],
-    "slips": [{ "goal": "XW-0001", "summary": "Regenerate the E28 canon by Oct 1", "date": "2026-10-01", "days": 22 }],
+    "slips": [{ "goal": "XW-0001", "summary": "Regenerate the E28 canon by Oct 1", "date": "2026-10-01", "kind": "Committed", "days": 22 }],
     "drafts": 0,
     "nextPromotion": { "milestone": "XW-0004", "date": "2026-11-06", "days": 14, "goal": "XW-0003", "summary": "Tig, Chelsea, and agents use GOALIE to drive Excaliwire execution" }
   }

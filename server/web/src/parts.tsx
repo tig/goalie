@@ -1,13 +1,14 @@
 import { useCallback, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { ActorRef, GoalDate, Health } from "../../src/api.ts";
-import { dateLabel } from "./model/dates.ts";
-import { placePopover } from "./model/popover.ts";
+import { dateLabel, slipLabel } from "./model/labels.ts";
+import { placePopover, popoverWidth } from "./model/popover.ts";
 import { useDismiss } from "./useScreen.ts";
 
 /** The shared parts every view is built from. */
 
-export const BRAND = { app: "Goalie", mark: "G" } as const;
+/** The brand the server writes into the page (review E4). One source: server/src/brand.ts. */
+export const BRAND = JSON.parse(document.getElementById("goalie-brand")?.textContent ?? '{"app":"","mark":""}') as { app: string; mark: string };
 
 const HEALTH: Record<string, { bg: string; ink: string; bar: string }> = {
   GREEN: { bg: "var(--green-bg)", ink: "var(--green-ink)", bar: "var(--green)" },
@@ -41,12 +42,15 @@ export function Avatar({ actor, mine = false }: { actor: ActorRef; mine?: boolea
 /** Text a screen reader reads and the eye does not see. */
 export const Hidden = ({ children }: { children: ReactNode }) => <span className="vh">{children}</span>;
 
-/** The health as a dot of its color. The word is there for a screen reader. No health is a hollow dot. */
-export function HealthDot({ health }: { health: Health }) {
+/**
+ * The health as a mark of its color and its own shape, so color is not the only cue (review X3): GREEN a circle, YELLOW a diamond, RED a square.
+ * No health is a hollow circle. The word is there for a screen reader, and on a phone it shows beside the mark.
+ */
+export function HealthDot({ health, word = true }: { health: Health; word?: boolean }) {
   return (
     <>
-      <span className={`hdot${health ? "" : " none"}`} style={{ background: health ? look(health).bar : "transparent" }} />
-      <Hidden>{health ?? "no health"}</Hidden>
+      <span className={`hdot ${health ?? "none"}`} style={{ background: health ? look(health).bar : "transparent" }} aria-hidden="true" />
+      {word ? <span className={`hword ${health ?? "none"}`}>{health ?? "no health"}</span> : <Hidden>{health ?? "no health"}</Hidden>}
     </>
   );
 }
@@ -59,7 +63,7 @@ export function DateMark({ date, today }: { date: GoalDate; today: string }) {
   return (
     <span className="date">
       {dateLabel(date, today)}
-      {date.slipDays !== undefined && <span className="late"> slip {date.slipDays} days</span>}
+      {date.slipDays !== undefined && <span className="late"> {slipLabel(date.slipDays)}</span>}
     </span>
   );
 }
@@ -107,7 +111,7 @@ export function Help({ label, children }: { label: string; children: ReactNode }
       </button>
       {shown &&
         createPortal(
-          <div ref={card} className="tip" role="note" style={{ width: Math.min(300, document.documentElement.clientWidth - 32), left: -9999, top: 0, ...place }}>
+          <div ref={card} className="tip" role="note" style={{ width: popoverWidth(document.documentElement.clientWidth), left: -9999, top: 0, ...place }}>
             {children}
           </div>,
           document.body,
@@ -134,3 +138,37 @@ export const CHEVRON = (
     <path d="M3 4.5 6 7.5 9 4.5" />
   </svg>
 );
+
+/** The legend's marks. The Timeline draws its swatches and the Calendar its chip marks; the words are the same. */
+const LEGEND = {
+  timeline: [
+    ["sw health", "Health"],
+    ["sw ahead", "Committed date"],
+    ["sw pm", "Promotion Milestone"],
+    ["sw Ambition", "Ambition date"],
+    ["sw Fantasy", "Fantasy date"],
+    ["sw slip", "Slip"],
+  ],
+  calendar: [
+    ["mk Committed", "Committed date"],
+    ["mk pm", "Promotion Milestone"],
+    ["mk Ambition", "Ambition date"],
+    ["mk Fantasy", "Fantasy date"],
+    ["mk slip", "Slip"],
+  ],
+} as const;
+
+/** The one legend. `help` adds a ? beside the item it names. */
+export function Legend({ kind, help }: { kind: keyof typeof LEGEND; help?: Partial<Record<string, ReactNode>> }) {
+  return (
+    <div className={`legend ${kind}`}>
+      {LEGEND[kind].map(([mark, label]) => (
+        <span key={label} className="lg">
+          <i className={mark} />
+          {label}
+          {help?.[label] && <Help label={label}>{help[label]}</Help>}
+        </span>
+      ))}
+    </div>
+  );
+}

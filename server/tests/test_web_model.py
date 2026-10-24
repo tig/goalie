@@ -13,7 +13,7 @@ FIXTURE = Path(__file__).resolve().parents[1] / "web" / "fixtures" / "priorities
 
 def run(body: str) -> object:
     """Run an ES module that imports the model as `m` and the seed fixture as `api`, and return what it prints as JSON."""
-    imports = "".join(f'import * as {name} from "{(MODEL / f"{name}.ts").as_uri()}";\n' for name in ("dates", "query", "filter", "timeline", "calendar", "popover", "labels", "scroll"))
+    imports = "".join(f'import * as {name} from "{(MODEL / f"{name}.ts").as_uri()}";\n' for name in ("query", "filter", "timeline", "calendar", "popover", "labels", "scroll"))
     script = f"""{imports}
 import {{ readFileSync }} from "node:fs";
 const api = JSON.parse(readFileSync({json.dumps(str(FIXTURE))}, "utf-8"));
@@ -27,14 +27,13 @@ process.stdout.write(JSON.stringify(out));
 
 
 class DateTests(unittest.TestCase):
-    def test_short_date_names_the_year_only_outside_the_current_one(self) -> None:
-        self.assertEqual(run('return [dates.shortDate("2026-10-01", "2026-10-23"), dates.shortDate("2027-03-31", "2026-10-23")];'), ["Oct 1", "Mar 31, 2027"])
-
-    def test_a_week_starts_on_monday(self) -> None:
-        self.assertEqual(run('return [dates.weekStart("2026-10-23"), dates.weekStart("2026-10-19"), dates.weekStart("2026-11-01")];'), ["2026-10-19", "2026-10-19", "2026-10-26"])
+    """The date math itself is server/src/dates.ts, tested in test_dates.py. These are the app's labels on top of it."""
 
     def test_a_date_label_carries_its_date_type(self) -> None:
-        self.assertEqual(run('return dates.dateLabel({ date: "2026-11-06", kind: "Promotion Milestone" }, "2026-10-23");'), "Promotion Milestone Nov 6")
+        self.assertEqual(run('return labels.dateLabel({ date: "2026-11-06", kind: "Promotion Milestone" }, "2026-10-23");'), "Promotion Milestone Nov 6")
+
+    def test_a_slip_is_written_in_one_place(self) -> None:
+        self.assertEqual(run("return [labels.slipLabel(22), labels.slipLabel(1)];"), ["slip 22 days", "slip 1 day"])
 
 
 class QueryTests(unittest.TestCase):
@@ -49,6 +48,10 @@ class QueryTests(unittest.TestCase):
 
     def test_the_default_screen_has_no_query(self) -> None:
         self.assertEqual(run('return query.screenQuery({ zoom: "weeks", view: "timeline" });'), "")
+
+    def test_a_from_outside_1970_to_9999_is_ignored(self) -> None:
+        froms = run('return ["0099-01-01", "1969-12-31", "1970-01-01", "9999-12-31"].map((d) => query.parseScreen("?from=" + d).from ?? null);')
+        self.assertEqual(froms, [None, None, "1970-01-01", "9999-12-31"])
 
     def test_search_is_trimmed_to_100_characters(self) -> None:
         self.assertEqual(run('return query.parseScreen("?q=" + "x".repeat(150) + "%20").q.length;'), 100)
@@ -82,6 +85,21 @@ class FilterTests(unittest.TestCase):
     def test_a_health_filter_shows_only_that_health(self) -> None:
         self.assertEqual(titles(run('return filter.filterPriorities(api.funded, { health: "RED" });')), [["XW-0001", True]])
 
+    def test_a_health_filter_selects_what_its_count_counts(self) -> None:
+        # "1 GREEN" counts one top-level goal in progress above the cut line. Its GREEN sub-goals are not counted.
+        self.assertEqual(titles(run('return filter.filterPriorities(api.funded, { health: "GREEN" });')), [["XW-0003", True]])
+        self.assertEqual(run('return filter.filterPriorities(api.funded, { health: "GREEN" }, { counted: false });'), [])
+
+    def test_pointing_at_a_count_lights_what_it_counts(self) -> None:
+        lit = run('return filter.flatten(filter.filterPriorities(api.funded, {}).flatMap((p) => p.goals)).filter((g) => filter.isLit(g, { hot: "GREEN" })).map((g) => g.id);')
+        self.assertEqual(lit, ["XW-0003"])
+        self.assertEqual(run('return filter.flatten(filter.filterPriorities(api.funded, { health: "RED" }).flatMap((p) => p.goals)).filter((g) => filter.isLit(g, { selected: "RED" })).map((g) => g.id);'), ["XW-0001"])
+
+    def test_a_sub_goal_with_its_parents_date_inherits_it(self) -> None:
+        kid = run("return filter.filterPriorities(api.funded, {})[2].goals[0].children[0].children[0];")
+        self.assertEqual(kid["inherited"], [{"date": "2026-11-06", "kind": "Committed"}])  # type: ignore[index]
+        self.assertEqual(run("return filter.filterPriorities(api.funded, {})[2].goals[0].inherited;"), [])
+
     def test_health_and_search_both_hold(self) -> None:
         self.assertEqual(titles(run('return filter.filterPriorities(api.funded, { health: "GREEN", q: "canon" });')), [])
 
@@ -96,6 +114,13 @@ class TimelineTests(unittest.TestCase):
         self.assertEqual((w["open"], w["start"], w["end"]), ("2026-09-28", "2026-03-30", "2027-06-28"))  # type: ignore[index]
         self.assertEqual((w["weeks"], w["weekPx"], w["openPx"]), (65, 84, 26 * 84))  # type: ignore[index]
         self.assertEqual((w["first"], w["last"]), ("2026-09-28", "2026-12-27"))  # type: ignore[index]
+
+    def test_the_board_is_wider_than_the_screen_at_every_zoom(self) -> None:
+        sizes = run('return ["weeks", "months", "quarters"].map((z) => { const w = timeline.timelineWindow(api.funded, "2026-10-23", z); return [w.weeks, w.openPx, w.weeks * w.weekPx, w.open]; });')
+        self.assertEqual(sizes, [[65, 26 * 84, 65 * 84, "2026-09-28"], [130, 52 * 30, 130 * 30, "2026-09-28"], [260, 104 * 14, 260 * 14, "2026-09-28"]])
+
+    def test_the_board_opens_inside_its_scroll_range(self) -> None:
+        self.assertEqual(run("return [timeline.openScroll(2184, 5460, 1200), timeline.openScroll(2184, 2500, 1200), timeline.openScroll(-5, 2500, 1200)];"), [2184, 1300, 0])
 
     def test_with_no_recent_slip_it_opens_two_weeks_before_today(self) -> None:
         w = run('return timeline.timelineWindow(api.funded.slice(1), "2026-10-23", "weeks");')
@@ -113,18 +138,42 @@ class TimelineTests(unittest.TestCase):
         labels = run('return ["weeks", "months"].map((z) => timeline.timelineWindow(api.funded, "2026-10-23", z).labels);')
         self.assertEqual(len(labels[0]), 65)  # type: ignore[index]
         self.assertEqual(labels[0][26]["label"], "Sep 28")  # type: ignore[index]
-        self.assertEqual([l["label"] for l in labels[1][:3]], ["Apr", "May", "Jun"])  # type: ignore[index]
+        self.assertEqual([l["label"] for l in labels[1][:3]], ["Oct 2025", "Nov", "Dec"])  # type: ignore[index]
+        self.assertIn("Jan 2026", [l["label"] for l in labels[1]])  # type: ignore[index]
         self.assertIn("Jan 2027", [l["label"] for l in labels[1]])  # type: ignore[index]
+
+    def test_quarters_name_every_other_month(self) -> None:
+        names = run('return timeline.timelineWindow(api.funded, "2026-10-23", "quarters").labels.map((l) => l.label);')
+        self.assertEqual(names[:3], ["Oct 2024", "Dec", "Feb 2025"])  # type: ignore[index]
+        self.assertIn("Feb 2027", names)  # type: ignore[operator]
+        self.assertNotIn("Jan 2027", names)  # type: ignore[operator]
 
     def test_the_visible_range_follows_the_scroll(self) -> None:
         r = run('const w = timeline.timelineWindow(api.funded, "2026-10-23", "weeks"); return [timeline.visibleRange(w, w.openPx, 13 * 84), timeline.visibleRange(w, 0, 7 * 84)];')
         self.assertEqual(r, [{"first": "2026-09-28", "last": "2026-12-27"}, {"first": "2026-03-30", "last": "2026-05-17"}])
 
+    def test_the_visible_range_names_the_day_cut_by_the_left_edge(self) -> None:
+        r = run('const w = timeline.timelineWindow(api.funded, "2026-10-23", "weeks"); return timeline.visibleRange(w, w.openPx + 11, 13 * 84);')
+        self.assertEqual(r["first"], "2026-09-28")  # type: ignore[index]
+
     def test_a_slip_runs_from_the_committed_date_to_today(self) -> None:
-        lane = run('const w = timeline.timelineWindow(api.funded, "2026-10-23", "weeks"); const l = timeline.laneOf(api.funded[0].goals[0], w, "2026-10-23"); return { l, d: w.pos("2026-10-01"), t: w.pos("2026-10-23") };')
-        self.assertEqual(lane["l"]["slip"], {"from": lane["d"], "to": lane["t"], "days": 22})  # type: ignore[index]
+        lane = run('const w = timeline.timelineWindow(api.funded, "2026-10-23", "weeks"); const l = timeline.laneOf({ ...api.funded[0].goals[0], started: "2026-09-01" }, w, "2026-10-23"); return { l, s: w.pos("2026-09-01"), d: w.pos("2026-10-01"), t: w.pos("2026-10-23") };')
+        self.assertEqual(lane["l"]["slip"], {"from": lane["d"], "to": lane["t"], "days": 22, "over": False})  # type: ignore[index]
+        self.assertEqual(lane["l"]["health"], {"from": lane["s"], "to": lane["d"]})  # type: ignore[index]
         self.assertEqual(lane["l"]["tick"]["date"]["kind"], "Committed")  # type: ignore[index]
         self.assertNotIn("ahead", lane["l"])  # type: ignore[operator]
+
+    def test_a_goal_started_after_its_date_draws_health_under_the_slip(self) -> None:
+        lane = run('const w = timeline.timelineWindow(api.funded, "2026-10-23", "weeks"); return { l: timeline.laneOf(api.funded[0].goals[0], w, "2026-10-23"), d: w.pos("2026-10-01"), t: w.pos("2026-10-23") };')
+        self.assertEqual(lane["l"]["health"], {"from": lane["d"], "to": lane["t"]})  # type: ignore[index]
+        self.assertTrue(lane["l"]["slip"]["over"])  # type: ignore[index]
+
+    def test_a_label_stays_inside_what_is_on_screen(self) -> None:
+        places = run('const v = { left: 1000, right: 1800 }; return [timeline.placeLabel(1200, 100, v), timeline.placeLabel(1750, 100, v), timeline.placeLabel(900, 100, v), timeline.placeLabel(1900, 100, v), timeline.placeLabel(1040, 900, v)];')
+        self.assertEqual(places, ["right", "left", "before", "after", "right"])
+
+    def test_a_label_width_is_estimated_from_its_text(self) -> None:
+        self.assertEqual(run('return [timeline.labelWidth("Committed Nov 15"), timeline.labelWidth("")];'), [16 * 7, 0])
 
     def test_a_fantasy_date_draws_a_line_from_the_promotion_milestone(self) -> None:
         lane = run('const w = timeline.timelineWindow(api.funded, "2026-10-23", "weeks"); return timeline.laneOf(api.funded[2].goals[0], w, "2026-10-23");')
@@ -170,25 +219,27 @@ class PopoverTests(unittest.TestCase):
     def place(self, anchor: dict, vw: int, vh: int, height: int = 150) -> dict:
         return run(f"return popover.placePopover({json.dumps(anchor)}, {height}, {{ width: {vw}, height: {vh} }});")  # type: ignore[return-value]
 
-    def test_it_opens_below_and_left_aligned(self) -> None:
-        self.assertEqual(self.place({"left": 200, "top": 160, "right": 218, "bottom": 178}, 1440, 900), {"left": 192, "top": 186, "width": 300})
+    def test_it_opens_beside_its_icon_on_the_right(self) -> None:
+        self.assertEqual(self.place({"left": 200, "top": 160, "right": 218, "bottom": 178}, 1440, 900), {"left": 226, "top": 152, "width": 300})
 
-    def test_it_stays_inside_the_right_edge(self) -> None:
-        self.assertEqual(self.place({"left": 1150, "top": 160, "right": 1168, "bottom": 178}, 1440, 900)["left"], 1440 - 16 - 300)
-        self.assertEqual(self.place({"left": 1050, "top": 160, "right": 1068, "bottom": 178}, 1100, 900)["left"], 1100 - 16 - 300)
+    def test_with_no_room_on_the_right_it_opens_on_the_left(self) -> None:
+        self.assertEqual(self.place({"left": 1150, "top": 160, "right": 1168, "bottom": 178}, 1440, 900)["left"], 1150 - 8 - 300)
+        self.assertEqual(self.place({"left": 1050, "top": 160, "right": 1068, "bottom": 178}, 1100, 900)["left"], 1050 - 8 - 300)
 
-    def test_it_is_never_wider_than_the_screen_less_32_px(self) -> None:
-        p = self.place({"left": 300, "top": 160, "right": 318, "bottom": 178}, 320, 900)
-        self.assertEqual((p["left"], p["width"]), (16, 288))
+    def test_with_no_room_on_either_side_it_opens_below(self) -> None:
+        self.assertEqual(self.place({"left": 300, "top": 160, "right": 318, "bottom": 178}, 320, 900), {"left": 16, "top": 186, "width": 288})
 
-    def test_it_opens_above_when_below_would_leave_the_screen(self) -> None:
-        self.assertEqual(self.place({"left": 600, "top": 820, "right": 618, "bottom": 838}, 1440, 900)["top"], 820 - 8 - 150)
+    def test_it_stays_inside_the_bottom_edge(self) -> None:
+        self.assertEqual(self.place({"left": 600, "top": 820, "right": 618, "bottom": 838}, 1440, 900)["top"], 900 - 16 - 150)
+
+    def test_its_width_is_one_number(self) -> None:
+        self.assertEqual(run("return [popover.popoverWidth(1440), popover.popoverWidth(320)];"), [300, 288])
 
 
 class LabelTests(unittest.TestCase):
     def test_the_range_names_a_year_only_outside_the_current_one(self) -> None:
         labels = run('return [["2026-09-28", "2026-12-04"], ["2026-09-28", "2027-04-05"], ["2027-04-21", "2027-06-27"], ["2025-12-29", "2027-01-03"]].map(([a, b]) => labels.rangeLabel(a, b, "2026-10-23"));')
-        self.assertEqual(labels, ["Sep 28 – Dec 4", "Sep 28 – Apr 5, 2027", "Apr 21 – Jun 27, 2027", "Dec 29, 2025 – Jan 3, 2027"])
+        self.assertEqual(labels, ["Sep 28 – Dec 4", "Sep 28, 2026 – Apr 5, 2027", "Apr 21 – Jun 27, 2027", "Dec 29, 2025 – Jan 3, 2027"])
 
     def test_the_sizers_hold_the_longest_form_for_every_month(self) -> None:
         sizers = run('return labels.labelSizers("2026-10-23");')

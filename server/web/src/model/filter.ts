@@ -1,4 +1,4 @@
-import type { ApiGoal, ApiPriority } from "../../../src/api.ts";
+import type { ApiGoal, ApiPriority, GoalDate, Health } from "../../../src/api.ts";
 import type { Filter } from "./query.ts";
 
 /** Health filter and search over the goal tree. The server sends every goal; the app chooses what to draw. */
@@ -7,6 +7,10 @@ export type GoalRow = Omit<ApiGoal, "children"> & {
   depth: number;
   /** False when a filter is on and this goal is drawn only as the parent of one that matches. */
   match: boolean;
+  /** True when the Committed dates card counts this goal: a top-level goal in progress above the cut line. */
+  counted: boolean;
+  /** The dates a sub-goal shares with its parent, when it has none of its own. Empty for a goal with its own dates. */
+  inherited: GoalDate[];
   children: GoalRow[];
 };
 
@@ -14,18 +18,30 @@ export type PriorityRow = Omit<ApiPriority, "goals"> & { goals: GoalRow[] };
 
 export const isFiltering = (filter: Filter) => Boolean(filter.health || filter.q);
 
-/** Each Priority with its goals marked. With a filter on, a goal stays when it matches or holds one that does, and a Priority with no goal left goes. */
-export function filterPriorities(priorities: ApiPriority[], filter: Filter): PriorityRow[] {
+/**
+ * Each Priority with its goals marked. `counted` is true above the cut line.
+ * A health filter selects what its count counts (review Q4). Search matches any goal's summary.
+ * With a filter on, a goal stays when it matches or holds one that does, and a Priority with no goal left goes.
+ */
+export function filterPriorities(priorities: ApiPriority[], filter: Filter, options: { counted: boolean } = { counted: true }): PriorityRow[] {
   const needle = filter.q?.toLowerCase();
-  const matches = (goal: ApiGoal) => (!filter.health || goal.health === filter.health) && (!needle || goal.summary.toLowerCase().includes(needle));
-  const row = (goal: ApiGoal, depth: number): GoalRow | undefined => {
-    const children = goal.children.map((c) => row(c, depth + 1)).filter((c): c is GoalRow => c !== undefined);
-    const match = matches(goal);
-    return match || children.length || !isFiltering(filter) ? { ...goal, depth, match, children } : undefined;
+  const row = (goal: ApiGoal, depth: number, from: GoalDate[]): GoalRow | undefined => {
+    const inherited = goal.dates.length ? [] : from;
+    const own = goal.dates.length ? goal.dates : from;
+    const counted = options.counted && depth === 0 && goal.state === "In Progress" && goal.health !== null;
+    const match = (!filter.health || (counted && goal.health === filter.health)) && (!needle || goal.summary.toLowerCase().includes(needle));
+    const children = goal.children.map((c) => row(c, depth + 1, own)).filter((c): c is GoalRow => c !== undefined);
+    return match || children.length || !isFiltering(filter) ? { ...goal, depth, match, counted, inherited, children } : undefined;
   };
   return priorities
-    .map((p) => ({ ...p, goals: p.goals.map((g) => row(g, 0)).filter((g): g is GoalRow => g !== undefined) }))
+    .map((p) => ({ ...p, goals: p.goals.map((g) => row(g, 0, [])).filter((g): g is GoalRow => g !== undefined) }))
     .filter((p) => !isFiltering(filter) || p.goals.length > 0);
+}
+
+/** Highlighted (rule H2) or selected (rule H3): a goal the Committed dates card counts, with the health pointed at or filtered on. */
+export function isLit(goal: Pick<GoalRow, "counted" | "health" | "match">, lit: { selected?: Health; hot?: Health }): boolean {
+  if (!goal.counted) return false;
+  return Boolean((lit.selected && goal.match && goal.health === lit.selected) || (lit.hot !== undefined && goal.health === lit.hot));
 }
 
 /** Every goal in the trees, depth first. */

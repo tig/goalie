@@ -1,6 +1,6 @@
-import type { ApiGoal, Health, PrioritiesResponse } from "../../src/api.ts";
-import { shortDate } from "./model/dates.ts";
-import { flatten } from "./model/filter.ts";
+import type { Health, PrioritiesResponse } from "../../src/api.ts";
+import { shortDate } from "../../src/dates.ts";
+import { slipLabel } from "./model/labels.ts";
 import { HEALTHS, type Filter } from "./model/query.ts";
 import { HELP } from "./helpText.tsx";
 import { Card, HealthDot, look } from "./parts.tsx";
@@ -14,26 +14,37 @@ type Props = {
   onHot: (health: Health | undefined) => void;
 };
 
+const controls = ({ filter, onHealth, onHot }: Omit<Props, "data">) => ({
+  pick: (h: Exclude<Health, null>) => onHealth(filter.health === h ? undefined : h),
+  hover: (h: Health) => ({ onPointerEnter: () => onHot(h), onPointerLeave: () => onHot(undefined), onFocus: () => onHot(h), onBlur: () => onHot(undefined) }),
+});
+
+/** The health counts: controls that highlight and filter (rule 24). The Committed dates card draws them, and so does the line above Priorities on a phone. */
+export function HealthCounts({ data, ...props }: Props) {
+  const { pick, hover } = controls(props);
+  return (
+    <p className="counts">
+      {HEALTHS.map((h) => (
+        <button key={h} type="button" className={`count${props.filter.health === h ? " on" : ""}`} aria-pressed={props.filter.health === h} onClick={() => pick(h)} {...hover(h)}>
+          <HealthDot health={h} word={false} />
+          {data.summary.counts[h]} {h}
+        </button>
+      ))}
+    </p>
+  );
+}
+
 /** The three summary cards above the board. */
-export function Cards({ data, filter, onHealth, onHot }: Props) {
-  const { counts, healths, slips, drafts, nextPromotion } = data.summary;
+export function Cards(props: Props) {
+  const { data } = props;
+  const { healths, slips, drafts, nextPromotion } = data.summary;
   const today = data.today;
-  const pick = (h: Exclude<Health, null>) => onHealth(filter.health === h ? undefined : h);
-  const hover = (h: Health) => ({ onPointerEnter: () => onHot(h), onPointerLeave: () => onHot(undefined), onFocus: () => onHot(h), onBlur: () => onHot(undefined) });
+  const { pick, hover } = controls(props);
   const slip = slips[0];
-  const goals = flatten([...data.funded, ...data.backlog].flatMap((p) => p.goals) as ApiGoal[]);
-  const slipKind = slip && goals.find((g) => g.id === slip.goal)?.dates.find((d) => d.date === slip.date)?.kind;
   return (
     <section className="cards">
       <Card label="Committed dates" help={HELP.committed}>
-        <p className="counts">
-          {HEALTHS.map((h) => (
-            <button key={h} type="button" className={`count${filter.health === h ? " on" : ""}`} aria-pressed={filter.health === h} onClick={() => pick(h)} {...hover(h)}>
-              <HealthDot health={h} />
-              {counts[h]} {h}
-            </button>
-          ))}
-        </p>
+        <HealthCounts {...props} />
         <div className="meter">
           {healths.map((h, i) => (
             <span key={i} style={{ background: look(h).bar }} {...(h ? { role: "button", "aria-label": h, onClick: () => pick(h) } : {})} {...hover(h)} />
@@ -41,7 +52,7 @@ export function Cards({ data, filter, onHealth, onHot }: Props) {
         </div>
         {slip ? (
           <p className="note">
-            <span className="late">slip {slip.days} days</span> past <span className="date">{slipKind ?? "Committed"} {shortDate(slip.date, today)}</span> · {slip.summary}
+            <span className="late">{slipLabel(slip.days)}</span> past <span className="date">{slip.kind} {shortDate(slip.date, today)}</span> · {slip.summary}
           </p>
         ) : (
           <p className="note muted">No slips.</p>
@@ -49,14 +60,14 @@ export function Cards({ data, filter, onHealth, onHot }: Props) {
       </Card>
       <Card label="Drafts" help={HELP.drafts}>
         <p className="big">
-          {drafts} <small>waiting on an owner</small>
+          <span className="num">{drafts}</span> <small>waiting on an owner</small>
         </p>
       </Card>
       <Card label="Promotions due" help={HELP.promotions}>
         {nextPromotion ? (
           <>
             <p className="big">
-              {nextPromotion.days} days <small>to the Promotion Milestone</small>
+              <span className="num">{nextPromotion.days} days</span> <small>to the Promotion Milestone</small>
             </p>
             <p className="note">
               <span className="date">{shortDate(nextPromotion.date, today)}</span> · {nextPromotion.summary}

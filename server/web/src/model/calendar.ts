@@ -1,5 +1,5 @@
 import type { GoalDate } from "../../../src/api.ts";
-import { DAY, day, iso, weekStart } from "./dates.ts";
+import { DAY, day, iso, weekStart } from "../../../src/dates.ts";
 import { flatten, type GoalRow } from "./filter.ts";
 
 /** The Priorities view laid out as a month calendar. Each goal date sits on its day. Monday first. */
