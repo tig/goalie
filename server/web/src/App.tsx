@@ -117,8 +117,12 @@ const VIEW_LABELS: Record<View, string> = { timeline: "Timeline", list: "List", 
 /** The page the URL names. Home stays the data source for every page until the goal API lands. */
 function Pages({ data }: { data: PrioritiesResponse }) {
   const route = useRoute();
-  if (route.page === "goal") return <GoalPage data={data} goalKey={route.key} />;
-  return <Home data={data} />;
+  return (
+    <>
+      <TopBar data={data} />
+      {route.page === "goal" ? <GoalPage goalKey={route.key} viewName={data.view.name} /> : <Home data={data} />}
+    </>
+  );
 }
 
 function Home({ data }: { data: PrioritiesResponse }) {
@@ -159,7 +163,6 @@ function Home({ data }: { data: PrioritiesResponse }) {
 
   return (
     <>
-      <TopBar data={data} />
       <main>
         <h1>{data.org.name}</h1>
         <Cards data={data} filter={filter} onHealth={(health) => change({ health })} onHot={setHot} />

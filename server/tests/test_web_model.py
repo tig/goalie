@@ -13,10 +13,11 @@ FIXTURE = Path(__file__).resolve().parents[1] / "web" / "fixtures" / "priorities
 
 def run(body: str) -> object:
     """Run an ES module that imports the model as `m` and the seed fixture as `api`, and return what it prints as JSON."""
-    imports = "".join(f'import * as {name} from "{(MODEL / f"{name}.ts").as_uri()}";\n' for name in ("query", "filter", "timeline", "calendar", "popover", "labels", "scroll", "route"))
+    imports = "".join(f'import * as {name} from "{(MODEL / f"{name}.ts").as_uri()}";\n' for name in ("query", "filter", "timeline", "calendar", "popover", "labels", "scroll", "route", "goalpage"))
     script = f"""{imports}
 import {{ readFileSync }} from "node:fs";
 const api = JSON.parse(readFileSync({json.dumps(str(FIXTURE))}, "utf-8"));
+const page = (key) => JSON.parse(readFileSync({json.dumps(str(FIXTURE.parent))} + "/goal-" + key + ".json", "utf-8"));
 const out = await (async () => {{ {body} }})();
 process.stdout.write(JSON.stringify(out));
 """
@@ -345,6 +346,41 @@ class ScrollTests(unittest.TestCase):
 
     def test_a_drag_pans_once_it_passes_4_px(self) -> None:
         self.assertEqual(run("return [scroll.isDrag(3), scroll.isDrag(-5), scroll.dragLeft(500, 100, 160)];"), [False, True, 440])
+
+
+class GoalPageTests(unittest.TestCase):
+    def test_work_items_group_by_status_in_order(self) -> None:
+        groups = run('const items = [...page("XW-0003").workItems, { id: "WI-0009", status: "Deleted" }]; return goalpage.groupWorkItems(items).map((g) => [g.status, g.items.map((i) => i.id)]);')
+        self.assertEqual(groups, [["In Progress", ["WI-0001", "WI-0002"]], ["Backlog", ["WI-0003"]], ["Completed", ["WI-0004"]]])
+
+    def test_history_filters_by_kind_of_change(self) -> None:
+        counts = run('const e = page("XW-0003").events; return ["All", "Dates", "Health", "State", "Comments"].map((f) => goalpage.filterEvents(e, f).length);')
+        self.assertEqual(counts[4], 1)  # type: ignore[index]
+        self.assertEqual(counts[3], 1)  # type: ignore[index]
+        self.assertGreater(counts[0], counts[1])  # type: ignore[index]
+
+    def test_an_event_value_reads_as_words(self) -> None:
+        values = run('return [goalpage.eventValue(null), goalpage.eventValue("GREEN"), goalpage.eventValue(3), goalpage.eventValue({ steps: [1, 2], criteria: "x" }), goalpage.eventValue([{ repo: "github.com/tig/goalie" }])];')
+        self.assertEqual(values, ["None", "GREEN", "3", "Path to Green, 2 steps", "github.com/tig/goalie"])
+
+    def test_a_field_reads_as_its_spec_words(self) -> None:
+        self.assertEqual(run('return ["due_date", "date_type", "path_to_green", "original_committed_date", "comment", "status"].map(goalpage.fieldLabel);'), ["Due Date", "Date Type", "Path to Green", "Original Committed Date", "Comment", "Status"])
+
+    def test_an_actor_field_reads_as_the_name(self) -> None:
+        self.assertEqual(run('return goalpage.eventValue("tig", "owner", page("XW-0003").actors);'), "Tig")
+
+    def test_the_date_bar_spans_start_today_and_every_date(self) -> None:
+        bar = run('return goalpage.dateBar("2026-10-23", "2026-10-23", [{ date: "2026-11-06", kind: "Promotion Milestone" }, { date: "2026-11-30", kind: "Fantasy" }]);')
+        self.assertEqual(bar["start"], 0)  # type: ignore[index]
+        self.assertEqual(bar["today"], 0)  # type: ignore[index]
+        self.assertEqual([round(m["at"]) for m in bar["marks"]], [37, 100])  # type: ignore[index]
+
+    def test_a_date_before_the_start_widens_the_bar(self) -> None:
+        bar = run('return goalpage.dateBar("2026-10-23", "2026-10-23", [{ date: "2026-10-01", kind: "Committed" }]);')
+        self.assertEqual((bar["marks"][0]["at"], bar["start"], bar["today"]), (0, 100, 100))  # type: ignore[index]
+
+    def test_comments_are_the_comment_events(self) -> None:
+        self.assertEqual(run('return goalpage.comments(page("XW-0003").events).map((e) => e.actor);'), ["tig"])
 
 
 class RouteTests(unittest.TestCase):
