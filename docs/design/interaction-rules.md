@@ -106,17 +106,21 @@ GP4. Choosing a health that is not saved outlines it in its color; the saved hea
 GP5. + Sub-goal and + Work item open one add row in place (G20, G22). A sub-goal takes this goal's date, written out, unless it is given its own; its own Ambition or Fantasy date opens its own Promotion Milestone.
 GP6. Ticking a work item asks for its reason in the row; Enter saves and Escape undoes the tick (G24).
 GP7. History shows one row per write: the Events of one save (same actor, time, and reason). A create reads "Created" with its date and health, and opens to list its fields. Values are names and dates with their year, never ids.
-GP8. Dates on the goal page header carry their year: "Nov 6, 2026". The goal's own date reads "Nov 30, 2026 Fantasy · this goal's date". Each mark on the date bar is labelled under it.
+GP8. Dates on the goal page header carry their year: "Nov 6, 2026". The goal's own date reads "Nov 30, 2026 Fantasy · this goal's date". Each mark on the date bar is labelled under it. A label that would touch the one before it drops to a second row.
 GP9. A panel's buttons sit at its right, Cancel then Save. A new Path to Green step has no date until one is picked. Panel tints are light (--yellow-tint, --red-tint, --green-tint) with the health's -bg border.
 GP10. Description and Fields stack under 900 px of page.
+GP11. Close goal on an Ambition goal offers "Promote and close" when the server sends the state it would close as. One save completes the Promotion Milestone, makes the current date Committed, and closes the goal in that state. A Fantasy goal offers Did Not Meet and Deleted, with "Promote to Ambition first to close as Completed." (G15). A new Promotion Milestone starts In Progress with the health of the goal it backs (N6a). An older Backlog milestone passes through In Progress, GREEN, in the same save, because a Backlog goal cannot move to Completed.
 NG1. New goal is a filled 32 px button, last in the toolbar's right cluster in every view, so it never moves (rule 25c). On a phone it is a 40 px button after the view tabs.
 NG2. The New goal page is one form of five numbered cards and a rail (N1). The rail asks the server to check the save 400 ms after the last change and shows its answer: the keys it would make, or what it refuses. The browser checks no rule (ADR 0010). The Create button names the goal's key from that answer.
-NG3. A refusal shows at the card and field it names. Typing again clears it until the next check.
+NG3. A refusal shows at the card and field it names, and the rail lists every refusal the check finds. Typing again clears it until the next check.
+NG4. "Create will make" names each key with what it is: "XW-0013 this goal", "XW-0012 its Promotion Milestone". The server gives keys in its create order, so the milestone may take the lower key. A sub-goal on an uncommitted goal's date says "· this goal's date · shares XW-0012", and the rail says how many share it.
+NG5. More fields is one row of chips, each a field, its default as a small picker, and a ? with its §6.1 meaning; Work Product is among them (N8). The preview leads with the judged date.
+NG6. On a phone the checks are a one-line count at the top, and Create is a 48 px bar fixed to the bottom of the screen (N15). On touch every field is 44 px tall, and a Priority row is its own tap target.
 
 ## Work items page
 
 W1. The top bar has two pages: Home and Work items. The page you are on is filled.
-W2. Work items lists one queue per owner (the team view, titled with the org unit's name) or one owner's queue (titled with that owner's name), each by status: In Progress, Backlog, then Completed, closed. The signed-in actor's queue comes first. An agent owner carries the muted word "agent". Each row shows its goal, linked, and its due date, with "late" when it is past.
+W2. Work items lists one queue per owner (the team view, the org unit's name under "Owner") or one owner's queue (that owner's name), each by status: In Progress, then Backlog. Completed work is one muted line per owner, "5 completed", opening in place. People with work In Progress come first, then the signed-in actor. An agent owner carries the muted word "agent". Each row shows its goal, linked, and its due date, with "late" in --red-ink when it is past and "today" when it is today.
 W3. The page updates live: a change to any work item, by anyone, reloads it (ADR 0007). Ticking a row asks for its reason, as on a goal page.
 
 ## Access

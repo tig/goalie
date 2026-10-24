@@ -1,4 +1,4 @@
-import type { ApiWorkItem, CommandsRequest, FormOptions, GoalFields, Health, PathToGreen, StoredGoal, WorkItemFields, WorkItemStatus } from "../../../src/api.ts";
+import type { ApiViolation, ApiWorkItem, CommandsRequest, CommandsResponse, FormOptions, GoalFields, Health, PathToGreen, StoredGoal, WorkItemFields, WorkItemStatus } from "../../../src/api.ts";
 
 /**
  * The goal page's panels as batches for POST /api/commands (docs/engineering/goal-page-and-create.md, Edits from the goal page).
@@ -29,25 +29,39 @@ export function slipBatch(goal: StoredGoal, changedDueDate: string, health: Excl
 
 export type NewMilestone = { summary: string; due_date: string; owner: string };
 
+/** A new Promotion Milestone is pursued with the health of the goal it backs (N6a). A goal with no health yet is not pursued, so neither is its milestone. */
+const pursued = (health: Health, ptg: PathToGreen | null) =>
+  health ? { state: "In Progress" as const, health, ...(health !== "GREEN" ? { path_to_green: ptg } : {}) } : { state: "Backlog" as const };
+
+/** The Promotion Milestone being met. */
+export type MetMilestone = { id: string; version: number; state: StoredGoal["state"] };
+
+/** Completes a met milestone. A Backlog milestone cannot move straight to Completed (SPEC.md §7), so it passes through In Progress, GREEN, in the same batch. */
+function completes(met: MetMilestone, reason: string): CommandsRequest["commands"] {
+  const done = (version: number) => ({ op: "update" as const, kind: "goal" as const, id: met.id, base_version: version, fields: { state: "Completed" as const }, reason });
+  if (met.state !== "Backlog") return [done(met.version)];
+  return [{ op: "update", kind: "goal", id: met.id, base_version: met.version, fields: { state: "In Progress", health: "GREEN" }, reason }, done(met.version + 1)];
+}
+
 /** Promote date (G14), Fantasy to Ambition: the met milestone is completed, the next Promotion Milestone is made ($m), then the goal points at it. The new date is sent only when it differs. */
-export function promoteToAmbition(goal: StoredGoal, milestone: NewMilestone, newDate: string, reason: string, milestoneType: string, met?: { id: string; version: number }): CommandsRequest {
+export function promoteToAmbition(goal: StoredGoal, milestone: NewMilestone, newDate: string, reason: string, milestoneType: string, met?: MetMilestone): CommandsRequest {
   const date = newDate !== goal.due_date ? { due_date: newDate } : {};
   return {
     commands: [
       // The milestone that was met is completed first (G14).
-      ...(met ? [{ op: "update" as const, kind: "goal" as const, id: met.id, base_version: met.version, fields: { state: "Completed" as const }, reason }] : []),
-      { op: "create", kind: "goal", ref: "$m", fields: { ...milestone, type: milestoneType, date_type: "Committed", org_unit: goal.org_unit, level: goal.level, ...kept(goal), state: "Backlog" }, reason },
+      ...(met ? completes(met, reason) : []),
+      { op: "create", kind: "goal", ref: "$m", fields: { ...milestone, type: milestoneType, date_type: "Committed", org_unit: goal.org_unit, level: goal.level, ...kept(goal), ...pursued(goal.health, goal.path_to_green) }, reason },
       { op: "update", kind: "goal", id: goal.id, base_version: goal.version, fields: { date_type: "Ambition", promotion_milestone: "$m", ...date }, reason },
     ],
   };
 }
 
 /** Promote date (G14), Ambition to Committed: the Promotion Milestone is completed first, then the goal is Committed and drops it. */
-export function promoteToCommitted(goal: StoredGoal, milestone: { id: string; version: number }, newDate: string, reason: string): CommandsRequest {
+export function promoteToCommitted(goal: StoredGoal, milestone: MetMilestone, newDate: string, reason: string): CommandsRequest {
   const date = newDate !== goal.due_date ? { due_date: newDate } : {};
   return {
     commands: [
-      { op: "update", kind: "goal", id: milestone.id, base_version: milestone.version, fields: { state: "Completed" }, reason },
+      ...completes(milestone, reason),
       { op: "update", kind: "goal", id: goal.id, base_version: goal.version, fields: { date_type: "Committed", promotion_milestone: null, ...date }, reason },
     ],
   };
@@ -55,6 +69,17 @@ export function promoteToCommitted(goal: StoredGoal, milestone: { id: string; ve
 
 /** Close goal (G15): the state the close records, with a reason. */
 export const closeBatch = (goal: StoredGoal, state: StoredGoal["state"], reason: string) => update(goal, { state }, reason);
+
+/** Promote and close (G15): the Promotion Milestone is completed, the Ambition goal is Committed on its own date, then closed as the server computes. */
+export function promoteAndClose(goal: StoredGoal, milestone: MetMilestone, state: StoredGoal["state"], reason: string): CommandsRequest {
+  return {
+    commands: [
+      ...completes(milestone, reason),
+      { op: "update", kind: "goal", id: goal.id, base_version: goal.version, fields: { date_type: "Committed", promotion_milestone: null }, reason },
+      { op: "update", kind: "goal", id: goal.id, base_version: goal.version + 1, fields: { state }, reason },
+    ],
+  };
+}
 
 /** Pursue (G16): a Backlog goal moves to In Progress with a health. */
 export const pursueBatch = (goal: StoredGoal, health: Exclude<Health, null>, reason: string) => update(goal, { state: "In Progress", health }, reason);
@@ -136,6 +161,8 @@ export type NewGoalForm = {
   plan_maturity: GoalFields["plan_maturity"];
   more: Pick<GoalFields, "type" | "severity" | "state" | "origination" | "level" | "visibility" | "org_unit">;
   milestone: NewMilestone | null;
+  /** Work Product links (§6.1), or none. */
+  work_product?: GoalFields["work_product"];
   /** The type of a Promotion Milestone, from the server's options. */
   milestoneType: string;
   /** Set when the form opens from a goal page's + Sub-goal (N2). */
@@ -177,11 +204,14 @@ export function createBatch(form: NewGoalForm, check = false): CommandsRequest {
       plan: form.plan,
       plan_maturity: form.plan_maturity,
       ...(form.parent ? { parent: form.parent } : {}),
+      ...(form.work_product?.length ? { work_product: form.work_product } : {}),
       ...form.more,
     },
     reason,
   });
   if (uncommitted) commands.push({ op: "update", kind: "goal", id: "$m", base_version: 1, fields: { parent: "$goal" }, reason });
+  // N6a: the milestone is pursued with this goal's health. It moves after it joins the goal, so its version is the same in a check and a save.
+  if (uncommitted && form.health) commands.push({ op: "update", kind: "goal", id: "$m", base_version: 2, fields: pursued(form.health, form.path_to_green), reason });
   for (const s of own) {
     const ref = `$s${s.i + 1}` as `$${string}`;
     commands.push({
@@ -216,4 +246,11 @@ export function commandPlace(batch: CommandsRequest, at: number): string {
     if (owner && owner.op === "create" && owner.ref) return `sub:${Number(owner.ref.slice(2)) - 1}`;
   }
   return "goal";
+}
+
+/** Every refusal in an answer, each with its place on the form. A check run lists every refused command in `all`; a save, the first. */
+export function refusals(answer: CommandsResponse, batch: CommandsRequest): (ApiViolation & { place: string })[] {
+  if (answer.ok) return [];
+  if (answer.error !== "invalid") return [{ rule: answer.error, message: answer.error === "stale" ? "" : answer.message, place: commandPlace(batch, answer.at) }];
+  return (answer.all ?? answer.violations.map((v) => ({ ...v, at: answer.at }))).map(({ at, ...v }) => ({ ...v, place: commandPlace(batch, at) }));
 }

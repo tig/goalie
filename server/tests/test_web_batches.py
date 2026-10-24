@@ -91,6 +91,22 @@ class WebBatchTests(unittest.TestCase):
         self.assertTrue(answer["ok"])
         self.assertIn("$goal", answer["ids"])
 
+    def test_a_create_check_lists_every_refusal_in_its_place(self) -> None:
+        options = self.read("/api/options")
+        form = {
+            "summary": "Run the spring offsite", "description": "", "owner": "chelsea", "priority": options["priorities"][0]["id"],
+            "due_date": "2027-04-01", "date_type": "Fantasy", "health": "YELLOW", "path_to_green": None, "plan": None, "plan_maturity": options["defaults"]["plan_maturity"],
+            "more": {k: options["defaults"][k] for k in ("type", "severity", "state", "origination", "level", "visibility", "org_unit")} | {"state": "In Progress"},
+            "milestone": None, "milestoneType": self.types()["milestone"], "subGoals": [], "workItems": [],
+        }
+        batch = build("return { ...commands.createBatch(form), check: true };", form=form)
+        reply = post(self.proc, self.port, "/api/commands", batch, self.auth)
+        answer = json.loads(reply.body)
+        self.assertEqual(reply.status, 422, answer)
+        found = build("return commands.refusals(answer, batch);", answer=answer, batch=batch)
+        self.assertEqual({v["place"] for v in found}, {"goal"})
+        self.assertGreaterEqual(len(found), 2, found)
+
     def test_health_with_a_path_to_green_is_stored(self) -> None:
         goal = self.read("/api/goals/XW-0003")["goal"]
         ptg = {"steps": [{"text": "Load the tree", "owner": "chelsea", "date": "2026-10-30"}], "criteria": "The tree is loaded", "trigger": "Not loaded by Nov 2"}
@@ -101,8 +117,42 @@ class WebBatchTests(unittest.TestCase):
         page = self.read("/api/goals/XW-0003")
         pm = page["promotionMilestone"]
         ms = {"summary": "Commit a date for the MLP release", "due_date": "2026-11-20", "owner": "chelsea"}
-        batch = build("return { ...commands.promoteToAmbition(goal, ms, '2026-11-30', 'Milestone met', type, met), check: true };", goal=page["goal"], ms=ms, type=self.types()["milestone"], met={"id": pm["id"], "version": pm["version"]})
+        batch = build("return { ...commands.promoteToAmbition(goal, ms, '2026-11-30', 'Milestone met', type, met), check: true };", goal=page["goal"], ms=ms, type=self.types()["milestone"], met={k: pm[k] for k in ("id", "version", "state")})
         self.assertTrue(self.send(batch)["ok"])
+
+
+    def test_promote_and_close_completes_an_ambition_goal_in_one_batch(self) -> None:
+        options = self.read("/api/options")
+        form = {
+            "summary": "Ship the export", "description": "", "owner": "chelsea", "priority": options["priorities"][0]["id"],
+            "due_date": "2027-03-01", "date_type": "Ambition", "health": "GREEN", "path_to_green": None, "plan": "https://docs.example/export", "plan_maturity": "Pencil",
+            "more": {k: options["defaults"][k] for k in ("type", "severity", "state", "origination", "level", "visibility", "org_unit")} | {"state": "In Progress"},
+            "milestone": {"summary": "Commit a date for the export", "due_date": "2026-12-01", "owner": "chelsea"},
+            "milestoneType": self.types()["milestone"], "subGoals": [], "workItems": [],
+        }
+        key = self.send(build("return commands.createBatch(form);", form=form))["ids"]["$goal"]
+        page = self.read(f"/api/goals/{key}")
+        pm = page["promotionMilestone"]
+        self.assertEqual(page["closesAsPromoted"], "Completed")
+        self.assertEqual(self.read(f"/api/goals/{pm['id']}")["goal"]["health"], "GREEN")
+        self.assertEqual(pm["state"], "In Progress")
+        batch = build("return commands.promoteAndClose(goal, met, state, 'Shipped');", goal=page["goal"], state=page["closesAsPromoted"], met={k: pm[k] for k in ("id", "version", "state")})
+        self.assertTrue(self.send(batch)["ok"])
+        goal = self.read(f"/api/goals/{key}")["goal"]
+        self.assertEqual((goal["date_type"], goal["state"], goal["promotion_milestone"]), ("Committed", "Completed", None))
+
+    def test_the_fields_and_description_panels_save_with_a_reason(self) -> None:
+        goal = self.read("/api/goals/XW-0004")["goal"]
+        batch = build("return commands.fieldsBatch(goal, { description: 'The MLP running with real goals.', severity: 'sev2' }, 'Wrote it down');", goal=goal)
+        self.assertTrue(self.send(batch)["ok"])
+
+    def test_a_panel_saved_with_no_reason_is_refused_at_the_reason(self) -> None:
+        goal = self.read("/api/goals/XW-0002")["goal"]
+        batch = build("return commands.fieldsBatch(goal, { severity: 'sev3' }, '');", goal=goal)
+        reply = post(self.proc, self.port, "/api/commands", batch, self.auth)
+        answer = json.loads(reply.body)
+        self.assertEqual(reply.status, 422, answer)
+        self.assertEqual([v["field"] for v in answer["violations"]], ["reason"])
 
 
 if __name__ == "__main__":

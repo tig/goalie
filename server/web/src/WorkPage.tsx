@@ -24,7 +24,9 @@ export function WorkPage({ data, owner }: { data: PrioritiesResponse; owner?: st
     <main className="workpage">
       <div className="workhead">
         <h1>Work items</h1>
-        <span className="tabs" role="group" aria-label="Work items">
+        {/* The switch names what it switches: the Owner (SPEC.md §6.7). */}
+        <span className="flabel">Owner</span>
+        <span className="tabs" role="group" aria-label="Owner">
           {tab(data.me.id, data.me.name)}
           {tab(undefined, data.org.name)}
         </span>
@@ -59,6 +61,18 @@ function useLive(reload: () => void) {
   }, []);
 }
 
+/** A due date: past and not Completed in red with "late", today with "today" (G23). */
+function Due({ date, late, today, done }: { date: string | null; late: boolean; today: string; done: boolean }) {
+  if (!date) return <span className="wdue small" />;
+  const now = !done && date === today;
+  return (
+    <span className={`wdue small${late ? " late" : now ? " today" : ""}`}>
+      {shortDate(date, today)}
+      {late ? " late" : now ? " today" : ""}
+    </span>
+  );
+}
+
 function Queues({ work, reload, single }: { work: WorkResponse; reload: () => void; single: boolean }) {
   const [closed, setClosed] = useState<Record<string, boolean>>({});
   const { ticked, tick, box } = useTick(reload);
@@ -74,24 +88,36 @@ function Queues({ work, reload, single }: { work: WorkResponse; reload: () => vo
           </h2>
           {q.groups.map((g) => {
             const key = `${q.owner.id}:${g.status}`;
-            const shut = closed[key] ?? g.status === "Completed";
+            const done = g.status === "Completed";
+            const shut = closed[key] ?? done;
+            const rows = g.items.map((i) => (
+              <div key={i.id} className={`wrow qrow${i.status === "Completed" ? " done" : ""}`}>
+                <input type="checkbox" checked={i.status === "Completed" || ticked?.id === i.id} disabled={i.status === "Completed"} onChange={() => tick(i)} aria-label={`Mark ${i.title} Completed`} />
+                <span className="wtitle">{i.title}</span>
+                <Link to={goalPath(i.goal)} className="wgoal small">
+                  {work.goals[i.goal]?.summary ?? i.goal}
+                </Link>
+                <Due date={i.due_date} late={i.late} today={work.today} done={done} />
+                {box(i)}
+              </div>
+            ));
+            // Completed work is one muted line per person, opening in place (design check).
+            if (done) {
+              return (
+                <div key={g.status} className="qdone">
+                  <button type="button" className="linkbtn muted" aria-expanded={!shut} onClick={() => setClosed((c) => ({ ...c, [key]: !shut }))}>
+                    {g.items.length} completed {shut ? "▸" : "▾"}
+                  </button>
+                  {!shut && <div className="wgroup">{rows}</div>}
+                </div>
+              );
+            }
             return (
               <div key={g.status} className="wgroup">
-                <button type="button" className="wghead" aria-expanded={!shut} onClick={() => setClosed((c) => ({ ...c, [key]: !shut }))}>
+                <div className="wghead">
                   {g.status} <span className="muted">{g.items.length}</span>
-                </button>
-                {!shut &&
-                  g.items.map((i) => (
-                    <div key={i.id} className={`wrow qrow${i.status === "Completed" ? " done" : ""}`}>
-                      <input type="checkbox" checked={i.status === "Completed" || ticked?.id === i.id} disabled={i.status === "Completed"} onChange={() => tick(i)} aria-label={`Mark ${i.title} Completed`} />
-                      <span className="wtitle">{i.title}</span>
-                      <Link to={goalPath(i.goal)} className="wgoal small">
-                        {work.goals[i.goal]?.summary ?? i.goal}
-                      </Link>
-                      <span className={`wdue small${i.late ? " late" : ""}`}>{i.due_date ? `${shortDate(i.due_date, work.today)}${i.late ? " late" : ""}` : ""}</span>
-                      {box(i)}
-                    </div>
-                  ))}
+                </div>
+                {rows}
               </div>
             );
           })}

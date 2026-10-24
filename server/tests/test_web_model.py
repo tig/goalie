@@ -376,6 +376,11 @@ class GoalPageTests(unittest.TestCase):
         self.assertEqual(bar["today"], 0)  # type: ignore[index]
         self.assertEqual([round(m["at"]) for m in bar["marks"]], [37, 100])  # type: ignore[index]
 
+    def test_date_bar_labels_that_would_touch_drop_to_a_second_row(self) -> None:
+        labels = '[{ at: 0, text: "In Progress since Oct 24", align: "start" }, { at: 37, text: "Nov 6", align: "center" }, { at: 100, text: "Nov 30", align: "end" }]'
+        self.assertEqual(run(f"return goalpage.labelRows({labels}, 310);"), [0, 1, 0])  # a phone
+        self.assertEqual(run(f"return goalpage.labelRows({labels}, 990);"), [0, 0, 0])  # 1440
+
     def test_a_date_before_the_start_widens_the_bar(self) -> None:
         bar = run('return goalpage.dateBar("2026-10-23", "2026-10-23", [{ date: "2026-10-01", kind: "Committed" }]);')
         self.assertEqual((bar["marks"][0]["at"], bar["start"], bar["today"]), (0, 100, 100))  # type: ignore[index]
@@ -401,6 +406,11 @@ class GoalPageTests(unittest.TestCase):
         actors = {"qa": {"id": "qa", "name": "QA", "kind": "agent"}, "chelsea": {"id": "chelsea", "name": "Chelsea", "kind": "human"}}
         q = run(f"return goalpage.queues({json.dumps(items)}, {json.dumps(actors)}, 'chelsea').map((q) => [q.owner.id, q.groups.map((g) => [g.status, g.items.map((i) => i.id)])]);")
         self.assertEqual(q, [["chelsea", [["In Progress", ["WI-2"]]]], ["qa", [["In Progress", ["WI-3"]], ["Backlog", ["WI-1"]]]]])
+
+    def test_people_with_work_in_progress_come_first(self) -> None:
+        items = [{"id": "1", "owner": "ann", "status": "Completed"}, {"id": "2", "owner": "bob", "status": "In Progress"}, {"id": "3", "owner": "me", "status": "Backlog"}, {"id": "4", "owner": "cat", "status": "In Progress"}]
+        actors = {k: {"id": k, "name": k.title(), "kind": "human"} for k in ("ann", "bob", "cat", "me")}
+        self.assertEqual(run(f"return goalpage.queues({json.dumps(items)}, {json.dumps(actors)}, 'me').map((q) => q.owner.id);"), ["bob", "cat", "me", "ann"])
 
     def test_comments_are_the_comment_events(self) -> None:
         events = [{"field": "comment", "actor": "tig"}, {"field": "health", "actor": "chelsea"}, {"field": "comment", "actor": "chelsea"}]
@@ -491,13 +501,18 @@ class CommandTests(unittest.TestCase):
         b = run(f"return commands.createBatch({json.dumps(self.FORM)});")
         steps = [(c["op"], c["kind"], c.get("ref") or c.get("id")) for c in b["commands"]]  # type: ignore[index]
         self.assertEqual(steps, [
-            ("create", "goal", "$m"), ("create", "goal", "$m1"), ("create", "goal", "$goal"), ("update", "goal", "$m"),
+            ("create", "goal", "$m"), ("create", "goal", "$m1"), ("create", "goal", "$goal"), ("update", "goal", "$m"), ("update", "goal", "$m"),
             ("create", "goal", "$s1"), ("create", "goal", "$s2"), ("update", "goal", "$m1"), ("create", "work_item", None),
         ])
 
+    def test_a_new_promotion_milestone_is_pursued_with_the_goals_health(self) -> None:
+        c = run(f"return commands.createBatch({json.dumps(self.FORM)}).commands;")
+        self.assertEqual(c[0]["fields"]["state"], "Backlog")  # type: ignore[index]
+        self.assertEqual((c[4]["base_version"], c[4]["fields"]), (2, {"state": "In Progress", "health": "GREEN"}))  # type: ignore[index]
+
     def test_each_create_names_its_refs(self) -> None:
         c = run(f"return commands.createBatch({json.dumps(self.FORM)}).commands;")
-        goal, s1, s2, wi = c[2], c[4], c[5], c[7]  # type: ignore[index]
+        goal, s1, s2, wi = c[2], c[5], c[6], c[8]  # type: ignore[index]
         self.assertEqual((goal["fields"]["promotion_milestone"], goal["fields"]["priority"], goal["fields"]["date_type"]), ("$m", "PRI-3", "Fantasy"))
         self.assertNotIn("due_date", s1["fields"])
         self.assertEqual((s1["fields"]["parent"], s2["fields"]["promotion_milestone"]), ("$goal", "$m1"))
@@ -511,7 +526,7 @@ class CommandTests(unittest.TestCase):
 
     def test_a_refusal_points_back_to_its_part_of_the_form(self) -> None:
         places = run(f"const b = commands.createBatch({json.dumps(self.FORM)}); return b.commands.map((_, i) => commands.commandPlace(b, i));")
-        self.assertEqual(places, ["milestone", "sub:1", "goal", "milestone", "sub:0", "sub:1", "sub:1", "workitem:0"])
+        self.assertEqual(places, ["milestone", "sub:1", "goal", "milestone", "milestone", "sub:0", "sub:1", "sub:1", "workitem:0"])
 
     def test_a_new_goal_under_a_parent_names_it(self) -> None:
         form = {**self.FORM, "parent": "XW-0003", "subGoals": [], "workItems": []}

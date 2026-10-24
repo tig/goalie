@@ -3,10 +3,10 @@ import type { ApiActor, ApiViolation, CommandsResponse, FormOptions, Health, Pat
 import { addDays, shortDate } from "../../src/dates.ts";
 import { postCommands, useJson } from "./data.ts";
 import { PtgFields } from "./GoalPanels.tsx";
-import { commandPlace, createBatch, goalTypes, type NewGoalForm, type NewMilestone, type SubGoalRow } from "./model/commands.ts";
-import { fieldLabel } from "./model/goalpage.ts";
+import { commandPlace, createBatch, goalTypes, refusals, type NewGoalForm, type NewMilestone, type SubGoalRow } from "./model/commands.ts";
+import { eventValue, fieldLabel } from "./model/goalpage.ts";
 import { backPath, goalPath } from "./model/route.ts";
-import { Avatar, HealthDot } from "./parts.tsx";
+import { Avatar, HealthDot, Help } from "./parts.tsx";
 import { homeSearch, Link, navigate } from "./router.tsx";
 
 /**
@@ -38,6 +38,20 @@ const MATURITY: Record<PlanMaturity, string> = {
 const PARTS = ["Key results", "Metrics", "Why it matters", "Who shares it"];
 
 const CHECK_DELAY = 400;
+
+/** "1 sub-goal", "2 sub-goals". */
+const count = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+/** The §6.1 meaning of each field the More fields row offers (N8). */
+const MEANINGS: Record<string, string> = {
+  type: "What kind of goal it is, for example a launch or a metric.",
+  severity: "How much it matters if the goal is missed. sev1 matters most.",
+  state: "Where the goal is in its life: Backlog, then In Progress.",
+  origination: "Whether the goal is new, carried over from the last period, or repeating.",
+  level: "The level of the org the goal belongs to.",
+  visibility: "Who can see the goal.",
+  work_product: "Links to what the goal produces, such as a repo or a page.",
+};
 
 export function NewGoal({ parent, viewName }: { parent?: string; viewName: string }) {
   const [options] = useJson<FormOptions>("/api/options");
@@ -118,22 +132,22 @@ function Form({ options, parent, back }: { options: FormOptions; parent?: string
   const [saving, setSaving] = useState(false);
   const shown = result ?? (asked ? check : null);
   const refused = shown && !shown.ok ? shown : null;
-  const place = refused ? commandPlace(createBatch(sent), refused.at) : null;
-  const violations: ApiViolation[] = refused ? (refused.error === "invalid" ? refused.violations : [{ rule: refused.error, message: refused.error === "stale" ? "" : refused.message }]) : [];
+  const batch = createBatch(sent);
+  const every = refused ? refusals(refused, batch) : [];
+  const violations: ApiViolation[] = every;
   const at = (where: string, field?: string) =>
-    place === where
-      ? violations
-          .filter((v) => (field ? v.field === field : !v.field || !KNOWN.includes(v.field)))
-          .map((v, i) => (
-            <p key={i} className="ferror">
-              {v.message}
-            </p>
-          ))
-      : null;
+    every
+      .filter((v) => v.place === where && (field ? v.field === field : !v.field || !KNOWN.includes(v.field)))
+      .map((v, i) => (
+        <p key={i} className="ferror">
+          {v.message}
+        </p>
+      ));
   // The keys come from the server's answer; before it, from nextGoalKeys in create order (milestones are made first).
-  const order = createBatch(sent).commands.flatMap((c) => (c.op === "create" && c.kind === "goal" && c.ref ? [c.ref] : []));
+  const order = batch.commands.flatMap((c) => (c.op === "create" && c.kind === "goal" && c.ref ? [c.ref] : []));
   const keyOf = (ref: string) => (shown?.ok ? shown.ids[ref as `$${string}`] : options.nextGoalKeys[order.indexOf(ref as `$${string}`)]);
   const key = keyOf("$goal");
+  const sharing = form.subGoals.filter((r) => !r.date).length;
 
   const typed = form.summary || form.description || form.subGoals.length > 0;
   const leave = () => !typed || confirm("Leave without creating?");
@@ -173,6 +187,12 @@ function Form({ options, parent, back }: { options: FormOptions; parent?: string
     <main className="newgoal">
       {back}
       <h1>New goal</h1>
+      {/* On a phone the rail's checks are a one-line count at the top (N15). */}
+      {refused && (
+        <button type="button" className="linkbtn ngtopcount" onClick={() => document.querySelector(".ngmake")?.scrollIntoView({ behavior: "smooth" })}>
+          {count(violations.length, "check")} to fix
+        </button>
+      )}
       <div className="nglayout">
         <div className="ngform">
           <section className="card ngcard" id="ng-1">
@@ -282,7 +302,7 @@ function Form({ options, parent, back }: { options: FormOptions; parent?: string
                 </span>
                 <p className="small">{MATURITY[form.plan_maturity]}</p>
                 <p className="small">No plan yet? Choose Ambition now, and commit when the plan is at Pencil.</p>
-                {place === "goal" && violations.some((v) => v.field === "plan_maturity") && (
+                {every.some((v) => v.place === "goal" && v.field === "plan_maturity") && (
                   <>
                     {at("goal", "plan_maturity")}
                     <button type="button" className="linkbtn" onClick={() => set({ date_type: "Ambition" })}>
@@ -317,8 +337,8 @@ function Form({ options, parent, back }: { options: FormOptions; parent?: string
 
           <section className="card ngcard ngmore">
             <h2>More fields</h2>
-            {/* Every other §6.1 field shows its default and can be changed (N8). */}
-            <div className="morechips">
+            {/* Every other §6.1 field shows its default in one row of chips, each a small picker with its meaning (N8). */}
+            <div className="mchips">
               {(
                 [
                   ["type", options.choices.type],
@@ -329,28 +349,43 @@ function Form({ options, parent, back }: { options: FormOptions; parent?: string
                   ["visibility", [form.more.visibility]],
                 ] as const
               ).map(([field, list]) => (
-                <label key={field} className="morechip">
-                  <span className="flabel">{fieldLabel(field)}</span>
-                  <select value={form.more[field]} onChange={(e) => set({ more: { ...form.more, [field]: e.target.value } })}>
-                    {list.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
+                <span key={field} className="mchip">
+                  <label>
+                    <span className="mlabel">{fieldLabel(field)}</span>
+                    <select value={form.more[field]} onChange={(e) => set({ more: { ...form.more, [field]: e.target.value } })}>
+                      {list.map((c) => (
+                        <option key={c} value={c}>
+                          {eventValue(c, field)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <Help label={fieldLabel(field)}>
+                    <div>{MEANINGS[field]}</div>
+                  </Help>
                   {at("goal", field)}
-                </label>
+                </span>
               ))}
+              <span className="mchip">
+                <label>
+                  <span className="mlabel">{fieldLabel("work_product")}</span>
+                  <input value={form.work_product?.[0]?.url ?? ""} placeholder="None" onChange={(e) => set({ work_product: e.target.value ? [{ url: e.target.value }] : null })} />
+                </label>
+                <Help label={fieldLabel("work_product")}>
+                  <div>{MEANINGS.work_product}</div>
+                </Help>
+                {at("goal", "work_product")}
+              </span>
             </div>
           </section>
 
-          <SubGoals form={form} set={set} humans={humans} today={today} errors={(k) => at(`sub:${k}`)} />
+          <SubGoals form={form} set={set} humans={humans} today={today} shares={uncommitted ? keyOf("$m") : undefined} errors={(k) => at(`sub:${k}`)} />
           {options.workItems && <WorkItems form={form} set={set} actors={options.actors} errors={(k) => at(`workitem:${k}`)} />}
         </div>
 
         <aside className="ngrail">
           <div className="card ngpreview">
-            <div className="lbl">Home</div>
+            <div className="lbl">Preview</div>
             <div className="previewrow">
               <span className="rnum">{options.priorities.find((p) => p.id === form.priority)?.rank ?? ""}</span>
               <HealthDot health={form.health} word={false} />
@@ -358,19 +393,31 @@ function Form({ options, parent, back }: { options: FormOptions; parent?: string
               <Avatar actor={options.actors.find((a) => a.id === form.owner) ?? me} mine={form.owner === me.id} />
             </div>
             {form.due_date && form.date_type && (
-              <p className="small date">
-                {form.date_type} {shortDate(form.due_date, today)}
-                {uncommitted && ` · Promotion Milestone ${shortDate(milestone.due_date, today)}`}
+              <p className="small">
+                {/* The judged date leads, as everywhere else (G5). */}
+                {uncommitted ? `Committed ${shortDate(milestone.due_date, today)} · Promotion Milestone, then ${form.date_type} ${shortDate(form.due_date, today)}` : `${form.date_type} ${shortDate(form.due_date, today)}`}
               </p>
             )}
           </div>
           <div className="card ngmake">
             <div className="lbl">Create will make</div>
             <ul>
-              <li>{key}</li>
-              {uncommitted && <li>{keyOf("$m")} Promotion Milestone</li>}
-              {form.subGoals.length > 0 && <li>{form.subGoals.length} sub-goals</li>}
-              {form.workItems.length > 0 && <li>{form.workItems.length} work items</li>}
+              {/* The server gives the keys in its create order, the milestone first; each line names what it is. */}
+              <li>
+                {key} <span className="muted">this goal</span>
+              </li>
+              {uncommitted && (
+                <li>
+                  {keyOf("$m")} <span className="muted">its Promotion Milestone</span>
+                </li>
+              )}
+              {form.subGoals.length > 0 && (
+                <li>
+                  {count(form.subGoals.length, "sub-goal")}
+                  {uncommitted && sharing > 0 && <span className="muted"> · {sharing} sharing {keyOf("$m")}</span>}
+                </li>
+              )}
+              {form.workItems.length > 0 && <li>{count(form.workItems.length, "work item")}</li>}
             </ul>
             {asked ? (
               checking && !shown ? (
@@ -393,7 +440,7 @@ function Form({ options, parent, back }: { options: FormOptions; parent?: string
           <button type="button" className="btn primary create" onClick={create} disabled={saving} aria-busy={saving}>
             Create {key}
           </button>
-          {refused && <p className="ferror">{violations.length === 1 ? "1 check to fix" : `${violations.length} checks to fix`}</p>}
+          {refused && <p className="ferror ngcount">{count(violations.length, "check")} to fix</p>}
           <a
             href={parent ? goalPath(parent) : backPath(homeSearch())}
             className="cancel"
@@ -411,7 +458,7 @@ function Form({ options, parent, back }: { options: FormOptions; parent?: string
 }
 
 /** The fields a rule names that the form shows in place. A violation of any other field shows at the top of its card. */
-const KNOWN = ["summary", "description", "owner", "priority", "due_date", "date_type", "promotion_milestone", "plan_maturity", "health", "path_to_green", "type", "severity", "state", "origination", "level", "visibility"];
+const KNOWN = ["summary", "description", "owner", "priority", "due_date", "date_type", "promotion_milestone", "plan_maturity", "health", "path_to_green", "type", "severity", "state", "origination", "level", "visibility", "work_product"];
 
 /** N6: the Promotion Milestone, in place, filled in. Its heading names the step it promotes to. */
 function MilestoneBox({ value, onChange, step, humans, children }: { value: NewMilestone; onChange: (v: NewMilestone) => void; step: string; humans: ApiActor[]; children?: ReactNode }) {
@@ -446,7 +493,7 @@ function MilestoneBox({ value, onChange, step, humans, children }: { value: NewM
 type Part = { form: NewGoalForm; set: (p: Partial<NewGoalForm>) => void };
 
 /** N9: sub-goals, added in rows. A row takes this goal's date and Date Type unless it is given its own (D2). */
-function SubGoals({ form, set, humans, today, errors }: Part & { humans: ApiActor[]; today: string; errors: (k: number) => ReactNode }) {
+function SubGoals({ form, set, humans, today, shares, errors }: Part & { humans: ApiActor[]; today: string; shares?: string; errors: (k: number) => ReactNode }) {
   const empty = (): SubGoalRow => ({ summary: "", owner: form.owner });
   const [row, setRow] = useState<SubGoalRow>(empty);
   const [own, setOwn] = useState(false);
@@ -464,7 +511,15 @@ function SubGoals({ form, set, humans, today, errors }: Part & { humans: ApiActo
     setRow(empty());
     setOwn(false);
   };
-  const thisDate = form.due_date && form.date_type ? `${form.date_type} ${shortDate(form.due_date, "0000")}` : "This goal's date";
+  // A sub-goal on this goal's date says so, and under an uncommitted goal says it shares this goal's Promotion Milestone (N9).
+  const thisDate = (
+    <>
+      {form.due_date && form.date_type ? `${form.date_type} ${shortDate(form.due_date, "0000")} ` : ""}
+      <span className="muted">
+        · this goal's date{shares ? ` · shares ${shares}` : ""}
+      </span>
+    </>
+  );
   return (
     <section className="card ngcard" id="ng-4">
       <h2>
@@ -473,7 +528,7 @@ function SubGoals({ form, set, humans, today, errors }: Part & { humans: ApiActo
       {form.subGoals.map((s, i) => (
         <div key={i} className="ngsub">
           <span className="title">{s.summary}</span>
-          <span className="small">{s.date ? `${s.date.date_type} ${shortDate(s.date.due_date, "0000")}` : <>{thisDate} <span className="muted">· this goal's date</span></>}</span>
+          <span className="small">{s.date ? `${s.date.date_type} ${shortDate(s.date.due_date, "0000")}` : thisDate}</span>
           <span className="ngsubbtns">
             <button type="button" className="gbtn" aria-label="Up" disabled={i === 0} onClick={() => move(i, -1)}>
               ↑
@@ -507,7 +562,7 @@ function SubGoals({ form, set, humans, today, errors }: Part & { humans: ApiActo
       <div className="radios">
         <label className={`radio${own ? "" : " on"}`}>
           <input type="radio" checked={!own} onChange={() => setOwn(false)} />
-          {thisDate} <span className="muted">· this goal's date</span>
+          {thisDate}
         </label>
         <label className={`radio${own ? " on" : ""}`}>
           <input type="radio" checked={own} onChange={() => setOwn(true)} />
