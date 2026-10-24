@@ -97,5 +97,17 @@ class WebBatchTests(unittest.TestCase):
         self.assertTrue(self.send(build("return commands.healthBatch(goal, 'YELLOW', ptg, 'Seed is late');", goal=goal, ptg=ptg))["ok"])
 
 
+    def test_promoting_fantasy_to_ambition_passes_the_server_check(self) -> None:
+        page = self.read("/api/goals/XW-0003")
+        pm = page["promotionMilestone"]
+        ms = {"summary": "Commit a date for the MLP release", "due_date": "2026-11-20", "owner": "chelsea"}
+        batch = build("return { ...commands.promoteToAmbition(goal, ms, '2026-11-30', 'Milestone met', type, met), check: true };", goal=page["goal"], ms=ms, type=self.types()["milestone"], met={"id": pm["id"], "version": pm["version"]})
+        reply = post(self.proc, self.port, "/api/commands", batch, self.auth)
+        answer = json.loads(reply.body)
+        # The server may refuse to complete a milestone with open sub-goals; it must never refuse for a missing field.
+        missing = [v for v in answer.get("violations", []) if v["rule"] == "required-field"]
+        self.assertEqual(missing, [], answer)
+
+
 if __name__ == "__main__":
     unittest.main()

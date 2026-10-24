@@ -230,7 +230,8 @@ export function PromotePanel({ data, onDone }: { data: GoalPageResponse; onDone:
     <Shell
       title={`Promote date to ${next}`}
       saved={saved}
-      fields={["due_date", "promotion_milestone", "plan_maturity", "reason"]}
+      // A message for a field the panel does not draw shows at its top, never dropped.
+      fields={fantasy ? ["due_date", "promotion_milestone", "reason"] : ["due_date", "plan_maturity", "reason"]}
       saveLabel="Promote date"
       onSave={() => saved.save((g) => (fantasy ? promoteToAmbition(g, ms, date, reason, milestoneType, met) : promoteToCommitted(g, met ?? { id: "", version: 1 }, date, reason)), { date_type: next, due_date: date })}
       onCancel={() => onDone(false)}
