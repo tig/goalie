@@ -34,7 +34,7 @@ class WorkApiTests(unittest.TestCase):
             auth = {"Authorization": f"Bearer {token}"}
             cls.team = json.loads(get(proc, port, "/api/work", auth).body)
             cls.mine = json.loads(get(proc, port, "/api/work?owner=backend-engineer", auth).body)
-            cls.nobody = json.loads(get(proc, port, "/api/work?owner=nobody", auth).body)
+            cls.nobody = get(proc, port, "/api/work?owner=nobody", auth)
         token, env = seat_token("app-backend-engineer")
         with running_server(cls.store.path, env) as (proc, port):
             cls.as_seat = get(proc, port, "/api/work?owner=backend-engineer", {"Authorization": f"Bearer {token}"})
@@ -52,7 +52,9 @@ class WorkApiTests(unittest.TestCase):
     def test_one_queue_has_only_that_owners_items(self) -> None:
         self.assertTrue(self.mine["items"])
         self.assertEqual({item["owner"] for item in self.mine["items"]}, {"backend-engineer"})
-        self.assertEqual(self.nobody["items"], [])
+        # Codebase QA Q17: a wrong link must not read as an empty queue.
+        self.assertEqual(self.nobody.status, 404)
+        self.assertEqual(set(json.loads(self.nobody.body)), {"error", "reason"})
 
     def test_the_answer_names_every_goal_and_actor_it_holds(self) -> None:
         for item in self.team["items"]:

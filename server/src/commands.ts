@@ -25,7 +25,12 @@ const isObject = (value: unknown): value is Row => typeof value === "object" && 
 const isRef = (value: unknown): value is Ref => typeof value === "string" && /^\$[A-Za-z0-9_-]+$/.test(value);
 
 /** Thrown by resolve in a check, for a command that names a ref whose create was refused. */
-class Skip {}
+class Skip {
+  readonly ref: string;
+  constructor(ref: string) {
+    this.ref = ref;
+  }
+}
 
 /** Thrown inside the transaction to stop the batch and roll it back. */
 class Stop {
@@ -73,7 +78,12 @@ export function runCommands(db: DatabaseSync, actor: string, request: unknown, t
           command = resolve(at, raw, ids, refused);
         } catch (error) {
           // A command that names a refused create cannot run; the refusal is already counted.
-          if (error instanceof Skip) return void (ref && refused.add(ref));
+          if (error instanceof Skip) {
+            // Codebase QA Q11: say which commands a check could not run, so the rail knows more checks follow.
+            if (ref) refused.add(ref);
+            all.push({ rule: "not-checked", message: `not checked yet: it names ${error.ref}, whose create was refused`, at });
+            return;
+          }
           throw error;
         }
         if (command.op === "create" && command.kind === "goal" && command.fields.state === "In Progress") {
@@ -123,7 +133,7 @@ function resolve(at: number, raw: unknown, ids: Record<Ref, string>, refused: Se
   if (!(API_KINDS as readonly unknown[]).includes(kind)) throw bad(at, `api-kind: the API writes goals and work items, not ${String(raw.kind)}`);
   const key = (value: unknown): unknown => {
     if (!isRef(value)) return value;
-    if (refused.has(value)) throw new Skip();
+    if (refused.has(value)) throw new Skip(value);
     if (!(value in ids)) throw bad(at, `unknown-ref: ${value} is used before the command that creates it`);
     return ids[value];
   };

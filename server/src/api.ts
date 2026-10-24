@@ -1,5 +1,6 @@
 /**
  * The JSON contract between the server and the React app (ADR 0003, ADR 0010).
+ * Every type here is exported on purpose, as part of the contract, even when only this file names it (Codebase QA Q16).
  * The server builds these values from the store. The app draws them and holds no rule.
  * Dates are ISO strings (YYYY-MM-DD). Labels are made in the app.
  */

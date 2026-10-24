@@ -125,7 +125,8 @@ export function closesAs(goal: Row, today: string): "Completed" | "Completed Lat
  * Null for any other goal, including a sub-goal that takes its parent's Ambition date.
  */
 export function closesAsPromoted(goal: Row, today: string): "Completed" | "Completed Late" | null {
-  if (goal.state !== "In Progress" || goal.date_type !== "Ambition") return null;
+  // Promotion to Committed needs a Plan at Pencil (Codebase QA Q13), so a goal without one gets no answer to offer.
+  if (goal.state !== "In Progress" || goal.date_type !== "Ambition" || goal.plan_maturity !== "Pencil" || !goal.plan) return null;
   return closesAs({ ...goal, date_type: "Committed", original_committed_date: goal.due_date }, today);
 }
 

@@ -126,8 +126,18 @@ class CommandsApiTests(unittest.TestCase):
         batch[0]["fields"] = {**batch[0]["fields"], "due_date": "2026-13-45"}
         status, body = self.send(batch, check=True)
         self.assertEqual(status, 422)
-        self.assertEqual({v["at"] for v in body["all"]}, {0})
+        self.assertEqual({v["at"] for v in body["all"] if v["rule"] != "not-checked"}, {0})
         self.assertNotIn("unknown-ref", json.dumps(body))
+
+    def test_a_check_lists_the_commands_it_could_not_check(self) -> None:
+        # Codebase QA Q11: the skipped commands were silent, so the rail undercounted.
+        batch = create_batch()
+        batch[0]["fields"] = {**batch[0]["fields"], "due_date": "2026-13-45"}
+        status, body = self.send(batch, check=True)
+        skipped = sorted(v["at"] for v in body["all"] if v["rule"] == "not-checked")
+        # $goal names the refused $m, and the sub-goals name the skipped $goal.
+        self.assertEqual(skipped, [1, 2, 3, 4])
+        self.assertTrue(all("$m" in v["message"] or "$goal" in v["message"] for v in body["all"] if v["rule"] == "not-checked"))
 
     def test_a_real_save_stops_at_the_first_refusal(self) -> None:
         batch = create_batch({"plan_maturity": "Crayon"})

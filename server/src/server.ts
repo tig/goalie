@@ -15,6 +15,7 @@ import { checkConfiguration, configuredDatabase, configuredOrgUnit, configuredSi
 import { prioritiesView } from "./priorities.ts";
 import { BRAND_SLOT, brandHead } from "./brand.ts";
 import { signInPage } from "./signin.ts";
+import { read } from "./read.ts";
 import { openStore } from "./store.ts";
 import { workQueue } from "./work.ts";
 
@@ -97,7 +98,12 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
     return page ? c.json<GoalPageResponse>(page) : refuse(c, 404, "not_found", `no goal ${c.req.param("id")}`);
   });
   app.get("/api/options", (c) => c.json<FormOptions>(formOptions(db, c.get("actor").id, unit(), todayIn(db))));
-  app.get("/api/work", (c) => c.json<WorkResponse>(workQueue(db, c.get("actor").id, todayIn(db), c.req.query("owner"))));
+  app.get("/api/work", (c) => {
+    const owner = c.req.query("owner");
+    // Codebase QA Q17: a wrong link must not read as an empty queue.
+    if (owner !== undefined && read(db, "actor", owner) === undefined) return refuse(c, 404, "not_found", `no actor ${owner}`);
+    return c.json<WorkResponse>(workQueue(db, c.get("actor").id, todayIn(db), owner));
+  });
   app.get("/api/events", (c) => eventStream(c, db));
   // A write is JSON from the app's own origin. A cross-site form can send neither (Codebase QA). The body is capped.
   app.post(

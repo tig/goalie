@@ -200,6 +200,10 @@ export function checkTransition(kind: string, before: Row | undefined, after: Ro
     found.push({ rule: "completed-on-time", message: `${after.id}: met ${expected === "Completed" ? "on time" : "late"}, so it is ${expected}.`, field: "state" });
   }
   // A slip moves the date later (SPEC.md §7.1: a missed Committed date is a slip, never a re-baseline).
+  // Codebase QA Q12: clearing a slip would let the next slip move the date earlier.
+  if (before.changed_due_date != null && after.changed_due_date == null && after.date_type === "Committed") {
+    found.push({ rule: "slip-moves-later", message: `${after.id}: a slip is kept. The next slip moves the date later than ${String(before.changed_due_date)}.`, field: "changed_due_date" });
+  }
   if (after.changed_due_date != null && after.changed_due_date !== before.changed_due_date) {
     const current = (before.changed_due_date ?? before.due_date) as string;
     if (typeof current === "string" && (after.changed_due_date as string) <= current) {

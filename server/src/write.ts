@@ -153,7 +153,7 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
   const violations: Violation[] = [...(author ? checkAuthor(author, goalieOwner(db), kind, before, after, (key) => read(db, "goal", key)) : []), ...checkTransition(kind, before, after, today, (id) => read(db, "goal", id))];
   const needReason = REASONED_KINDS.includes(kind) ? changed : [];
   if (needReason.length > 0 && reason === null) {
-    violations.push({ rule: "reason-required", message: `a change to ${needReason.join(", ")} needs a reason.`, field: "reason" });
+    violations.push({ rule: "reason-required", message: `a change to ${needReason.map(fieldWords).join(", ")} needs a reason.`, field: "reason" });
   }
   if (missing.length > 0) {
     // The row cannot be stored, but the rules still run on it, so one refusal names every rule it breaks (Product Designer's check).

@@ -180,6 +180,19 @@ class WritePathTests(unittest.TestCase):
         self.ok(update("goal", "GOAL-57", 1, {"changed_due_date": "2026-11-30"}, "Slip"))
         self.rejected(update("goal", "GOAL-57", 2, {"changed_due_date": "2026-11-20"}, "Slip back"), "slip-moves-later")
 
+    def test_a_slip_cannot_be_cleared_to_step_around_it(self) -> None:
+        # Codebase QA Q12: slip, clear, slip earlier moved the date back 9 days.
+        self.ok(update("goal", "GOAL-57", 1, {"changed_due_date": "2026-11-25"}, "Slip"))
+        result = self.rejected(update("goal", "GOAL-57", 2, {"changed_due_date": None}, "Undo"), "slip-moves-later")
+        self.assertEqual(result["violations"][-1]["field"], "changed_due_date")
+
+    def test_a_reason_message_names_fields_in_spec_words(self) -> None:
+        # Codebase QA Q15.
+        result = self.rejected(update("goal", "GOAL-57", 1, {"plan_maturity": "Pencil", "severity": "sev1"}), "reason-required")
+        message = next(v["message"] for v in result["violations"] if v["rule"] == "reason-required")
+        self.assertIn("Severity", message)
+        self.assertNotIn("plan_maturity", message)
+
     def test_a_blank_required_text_is_missing(self) -> None:
         result = self.rejected(create("goal", "GOAL-42", {**EXAMPLE, "summary": "   "}, "Planned"), "required-field")
         self.assertEqual(result["violations"][0]["field"], "summary")
