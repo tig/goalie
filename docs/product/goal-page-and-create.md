@@ -119,7 +119,7 @@ Work items:
 30. Two tabs change the same work item. The second save against the old version is rejected and shows the current work item.
 31. A comment on a work item appears on that work item.
 
-Who changes a goal ([SPEC.md §6.1, rule `owners-change-goal`](../specs/SPEC.md#s6-1-owners)):
+Who changes a goal ([SPEC.md §6.1, rule `owners-change-goal`](../specs/SPEC.md#s6-1)):
 
 The seed: Tig owns XW-0001 and XW-0002 and is the GOALIE owner. Chelsea owns XW-0003, XW-0004, and XW-0005 to XW-0011 (parent XW-0004). The test adds Galahad, a human who owns no goal, and an agent operated by Chelsea.
 

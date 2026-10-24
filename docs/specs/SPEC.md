@@ -192,13 +192,12 @@ Structured fields are state, date type, health, PTG, rank, and every other field
 | `visibility` | Enum | default: organization-wide | Restricting it is a logged exception. |
 
 **Who changes a goal** (rule `owners-change-goal`)
-<a id="s6-1-owners"></a>
 
 Three actors may change a goal's fields: the goal's `owner`, the owner of any goal above it through `parent` (the parent's owner, that goal's parent's owner, and so on to the top), and the GOALIE owner (invariant). Every other actor may read the goal and comment on it ([§6.6 (Events)](#s6-6)). An agent proposes a change as a Draft ([§6.9 (Draft)](#s6-9)). A write by any other actor is rejected, and the rejection names the rule (invariant).
 
 - The rule covers every field a human writes: `health`, `path_to_green`, `state`, `due_date`, `date_type`, `changed_due_date`, `promotion_milestone`, `summary`, `description`, `owner`, `parent`, `priority`, `plan`, `plan_maturity`, `severity`, `type`, `level`, `org_unit`, `origination`, `work_product`, and `visibility`.
 - Health is the owner's belief ([§6.1 (Goal)](#s6-1), `health`). The owner of a goal above it may change it, with a reason, because that owner answers for the goals below it in the review ([§9 (Reviews)](#s9)).
-- A new `owner` is one human (invariant above). The old owner, an owner above, or the GOALIE owner makes the change.
+- A new `owner` is exactly one human, as for every goal. The old owner, an owner above, or the GOALIE owner makes the change.
 - A goal with a `parent` is created by an actor who may change that parent. A goal with no `parent` is created by any human.
 - Approving a Draft is a write to the goal. Only an actor who may change the goal approves or rejects its Draft ([§6.9 (Draft)](#s6-9)).
 - Comments are open to every actor. A comment is not a field change.
@@ -356,7 +355,7 @@ At the end of the plan period (default: yearly), each open goal is closed out as
 Where the implementation can do these natively it does. Otherwise an agent does them through the API.
 
 - **Validation:** reject a save, or open a Draft for the owner, when it would break an invariant (a missing date type, an uncommitted date with no Promotion Milestone, Committed without a Pencil plan, a date or state change without a reason, YELLOW/RED without a PTG).
-- **Who changes a goal:** a change to a goal by an actor who is not its owner, the owner of a goal above it, or the GOALIE owner is rejected, and the rejection names `owners-change-goal` (invariant, [§6.1 (Goal)](#s6-1-owners)).
+- **Who changes a goal:** a change to a goal by an actor who is not its owner, the owner of a goal above it, or the GOALIE owner is rejected, and the rejection names `owners-change-goal` (invariant, [§6.1 (Goal)](#s6-1)).
 - **Structured fields:** state, date type, health, PTG, rank, and every other field that is not Markdown text change only through validated writes (invariant, [§6 (Data model)](#s6)). Automatic merging must not apply to them (invariant).
 - **Stale writes:** a write names the version it read (invariant, [§6 (Data model)](#s6)). A write against a stale version is rejected, and the rejection returns the current state (invariant).
 - **Commit check:** Invariants are checked on the committed result, on the server, in one transaction (invariant). A failed check must not become visible.
