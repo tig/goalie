@@ -172,6 +172,26 @@ class TimelineTests(unittest.TestCase):
         places = run('const v = { left: 1000, right: 1800 }; return [timeline.placeLabel(1200, 100, v), timeline.placeLabel(1750, 100, v), timeline.placeLabel(900, 100, v), timeline.placeLabel(1900, 100, v), timeline.placeLabel(1040, 900, v)];')
         self.assertEqual(places, ["right", "left", "before", "after", "right"])
 
+    def lanes(self, marks: list, view: dict = {"left": 1000, "right": 1800}) -> dict:
+        return run(f"return timeline.placeLaneLabels({json.dumps(marks)}, {json.dumps(view)});")  # type: ignore[return-value]
+
+    def test_two_marks_past_one_edge_become_one_label(self) -> None:
+        placed = self.lanes([{"key": "end", "atPx": 300, "text": "Fantasy Nov 30", "outside": None}, {"key": "tick", "atPx": 100, "text": "Promotion Milestone Nov 6", "outside": None}])
+        self.assertEqual(placed, {"before": ["tick", "end"], "after": [], "inside": []})
+
+    def test_marks_past_both_edges_give_one_label_each_side(self) -> None:
+        placed = self.lanes([{"key": "tick", "atPx": 100, "text": "Committed Oct 1", "outside": None}, {"key": "end", "atPx": 2400, "text": "Fantasy Nov 30", "outside": "after"}])
+        self.assertEqual(placed, {"before": ["tick"], "after": ["end"], "inside": []})
+
+    def test_a_mark_under_an_edge_label_joins_it(self) -> None:
+        # "Committed Oct 1" at the left edge takes 30 + 105 + 6 px, so a mark at 1050 would sit under it.
+        placed = self.lanes([{"key": "tick", "atPx": 100, "text": "Committed Oct 1", "outside": None}, {"key": "end", "atPx": 1050, "text": "Fantasy Nov 30", "outside": None}])
+        self.assertEqual(placed["before"], ["tick", "end"])
+
+    def test_a_mark_on_screen_keeps_its_own_label(self) -> None:
+        placed = self.lanes([{"key": "tick", "atPx": 1200, "text": "Committed Nov 15", "outside": None}, {"key": "end", "atPx": 1790, "text": "Fantasy Nov 30", "outside": None}])
+        self.assertEqual(placed, {"before": [], "after": [], "inside": [{"key": "tick", "side": "right"}, {"key": "end", "side": "left"}]})
+
     def test_a_label_width_is_estimated_from_its_text(self) -> None:
         self.assertEqual(run('return [timeline.labelWidth("Committed Nov 15"), timeline.labelWidth("")];'), [16 * 7, 0])
 

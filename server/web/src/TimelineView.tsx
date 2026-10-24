@@ -3,7 +3,7 @@ import { shortDate } from "../../src/dates.ts";
 import type { GoalRow } from "./model/filter.ts";
 import { dateLabel, slipLabel } from "./model/labels.ts";
 import { arrowStep, dragLeft, isDrag, scrollEdges, wheelToScroll } from "./model/scroll.ts";
-import { labelWidth, laneOf, openScroll, placeLabel, visibleRange, type Lane, type TimelineWindow } from "./model/timeline.ts";
+import { EDGE_INSET, laneOf, openScroll, placeLaneLabels, visibleRange, type Lane, type LaneMark, type TimelineWindow } from "./model/timeline.ts";
 import { GoalTree, type TreeProps } from "./GoalTree.tsx";
 import { HELP } from "./helpText.tsx";
 import { Legend, look } from "./parts.tsx";
@@ -13,33 +13,38 @@ const pct = (n: number) => `${n.toFixed(3)}%`;
 /** The board's px on screen: what the pinned goal column does not cover. */
 type View = { left: number; right: number };
 
-/** An edge label sits clear of the edge fade. */
-const EDGE_INSET = 30;
-
 /** A segment. Round only the outer ends of the bar. */
 function Seg({ cls, from, to, style, first, last }: { cls: string; from: number; to: number; style?: CSSProperties; first: boolean; last: boolean }) {
   if (to <= from) return null;
   return <span className={`seg ${cls}${first ? " first" : ""}${last ? " last" : ""}`} style={{ left: pct(from), width: pct(to - from), ...style }} />;
 }
 
-/**
- * A mark's label, whole on screen (rule 23): to the right of the mark, else to its left.
- * A mark off screen, or past the board's edge, is written at the edge of what is on screen with an arrow.
- */
-function MarkLabel({ cls, at, text, view, board, color, outside }: { cls: string; at: number; text: string; view: View; board: number; color?: string; outside: "before" | "after" | null }) {
-  const atPx = (at / 100) * board;
-  const place = outside ?? placeLabel(atPx, labelWidth(text), view);
-  if (place === "before" || place === "after") {
-    return (
-      <span className={`edge ${place} ${cls}`} style={{ left: place === "before" ? view.left + EDGE_INSET : view.right - EDGE_INSET, color }}>
-        {place === "before" ? `← ${text}` : `${text} →`}
-      </span>
-    );
-  }
-  const style: CSSProperties = place === "left" ? { left: `calc(${pct(at)} - 6px)`, transform: "translateX(-100%)" } : { left: `calc(${pct(at)} + 6px)` };
+/** A label that sits beside its mark: to its right, or to its left. */
+function SideLabel({ cls, at, side, color, children }: { cls: string; at: number; side: "left" | "right"; color?: string; children: ReactNode }) {
+  const style: CSSProperties = side === "left" ? { left: `calc(${pct(at)} - 6px)`, transform: "translateX(-100%)" } : { left: `calc(${pct(at)} + 6px)` };
   return (
     <span className={cls} style={{ ...style, color }}>
-      {text}
+      {children}
+    </span>
+  );
+}
+
+type Labeled = LaneMark & { cls: string; color?: string };
+
+/** One label at an edge of the screen for every mark past it, in date order, with an arrow (rule 23). */
+function EdgeLabel({ side, marks, view }: { side: "before" | "after"; marks: Labeled[]; view: View }) {
+  if (!marks.length) return null;
+  const parts = marks.map((m, i) => (
+    <span key={m.key} className={m.cls} style={{ color: m.color }}>
+      {i > 0 && " · "}
+      {m.text}
+    </span>
+  ));
+  return (
+    <span className={`edge ${side}`} style={{ left: side === "before" ? view.left + EDGE_INSET : view.right - EDGE_INSET }}>
+      {side === "before" && "← "}
+      {parts}
+      {side === "after" && " →"}
     </span>
   );
 }
@@ -54,16 +59,29 @@ function LaneMarks({ lane, goal, today, view, board }: { lane: Lane; goal: GoalR
   if (lane.slip) parts.push(<Seg key="s" cls={`slip${lane.slip.over ? " over" : ""}`} {...lane.slip} {...ends("slip")} />);
   if (lane.ahead) parts.push(<Seg key="a" cls="ahead" {...lane.ahead} style={goal.health ? { background: l.bg } : undefined} {...ends("ahead")} />);
   if (lane.line && lane.line.to > lane.line.from) parts.push(<span key="l" className={`line ${lane.line.kind}`} style={{ left: pct(lane.line.from), width: pct(lane.line.to - lane.line.from) }} />);
+  const labeled: Labeled[] = [];
   if (lane.tick) {
     const pm = lane.tick.date.kind === "Promotion Milestone";
     const text = dateLabel(lane.tick.date, today) + (lane.slip ? ` · ${slipLabel(lane.slip.days)}` : "");
     if (!lane.tick.outside) parts.push(<span key="t" className={`tick${pm ? " pm" : ""}`} style={{ left: pct(lane.tick.at) }} />);
-    parts.push(<MarkLabel key="tl" cls="ticklbl" at={lane.tick.at} text={text} view={view} board={board} color={lane.slip ? "var(--red-ink)" : "var(--ink)"} outside={lane.tick.outside} />);
+    labeled.push({ key: "tick", atPx: (lane.tick.at / 100) * board, text, outside: lane.tick.outside, cls: "ticklbl", color: lane.slip ? "var(--red-ink)" : "var(--ink)" });
   }
   if (lane.end) {
     if (!lane.end.outside) parts.push(<span key="d" className={`dot ${lane.end.date.kind}`} style={{ left: pct(lane.end.at) }} />);
-    parts.push(<MarkLabel key="dl" cls={`endlbl ${lane.end.date.kind}`} at={lane.end.at} text={dateLabel(lane.end.date, today)} view={view} board={board} outside={lane.end.outside} />);
+    labeled.push({ key: "end", atPx: (lane.end.at / 100) * board, text: dateLabel(lane.end.date, today), outside: lane.end.outside, cls: `endlbl ${lane.end.date.kind}` });
   }
+  const placed = placeLaneLabels(labeled, view);
+  const byKey = (keys: string[]) => labeled.filter((m) => keys.includes(m.key));
+  for (const { key, side } of placed.inside) {
+    const m = labeled.find((x) => x.key === key) as Labeled;
+    parts.push(
+      <SideLabel key={`l-${key}`} cls={m.cls} at={(m.atPx / board) * 100} side={side} color={m.color}>
+        {m.text}
+      </SideLabel>,
+    );
+  }
+  parts.push(<EdgeLabel key="eb" side="before" marks={byKey(placed.before)} view={view} />);
+  parts.push(<EdgeLabel key="ea" side="after" marks={byKey(placed.after)} view={view} />);
   return <>{parts}</>;
 }
 

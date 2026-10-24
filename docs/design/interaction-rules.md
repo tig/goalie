@@ -56,7 +56,7 @@ The screens are a React app in `server/web/`. It reads `GET /api/priorities` and
 21b. Earlier and Later move 4 weeks at weeks, 13 weeks at months, and 26 weeks at quarters. The date pill shows the days on screen and follows the scroll exactly; a day cut by an edge counts (review X11). A year is named outside the current one, on both dates when they differ (review Q3).
 21c. The Today label reads "Today". Pointing at it adds the date: "Today · Oct 23".
 22. Moving or zooming the timeline keeps the filter and the search in force.
-23. A label stays whole on screen (review X1). It sits to the right of its mark, or to its left when the right has no room. A date off screen, or past the edge of the board, is written at the edge of what is on screen with an arrow; an uncommitted date's arrow sits under its line.
+23. A label stays whole on screen (review X1), and never overlaps another label, a bar, or a tick on its row. It sits to the right of its mark, or to its left when the right has no room. Every date off screen, or past the edge of the board, joins one label at that edge, one per row and side, in date order with an arrow: "← Promotion Milestone Nov 6 · Fantasy Nov 30". A mark too close to that label to clear it joins it too. An edge label sits in the label band above the bars and has no fill.
 23a. A Promotion Milestone date is a diamond. A goal's own Committed date is a bar. A parent and a sub-goal on one day tell apart (review X12).
 23b. A goal that started after its Committed date passed draws its health bar under the slip, from that date to today (review Q6).
 
