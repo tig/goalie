@@ -21,6 +21,9 @@ class HomeTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         with running_server() as (proc, port):
             cls.reply = get(proc, port, "/")
+            cls.deep = get(proc, port, "/goals/XW-0001?view=list")
+        with running_server(extra_env={"GOALIE_SIGN_IN_URL": "https://login.example/start"}) as (proc, port):
+            cls.configured = get(proc, port, "/")
 
     def test_home_is_html_with_a_body(self) -> None:
         self.assertEqual(self.reply.status, 401)
@@ -37,6 +40,14 @@ class HomeTests(unittest.TestCase):
         text = self.reply.body.decode("utf-8")
         self.assertIn("<h1>Sign in to Goalie</h1>", text)
         self.assertIn("<title>Goalie</title>", text)
+
+    def test_the_sign_in_page_links_to_the_host_login_and_back(self) -> None:
+        text = self.reply.body.decode("utf-8")
+        self.assertIn('<a href="/oauth2/start?rd=%2F">Sign in</a>', text)
+        self.assertIn('<a href="/oauth2/start?rd=%2Fgoals%2FXW-0001%3Fview%3Dlist">Sign in</a>', self.deep.body.decode("utf-8"))
+
+    def test_the_login_route_is_process_configuration(self) -> None:
+        self.assertIn('<a href="https://login.example/start?rd=%2F">Sign in</a>', self.configured.body.decode("utf-8"))
 
 
 if __name__ == "__main__":

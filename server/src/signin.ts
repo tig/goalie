@@ -5,8 +5,8 @@ import { BRAND, brandHead, escape } from "./brand.ts";
  * The React app draws every other screen (ADR 0010).
  */
 
-/** The page for a request with no verified actor. It gives the reason. */
-export function signInPage(reason: string): string {
+/** The page for a request with no verified actor. It gives the reason, and links to the host's login route with the way back. */
+export function signInPage(reason: string, signIn: string): string {
   const app = escape(BRAND.app);
   return `<!doctype html>
 <html lang="en">
@@ -22,6 +22,7 @@ ${brandHead()}
 <h1>Sign in to ${app}</h1>
 <p>${app} shows goals only to a signed-in actor.</p>
 <p>Not signed in: ${escape(reason)}.</p>
+<p><a href="${escape(signIn)}">Sign in</a></p>
 </main>
 </body>
 </html>

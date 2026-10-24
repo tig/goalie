@@ -44,3 +44,8 @@ export function configuredToday(db: DatabaseSync): string {
   }
   return dateIn(Date.now(), configuredTimeZone(db));
 }
+
+/** GOALIE_SIGN_IN_URL is the host's login route. The default is oauth2-proxy's /oauth2/start. */
+export function configuredSignInUrl(): string {
+  return process.env.GOALIE_SIGN_IN_URL || "/oauth2/start";
+}
