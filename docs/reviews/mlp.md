@@ -1,109 +1,111 @@
 # MLP review
 
-**Status:** Round 2, fixes in progress
+**Status:** Round 3, no blocks, 26 open
 
-**Date:** 2026-10-23
+**Date:** 2026-10-24
 
 **Owner:** Chelsea
 
-This is the review list for pull request #52 (XW-0003 MLP). It is overwritten each round.
-Round 1 (2026-10-22) read the server-drawn Home at 05ff75b. Its 50 findings are fixed. QA re-checked them in round 2 and they hold.
-Round 2 read the React app at e147b21: QA, Head of Engineering, and the Experience pair (User and UI/UX designer).
-Status words: **blocks** stops the merge, **open** is a real problem with a clear fix, **yours** is Chelsea's call, **Tig** is a word or decision for Tig, **fixed** is done.
+This is the review list for pull request #52 (XW-0003 MLP). It is overwritten each round. Earlier rounds are in this file's git history.
+Round 3 read chelsea/mlp at 1eabb80: the goal page fixes from 5087caa, New goal (F5), and the Work items page (F6).
+Reviewers: Codebase QA (lead), Frontend QA, and the User Researcher. Each ran an own server from the pinned review worktree, on a seeded scratch store, with GOALIE_TODAY 2026-10-24.
+Out of scope: who may change a goal (a new rule is being built).
+Status words: **blocks** stops the merge, **open** is a real problem with a clear fix, **decision** waits on Chelsea or Tig, **fixed** is done.
 
 ## Summary
 
 | Status | Count |
 | --- | --- |
-| blocks | 6 |
-| open | 46 |
-| yours | 3 |
-| Tig | 2 |
-| fixed | 2 |
+| blocks | 0 |
+| open, new | 26 |
+| not fixed, from 5087caa | 3 |
+| decision | 3 |
+| fixed | 15, and 1 in part |
 
-The one-minute test (release plan §1), User as Tig, desktop: Q1 yes, 10 s. Q2 "What needs me?" no. Q3 yes. About 25 s for 2 of 3. Phone: Q1 took 30 s, because the Committed dates card sits below every goal.
+All three blocks from 5087caa are fixed: + Sub-goal saves, Promote saves, and every change needs a reason.
+The worst open items: a check hides the rules of every command under a refused create (Q11); a slip can move a date earlier in two saves (Q12); Promote and close is offered where it cannot save (Q13).
 
-## Chelsea's notes
+## Rechecks from 5087caa
 
-| # | Status | Finding | Fix |
-| --- | --- | --- | --- |
-| C1 | fixed | The board controls moved sideways when the date label changed width | The date label has a fixed width. Every pill keeps its x in 8 states (13413dd) |
-| C2 | fixed | The timeline scrollbar | No scrollbar. Wheel, shift and wheel, drag, arrow keys, Earlier, Later, Today, and edge fades (13413dd) |
+| # | Status | Evidence |
+| --- | --- | --- |
+| R1 | fixed | + Sub-goal: 3 of 3 saved from the app (on the parent's date, own Fantasy date with its milestone, a later date). test_web_batches posts the real batch: 6 errors and 1 failure on 5087caa, OK on 1eabb80 |
+| R2 | fixed | Promote, Fantasy to Ambition: one save completed the met milestone, made the next one In Progress, and set Ambition |
+| R3 | fixed | A reason on every change. Description, Plan Maturity, and summary with no reason or a blank reason: 422 reason-required. 8 of 8 panels show the refusal at the Reason field |
+| R4 | fixed | text/plain and form-urlencoded: 415. Origin evil.example and "null": 403. Same origin and no Origin: 200 |
+| R5 | fixed | A 300 KB body: 413. A 10,001-character comment: 422. 10,000 characters: 200 |
+| R6 | fixed, gap in Q12 | A slip to Nov 1, or to the due date Nov 15: 422. Nov 20: 200 |
+| R7 | fixed | Blank summary and blank title: "Summary is required.", "Title is required." |
+| R8 | fixed, gap in Q15 | required-field messages in SPEC words: "Type is required." |
+| R9 | fixed | dateIn speed. Home 2, 20, and 60 to 128 ms at N = 100, 1,000, 3,000 (was 6, 51, 155) |
+| R10 | fixed | GOALIE_TODAY "nope" and 2026-02-30 stop the server with a message, exit 1 |
+| R11 | fixed in part | Exports used in one file: 8 left (was 11), in Q16 |
+| R12 | fixed, gap in Q13 | G15 closesAsPromoted: Completed for a goal due Dec 1, Completed Late for one due Oct 20. Promote and close saved with the plan at Pencil |
+| R13 | fixed | N6a: a New goal In Progress makes its milestone In Progress with the goal's health and Path to Green. A Backlog goal's milestone is Backlog |
+| R14 | not fixed | A check reports every rule of one command, but not of a command under a refused create (Q11) |
+| R15 | not fixed | Edge labels cut. At 768 px on first load, "Promotion Milestone Nov 6" is cut by 29 px. Months zoom: 6 of 122 scroll positions cut a label at 768, 1 of 119 at 860. Weeks: 5 of 124 and 1 of 122. Quarters: 12 of 242 and 1 of 236 |
+| R16 | not fixed | Meter touch areas. The meter is fixed (108x44 per segment at 390). On the Committed dates card, "1 YELLOW" answers 115x13: the "?" area above and the meter area below cover it. "1 RED" and "1 GREEN" answer 26 tall |
+| R17 | fixed | Work items page: the first In Progress heading is at y 184 (1440) and y 212 (390). Late reads "Oct 22 late" with the word |
+| R18 | fixed | New goal at 390: Create is a 358x48 bar fixed at the bottom at every scroll. Inputs, selects, and the date are 44 tall |
+| R19 | fixed | Empty reason: refused by the server and shown at Reason in 8 of 8 panels. The app does not check rules (ADR 0010), so this holds |
+| R20 | unchanged | The "Chelsea | Excaliwire" Owner pair matches W2 as written. See U4 |
 
 ## Code: QA
 
 | # | Status | Where | Finding | Fix |
 | --- | --- | --- | --- | --- |
-| Q1 | blocks | rules.ts | A Committed goal's due_date can be rewritten in place, which erases its slip (SPEC §6.1, §7.1: no silent re-baselines) | Once Committed, the date moves only through changed_due_date with a reason |
-| Q2 | open | model/timeline.ts | At Quarters zoom the board cannot open two weeks before today | Fill the board at every zoom, or clamp the open week |
-| Q3 | open | App.tsx | The range label drops the year on the first date | Write the year on both dates when they differ |
-| Q4 | open | model/filter.ts | "1 GREEN" lights 3 rows | The filter selects what the count counts |
-| Q5 | open | server.ts | A missing script URL gets index.html, not 404 | 404 for a file path outside /assets/ |
-| Q6 | open | model/timeline.ts | The RED goal draws no health bar when it started after its date | Start the bar at the earlier of the two |
-| Q7 | open | rules.ts | A date that is not on the calendar is rejected with the wrong message | Rule `real-date` |
-| Q8 | open | write.ts | A create with no fields returns raw SQLite text | Rule `required-field` |
-| Q9 | open | write.ts | A string base_version answers "stale" | Reject as bad_command |
-| Q10 | open | model/calendar.ts | Years below 100 and above 9999 break the calendar and the timeline | Bound `from` to 1970 to 9999 |
-| Q11 | open | cli.ts | `write` with bad JSON crashes | A named rejection |
+| Q11 | open | server/src/commands.ts:126 | A check skips every command that names a refused create, and the answer does not say so. New goal with a blank milestone summary lists 1 refusal. Fix it and 3 more appear on the goal: blank summary, milestone after the goal's date, no Path to Green. Work items under the goal stay unchecked until the goal passes | In a check, store a refused create anyway, so later commands still run; the check rolls back as now. Or list the skipped commands in `all` |
+| Q12 | open | server/src/rules.ts:203 | slip-moves-later is stepped around in two saves: slip Nov 15 to Nov 25, clear changed_due_date to null, slip to Nov 16. The date moved 9 days earlier (SPEC §6.1: no silent re-baselines) | Refuse clearing changed_due_date once set, or compare with the latest slip in the Event log |
+| Q13 | open | server/src/goal.ts:127 | closesAsPromoted gives a state for an Ambition goal at Crayon. The Close panel offers Promote and close, and the save is refused, committed-needs-pencil, at the panel top, at no field. A sub-goal defaults to Crayon, so this is the common case (Frontend QA hit it on XW-0014) | Return null unless the plan is at Pencil, or the panel says "Plan at Pencil first" with a link to Edit Fields |
+| Q14 | open | server/src/goalpage.ts:72 | The goal page reads its own Events twice: once for former milestones, once for history. 6,000 rows read for 3,000 comments | Read promotion_milestone Events by field, or reuse the first read |
+| Q15 | open | server/src/write.ts:156 | reason-required names code fields: "a change to health, path_to_green needs a reason.", "changed_due_date", "plan_maturity" | Use fieldWords, as required-field does |
+| Q16 | open | server/src/api.ts:76, 82, 88, 214; web/src/data.ts:6, 8; web/src/model/commands.ts:37, 111 | 8 exports used only in their own file: ActorKind, GoalRef, WorkProductLink, ApiCommand, Loaded, getJson, MetMilestone, GoalTypes | Drop export, or say in api.ts that contract types are exported on purpose |
+| Q17 | open | server/src/work.ts:12 | GET /api/work?owner=nobody answers 200 with 0 items. A wrong link reads as an empty queue | 404 for an owner that is not an actor |
+| Q18 | open | server/web/src/model/commands.ts:53 | Promote makes the next Promotion Milestone with no parent. New goal gives its milestone the goal as parent. The User Researcher found XW-0021 in neither Sub-goals nor Home: only the header link reaches it | Set parent to the goal in promoteToAmbition, as createBatch does |
 
-## Code: Head of Engineering
+## Experience: Frontend QA and User Researcher
 
 | # | Status | Where | Finding | Fix |
 | --- | --- | --- | --- | --- |
-| E1 | blocks | web model/dates.ts, goal.ts, priorities.ts | The date helpers (isDate, day) are copied on the server and in the app | One server/src/dates.ts that both import |
-| E2 | open | web | "slip N days" is built in 5 places | One slipLabel |
-| E3 | open | Cards.tsx, api.ts | The app walks the tree for a slip's Date Type | Put kind on the summary's slips |
-| E4 | open | signin.ts, parts.tsx, index.html | The brand is in 3 places | One brand source on the server |
-| E5 | open | App.tsx | The 401 screen copies the sign-in text | Reload and let the server answer |
-| E6 | open | index.html | The font comes from Google Fonts, hard-coded | Serve it with the app, named only by a token |
-| E7 | open | seed.ts | Excaliwire's data is code shipped to every deployment | A data file outside src/ |
-| E8 | open | CONTRIBUTING.md | Names the Excaliwire Entra tenant | Move it to excaliwire/operations |
-| E9 | open | fixtures/priorities.json | Nothing ties the fixture to the API | A test that compares them |
-| E10 | open | App.tsx | "Priorities" is a literal | Draw the view's name |
-| E11 | open | App.tsx, styles.css | The phone width is in two places | One home |
-| E12 | open | TimelineView, CalendarView | The legend is copied | One Legend |
-| E13 | open | GoalTree, CalendarView | The highlight test is copied | One isLit |
-| E14 | open | parts.tsx, popover.ts | Popover sizes are copied | Export them |
-| E15 | open | CalendarView, dates.ts | The Monday-first formula is copied | One weekday |
-| E16 | open | GoalTree.tsx | The rank column width is hard-coded | Read the CSS variable |
-| E17 | open | write.ts | A re-export shim is left over | Delete it |
-| E18 | open | write.ts, read.ts | The goal key prefix is in two places | One home |
-| E19 | open | priorities.ts | Calendar quarters are hard-coded | Read the calendar from owner settings, quarters as default |
-| E20 | open | priorities.ts | The Drafts count covers the whole store | Count this view's Drafts |
-| E21 | open | priorities.ts, store.ts | A subquery per goal and no index on the Event log | Index event(entity_kind, entity, sequence) |
-| E22 | open | server.ts | The org unit is resolved on every request | Resolve it once |
-| E23 | open | api.ts | ApiGoal.state is a plain string | Type it State |
-| E24 | open | web tsconfig | Browser code can call Node APIs and still typecheck | DOM types only for the app |
+| F1 | open | server/web/src/GoalPanels.tsx:36 | A refusal that is not invalid or stale shows nothing. A 403 {error, reason} left the panel open and silent: it reads body.message, which 403, 413, and 415 answers do not have | Show body.reason when body.message is absent |
+| F2 | open | server/web/src/GoalPage.tsx:445 | A Promote shows in History as "Created · Ambition None “Plan drafted”". GP7 says "Promoted · XW-0013 completed". The batch holds a create, so it takes the Created form; "None" is the new milestone's empty date | Test for a Promote batch before the created branch |
+| F3 | open | server/src/rules.ts | A sub-goal dated after its parent is accepted: XW-0016 Mar 1, 2027 under XW-0003 Nov 30, 2026. The New goal rail (N11) lists "sub-goal dates on or before this goal's" | Add the rule, or drop the line from N11 |
+| F4 | open | server/web/src/NewGoal.tsx:192 | On a phone the one-line checks count shows only after a refused Create, not as the rail's standing summary (NG6) | Draw it whenever the rail has an answer |
+| F5 | open | server/web/src/styles.css:283 | Rule 29: Zoom out answers 30x44, Zoom in 40x44 (their ::after areas overlap). The count chip answers 39x26 at 1100 and 40x22 at 390 | 44 by 44 each, no overlap |
+| F6 | open | server/web/src/styles.css:409 | .fchip is 28 tall with no 44 px area on touch. The 4 Description chips on New goal answer 81x28 | A 44 px ::after on touch |
+| F7 | open | Promote, New goal | A Promote-made milestone has the same summary as the one it replaces: 2 goals on one page named "Commit a date for Launch the pilot with a second company" | Default a different summary, or ask for one |
+| U1 | open | goal page, sub-goal row | A sub-goal on "This goal's date" stores no date, as SPEC §6.1 allows, but its row shows only "Backlog" and a hollow circle. Read as no date, against USERS_MANUAL rule 2 (3 of 3) | Write the parent's date and "shares XW-nnnn" on the row |
+| U2 | open | goal page, + Sub-goal and Promote | No saved message: 0 of 3 saves had role=status or aria-live text, and nothing named the new key | A one-line live status: "Added XW-0020 under this goal" |
+| U3 | open | goal page, Promote panel | "create the next Promotion Milestone and link it" does not name the key | Name it after the save, in U2's status |
+| U4 | open | Work items, Owner "Chelsea" | Shows 1 item (hers) and hides her seat Frontend Engineer's 3. Only "Excaliwire" shows them, mixed with Tig's. Nothing says the seat is operated by Chelsea | Add the seats a person operates to that person's filter; write "operated by Chelsea" on the agent's group |
+| U5 | open | Work items, after Completed | Completing Chelsea's only item moved her group from the top to the bottom, about 700 px away at 390 | Keep the group in place after a save |
+| U6 | open | Work items | Only Completed can be set here: 0 controls for Backlog to In Progress, and no + Work item | A status control per row, or say status changes on the goal page |
+| U7 | open | New goal, 390 | Create with no date shows "Choose a date and a Date Type." under Summary, about 500 px above the date | Show it at the Date card |
+| U8 | open | New goal | Create looks the same with 2 checks failing; only small red "2 checks to fix" says no. "an In Progress goal has a health." reads as a statement | Draw Create as unavailable while checks fail; "Choose a health for an In Progress goal." |
+| U9 | open | New goal, Description chips | A description with all 4 parts left the 4 chips unchecked, and the goal page still says "Add who shares responsibility" | Light a chip only from a real check, or call them prompts |
+| U10 | open | New goal 390, Work items 390, goal page 390 | Drawn boxes under 44 in one dimension: 23, 19, and 24 controls. Smallest: 18x18 "What … means" buttons, 16x16 checkboxes, 28x28 Edit pencils, 26 high tabs and owner chips, 17 high goal links. The ::after hit areas are not measured | 44 px hit areas on touch, measured by elementFromPoint |
+| U11 | open | New goal, Work items | Words not in SPEC §4 or USERS_MANUAL.md: "Excaliwire" as everyone, "Create will make", "Preview", "Every check passes", "checks to fix", "This goal's date", "Its own date", "shares XW-nnnn", "More fields", "late" on a work item, "no health" read aloud, "New Date Type" | Tig picks the words, in SPEC.md |
 
-Head of Engineering: keep the app inside the server component. It imports api.ts and ships in the same publish.
+## Decisions
 
-## Experience: User and UI/UX designer
+| # | Status | Question |
+| --- | --- | --- |
+| D1 | decision | History paging. The goal page sends every Event of the goal, its milestones, and its work items: 4,327 KB and 147 to 208 ms at 3,000 sub-goals, 3,000 comments, and 3,000 work items (18,019 rows). Was 1,241 KB at 3,000 comments in 5087caa. Lean: page it, newest first; the page size is the deciding number and I have not measured one |
+| D2 | decision | Visibility values. Any text is stored ("banana"). Lean: a fixed list in SPEC §6.1 |
+| D3 | decision | Health on close. Completed Late keeps its health. Lean: one rule for Completed and Completed Late |
 
-| # | Status | Who hit it | Finding | Fix |
-| --- | --- | --- | --- | --- |
-| X1 | blocks | Tig, Design | Labels at the right edge are cut off ("Com", "Fantasy Nov"), against rule 23 | Keep the whole label inside the window, or the edge arrow |
-| X2 | blocks | Tig | Once, the first load opened on Nov 30 – Feb 5 with no Today line | Set the scroll after layout and fonts; a test that opens late |
-| X3 | blocks | Galahad | On a phone, health is a dot only. A color-blind person cannot tell RED from GREEN | A shape per health on every screen, and the word on the phone |
-| X4 | blocks | Design | Months and quarters labels are 10.5 px, under the 11 px floor (rule 28) | 11 px; drop alternate labels if they crowd |
-| X5 | open | Tig | On a phone the health counts sit 1300 px down | A one-line health summary above Priorities |
-| X6 | open | Chelsea | Sub-goals with no date show nothing | Say there is no date, in muted text |
-| X7 | open | Tig | The List's PTG cell shows seed placeholder text, and "PTG" is never spelled out | "Path to Green (PTG)" once; an empty state |
-| X8 | open | Tig | The List does not say which date health is judged on | The judged date first, the uncommitted date second and light |
-| X9 | open | Tig | Calendar chips cut the title and carry no Date Type word | Wider chips, two lines, the Date Type in the label for a screen reader |
-| X10 | open | Tig | The Committed dates help opens over the filter chip | Open it beside the icon |
-| X11 | open | Chelsea | The range label disagrees with the visible axis | Follow the scroll exactly |
-| X12 | open | Chelsea | A parent and a child bar both end Nov 6 and the child's own date is lost | Tell the two marks apart |
-| X13 | open | Design | Sub-goal titles cut at two lines on a phone | Three lines on a phone |
-| X14 | open | Galahad | Nothing says the 1, 2, 3 are ranks | A "Priority" column title in the List |
-| X15 | open | Design | At 1100 px the cards differ in height and the Promotions due line wraps | One min-height; one alignment |
-| X16 | yours | Design | Rule 25b says 36 px pills and rule 29 says 44 px to tap | Recommend: a 36 px pill with a 44 px hit area on touch |
-| X17 | yours | Tig | Priorities before the cards costs Tig 20 s on a phone | Recommend: keep rule 32 and add X5 |
-| X18 | yours | Design | Polish | Recommend: 16 px card radius, a soft hover lift on cards, a loading skeleton |
-| X19 | open | Galahad | No way to add a goal from Home | A New goal button when creating a goal works (MLP 4) |
+## Standing checks
 
-## For Tig
+On a clean copy of 1eabb80 (git archive), Node v22.22.3 (package.json asks for 24):
 
-| # | Question |
-| --- | --- |
-| T1 | A word for "What needs me?": goals a human owns that are RED or YELLOW, and the Drafts waiting on them. |
-| T2 | The view names Timeline, List, Calendar, the calendar day names, and "+N" for more chips. |
+- npm ci exit 0, 0 vulnerabilities. Lint exit 0. Typecheck exit 0.
+- Build twice: identical, diff -r exit 0. JS 326.19 kB (gzip 97.18), up from 293.01 (88.90) at 5087caa. CSS 42.49 kB (gzip 9.74), up from 34.77 (8.31).
+- Server suite three times: 342 tests OK in 112.9, 112.0, and 109.4 s. At 5087caa: 283 tests in about 85 s. No flaky or clock-bound test in 3 runs.
+- Shared tests: 87 OK, 45 skipped. Guidance: 10, 1 known macOS failure (test_map_sends_the_paid_file_to_the_repo_root). agent_forms check: exit 0.
+- New tests fail on 5087caa: test_commands_api 5 failures and 3 errors, test_write_path 6 failures, test_web_batches 1 failure and 6 errors, test_goal_page_api 1 failure and 2 errors. All pass on 1eabb80.
+- Prepares per call: Home 6, goal page 10, work queue 3, options 26, comment 5. Work queue at 3,000 items: 25 to 35 ms, 445 KB.
+- Live stream: 50 of 50 burst writes seen; a Last-Event-ID replay of 51 in order.
+
+## Not checked
+
+The oauth2-proxy cookie SameSite setting in production. Who may change a goal. Dead CSS. The app on Node 24. A priority edit: no panel opens from the goal page. Keyboard, contrast, a real screen reader, and dark mode. Live update between two browsers. A stale save. Ambition to Committed from the app. Widths other than 390, 768, 860, 1100, 1280, and 1440.
