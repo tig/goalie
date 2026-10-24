@@ -136,6 +136,8 @@ export type NewGoalForm = {
   plan_maturity: GoalFields["plan_maturity"];
   more: Pick<GoalFields, "type" | "severity" | "state" | "origination" | "level" | "visibility" | "org_unit">;
   milestone: NewMilestone | null;
+  /** Work Product links (§6.1), or none. */
+  work_product?: GoalFields["work_product"];
   /** The type of a Promotion Milestone, from the server's options. */
   milestoneType: string;
   /** Set when the form opens from a goal page's + Sub-goal (N2). */
@@ -177,6 +179,7 @@ export function createBatch(form: NewGoalForm, check = false): CommandsRequest {
       plan: form.plan,
       plan_maturity: form.plan_maturity,
       ...(form.parent ? { parent: form.parent } : {}),
+      ...(form.work_product?.length ? { work_product: form.work_product } : {}),
       ...form.more,
     },
     reason,

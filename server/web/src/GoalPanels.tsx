@@ -175,7 +175,8 @@ export function HealthPanel({ data, health, onDone }: { data: GoalPageResponse; 
 /** G13: Record a slip. The original committed date is locked; the changed due date, health, and the Path to Green save together. */
 export function SlipPanel({ data, onDone }: { data: GoalPageResponse; onDone: (saved: boolean) => void }) {
   const { goal, today } = data;
-  const [date, setDate] = useState(goal.changed_due_date ?? goal.due_date ?? today);
+  // A slip moves the date later (slip-moves-later), so no date is picked for you.
+  const [date, setDate] = useState("");
   const [health, setHealth] = useState<"YELLOW" | "RED">(goal.health === "RED" ? "RED" : "YELLOW");
   const [ptg, setPtg] = useState(emptyPtg(data));
   const [reason, setReason] = useState("");

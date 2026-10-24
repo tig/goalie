@@ -92,11 +92,14 @@ export function dateBar(started: string, today: string, dates: { date: string; k
   return { start: at(started), today: at(today), marks: dates.map((d) => ({ at: at(d.date), date: d.date, kind: d.kind })) };
 }
 
-/** The team view (plan F6): one queue per owner, the signed-in actor's first, then by name; each queue by status. Deleted items are left out. */
+/** The team view (plan F6): one queue per owner, people with work In Progress first; each queue by status. Deleted items are left out. */
 export function queues<T extends Pick<ApiWorkItem, "owner" | "status">>(items: T[], actors: Record<string, ApiActor>, me: string) {
   const owners = [...new Set(items.filter((i) => i.status !== "Deleted").map((i) => i.owner))];
   const actor = (id: string): ApiActor => actors[id] ?? { id, name: id, kind: "human" };
+  // What is happening now comes first: people with work In Progress, then the signed-in actor, then everyone else; by name within each.
+  const busy = (id: string) => items.some((i) => i.owner === id && i.status === "In Progress");
+  const rank = (q: { owner: ApiActor }) => (busy(q.owner.id) ? 0 : q.owner.id === me ? 1 : 2);
   return owners
     .map((id) => ({ owner: actor(id), groups: groupWorkItems(items.filter((i) => i.owner === id)) }))
-    .sort((a, b) => (a.owner.id === me ? -1 : b.owner.id === me ? 1 : a.owner.name.localeCompare(b.owner.name)));
+    .sort((a, b) => rank(a) - rank(b) || a.owner.name.localeCompare(b.owner.name));
 }

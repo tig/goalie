@@ -105,5 +105,19 @@ class WebBatchTests(unittest.TestCase):
         self.assertTrue(self.send(batch)["ok"])
 
 
+    def test_the_fields_and_description_panels_save_with_a_reason(self) -> None:
+        goal = self.read("/api/goals/XW-0004")["goal"]
+        batch = build("return commands.fieldsBatch(goal, { description: 'The MLP running with real goals.', severity: 'sev2' }, 'Wrote it down');", goal=goal)
+        self.assertTrue(self.send(batch)["ok"])
+
+    def test_a_panel_saved_with_no_reason_is_refused_at_the_reason(self) -> None:
+        goal = self.read("/api/goals/XW-0002")["goal"]
+        batch = build("return commands.fieldsBatch(goal, { severity: 'sev3' }, '');", goal=goal)
+        reply = post(self.proc, self.port, "/api/commands", batch, self.auth)
+        answer = json.loads(reply.body)
+        self.assertEqual(reply.status, 422, answer)
+        self.assertEqual([v["field"] for v in answer["violations"]], ["reason"])
+
+
 if __name__ == "__main__":
     unittest.main()
