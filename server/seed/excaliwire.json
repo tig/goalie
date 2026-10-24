@@ -1,0 +1,436 @@
+{
+  "about": [
+    "The Excaliwire seed: the org unit, Tig and Chelsea, and the goal tree on tig/goalie#47.",
+    "node src/cli.ts seed loads it through the write path, in one transaction. Each write is made as its `as` actor.",
+    "Chelsea runs the load. Tig writes the owner settings and the org unit, because only the GOALIE owner may (ADR 0011).",
+    "Values marked Placeholder are not in #47. The pull request for #48 lists them for Tig."
+  ],
+  "writes": [
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "actor",
+        "id": "chelsea",
+        "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)",
+        "fields": {
+          "kind": "human",
+          "display_name": "Chelsea"
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "actor",
+        "id": "tig",
+        "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)",
+        "fields": {
+          "kind": "human",
+          "display_name": "Tig"
+        }
+      }
+    },
+    {
+      "as": "tig",
+      "command": {
+        "op": "create",
+        "kind": "owner_settings",
+        "id": "owner",
+        "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)",
+        "fields": {
+          "owner": "tig",
+          "settings": {
+            "goal_key_prefix": "XW"
+          }
+        }
+      }
+    },
+    {
+      "as": "tig",
+      "command": {
+        "op": "create",
+        "kind": "org_unit",
+        "id": "excaliwire",
+        "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)",
+        "fields": {
+          "name": "Excaliwire",
+          "level": "Company",
+          "owner": "tig"
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "priority",
+        "id": "PRI-1",
+        "reason": "Seeded from tig/goalie#47 (XW-0003 MLP). Placeholder: Tig ranks the Priorities.",
+        "fields": {
+          "org_unit": "excaliwire",
+          "period": "2026-Q4",
+          "rank": 1,
+          "title": "Regenerate the E28 canon",
+          "status": "Current"
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "priority",
+        "id": "PRI-2",
+        "reason": "Seeded from tig/goalie#47 (XW-0003 MLP). Placeholder: Tig ranks the Priorities.",
+        "fields": {
+          "org_unit": "excaliwire",
+          "period": "2026-Q4",
+          "rank": 2,
+          "title": "Grow the XW team",
+          "status": "Current"
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "priority",
+        "id": "PRI-3",
+        "reason": "Seeded from tig/goalie#47 (XW-0003 MLP). Placeholder: Tig ranks the Priorities.",
+        "fields": {
+          "org_unit": "excaliwire",
+          "period": "2026-Q4",
+          "rank": 3,
+          "title": "Run Excaliwire on GOALIE",
+          "status": "Current",
+          "cut_line": true
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "goal",
+        "id": "XW-0001",
+        "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)",
+        "fields": {
+          "org_unit": "excaliwire",
+          "level": "Company",
+          "severity": "sev1",
+          "origination": "New",
+          "priority": "PRI-1",
+          "summary": "Regenerate the E28 canon by Oct 1",
+          "owner": "tig",
+          "type": "Milestone (Launch)",
+          "due_date": "2026-10-01",
+          "date_type": "Committed",
+          "plan": "Placeholder: Tig links the plan",
+          "plan_maturity": "Pencil",
+          "state": "In Progress",
+          "health": "RED",
+          "path_to_green": {
+            "steps": [
+              {
+                "owner": "tig",
+                "date": "2026-10-29",
+                "text": "Placeholder: Tig writes the Path to Green"
+              }
+            ],
+            "criteria": "Placeholder: Tig writes the criteria for returning to GREEN"
+          }
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "goal",
+        "id": "XW-0002",
+        "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)",
+        "fields": {
+          "org_unit": "excaliwire",
+          "level": "Company",
+          "severity": "sev2",
+          "origination": "New",
+          "priority": "PRI-2",
+          "summary": "Add two more humans to XW by Nov 15",
+          "owner": "tig",
+          "type": "Milestone (Launch)",
+          "due_date": "2026-11-15",
+          "date_type": "Committed",
+          "plan": "Placeholder: Tig links the plan",
+          "plan_maturity": "Pencil",
+          "state": "In Progress",
+          "health": "YELLOW",
+          "path_to_green": {
+            "steps": [
+              {
+                "owner": "tig",
+                "date": "2026-10-29",
+                "text": "Placeholder: Tig writes the Path to Green"
+              }
+            ],
+            "criteria": "Placeholder: Tig writes the criteria for returning to GREEN",
+            "trigger": "Placeholder: Tig names the trigger that turns this RED"
+          }
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "goal",
+        "id": "XW-0004",
+        "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)",
+        "fields": {
+          "org_unit": "excaliwire",
+          "level": "Company",
+          "severity": "sev1",
+          "origination": "New",
+          "summary": "Run the MLP prototype at goalie.excaliwire.com with Excaliwire's real goals loaded",
+          "description": "The Promotion Milestone for XW-0003. Held in tig/goalie#47 until GOALIE holds it.",
+          "owner": "chelsea",
+          "type": "Milestone (Commit)",
+          "due_date": "2026-11-06",
+          "date_type": "Committed",
+          "plan": "docs/release-plan.md",
+          "plan_maturity": "Pencil",
+          "work_product": [
+            {
+              "repo": "github.com/tig/goalie"
+            },
+            {
+              "url": "https://goalie.excaliwire.com"
+            },
+            {
+              "doc": "https://claude.ai/artifact/KL6KBcJMeBMG3Cr7bPWyMk"
+            }
+          ],
+          "state": "In Progress",
+          "health": "GREEN"
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "goal",
+        "id": "XW-0003",
+        "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)",
+        "fields": {
+          "org_unit": "excaliwire",
+          "level": "Company",
+          "severity": "sev1",
+          "origination": "New",
+          "priority": "PRI-3",
+          "summary": "Tig, Chelsea, and agents use GOALIE to drive Excaliwire execution",
+          "owner": "chelsea",
+          "type": "Milestone (Launch)",
+          "due_date": "2026-11-30",
+          "date_type": "Fantasy",
+          "promotion_milestone": "XW-0004",
+          "plan": "docs/release-plan.md",
+          "plan_maturity": "Crayon",
+          "state": "In Progress",
+          "health": "GREEN"
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "update",
+        "kind": "goal",
+        "id": "XW-0004",
+        "base_version": 1,
+        "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)",
+        "fields": {
+          "parent": "XW-0003"
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "goal",
+        "id": "XW-0005",
+        "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)",
+        "fields": {
+          "org_unit": "excaliwire",
+          "level": "Company",
+          "severity": "sev1",
+          "origination": "New",
+          "summary": "Stand up the spine: store, rules, sign-in, event log",
+          "description": "An MLP sub-goal on tig/goalie#47.",
+          "owner": "chelsea",
+          "type": "Milestone (Launch)",
+          "due_date": "2026-11-06",
+          "date_type": "Committed",
+          "plan": "https://github.com/tig/goalie/issues/48",
+          "plan_maturity": "Pencil",
+          "state": "In Progress",
+          "health": "GREEN",
+          "parent": "XW-0004"
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "goal",
+        "id": "XW-0006",
+        "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)",
+        "fields": {
+          "org_unit": "excaliwire",
+          "level": "Company",
+          "severity": "sev1",
+          "origination": "New",
+          "summary": "Show Priorities as Home, on a timeline",
+          "description": "An MLP sub-goal on tig/goalie#47.",
+          "owner": "chelsea",
+          "type": "Milestone (Launch)",
+          "due_date": "2026-11-06",
+          "date_type": "Committed",
+          "plan": "https://github.com/tig/goalie/issues/49",
+          "plan_maturity": "Pencil",
+          "state": "Backlog",
+          "parent": "XW-0004"
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "goal",
+        "id": "XW-0007",
+        "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)",
+        "fields": {
+          "org_unit": "excaliwire",
+          "level": "Company",
+          "severity": "sev1",
+          "origination": "New",
+          "summary": "Open a goal and keep it true",
+          "description": "An MLP sub-goal on tig/goalie#47.",
+          "owner": "chelsea",
+          "type": "Milestone (Launch)",
+          "due_date": "2026-11-06",
+          "date_type": "Committed",
+          "plan": "https://github.com/tig/goalie/issues/50",
+          "plan_maturity": "Pencil",
+          "state": "Backlog",
+          "parent": "XW-0004"
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "goal",
+        "id": "XW-0008",
+        "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)",
+        "fields": {
+          "org_unit": "excaliwire",
+          "level": "Company",
+          "severity": "sev1",
+          "origination": "New",
+          "summary": "Create a goal or a sub-goal",
+          "description": "An MLP sub-goal on tig/goalie#47.",
+          "owner": "chelsea",
+          "type": "Milestone (Launch)",
+          "due_date": "2026-11-06",
+          "date_type": "Committed",
+          "plan": "docs/release-plan.md",
+          "plan_maturity": "Pencil",
+          "state": "Backlog",
+          "parent": "XW-0004"
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "goal",
+        "id": "XW-0009",
+        "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)",
+        "fields": {
+          "org_unit": "excaliwire",
+          "level": "Company",
+          "severity": "sev1",
+          "origination": "New",
+          "summary": "Let an agent work in GOALIE: API, MCP, Drafts",
+          "description": "An MLP sub-goal on tig/goalie#47.",
+          "owner": "chelsea",
+          "type": "Milestone (Launch)",
+          "due_date": "2026-11-06",
+          "date_type": "Committed",
+          "plan": "docs/release-plan.md",
+          "plan_maturity": "Pencil",
+          "state": "Backlog",
+          "parent": "XW-0004"
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "goal",
+        "id": "XW-0010",
+        "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)",
+        "fields": {
+          "org_unit": "excaliwire",
+          "level": "Company",
+          "severity": "sev1",
+          "origination": "New",
+          "summary": "Draft health from GitHub with the evidence",
+          "description": "An MLP sub-goal on tig/goalie#47.",
+          "owner": "chelsea",
+          "type": "Milestone (Launch)",
+          "due_date": "2026-11-06",
+          "date_type": "Committed",
+          "plan": "docs/release-plan.md",
+          "plan_maturity": "Pencil",
+          "state": "Backlog",
+          "parent": "XW-0004"
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "goal",
+        "id": "XW-0011",
+        "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)",
+        "fields": {
+          "org_unit": "excaliwire",
+          "level": "Company",
+          "severity": "sev1",
+          "origination": "New",
+          "summary": "Load Excaliwire's goals and release",
+          "description": "An MLP sub-goal on tig/goalie#47.",
+          "owner": "chelsea",
+          "type": "Milestone (Launch)",
+          "due_date": "2026-11-06",
+          "date_type": "Committed",
+          "plan": "docs/release-plan.md",
+          "plan_maturity": "Pencil",
+          "state": "Backlog",
+          "parent": "XW-0004"
+        }
+      }
+    }
+  ]
+}

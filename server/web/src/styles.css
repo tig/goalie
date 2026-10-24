@@ -1,0 +1,354 @@
+/*
+ * The app CSS. Every color is a token on :root so an organization can reskin GOALIE (rule 31).
+ * Text tokens meet 4.5:1 on --card and on --ground. No text is below 11 px.
+ */
+:root{--font:"Figtree Variable",system-ui,sans-serif;
+--ground:#f3f8f4;--card:#ffffff;--ink:#2f3a33;--mute:#56625b;--line:#edf2ee;--grid:#eef3ef;--sub-bg:#fafcfb;--control:#f0f5f1;--cut:#c9d3cc;
+--brand:#bfe6cc;--brand-ink:#17482f;--link:#1e6b45;--today:#22744a;--today-ink:#ffffff;--focus:#2c5796;
+--shadow:rgba(47,58,51,.05);
+--red-bg:#fbd9dd;--red-ink:#9c2a3c;--red:#e5677a;--yellow-bg:#fbefc6;--yellow-ink:#755800;--yellow:#e8c766;--green-bg:#d3f0e2;--green-ink:#1e6544;--green:#5cbf85;--none-bg:#eef2ef;--none:#b4beb7;
+--ahead:#e6ece8;--ambition:#8fadd9;--ambition-line:#b7c9e6;--ambition-ink:#2c5796;--fantasy:#a99ce0;--fantasy-line:#cfc6ee;--fantasy-ink:#5e4fa8;--slip-a:#f6b8c0;--slip-b:#fdeef0;
+--av-0-bg:#e3dafb;--av-0-ink:#4a3a91;--av-1-bg:#fadbe7;--av-1-ink:#9a2f5a;--av-2-bg:#d6ecfa;--av-2-ink:#1f5a85;--av-3-bg:#fde3cc;--av-3-ink:#8a4a12;--av-4-bg:#d3f0e2;--av-4-ink:#1e6544;--av-5-bg:#fbefc6;--av-5-ink:#6b5000;
+--hover:#f1f4f2;--tip-bg:#2f3a33;--tip-ink:#ffffff;--tip-shadow:rgba(47,58,51,.22);
+--radius:16px;--topbar:63px}
+html{scrollbar-gutter:stable}
+body{cursor:default;margin:0;background:var(--ground);color:var(--ink);font:14px/1.4 var(--font);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;-webkit-tap-highlight-color:transparent}
+.top,.cards,.board,.legend,.signin,.tip{user-select:none;-webkit-user-select:none}
+input,textarea{user-select:text;-webkit-user-select:text;cursor:text}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0}
+a,button,.row.parent,[role="button"]{cursor:pointer}
+.gbtn.off,.meter span{cursor:default}
+.meter span[role="button"]{cursor:pointer}
+a,.vtab,.gbtn,.btn,.count,.chev,.row,.chip,.morebtn,.q,.chip-x{transition:background-color .12s ease,box-shadow .12s ease,opacity .12s ease,transform .12s ease,color .12s ease}
+.btn:active,.count:active,.vtab:active,.gbtn:active,.q:active,.morebtn:active,.chip-x:active{transform:scale(.96)}
+.gbtn.off:active{transform:none}
+a{color:var(--link)}
+.top{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:14px;padding:14px 32px;background:var(--card);border-bottom:1px solid var(--line)}
+.logo{width:34px;height:34px;border-radius:11px;background:var(--brand);color:var(--brand-ink);display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:16px}
+.brand{font-weight:800;font-size:18px}.org{color:var(--mute)}
+.tab{height:34px;padding:0 16px;border-radius:999px;background:var(--brand);color:var(--brand-ink);font-weight:700;display:inline-flex;align-items:center;margin-left:16px}
+.me{margin-left:auto}
+.av{width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex:none}
+.av.mine{box-shadow:0 0 0 2px var(--card),0 0 0 3.5px var(--ink)}
+.me .av{width:30px;height:30px;font-size:13px;box-shadow:none}
+main{max-width:1312px;margin:0 auto;padding:28px 32px 48px;box-sizing:border-box;display:flex;flex-direction:column}
+h1{font-size:26px;font-weight:800;margin:0 0 20px}
+.cards{display:grid;grid-template-columns:1.6fr 1fr 1fr;gap:16px;margin-bottom:16px}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:0 1px 2px var(--shadow),0 4px 16px var(--shadow);padding:18px 20px;min-width:0}
+.lbl{display:flex;align-items:center;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin:0 0 8px}
+.num{white-space:nowrap}
+.big{font-size:22px;font-weight:800;margin:0 0 8px;display:flex;align-items:baseline;gap:10px}.big small{font-size:14px;font-weight:700;color:var(--ink);min-width:0}
+.counts{font-size:18px;font-weight:800;margin:0 0 8px}
+.meter{display:flex;gap:3px;margin:0 0 10px}.meter span{flex:1;height:8px;border-radius:999px}
+.note{font-size:13px;margin:0 0 6px}.small{font-size:12px;color:var(--mute)}
+.late{color:var(--red-ink);font-weight:700;white-space:nowrap}
+.date{white-space:nowrap}
+.muted{color:var(--mute)}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* Help: the ? icon and its card. The card is fixed to the screen and placed by the app (rule 9). */
+.help{display:inline-flex;margin-left:6px;vertical-align:middle}
+.q{width:18px;height:18px;border-radius:50%;background:var(--control);color:var(--mute);font-size:11px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;letter-spacing:0}
+.q:hover,.q.on{background:var(--brand);color:var(--brand-ink)}
+.tip{position:fixed;z-index:100;box-sizing:border-box;padding:10px 12px;border-radius:12px;background:var(--tip-bg);color:var(--tip-ink);font-size:12px;font-weight:500;line-height:1.5;box-shadow:0 8px 28px var(--tip-shadow);text-transform:none;letter-spacing:0;white-space:normal}
+.tip b{font-weight:800}
+.tip>div+div{margin-top:6px}
+
+/* The health counts and meter: controls (rule 24). */
+.count{display:inline-flex;align-items:center;gap:6px;margin:0 6px 0 -8px;padding:2px 8px;border-radius:999px;color:var(--ink);font-weight:800;font-size:18px}
+.count:hover,.count:focus-visible{background:var(--control)}.count.on{background:var(--control);box-shadow:inset 0 0 0 1.5px var(--cut)}
+
+/* Highlight and selection (rules H1 to H4). */
+.row.lit,.row.lit>.left{background:var(--hover)}
+.row.lit>.left{box-shadow:inset 3px 0 0 var(--hc),10px 0 10px -10px var(--tip-shadow)}
+/* A parent kept only for context is muted with an ink that keeps 4.5:1, not with opacity (rule 28). */
+.row.ctx .title{color:var(--mute)}.row.ctx .hdot{opacity:.5}
+.chip.lit{box-shadow:inset 3px 0 0 var(--hc, var(--cut));background:var(--hover)}
+.chip[data-health="RED"]{--hc:var(--red)}.chip[data-health="YELLOW"]{--hc:var(--yellow)}.chip[data-health="GREEN"]{--hc:var(--green)}
+
+.search{display:flex;align-items:center;gap:8px;height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--cut);background:var(--card);color:var(--mute);width:240px;flex:none;box-sizing:border-box}
+.search:focus-within{border-color:var(--focus)}
+.search input{border:0;outline:0;background:none;font:600 13px var(--font);color:var(--ink);width:100%;min-width:0}
+/* The health filter in force: a chip at the start of the search box (rule 25a). Its x is Show all. */
+.chip-filter{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 4px 0 8px;border-radius:999px;font-size:11px;font-weight:800;flex:none}
+.chip-filter.RED{background:var(--red-bg);color:var(--red-ink)}.chip-filter.YELLOW{background:var(--yellow-bg);color:var(--yellow-ink)}.chip-filter.GREEN{background:var(--green-bg);color:var(--green-ink)}
+.chip-filter .hdot{width:8px;height:8px}
+.chip-x{width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:13px;line-height:1;color:inherit}
+.chip-x:hover{background:rgba(47,58,51,.1)}
+/* A health is a shape as well as a color (rule 10): GREEN a circle, YELLOW a triangle, RED a square, no health a hollow circle. Each sits in the same 10 px box. A diamond is only a Promotion Milestone. */
+.hdot{width:10px;height:10px;border-radius:50%;flex:none;display:inline-block}
+.hdot.RED{border-radius:2px;transform:scale(.9)}
+.hdot.YELLOW{border-radius:0;clip-path:polygon(50% 4%,100% 92%,0 92%);transform:scale(1.2)}
+.hdot.none{box-shadow:inset 0 0 0 1.5px var(--none)}
+.hword{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.hword.shown{position:static;width:auto;height:auto;overflow:visible;clip:auto;margin-left:6px}
+.hword.GREEN{color:var(--green-ink)}.hword.YELLOW{color:var(--yellow-ink)}.hword.RED{color:var(--red-ink)}.hword.none{color:var(--mute)}
+
+/* The toolbar (rules 25 to 25c, V1, V4): one 44 px row. The left cluster is the view's name, the view tabs, and search. The right cluster is anchored right. Every control is 32 px tall. */
+.board{padding:18px 20px 14px;--left:380px;--gap:12px;--week:84px;--rank:18px;--colgap:10px;--indent:26px;container-type:inline-size}
+.toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;min-height:44px;margin:0 0 12px}
+.toolbar h2{font-size:16px;font-weight:800;margin:0 8px 0 0}
+.tabs{display:inline-flex;align-items:center;gap:2px;height:32px;padding:3px;box-sizing:border-box;border-radius:999px;background:var(--control)}
+.vtab{height:26px;padding:0 12px;border-radius:999px;font-size:13px;font-weight:700;color:var(--mute)}
+.vtab:hover{color:var(--ink)}
+.vtab.on{background:var(--card);color:var(--brand-ink);box-shadow:0 1px 2px rgba(47,58,51,.14)}
+.toolbar .search{margin-left:8px}
+.tright{display:flex;align-items:center;gap:8px;margin-left:auto}
+.range{display:flex;align-items:center;gap:8px}
+.pgroup{display:inline-flex;align-items:center;height:32px;border-radius:999px;border:1px solid var(--cut);background:var(--card);box-sizing:border-box}
+.gbtn{min-width:30px;height:100%;display:inline-flex;align-items:center;justify-content:center;color:var(--ink);font-weight:800;font-size:16px;border-radius:999px}
+.gbtn:hover{background:var(--control)}
+.gbtn.off{color:var(--cut)}.gbtn.off:hover{background:none}
+@container (max-width:1039px){.toolbar .search{width:200px}}
+/* When one row does not fit, the search box takes a second row, full width. */
+.tbreak{display:none}
+@container (max-width:942px){.tbreak{display:block;order:4;flex-basis:100%;height:0}.toolbar .search{order:5;flex:1 1 200px;width:auto;min-width:200px;margin:0}.tright{order:6}}
+.rangelbl{display:inline-grid;min-width:184px;padding:0 4px;box-sizing:border-box;font-weight:700;font-size:13px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.rangelbl>span{grid-area:1/1;text-align:center}
+.rangelbl>.sizer{visibility:hidden}
+.btn{height:32px;box-sizing:border-box;padding:0 12px;border-radius:999px;border:1px solid var(--cut);color:var(--ink);font-weight:700;font-size:13px;display:inline-flex;align-items:center}
+.btn:hover{background:var(--control)}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+/* A row's focus ring is on the goal column only, not across the timeline. */
+.row:focus-visible{outline:none}
+.row:focus-visible>.left{outline:3px solid var(--focus);outline-offset:-3px;border-radius:12px}
+.search input:focus-visible{outline:0}
+
+/* The timeline. No scrollbar shows (rule 20c); an edge fades where there is more to scroll. */
+.tlwrap{position:relative}
+.scroll{overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none}
+.scroll::-webkit-scrollbar{display:none}
+.scroll:focus-visible{outline-offset:-3px;border-radius:12px}
+.scroll.dragging,.scroll.dragging *{cursor:grabbing}
+.fade{position:absolute;top:0;bottom:0;width:28px;pointer-events:none;opacity:0;z-index:9;transition:opacity .12s ease}
+.fade.before{left:calc(var(--left) + var(--gap));background:linear-gradient(to right,var(--card),transparent)}
+.fade.after{right:0;background:linear-gradient(to left,var(--card),transparent)}
+.more-before>.fade.before,.more-after>.fade.after{opacity:1}
+.tl{position:relative;width:calc(var(--left) + var(--gap) + var(--weeks) * var(--week))}
+.tlbody>.cut{background:var(--card)}
+.row.note{min-height:40px}.row.note .lane{background:none}.row.note .title{font-weight:500;font-size:13px}
+.row>.left,.axis>.corner{position:sticky;left:0;z-index:7;background:var(--card);padding-right:var(--gap);box-shadow:10px 0 10px -10px var(--tip-shadow)}
+.axis{display:grid;grid-template-columns:calc(var(--left) + var(--gap)) calc(var(--weeks) * var(--week));height:52px}
+.corner{display:flex;align-items:flex-end;padding-bottom:8px;box-sizing:border-box}
+.colhead{justify-content:space-between;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);padding-bottom:10px}
+.ticks{position:relative}
+.wk{position:absolute;bottom:6px;margin-left:5px;font-size:12px;font-weight:600;color:var(--mute);white-space:nowrap}
+.wk.off{visibility:hidden}
+.td{display:none}.todaylbl:hover .td{display:inline}
+.todaylbl{position:absolute;top:0;transform:translateX(-50%);background:var(--today);color:var(--today-ink);font-size:11px;font-weight:800;padding:1px 8px;border-radius:999px;white-space:nowrap;z-index:6}
+.tlbody{position:relative;border-top:1px solid var(--line)}
+.group{border-bottom:1px solid var(--line)}
+.row{position:relative;display:grid;grid-template-columns:calc(var(--left) + var(--gap)) calc(var(--weeks) * var(--week));align-items:stretch;min-height:52px}
+.row:hover,.row:hover>.left{background:var(--hover)}
+.left{position:relative;display:flex;align-items:center;gap:var(--colgap);min-width:0;box-sizing:border-box;padding:6px var(--gap) 6px 0}
+.d1 .left,.d2 .left{min-height:40px}
+.d1,.d2{min-height:42px}
+.left.tree{background-size:1.5px 100%;background-repeat:no-repeat}
+.left.tree::before{content:"";position:absolute;left:calc((var(--depth) - 1) * var(--indent) + var(--rank) + var(--colgap) + 5px);top:0;height:50%;width:17px;border-left:1.5px solid var(--cut);border-bottom:1.5px solid var(--cut);border-bottom-left-radius:7px}
+.left.tree.more::after{content:"";position:absolute;left:calc((var(--depth) - 1) * var(--indent) + var(--rank) + var(--colgap) + 5px);top:50%;bottom:0;border-left:1.5px solid var(--cut)}
+.kids{position:relative}
+.title{flex:1;min-width:0;font-weight:700;font-size:14px;line-height:1.3;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.d1 .title{font-weight:600;font-size:13.5px}
+.d2 .title{font-weight:500;font-size:13px;color:var(--ink)}
+.rnum{width:var(--rank);flex:none;text-align:right;font-size:13px;font-weight:700;color:var(--mute);font-variant-numeric:tabular-nums}
+.left .hdot{margin-left:calc(var(--depth, 0) * var(--indent))}
+.slot{width:44px;flex:none;display:flex;justify-content:flex-end}
+.chev{display:inline-flex;align-items:center;gap:4px;height:26px;padding:0 9px;border-radius:999px;background:var(--control);color:var(--mute);font-size:12px;font-weight:700;flex:none}
+.chev svg{transition:transform .15s}
+.chev.open svg{transform:rotate(180deg)}
+.row.parent:hover .chev{background:var(--grid);color:var(--ink)}
+.lane{position:relative;height:100%;min-height:40px;
+background-image:linear-gradient(var(--today),var(--today)),repeating-linear-gradient(to right,var(--grid) 0 1px,transparent 1px var(--week));
+background-size:2px 100%,100% 100%;background-repeat:no-repeat;background-position:calc(var(--weeks) * var(--week) * var(--now) / 100 - 1px) 0,0 0}
+.seg{position:absolute;top:50%;height:20px;margin-top:-10px;z-index:2}
+.d1 .seg,.d2 .seg{height:12px;margin-top:-6px}
+.seg.first{border-radius:999px 0 0 999px}.seg.last{border-radius:0 999px 999px 0}.seg.first.last{border-radius:999px}
+.ahead{background:var(--ahead)}
+.slip{background:repeating-linear-gradient(135deg,var(--slip-a) 0 6px,var(--slip-b) 6px 12px)}
+.slip.over{background:repeating-linear-gradient(135deg,var(--slip-b) 0 6px,transparent 6px 12px)}
+.tick{position:absolute;top:50%;width:3px;height:26px;margin:-13px 0 0 -1.5px;border-radius:2px;background:var(--ink);z-index:3}
+.d1 .tick,.d2 .tick{height:18px;margin-top:-9px}
+/* A Promotion Milestone date is a diamond, a goal's own Committed date a bar, so a parent and a sub-goal on one day tell apart (review X12). */
+.tick.pm,.d1 .tick.pm,.d2 .tick.pm{width:11px;height:11px;margin:-5.5px 0 0 -5.5px;border-radius:2px;transform:rotate(45deg);box-shadow:0 0 0 2px var(--card)}
+.ticklbl{position:absolute;bottom:calc(50% + 11px);font-size:11px;font-weight:800;white-space:nowrap;z-index:3}
+.line{position:absolute;top:50%;height:0;margin-top:-1px;z-index:2;border-top:2px solid var(--ambition-line)}
+.line.Fantasy{border-top:2px dotted var(--fantasy-line)}
+.dot{position:absolute;top:50%;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border-radius:50%;z-index:3;background:var(--ambition);box-shadow:0 0 0 2px var(--card)}
+.dot.Fantasy{background:var(--card);box-shadow:inset 0 0 0 1.5px var(--fantasy),0 0 0 2px var(--card)}
+.endlbl{position:absolute;top:calc(50% + 8px);font-size:11px;font-weight:600;white-space:nowrap;color:var(--mute);z-index:3}
+.endlbl.Ambition{color:var(--ambition-ink)}.endlbl.Fantasy{color:var(--fantasy-ink)}
+/* An edge label sits in the label band above the bars, with no fill, so it covers no bar, tick, or label (rule 23). */
+.edge{position:absolute;bottom:calc(50% + 11px);font-size:11px;font-weight:800;z-index:3;white-space:nowrap}
+.edge.below{bottom:auto;top:calc(50% + 8px);font-weight:600}
+/* A label keeps a halo of the card color, so the today line and the grid never run through its text. */
+.ticklbl,.endlbl,.edge{text-shadow:0 0 2px var(--card),0 0 2px var(--card),0 0 3px var(--card)}
+.d1 .edge.above,.d2 .edge.above{bottom:calc(50% + 8px)}
+.edge>.ticklbl,.edge>.endlbl{position:static;font-size:inherit;font-weight:inherit}
+.edge.after{transform:translateX(-100%)}
+.edge.Ambition{color:var(--ambition-ink)}.edge.Fantasy{color:var(--fantasy-ink)}
+.cut{position:relative;z-index:6;display:flex;align-items:center;gap:10px;margin:0;padding:12px 0 6px;color:var(--mute);font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.cut::before,.cut::after{content:"";flex:1;border-top:1.5px dashed var(--cut)}
+.cut::before{flex:0 0 24px}
+.cut span{position:sticky;left:12px;background:var(--card);padding:0 4px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 20px;justify-content:flex-end;margin-top:12px;font-size:12px;color:var(--mute)}
+.lg{position:relative;display:inline-flex;align-items:center;gap:7px}
+.lg .help{margin-left:0}
+.sw{display:inline-block;width:22px;height:8px;border-radius:999px}
+.sw.health{background:var(--green)}.sw.ahead{background:var(--ahead)}.sw.slip{background:repeating-linear-gradient(135deg,var(--slip-a) 0 4px,var(--slip-b) 4px 8px)}
+.sw.pm{width:8px;height:8px;border-radius:1px;background:var(--ink);transform:rotate(45deg);margin:0 7px}
+.sw.Ambition{height:0;border-top:2px solid var(--ambition-line);border-radius:0}.sw.Fantasy{height:0;border-top:2px dotted var(--fantasy);border-radius:0}
+.z-quarters .lane{background-image:linear-gradient(var(--today),var(--today))}
+.z-months .lane,.z-quarters .lane{--grid:var(--line)}
+.z-months .ticklbl,.z-months .endlbl,.z-quarters .ticklbl,.z-quarters .endlbl{font-size:11px}
+.when{display:none;font-size:12px;color:var(--mute);padding:0 0 6px calc(var(--depth, 0) * var(--indent) + var(--rank) + 2 * var(--colgap))}
+.when.inherited,.inherited{opacity:.8}
+.when .date{color:var(--ink)}.when .light .date{color:var(--mute)}.when.inherited .date{color:var(--mute)}
+
+/* The List (rule V2): one grid, titled once in a 32 px header that stays on screen. Only the title wraps; every other cell is one line. */
+.list{--rank:28px;--colgap:12px}
+.list .lhead,.list .row{display:grid;grid-template-columns:28px minmax(240px,1fr) 48px 96px 192px 156px minmax(160px,.6fr);column-gap:12px;align-items:center}
+.lhead{position:sticky;top:var(--topbar);z-index:8;height:32px;background:var(--card);border-bottom:1px solid var(--line)}
+.col{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lhead .c-priority{grid-column:1/3}
+.lhead .c-owner{text-align:center}
+.list .row{min-height:40px}
+.list .row.d1,.list .row.d2{min-height:36px}
+.list .row>.left{grid-column:1/4;gap:12px;padding:6px 0;min-height:0;box-shadow:none}
+.list .row>.left .av{margin:0 12px}
+.list .title{margin-left:calc(var(--depth, 0) * var(--indent));line-height:18px}
+.list .group{border-bottom:0}
+.list .row.d0{border-top:1px solid var(--line)}
+.list .lbody>.group:first-child .row.d0{border-top:0}
+.cell{font-size:13px;font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell.c-health{display:flex;align-items:center;font-size:12px;font-weight:800;letter-spacing:.02em}
+.cell.c-ptg{font-weight:500}
+.light{color:var(--mute)}
+.pfx{display:none}
+.list .when{padding-left:calc(var(--depth, 0) * var(--indent) + var(--rank) + var(--colgap))}
+/* On a narrow board Promotion Milestone and PTG drop to a second line in the row, each named. */
+@container (max-width:991px){
+.list .lhead,.list .row{grid-template-columns:28px minmax(180px,1fr) 48px 96px 200px}
+.lhead .c-promotion-milestone,.lhead .c-ptg{display:none}
+.list .cell.c-promotion-milestone{grid-column:2/4}
+.list .cell.c-ptg{grid-column:4/6}
+.list .cell.c-promotion-milestone:not(:empty),.list .cell.c-ptg:not(:empty){padding-bottom:6px;font-size:12px}
+.pfx{display:inline;color:var(--mute)}}
+
+/* The Calendar: a month, Monday first. */
+.cal{border-radius:14px;border:1px solid var(--line)}
+.calhead,.calweek{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
+.dow{padding:8px 10px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);background:var(--sub-bg);border-bottom:1px solid var(--line)}
+.calhead .dow:first-child{border-top-left-radius:14px}.calhead .dow:last-child{border-top-right-radius:14px}
+.day{position:relative;min-height:112px;padding:6px 6px 8px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:4px;min-width:0;box-sizing:border-box}
+.calweek .day:last-child{border-right:0}.calweek:last-child .day{border-bottom:0}
+.day.out{background:var(--sub-bg)}.day.out .dnum{color:var(--mute)}
+.dnum{align-self:flex-start;min-width:24px;height:24px;padding:0 6px;box-sizing:border-box;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--mute);font-variant-numeric:tabular-nums}
+.day.today .dnum{background:var(--today);color:var(--today-ink);font-weight:800}
+.dfull{display:none}
+.chip{display:flex;align-items:center;gap:6px;min-height:26px;padding:4px 8px;box-sizing:border-box;border-radius:9px;background:var(--control);font-size:12px;font-weight:600;min-width:0}
+.chip .hdot{width:8px;height:8px}
+.ctitle{flex:1;min-width:0;line-height:1.3;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
+.mk{flex:none;display:inline-block;width:14px;height:6px;border-radius:999px}
+.mk.Committed{background:var(--ink)}
+.mk.Ambition{background:var(--ambition-line)}
+.mk.pm{width:7px;height:7px;border-radius:1px;background:var(--ink);transform:rotate(45deg);margin:0 3.5px}
+.mk.Fantasy{height:0;border-top:2px dotted var(--fantasy);border-radius:0}
+.mk.slip{background:repeating-linear-gradient(135deg,var(--red) 0 3px,var(--slip-b) 3px 6px);box-shadow:inset 0 0 0 1px var(--red)}
+.more{position:relative}
+.morebtn{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:700;color:var(--mute)}
+.morebtn:hover,.morebtn.on{background:var(--control);color:var(--ink)}
+.morelist{position:absolute;z-index:20;left:0;top:calc(100% + 4px);width:max(100%,220px);padding:6px;border-radius:12px;background:var(--card);box-shadow:0 8px 28px var(--tip-shadow);display:flex;flex-direction:column;gap:4px}
+.calweek .day:nth-child(n+5) .morelist{left:auto;right:0}
+
+.signin{max-width:32rem;margin:15vh auto;text-align:center;display:block}
+
+/* Polish (review X18): the summary cards lift a little under the pointer; a skeleton holds the screen's shape while it loads. */
+.cards>.card{min-height:132px;box-sizing:border-box;transition:box-shadow .12s ease,transform .12s ease}
+.cards>.card:hover{transform:translateY(-1px);box-shadow:0 2px 4px var(--shadow),0 10px 24px rgba(47,58,51,.09)}
+.skel{border-radius:10px;background:linear-gradient(90deg,var(--control) 0,var(--line) 40%,var(--control) 80%);background-size:300% 100%;animation:skel 1.2s ease-in-out infinite}
+.skel-title{width:220px;height:30px;margin:0 0 20px}
+.skel-line{height:14px;margin:0 0 12px}.skel-line.short{width:40%}
+.skel-row{height:40px;margin:0 0 10px}
+@keyframes skel{0%{background-position:100% 0}100%{background-position:0 0}}
+@media (prefers-reduced-motion:reduce){.skel{animation:none}}
+
+/* On touch every control answers a 44 px tap, even when it draws smaller (rule 29). No parent clips the tap area. */
+@media (pointer:coarse){
+.vtab,.gbtn,.btn,.count,.q,.morebtn,.chip-x,.av{position:relative}
+.vtab::after,.gbtn::after,.btn::after,.count::after,.q::after,.morebtn::after,.chip-x::after,.av::after{content:"";position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}}
+.tip.name{transform:translateX(-50%);white-space:nowrap;padding:6px 10px}
+
+.phonesum{margin:0 0 12px}.phonesum .counts{margin:0;font-size:16px}
+
+/* Phone (rules 32 to 34). The app sets the `phone` class on the root from its one phone width (review E11). */
+.phone .top{padding:12px 16px}
+.phone main{padding:20px 16px 40px}
+.phone .tab{margin-left:4px}
+.phone{--topbar:59px;scrollbar-gutter:auto}
+.phone .board{order:1;padding:14px 12px 12px;--left:100%;--gap:0px}
+.phone .cards{order:2;grid-template-columns:1fr;gap:10px;margin:16px 0 0}
+.phone .card{padding:14px 16px}
+.phone .big{font-size:18px}
+.phone .toolbar h2{flex:1}
+.phone .vtab-timeline{display:none}
+.phone .tbreak{display:none}
+.phone .toolbar .search{order:5;flex:1 1 100%;width:100%;height:40px;margin:4px 0 0}
+.phone .tright{order:6;width:100%;margin:4px 0 0}
+.phone .range{flex:1;justify-content:space-between}
+.phone .range .pgroup,.phone .range .btn{height:40px}
+.phone .corner{position:static;padding:0;box-shadow:none}
+.phone .row{grid-template-columns:minmax(0,1fr)}
+.phone .row>.left{position:relative;box-shadow:none}
+.phone .left{padding-right:4px}
+.phone .when{display:block}
+.phone .list .row{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:10px;padding-bottom:6px;min-height:0}
+.phone .list .row>.left{width:100%}
+.phone .list .cell{display:none}
+.phone .list .cell.c-ptg:not(:empty){display:block;flex-basis:100%;padding:0 0 4px calc(var(--depth, 0) * var(--indent) + var(--rank) + var(--colgap));font-size:12px;color:var(--mute);white-space:normal}
+.phone .list .pfx{display:none}
+.phone .cal{border:0;border-radius:0}
+.phone .calhead{display:none}
+.phone .calweek{display:block}
+.phone .day{display:none;min-height:0;border:0;border-bottom:1px solid var(--line);padding:10px 0}
+.phone .day.has{display:flex}
+.phone .day.out.has{background:none}
+.phone .dnum{display:none}
+.phone .dfull{display:block;font-size:12px;font-weight:800;color:var(--mute)}
+.phone .day.today .dfull{color:var(--today)}
+.phone .rangelbl{padding:0 4px;font-size:12px}
+
+.phone .hword{position:static;width:auto;height:auto;overflow:visible;clip:auto;font-size:11px;font-weight:800;letter-spacing:.02em;margin-left:5px}
+.phone .title{-webkit-line-clamp:3}
+/* On a phone the count chip moves to the date line, so the title takes the width up to the avatar. */
+.phone .left .slot{display:none}
+.when .chev{margin-left:8px;height:22px}
+.chev.inline{display:none}.phone .chev.inline{display:inline-flex}
+.calempty{display:none}.phone .calempty{display:block}
+.phone .legend{display:none}
+.phone .cards>.card{min-height:0}
+.phone .lhead{display:none}
+
+/* A goal title on Home opens its goal page. */
+a.title{color:var(--ink);text-decoration:none}
+a.title:hover{text-decoration:underline;text-underline-offset:3px}
+button.chev{border:0;font:inherit;font-size:12px;font-weight:700}
+button.chev:hover{background:var(--grid);color:var(--ink)}
+
+/* The goal page (docs/design/goal-page-and-create.md, G1 to G5, G12, G21). One column, 1040 px at most. */
+.goalpage{max-width:1104px}
+.back{align-self:flex-start;margin:0 0 14px;font-size:13px;font-weight:700;color:var(--link);text-decoration:none}
+.back:hover{text-decoration:underline}
+.ghead{padding:22px 24px;user-select:text;-webkit-user-select:text}
+.gtitle{font-size:26px;font-weight:800;margin:0 0 6px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+.gmeta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin:0 0 14px;font-size:13px;color:var(--mute)}
+.gowner{display:inline-flex;align-items:center;gap:6px}
+.ghealth{margin:0 0 12px;display:flex;align-items:center;font-size:12px;font-weight:800}
+.gjudged .lbl{font-size:11px;margin:0 0 2px}
+.gdate{font-size:22px;font-weight:800;margin:0 0 4px}
+.gother{display:block;font-size:15px;color:var(--mute);margin:0 0 2px}
+.gptg{margin-top:12px;padding:16px 20px}
+.gptg.RED{box-shadow:inset 0 0 0 2px var(--red-bg)}.gptg.YELLOW{box-shadow:inset 0 0 0 2px var(--yellow-bg)}
+.gsubs h2{font-size:16px;font-weight:800;margin:24px 0 10px}
+.gsub{display:flex;align-items:center;gap:10px;padding:12px 16px;margin:0 0 8px}
+.gsub .title{flex:1}
+.chev.static{cursor:default}

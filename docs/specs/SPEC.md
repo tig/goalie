@@ -165,7 +165,7 @@ Structured fields are state, date type, health, PTG, rank, and every other field
 
 | Field | Type | Required | Rules / meaning |
 |---|---|---|---|
-| `id` | Stable, human-readable key (e.g. `GOAL-123`) | auto | Never reused. Linkable by people, agents, and other systems. |
+| `id` | Stable, human-readable key (e.g. `GOAL-0123`) | auto | Never reused. Linkable by people, agents, and other systems. The prefix is the owner setting `goal_key_prefix` ([§12 (Configuration points)](#s12)), default `GOAL`. |
 | `version` | Integer | auto | The version of this goal ([§6 (Data model)](#s6)). A committed write advances it. |
 | `summary` | Short text | yes | Pithy and self-describing, with a verb (Increase, Launch, Reduce…). Lint: 5 words or more, or no verb. |
 | `description` | Long text (Markdown) | yes | Should cover: (a) key results; (b) the metrics used to track it and how often they are reviewed; (c) why it matters and what it contributes to (e.g. a theme in the operating plan); (d) who shares responsibility for delivering it (joint owners, not dependencies). Notes are added over time. Lint: any of (a)–(d) missing. Concurrent editing follows [§6.5 (Doc)](#s6-5). |
@@ -359,7 +359,7 @@ Where the implementation can do these natively it does. Otherwise an agent does 
 A view is a screen a human opens in the app, and a saved definition of which goals it shows, which columns it shows, and how it sorts (invariant). The saved definition selects goals by level, org unit, owner, type, severity, priority, date type, health, and period. It is not a database view. The app renders that saved definition. A database view alone must not satisfy this requirement. A screen with no saved definition must not satisfy it either.
 
 - **Default columns:** Summary, State, Health, due date (changed if set, otherwise original), **Date Type**, Promotion Milestone and its date (if not Committed), Owner, PTG. Plan and Work Product are one click away.
-- **Default sort:** RED, YELLOW, GREEN.
+- **Default sort:** RED, YELLOW, GREEN. The *Priorities* view sorts by Priority rank instead. It is the default view, drawn as a timeline: one row per Priority in rank order, its goals on that row, health as the color, and each date marked by its Date Type.
 - **Default date presentation:** the Date Type is shown next to the date, so an uncommitted date doesn't read as a promise. Custom views can drop the column.
 - **Standard views:** organization overview; one per org unit; *My goals*; *Promotions due* (Promotion Milestones due soon, default 2 weeks); *Priorities* (an org unit's ranked list, with the goals mapped to each entry and the cut line shown); *Hygiene*; period-end scorecard.
 - **Between reviews:** *My goals* and the view for each org unit are where a human works between reviews, not only during a review (invariant).
