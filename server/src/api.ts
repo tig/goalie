@@ -169,6 +169,8 @@ export type GoalPageResponse = {
   started: string;
   /** The state a Close would record now: Completed, or Completed Late against original_committed_date (G15). Null when the goal cannot be completed. */
   closesAs: "Completed" | "Completed Late" | null;
+  /** G15 Promote and close: the state an In Progress Ambition goal would close as, once promoted on its own date. Null otherwise. */
+  closesAsPromoted: "Completed" | "Completed Late" | null;
   /** The goal's Promotion Milestone, and what is still open under it (G14). */
   promotionMilestone: (GoalRef & { version: number; state: State; date: string; openSubGoals: number; openWorkItems: number }) | null;
   parent: GoalRef | null;
