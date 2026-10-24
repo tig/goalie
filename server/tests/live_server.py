@@ -98,6 +98,17 @@ def get(proc: subprocess.Popen[bytes], port: int, path: str, headers: dict[str, 
     raise AssertionError(f"{path} did not answer: {last_error}\n{stderr}")
 
 
+def post(proc: subprocess.Popen[bytes], port: int, path: str, body: object, headers: dict[str, str] | None = None) -> Reply:
+    """POST body as JSON, or as raw bytes when it is bytes. The server must already answer (call get first)."""
+    data = body if isinstance(body, bytes) else json.dumps(body).encode("utf-8")
+    request = urllib.request.Request(f"http://127.0.0.1:{port}{path}", data=data, method="POST", headers={"Content-Type": "application/json", **(headers or {})})
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            return Reply(response.status, response.headers.get("Content-Type", ""), response.read())
+    except urllib.error.HTTPError as error:
+        return Reply(error.code, error.headers.get("Content-Type", ""), error.read())
+
+
 def signed(subject: str) -> tuple[str, dict[str, str]]:
     """A token for subject, and the GOALIE_ISSUERS environment that trusts it."""
     now = int(time.time())
