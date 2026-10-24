@@ -6,7 +6,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
 import type { ActorRef, ApiError, PrioritiesResponse } from "./api.ts";
 import { configuredIssuers, resolveActor, type Issuer } from "./auth.ts";
-import { configuredDatabase, configuredOrgUnit, configuredWebDist } from "./config.ts";
+import { configuredDatabase, configuredOrgUnit, configuredTimeZone, configuredToday, configuredWebDist } from "./config.ts";
 import { prioritiesView } from "./priorities.ts";
 import { BRAND_SLOT, brandHead } from "./brand.ts";
 import { signInPage } from "./signin.ts";
@@ -59,7 +59,7 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
   // Resolve the org unit once (review E22). An empty store has none yet, so try again until it does.
   let orgUnit = "";
   const unit = () => (orgUnit ||= configuredOrgUnit(db));
-  app.get("/api/priorities", (c) => c.json<PrioritiesResponse>({ ...prioritiesView(db, unit()), me: c.get("actor") }));
+  app.get("/api/priorities", (c) => c.json<PrioritiesResponse>({ ...prioritiesView(db, unit(), configuredToday(db), configuredTimeZone(db)), me: c.get("actor") }));
   app.all("/api/*", (c) => refuse(c, 404, "not_found", `no API route ${c.req.method} ${c.req.path}`));
   app.get("/assets/*", async (c) => {
     const body = await built(webDist, c.req.path);

@@ -67,7 +67,9 @@ export function checkGoal(store: Lookup, goal: Row): Violation[] {
       );
     }
   }
-  if (goal.changed_due_date != null && !isDate(goal.changed_due_date)) {
+  if (goal.changed_due_date != null && goal.date_type !== "Committed") {
+    add("changed-date-only-when-committed", `${goal.id}: only a Committed goal has a changed_due_date. It records a slip.`);
+  } else if (goal.changed_due_date != null && !isDate(goal.changed_due_date)) {
     add("real-date", `${goal.id}: changed_due_date ${String(goal.changed_due_date)} is not a calendar date.`);
   }
   if ((COMPLETED_STATES as readonly unknown[]).includes(goal.state) && goal.date_type !== "Committed") {
@@ -170,10 +172,20 @@ export function checkTransition(kind: string, before: Row | undefined, after: Ro
   return found;
 }
 
-/** Who may write what (SPEC.md §6.9, §10, §12; ADR 0011). `actor` is the writer's row; `before` is the row the write replaces. */
-export function checkAuthor(actor: Row, kind: string, before: Row | undefined, after: Row): Violation[] {
+/**
+ * Who may write what (SPEC.md §6.9, §10, §12; ADR 0011). `actor` is the writer's row; `before` is the row the write replaces.
+ * `owner` is the GOALIE owner, or undefined before the owner settings exist.
+ */
+export function checkAuthor(actor: Row, owner: string | undefined, kind: string, before: Row | undefined, after: Row): Violation[] {
   if (actor.kind === "agent" && (kind === "goal" || kind === "priority")) {
     return [{ rule: "agent-writes-a-draft", message: `${actor.id} is an agent. An agent proposes a change to a ${kind} as a Draft.` }];
+  }
+  // An actor row maps a token to an actor, and an org unit holds the goals. A write there could take over another actor.
+  if ((kind === "actor" || kind === "org_unit") && (actor.kind !== "human" || (owner !== undefined && actor.id !== owner))) {
+    return [{ rule: "owner-writes-actors", message: `${actor.id}: only the GOALIE owner writes actors and org units.` }];
+  }
+  if (kind === "draft" && before === undefined && (actor.kind !== "agent" || after.actor !== actor.id)) {
+    return [{ rule: "draft-by-its-agent", message: `${actor.id}: an agent proposes a Draft as itself.` }];
   }
   if (kind === "owner_settings" && actor.id !== (before ?? after).owner) {
     return [{ rule: "owner-settings", message: `${actor.id}: only the GOALIE owner changes owner settings.` }];

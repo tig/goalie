@@ -27,7 +27,7 @@ const { prioritiesView } = await import("./src/priorities.ts");
 const db = openStore(process.argv[2]);
 const seeded = seed(db, JSON.parse(readFileSync("seed/excaliwire.json", "utf-8")));
 if (!seeded.ok) throw new Error(JSON.stringify(seeded));
-process.stdout.write(JSON.stringify({ ...prioritiesView(db, "excaliwire", new Date()), me: { id: "chelsea", name: "Chelsea" } }));
+process.stdout.write(JSON.stringify({ ...prioritiesView(db, "excaliwire", process.argv[1], "UTC"), me: { id: "chelsea", name: "Chelsea" } }));
 """
 
 

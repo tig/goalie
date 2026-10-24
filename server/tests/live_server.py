@@ -16,6 +16,8 @@ from pathlib import Path
 from typing import Iterator
 
 SERVER = Path(__file__).resolve().parents[1]
+# Every test runs on this day unless it sets GOALIE_TODAY itself. No test reads the wall clock for a product date.
+TODAY = "2026-10-23"
 ISSUER = "https://issuer.test/tenant/v2.0"
 AUDIENCE = "api://goalie-test"
 
@@ -50,6 +52,7 @@ def running_server(
     """Yield the process and its port. Stop the process on exit. The database defaults to a temporary file."""
     port = free_port()
     env = os.environ.copy()
+    env["GOALIE_TODAY"] = TODAY
     env.update(extra_env or {})
     env["PORT"] = str(port)
     env["HOST"] = "127.0.0.1"

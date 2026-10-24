@@ -218,6 +218,25 @@ class WritePathTests(unittest.TestCase):
             self.assertIn(date, result["violations"][0]["message"])
         self.rejected(update("goal", "GOAL-57", 1, {"changed_due_date": "2026-11-31"}, "Slip"), "real-date")
 
+    def test_a_changed_date_is_only_for_a_committed_goal(self) -> None:
+        # SPEC.md §6.1: changed_due_date is optional, and only when Committed.
+        result = self.rejected(create("goal", "GOAL-42", {**EXAMPLE, "date_type": "Fantasy", "changed_due_date": "2027-04-30"}, "Planned"), "changed-date-only-when-committed")
+        self.assertIn("GOAL-42", result["violations"][-1]["message"])
+
+    def test_a_date_lies_between_1970_and_9999(self) -> None:
+        # Review Q10.
+        self.rejected(create("goal", "GOAL-42", {**EXAMPLE, "due_date": "1969-12-31"}, "Planned"), "real-date")
+        self.rejected(update("goal", "GOAL-57", 1, {"changed_due_date": "0099-01-01"}, "Slip"), "real-date")
+
+    def test_a_command_that_is_not_an_object_is_a_bad_command(self) -> None:
+        env = {**os.environ, "GOALIE_DB": str(self.store.path)}
+        for raw in (b"null", b"[]", b'"update"', b"7"):
+            proc = subprocess.run(["node", "--no-warnings", "src/cli.ts", "write", "--as", JANE], cwd=SERVER, env=env, input=raw, capture_output=True, timeout=30)
+            self.assertNotIn(b"TypeError", proc.stderr, raw)
+            self.assertEqual(json.loads(proc.stdout)["error"], "bad_command", raw)
+        result = self.store.run("write", "--as", JANE, stdin={"op": "create", "kind": "doc", "fields": ["kind"]})[1]
+        self.assertEqual(result["error"], "bad_command", result)
+
     def test_a_committed_date_moves_only_by_a_slip(self) -> None:
         # Review Q1: rewriting due_date in place would erase the slip (SPEC.md §6.1: no silent re-baselines).
         result = self.rejected(update("goal", "GOAL-57", 1, {"due_date": "2026-12-15"}, "New date"), "no-silent-re-baseline")
@@ -324,6 +343,67 @@ class BootstrapTests(unittest.TestCase):
         result = store.write("tig", create("actor", "tig", {"kind": "human", "display_name": "Tig"}))
         self.assertTrue(result["ok"], result)
         self.assertEqual(store.events()[0]["actor"], "tig")
+
+
+class PermissionTests(unittest.TestCase):
+    """Only the GOALIE owner writes actor and org_unit rows. An agent never does. An agent's Draft is its own (SPEC.md §6.9, §10, §12)."""
+
+    def setUp(self) -> None:
+        self.store = Store()
+        self.addCleanup(self.store.close)
+        for actor, command in [
+            (JANE, create("actor", JANE, {"kind": "human", "display_name": "Jane", "subject": "sub-jane"})),
+            (JANE, create("actor", "tig", {"kind": "human", "display_name": "Tig", "subject": "sub-tig"})),
+            (JANE, create("org_unit", "company", {"name": "Example", "level": "Company", "owner": "tig"})),
+            ("tig", create("owner_settings", "owner", {"owner": "tig", "settings": {}})),
+            ("tig", create("actor", "bot", {"kind": "agent", "display_name": "Bot", "operator": "tig", "app_id": "app-bot"})),
+            ("tig", create("goal", "GOAL-1", committed_milestone(owner="tig", org_unit="company", level="Company"), "Planned")),
+        ]:
+            result = self.store.write(actor, command)
+            assert result["ok"], (command, result)
+
+    def refused(self, actor: str, command: dict[str, Any], rule: str) -> None:
+        result = self.store.write(actor, command)
+        self.assertFalse(result["ok"], result)
+        self.assertIn(rule, [v["rule"] for v in result.get("violations", [])], result)
+
+    def test_an_agent_cannot_make_itself_human(self) -> None:
+        self.refused("bot", update("actor", "bot", 1, {"kind": "human", "operator": None}), "owner-writes-actors")
+        self.assertEqual(self.store.read("actor", "bot")["kind"], "agent")
+
+    def test_an_agent_cannot_create_a_human(self) -> None:
+        self.refused("bot", create("actor", "eve", {"kind": "human", "display_name": "Eve", "subject": "sub-eve"}), "owner-writes-actors")
+
+    def test_an_agent_cannot_change_its_operator_or_app_id(self) -> None:
+        self.refused("bot", update("actor", "bot", 1, {"operator": JANE}), "owner-writes-actors")
+        self.refused("bot", update("actor", "bot", 1, {"app_id": "app-other"}), "owner-writes-actors")
+
+    def test_an_agent_cannot_rename_the_org_unit(self) -> None:
+        self.refused("bot", update("org_unit", "company", 1, {"name": "Taken"}), "owner-writes-actors")
+
+    def test_a_human_who_is_not_the_owner_cannot_rewrite_a_token_mapping(self) -> None:
+        self.refused(JANE, update("actor", "tig", 1, {"subject": "sub-jane"}), "owner-writes-actors")
+        self.refused(JANE, update("actor", JANE, 1, {"subject": "sub-other"}), "owner-writes-actors")
+        self.refused(JANE, update("org_unit", "company", 1, {"name": "Renamed"}), "owner-writes-actors")
+        self.assertEqual(self.store.read("actor", "tig")["subject"], "sub-tig")
+
+    def test_the_goalie_owner_writes_actors_and_org_units(self) -> None:
+        self.assertTrue(self.store.write("tig", update("actor", JANE, 1, {"subject": "sub-jane-2"}))["ok"])
+        self.assertTrue(self.store.write("tig", update("org_unit", "company", 1, {"name": "Example Inc"}))["ok"])
+
+    def test_before_there_is_an_owner_an_agent_still_cannot_write_actors(self) -> None:
+        store = Store()
+        self.addCleanup(store.close)
+        assert store.write(JANE, create("actor", JANE, {"kind": "human", "display_name": "Jane"}))["ok"]
+        assert store.write(JANE, create("actor", "bot", {"kind": "agent", "display_name": "Bot", "operator": JANE}))["ok"]
+        result = store.write("bot", create("actor", "eve", {"kind": "human", "display_name": "Eve"}))
+        self.assertIn("owner-writes-actors", [v["rule"] for v in result.get("violations", [])], result)
+
+    def test_an_agent_drafts_only_as_itself(self) -> None:
+        draft = {"entity": "GOAL-1", "base_version": 1, "change": {"health": "YELLOW"}, "reason": "Evidence"}
+        self.refused("bot", create("draft", "DRAFT-1", {**draft, "actor": "tig"}), "draft-by-its-agent")
+        self.refused("tig", create("draft", "DRAFT-2", {**draft, "actor": "tig"}), "draft-by-its-agent")
+        self.assertTrue(self.store.write("bot", create("draft", "DRAFT-3", {**draft, "actor": "bot"}))["ok"])
 
 
 class CliInputTests(unittest.TestCase):
