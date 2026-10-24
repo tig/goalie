@@ -302,7 +302,7 @@ export function PromotePanel({ data, onDone }: { data: GoalPageResponse; onDone:
 export function ClosePanel({ data, onDone }: { data: GoalPageResponse; onDone: (saved: boolean) => void }) {
   const { goal, promotionMilestone: pm } = data;
   // G15: an Ambition goal can be promoted and closed in one step. The server computes the state it closes as (closesAsPromoted).
-  const promoted = (data as GoalPageResponse & { closesAsPromoted?: StoredGoal["state"] | null }).closesAsPromoted ?? null;
+  const promoted = data.closesAsPromoted;
   const both = goal.date_type === "Ambition" && pm && promoted ? PROMOTE_AND_CLOSE : null;
   const choices = [data.closesAs, both, "Did Not Meet", "Deleted"].filter(Boolean) as string[];
   const [choice, setChoice] = useState(choices[0]);
