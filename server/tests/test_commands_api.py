@@ -84,6 +84,33 @@ class CommandsApiTests(unittest.TestCase):
         status, body = self.send(create_batch({"plan_maturity": "Crayon"}), check=True)
         self.assertEqual((status, body["at"]), (422, 4))
 
+    def test_check_returns_every_violation_with_its_command(self) -> None:
+        # Product Designer, via the Frontend Engineer: the New goal rail undercounted with only the first refused command.
+        batch = create_batch({"plan_maturity": "Crayon"})
+        batch[3]["fields"] = {**batch[3]["fields"], "severity": None}
+        status, body = self.send(batch, check=True)
+        self.assertEqual((status, body["at"]), (422, 3))
+        found = [(v["at"], v["rule"]) for v in body["all"]]
+        self.assertIn((3, "required-field"), found)
+        self.assertIn((4, "committed-needs-pencil"), found)
+        self.assertEqual(body["violations"], [{k: v for k, v in x.items() if k != "at"} for x in body["all"] if x["at"] == 3])
+        self.assertIsNone(self.store.read("goal", "XW-0012"))
+
+    def test_a_check_skips_a_command_whose_ref_was_refused(self) -> None:
+        batch = create_batch()
+        batch[0]["fields"] = {**batch[0]["fields"], "due_date": "2026-13-45"}
+        status, body = self.send(batch, check=True)
+        self.assertEqual(status, 422)
+        self.assertEqual({v["at"] for v in body["all"]}, {0})
+        self.assertNotIn("unknown-ref", json.dumps(body))
+
+    def test_a_real_save_stops_at_the_first_refusal(self) -> None:
+        batch = create_batch({"plan_maturity": "Crayon"})
+        batch[3]["fields"] = {**batch[3]["fields"], "severity": None}
+        status, body = self.send(batch)
+        self.assertEqual((status, body["at"]), (422, 3))
+        self.assertNotIn("all", body)
+
     def test_a_ref_used_before_it_is_made_is_a_bad_command(self) -> None:
         batch = create_batch()
         status, body = self.send([batch[1], batch[0]])

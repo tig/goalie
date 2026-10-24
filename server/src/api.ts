@@ -227,12 +227,13 @@ export type ApiViolation = { rule: string; message: string; field?: string };
 
 /**
  * The answer to POST /api/commands. `at` is the index of the command that failed.
+ * With check: true, an invalid answer also carries `all`: every violation of every refused command, each with its `at`.
  * HTTP: 200 ok, 409 stale or exists, 422 invalid, 404 not_found, 400 bad_command, 403 unknown_actor.
  */
 export type CommandsResponse =
   | { ok: true; ids: Record<Ref, string>; events: ApiEvent[] }
   | { ok: false; at: number; error: "stale"; current: StoredGoal | ApiWorkItem }
-  | { ok: false; at: number; error: "invalid"; violations: ApiViolation[] }
+  | { ok: false; at: number; error: "invalid"; violations: ApiViolation[]; all?: (ApiViolation & { at: number })[] }
   | { ok: false; at: number; error: "not_found" | "exists" | "bad_command" | "unknown_actor"; message: string };
 
 /** GET /api/work, or GET /api/work?owner=<actor id> for one actor's queue. Every work item, or that actor's, with the goals and actors they name. */
