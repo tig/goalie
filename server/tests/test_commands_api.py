@@ -142,7 +142,8 @@ class CommandsApiTests(unittest.TestCase):
     def test_a_work_item_key_has_four_digits(self) -> None:
         status, body = self.send([{"op": "create", "kind": "work_item", "ref": "$w", "fields": {"goal": "XW-0007", "title": "Draw the goal page", "owner": "chelsea", "status": "In Progress"}, "reason": "Filed"}])
         self.assertEqual(status, 200, body)
-        self.assertEqual(body["ids"], {"$w": "WI-0001"})
+        self.assertRegex(body["ids"]["$w"], r"^WI-\d{4}$")
+        self.assertEqual(self.store.read("work_item", body["ids"]["$w"])["title"], "Draw the goal page")
 
 
 if __name__ == "__main__":

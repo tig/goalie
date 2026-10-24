@@ -251,3 +251,29 @@ export function summaryLint(goal: Row): string | undefined {
   const words = String(goal.summary ?? "").trim().split(/\s+/).filter(Boolean);
   return words.length >= 5 ? undefined : `${goal.id}: the summary has ${words.length} words; it needs 5 or more.`;
 }
+
+/** The §6.1 description parts, each with words that show it is there. A heuristic: it flags, it does not block. */
+const DESCRIPTION_PARTS: { words: RegExp; hint: string }[] = [
+  { words: /key result/i, hint: "Add the key results" },
+  { words: /metric|measure/i, hint: "Add the metrics and how often they are reviewed" },
+  { words: /why|matters|contributes/i, hint: "Add why it matters" },
+  { words: /responsib|shares|joint owner/i, hint: "Add who shares responsibility" },
+];
+
+/** Lints from SPEC.md §6.1, as hints at the field they point to. They flag; they never block (§8.1). */
+export function goalLints(goal: Row): { field: string; text: string }[] {
+  const hints: { field: string; text: string }[] = [];
+  const words = String(goal.summary ?? "").trim().split(/\s+/).filter(Boolean).length;
+  if (words < 5) hints.push({ field: "summary", text: `The summary has ${words} words. Use 5 or more, starting with a verb.` });
+  const description = String(goal.description ?? "");
+  for (const part of DESCRIPTION_PARTS) if (!part.words.test(description)) hints.push({ field: "description", text: part.hint });
+  const ptg = goal.path_to_green as { trigger?: unknown } | null;
+  if (goal.health === "YELLOW" && (typeof ptg?.trigger !== "string" || ptg.trigger.trim() === "")) {
+    hints.push({ field: "path_to_green", text: "Name the trigger that turns this RED." });
+  }
+  const product = goal.work_product;
+  if (goal.type === "Milestone (Launch)" && goal.state === "In Progress" && (!Array.isArray(product) || product.length === 0)) {
+    hints.push({ field: "work_product", text: "Link the work product." });
+  }
+  return hints;
+}

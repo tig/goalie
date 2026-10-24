@@ -1,0 +1,904 @@
+{
+  "me": {
+    "id": "chelsea",
+    "name": "Chelsea",
+    "kind": "human"
+  },
+  "today": "2026-10-23",
+  "goal": {
+    "id": "XW-0007",
+    "version": 1,
+    "summary": "Open a goal and keep it true",
+    "description": "An MLP sub-goal on tig/goalie#47.",
+    "owner": "chelsea",
+    "org_unit": "excaliwire",
+    "level": "Company",
+    "type": "Milestone (Launch)",
+    "due_date": "2026-11-06",
+    "date_type": "Committed",
+    "promotion_milestone": null,
+    "plan": "https://github.com/tig/goalie/issues/50",
+    "committed_plan_version": null,
+    "plan_maturity": "Pencil",
+    "work_product": null,
+    "original_committed_date": "2026-11-06",
+    "changed_due_date": null,
+    "severity": "sev1",
+    "priority": null,
+    "state": "Backlog",
+    "health": null,
+    "path_to_green": null,
+    "origination": "New",
+    "parent": "XW-0004",
+    "visibility": "organization-wide"
+  },
+  "dates": [
+    {
+      "date": "2026-11-06",
+      "kind": "Committed"
+    }
+  ],
+  "inherited": false,
+  "started": "2026-10-23",
+  "closesAs": null,
+  "promotionMilestone": null,
+  "parent": {
+    "id": "XW-0004",
+    "summary": "Run the MLP prototype at goalie.excaliwire.com with Excaliwire's real goals loaded"
+  },
+  "priority": null,
+  "orgUnit": {
+    "id": "excaliwire",
+    "name": "Excaliwire",
+    "level": "Company"
+  },
+  "subGoals": [],
+  "workItems": [
+    {
+      "id": "WI-0001",
+      "version": 1,
+      "goal": "XW-0007",
+      "title": "Product spec: goal page and goal creation",
+      "owner": "product-manager",
+      "status": "Completed",
+      "due_date": "2026-10-23",
+      "links": null,
+      "late": false
+    },
+    {
+      "id": "WI-0002",
+      "version": 1,
+      "goal": "XW-0007",
+      "title": "Design: the goal page and New goal",
+      "owner": "product-designer",
+      "status": "Completed",
+      "due_date": "2026-10-23",
+      "links": null,
+      "late": false
+    },
+    {
+      "id": "WI-0003",
+      "version": 1,
+      "goal": "XW-0007",
+      "title": "Engineering plan: goal page and goal creation",
+      "owner": "head-of-engineering",
+      "status": "Completed",
+      "due_date": "2026-10-24",
+      "links": null,
+      "late": false
+    },
+    {
+      "id": "WI-0004",
+      "version": 1,
+      "goal": "XW-0007",
+      "title": "B1: the write route, POST /api/commands",
+      "owner": "backend-engineer",
+      "status": "Completed",
+      "due_date": "2026-10-24",
+      "links": null,
+      "late": false
+    },
+    {
+      "id": "WI-0005",
+      "version": 1,
+      "goal": "XW-0007",
+      "title": "B3: the goal page and form option routes",
+      "owner": "backend-engineer",
+      "status": "In Progress",
+      "due_date": "2026-10-26",
+      "links": null,
+      "late": false
+    },
+    {
+      "id": "WI-0008",
+      "version": 1,
+      "goal": "XW-0007",
+      "title": "F2: the goal page, read only",
+      "owner": "frontend-engineer",
+      "status": "Completed",
+      "due_date": "2026-10-24",
+      "links": null,
+      "late": false
+    },
+    {
+      "id": "WI-0009",
+      "version": 1,
+      "goal": "XW-0007",
+      "title": "F3: the goal page panels save as batches",
+      "owner": "frontend-engineer",
+      "status": "In Progress",
+      "due_date": "2026-10-27",
+      "links": null,
+      "late": false
+    },
+    {
+      "id": "WI-0012",
+      "version": 1,
+      "goal": "XW-0007",
+      "title": "Review the goal page build",
+      "owner": "qa",
+      "status": "Backlog",
+      "due_date": "2026-10-29",
+      "links": null,
+      "late": false
+    },
+    {
+      "id": "WI-0014",
+      "version": 1,
+      "goal": "XW-0007",
+      "title": "Run gate D for the goal page",
+      "owner": "chief-of-staff",
+      "status": "Backlog",
+      "due_date": "2026-11-03",
+      "links": null,
+      "late": false
+    }
+  ],
+  "events": [
+    {
+      "sequence": 311,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0014",
+      "field": "due_date",
+      "old": null,
+      "new": "2026-11-03",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 310,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0014",
+      "field": "status",
+      "old": null,
+      "new": "Backlog",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 309,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0014",
+      "field": "owner",
+      "old": null,
+      "new": "chief-of-staff",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 308,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0014",
+      "field": "title",
+      "old": null,
+      "new": "Run gate D for the goal page",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 307,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0014",
+      "field": "goal",
+      "old": null,
+      "new": "XW-0007",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 301,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0012",
+      "field": "due_date",
+      "old": null,
+      "new": "2026-10-29",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 300,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0012",
+      "field": "status",
+      "old": null,
+      "new": "Backlog",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 299,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0012",
+      "field": "owner",
+      "old": null,
+      "new": "qa",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 298,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0012",
+      "field": "title",
+      "old": null,
+      "new": "Review the goal page build",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 297,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0012",
+      "field": "goal",
+      "old": null,
+      "new": "XW-0007",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 286,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0009",
+      "field": "due_date",
+      "old": null,
+      "new": "2026-10-27",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 285,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0009",
+      "field": "status",
+      "old": null,
+      "new": "In Progress",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 284,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0009",
+      "field": "owner",
+      "old": null,
+      "new": "frontend-engineer",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 283,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0009",
+      "field": "title",
+      "old": null,
+      "new": "F3: the goal page panels save as batches",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 282,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0009",
+      "field": "goal",
+      "old": null,
+      "new": "XW-0007",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 281,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0008",
+      "field": "due_date",
+      "old": null,
+      "new": "2026-10-24",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 280,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0008",
+      "field": "status",
+      "old": null,
+      "new": "Completed",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 279,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0008",
+      "field": "owner",
+      "old": null,
+      "new": "frontend-engineer",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 278,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0008",
+      "field": "title",
+      "old": null,
+      "new": "F2: the goal page, read only",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 277,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0008",
+      "field": "goal",
+      "old": null,
+      "new": "XW-0007",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 266,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0005",
+      "field": "due_date",
+      "old": null,
+      "new": "2026-10-26",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 265,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0005",
+      "field": "status",
+      "old": null,
+      "new": "In Progress",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 264,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0005",
+      "field": "owner",
+      "old": null,
+      "new": "backend-engineer",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 263,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0005",
+      "field": "title",
+      "old": null,
+      "new": "B3: the goal page and form option routes",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 262,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0005",
+      "field": "goal",
+      "old": null,
+      "new": "XW-0007",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 261,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0004",
+      "field": "due_date",
+      "old": null,
+      "new": "2026-10-24",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 260,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0004",
+      "field": "status",
+      "old": null,
+      "new": "Completed",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 259,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0004",
+      "field": "owner",
+      "old": null,
+      "new": "backend-engineer",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 258,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0004",
+      "field": "title",
+      "old": null,
+      "new": "B1: the write route, POST /api/commands",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 257,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0004",
+      "field": "goal",
+      "old": null,
+      "new": "XW-0007",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 256,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0003",
+      "field": "due_date",
+      "old": null,
+      "new": "2026-10-24",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 255,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0003",
+      "field": "status",
+      "old": null,
+      "new": "Completed",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 254,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0003",
+      "field": "owner",
+      "old": null,
+      "new": "head-of-engineering",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 253,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0003",
+      "field": "title",
+      "old": null,
+      "new": "Engineering plan: goal page and goal creation",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 252,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0003",
+      "field": "goal",
+      "old": null,
+      "new": "XW-0007",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 251,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0002",
+      "field": "due_date",
+      "old": null,
+      "new": "2026-10-23",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 250,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0002",
+      "field": "status",
+      "old": null,
+      "new": "Completed",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 249,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0002",
+      "field": "owner",
+      "old": null,
+      "new": "product-designer",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 248,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0002",
+      "field": "title",
+      "old": null,
+      "new": "Design: the goal page and New goal",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 247,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0002",
+      "field": "goal",
+      "old": null,
+      "new": "XW-0007",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 246,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0001",
+      "field": "due_date",
+      "old": null,
+      "new": "2026-10-23",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 245,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0001",
+      "field": "status",
+      "old": null,
+      "new": "Completed",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 244,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0001",
+      "field": "owner",
+      "old": null,
+      "new": "product-manager",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 243,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0001",
+      "field": "title",
+      "old": null,
+      "new": "Product spec: goal page and goal creation",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 242,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "work_item",
+      "entity": "WI-0001",
+      "field": "goal",
+      "old": null,
+      "new": "XW-0007",
+      "reason": "Filed"
+    },
+    {
+      "sequence": 145,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0007",
+      "field": "visibility",
+      "old": null,
+      "new": "organization-wide",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 144,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0007",
+      "field": "parent",
+      "old": null,
+      "new": "XW-0004",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 143,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0007",
+      "field": "origination",
+      "old": null,
+      "new": "New",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 142,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0007",
+      "field": "state",
+      "old": null,
+      "new": "Backlog",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 141,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0007",
+      "field": "severity",
+      "old": null,
+      "new": "sev1",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 140,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0007",
+      "field": "original_committed_date",
+      "old": null,
+      "new": "2026-11-06",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 139,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0007",
+      "field": "plan_maturity",
+      "old": null,
+      "new": "Pencil",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 138,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0007",
+      "field": "plan",
+      "old": null,
+      "new": "https://github.com/tig/goalie/issues/50",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 137,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0007",
+      "field": "date_type",
+      "old": null,
+      "new": "Committed",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 136,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0007",
+      "field": "due_date",
+      "old": null,
+      "new": "2026-11-06",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 135,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0007",
+      "field": "type",
+      "old": null,
+      "new": "Milestone (Launch)",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 134,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0007",
+      "field": "level",
+      "old": null,
+      "new": "Company",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 133,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0007",
+      "field": "org_unit",
+      "old": null,
+      "new": "excaliwire",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 132,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0007",
+      "field": "owner",
+      "old": null,
+      "new": "chelsea",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 131,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0007",
+      "field": "description",
+      "old": null,
+      "new": "An MLP sub-goal on tig/goalie#47.",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 130,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0007",
+      "field": "summary",
+      "old": null,
+      "new": "Open a goal and keep it true",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    }
+  ],
+  "needsYou": {
+    "lateWorkItems": [],
+    "missingPtg": false
+  },
+  "hints": [
+    {
+      "field": "description",
+      "text": "Add the key results"
+    },
+    {
+      "field": "description",
+      "text": "Add the metrics and how often they are reviewed"
+    },
+    {
+      "field": "description",
+      "text": "Add why it matters"
+    },
+    {
+      "field": "description",
+      "text": "Add who shares responsibility"
+    }
+  ],
+  "actors": {
+    "backend-engineer": {
+      "id": "backend-engineer",
+      "name": "Backend Engineer",
+      "kind": "agent"
+    },
+    "chelsea": {
+      "id": "chelsea",
+      "name": "Chelsea",
+      "kind": "human"
+    },
+    "chief-of-staff": {
+      "id": "chief-of-staff",
+      "name": "Chief of Staff",
+      "kind": "agent"
+    },
+    "frontend-engineer": {
+      "id": "frontend-engineer",
+      "name": "Frontend Engineer",
+      "kind": "agent"
+    },
+    "head-of-engineering": {
+      "id": "head-of-engineering",
+      "name": "Head of Engineering",
+      "kind": "agent"
+    },
+    "product-designer": {
+      "id": "product-designer",
+      "name": "Product Designer",
+      "kind": "agent"
+    },
+    "product-manager": {
+      "id": "product-manager",
+      "name": "Product Manager",
+      "kind": "agent"
+    },
+    "qa": {
+      "id": "qa",
+      "name": "QA",
+      "kind": "agent"
+    },
+    "tig": {
+      "id": "tig",
+      "name": "Tig",
+      "kind": "human"
+    },
+    "user-researcher": {
+      "id": "user-researcher",
+      "name": "User Researcher",
+      "kind": "agent"
+    }
+  }
+}

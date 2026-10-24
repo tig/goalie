@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { ApiGoal, ApiPriority, ApiSummary, GoalDate, Health, PathToGreen, PrioritiesResponse, PtgStep } from "./api.ts";
 import { dateIn, day, daysBetween } from "./dates.ts";
-import { committedDate, currentDate, isOpen, OPEN_STATES, resolvedGoal, type State } from "./goal.ts";
+import { currentDate, goalDates, isOpen, OPEN_STATES, resolvedGoal, type State } from "./goal.ts";
 import { read, readAll } from "./read.ts";
 import type { Row } from "./rules.ts";
 
@@ -23,7 +23,7 @@ const PRIORITIES_VIEW = {
 } as const;
 
 /** A period is current when it names today's year ("2026") or quarter ("2026-Q4"). Calendar quarters are the default calendar (SPEC.md §12). */
-function isCurrentPeriod(period: string, todayIso: string): boolean {
+export function isCurrentPeriod(period: string, todayIso: string): boolean {
   const year = todayIso.slice(0, 4);
   const quarter = Math.floor((Number(todayIso.slice(5, 7)) - 1) / 3) + 1;
   return period === year || period === `${year}-Q${quarter}`;
@@ -34,7 +34,7 @@ function all(db: DatabaseSync, sql: string, ...params: string[]): Row[] {
 }
 
 /** When each goal started, as a day in `timeZone`: its first move to In Progress, else its first Event. One query. */
-function startedAll(db: DatabaseSync, timeZone: string): Map<string, string> {
+export function startedAll(db: DatabaseSync, timeZone: string): Map<string, string> {
   const rows = all(
     db,
     `SELECT entity,
@@ -90,17 +90,7 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, todayIso: stri
   );
   const inView = (g: Row): Row[] => [g, ...(childrenOf.get(g.id as string) ?? []).flatMap(inView)];
 
-  /** The goal's own date, then its Promotion Milestone's. A sub-goal lists them only when they differ from its parent's. A slip is always listed. */
-  const datesOf = (goal: Row, own: boolean): GoalDate[] => {
-    const dates: GoalDate[] = [];
-    const committed = committedDate(goal, getGoal);
-    const slipDays = committed && day(committed.date) < today ? daysBetween(committed.date, todayIso) : undefined;
-    const withSlip = (date: GoalDate): GoalDate => (slipDays !== undefined ? { ...date, slipDays } : date);
-    if (committed?.kind === "Committed" && (own || slipDays !== undefined)) dates.push(withSlip(committed));
-    if (own && (goal.date_type === "Ambition" || goal.date_type === "Fantasy")) dates.push({ date: goal.due_date as string, kind: goal.date_type });
-    if (committed?.kind === "Promotion Milestone" && (own || slipDays !== undefined)) dates.push(withSlip(committed));
-    return dates;
-  };
+  const datesOf = (goal: Row, own: boolean): GoalDate[] => goalDates(goal, own, getGoal, todayIso);
 
   /** `funded` is true for a goal under a Priority above the cut line. */
   const goalOf = (goal: Row, funded: boolean, parent?: Row): ApiGoal => {

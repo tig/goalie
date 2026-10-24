@@ -19,6 +19,19 @@ class SeedTests(unittest.TestCase):
         code, self.result = self.store.run("seed")
         self.assertEqual(code, 0, self.result)
 
+    def test_the_seats_are_agents_operated_by_chelsea(self) -> None:
+        # Plan B4: one agent actor per build seat, written by Tig, the GOALIE owner.
+        for seat in SEATS:
+            actor = self.store.read("actor", seat)
+            self.assertEqual((actor["kind"], actor["operator"], actor["app_id"]), ("agent", "chelsea", f"app-{seat}"), seat)
+
+    def test_each_seat_has_a_queue_of_work_items_under_the_mlp(self) -> None:
+        with sqlite3.connect(self.store.path) as db:
+            rows = db.execute("SELECT owner, goal, status FROM work_item").fetchall()
+        self.assertEqual({owner for owner, _, _ in rows}, set(SEATS))
+        self.assertLessEqual({goal for _, goal, _ in rows}, {f"XW-{n:04d}" for n in range(5, 12)})
+        self.assertLessEqual({status for _, _, status in rows}, {"Backlog", "In Progress", "Completed"})
+
     def test_seed_loads_org_unit_humans_and_owner(self) -> None:
         unit = self.store.read("org_unit", "excaliwire")
         self.assertEqual(unit["level"], "Company")
@@ -95,6 +108,9 @@ class SeedTransactionTests(unittest.TestCase):
         self.assertNotEqual(code, 0, result)
         self.assertEqual(store.events(), [])
         self.assertIsNone(store.read("actor", "tig"))
+
+
+SEATS = ("chief-of-staff", "product-manager", "product-designer", "head-of-engineering", "frontend-engineer", "backend-engineer", "qa", "user-researcher")
 
 
 class SeedFileTests(unittest.TestCase):
