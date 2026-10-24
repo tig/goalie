@@ -29,8 +29,10 @@ export type ApiGoal = {
   dates: GoalDate[];
   /** When the goal started: its first move to In Progress, else its first Event. */
   started: string;
-  /** Set when health is YELLOW or RED. */
+  /** Set when health is YELLOW or RED. The first step of the goal's Path to Green. */
   ptg?: PtgStep;
+  /** True when the Committed dates card counts this goal: at the top of its tree, In Progress, above the cut line (plan E-9). The app filters by it. */
+  counted: boolean;
   children: ApiGoal[];
 };
 
