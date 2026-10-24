@@ -28,7 +28,7 @@ class ServerLayoutTests(unittest.TestCase):
         self.assertEqual(package["engines"]["node"], ">=24")
         scripts = package["scripts"]
         self.assertEqual(scripts["lint"], "eslint src web")
-        self.assertEqual(scripts["typecheck"], "tsc --noEmit && tsc --noEmit -p web")
+        self.assertEqual(scripts["typecheck"], "tsc --noEmit && tsc --noEmit -p web && tsc --noEmit -p web/tsconfig.node.json")
         self.assertEqual(scripts["start"], "node src/server.ts")
         # The server serves web/dist (ADR 0010). The build writes it.
         self.assertEqual(scripts["build"], "vite build --config web/vite.config.ts")

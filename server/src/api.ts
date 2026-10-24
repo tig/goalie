@@ -4,6 +4,8 @@
  * Dates are ISO strings (YYYY-MM-DD). Labels are made in the app.
  */
 
+import type { State } from "./goal.ts";
+
 export type Health = "GREEN" | "YELLOW" | "RED" | null;
 
 /** How firm a date is (SPEC.md §5). A Promotion Milestone date is a Committed date that backs another goal's uncommitted date. */
@@ -21,7 +23,7 @@ export type ApiGoal = {
   id: string;
   summary: string;
   owner: ActorRef;
-  state: string;
+  state: State;
   health: Health;
   /** The goal's own dates, then its Promotion Milestone's. Empty when they are the same as its parent's. */
   dates: GoalDate[];
@@ -38,7 +40,7 @@ export type ApiSummary = {
   counts: { RED: number; YELLOW: number; GREEN: number };
   /** One health per goal in progress above the cut line, in rank order. */
   healths: Health[];
-  slips: { goal: string; summary: string; date: string; days: number }[];
+  slips: { goal: string; summary: string; date: string; kind: "Committed" | "Promotion Milestone"; days: number }[];
   /** Drafts waiting on an owner. */
   drafts: number;
   nextPromotion?: { milestone: string; date: string; days: number; goal: string; summary: string };

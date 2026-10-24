@@ -94,7 +94,7 @@ class PrioritiesApiTests(unittest.TestCase):
         if days <= 0:
             self.skipTest("Oct 1 has not passed")
         self.assertEqual(self.goals["XW-0001"]["dates"], [{"date": "2026-10-01", "kind": "Committed", "slipDays": days}])
-        self.assertEqual(self.body["summary"]["slips"], [{"goal": "XW-0001", "summary": self.goals["XW-0001"]["summary"], "date": "2026-10-01", "days": days}])
+        self.assertEqual(self.body["summary"]["slips"], [{"goal": "XW-0001", "summary": self.goals["XW-0001"]["summary"], "date": "2026-10-01", "kind": "Committed", "days": days}])
 
     def test_goalie_own_goal_tree_is_open_under_xw_0003(self) -> None:
         xw3 = self.body["funded"][2]["goals"][0]

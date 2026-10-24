@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { ApiGoal, ApiPriority, ApiSummary, GoalDate, Health, PrioritiesResponse, PtgStep } from "./api.ts";
 import { day, daysBetween } from "./dates.ts";
-import { committedDate, currentDate, isOpen, OPEN_STATES } from "./goal.ts";
+import { committedDate, currentDate, isOpen, OPEN_STATES, type State } from "./goal.ts";
 import { read, readAll } from "./read.ts";
 import type { Row } from "./rules.ts";
 
@@ -107,7 +107,7 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
       id: goal.id as string,
       summary: goal.summary as string,
       owner: actor(goal.owner as string),
-      state: goal.state as string,
+      state: goal.state as State,
       health,
       dates: datesOf(goal, !parent || ownDate(goal) !== ownDate(parent)),
       started: started.get(goal.id as string) ?? todayIso,
@@ -125,7 +125,7 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, now: Date = ne
   const top = funded.flatMap((p) => p.goals).filter((g) => g.state === "In Progress");
   const slips = top.flatMap((g) => {
     const date = g.dates.find((d) => d.slipDays !== undefined);
-    return date?.slipDays !== undefined ? [{ goal: g.id, summary: g.summary, date: date.date, days: date.slipDays }] : [];
+    return date?.slipDays !== undefined ? [{ goal: g.id, summary: g.summary, date: date.date, kind: date.kind as "Committed" | "Promotion Milestone", days: date.slipDays }] : [];
   });
   const count = (h: Health) => top.filter((g) => g.health === h).length;
   // Until the Drafts slice, every stored Draft counts as open.
