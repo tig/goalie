@@ -59,12 +59,12 @@ class WebBatchTests(unittest.TestCase):
         return {"goal": options["defaults"]["type"], "milestone": options["promotionMilestoneType"]}
 
     def test_a_sub_goal_on_its_parents_date_is_stored(self) -> None:
-        parent = self.read("/api/goals/XW-0002")["goal"]
+        parent = self.read("/api/goals/XW-0004")["goal"]
         batch = build("return commands.subGoalBatch(parent, { summary: 'Interview two candidates', owner: 'chelsea' }, types);", parent=parent, types=self.types())
         self.assertTrue(self.send(batch)["ok"])
 
     def test_a_sub_goal_with_its_own_fantasy_date_and_milestone_is_stored(self) -> None:
-        parent = self.read("/api/goals/XW-0002")["goal"]
+        parent = self.read("/api/goals/XW-0004")["goal"]
         row = {"summary": "Hire a designer", "owner": "chelsea", "date": {"due_date": "2027-03-01", "date_type": "Fantasy"}, "milestone": {"summary": "Commit a hire date", "due_date": "2026-11-12", "owner": "chelsea"}}
         batch = build("return commands.subGoalBatch(parent, row, types);", parent=parent, row=row, types=self.types())
         self.assertTrue(self.send(batch)["ok"])
@@ -147,7 +147,7 @@ class WebBatchTests(unittest.TestCase):
         self.assertTrue(self.send(batch)["ok"])
 
     def test_a_panel_saved_with_no_reason_is_refused_at_the_reason(self) -> None:
-        goal = self.read("/api/goals/XW-0002")["goal"]
+        goal = self.read("/api/goals/XW-0004")["goal"]
         batch = build("return commands.fieldsBatch(goal, { severity: 'sev3' }, '');", goal=goal)
         reply = post(self.proc, self.port, "/api/commands", batch, self.auth)
         answer = json.loads(reply.body)
