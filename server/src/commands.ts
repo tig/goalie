@@ -45,6 +45,8 @@ export function runCommands(db: DatabaseSync, actor: string, request: unknown, t
   const commands = request.commands as unknown[];
   const check = request.check === true;
   const outer = !db.isTransaction;
+  // One save is one write and one time: every Event of the batch shares this timestamp (Frontend Engineer, History rows).
+  const time = new Date().toISOString();
   try {
     const answer = inTransaction<CommandsAnswer>(db, (answer: CommandsAnswer) => answer.status === 200 && !check, () => {
       const ids: Record<Ref, string> = {};
@@ -54,7 +56,7 @@ export function runCommands(db: DatabaseSync, actor: string, request: unknown, t
       let first: { at: number; violations: ApiViolation[] } | undefined;
       const refused = new Set<string>();
       const run = (at: number, command: Command): Extract<WriteResult, { ok: true }> | undefined => {
-        const result = write(db, actor, command, today);
+        const result = write(db, actor, command, today, time);
         if (!result.ok) {
           if (!check || result.error !== "invalid") throw new Stop(failure(at, command.kind, result, today));
           first ??= { at, violations: result.violations };
@@ -78,7 +80,7 @@ export function runCommands(db: DatabaseSync, actor: string, request: unknown, t
           // A check first tests the create in its final state, so every In Progress rule runs, in a savepoint it always rolls back.
           // Then it stores what a save stores, so a check and a save give the same keys and versions.
           if (check) {
-            const probe = inTransaction(db, () => false, () => write(db, actor, command, today));
+            const probe = inTransaction(db, () => false, () => write(db, actor, command, today, time));
             if (!probe.ok) {
               if (probe.error !== "invalid") throw new Stop(failure(at, command.kind, probe, today));
               first ??= { at, violations: probe.violations };

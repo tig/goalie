@@ -78,11 +78,12 @@ function badCommand(message: string): WriteResult {
 const isObject = (value: unknown): value is Row => typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** `today` is the org's day, from the caller: a route or the CLI reads configuration, the write path does not (Head of Engineering). */
-export function write(db: DatabaseSync, actor: string, command: Command, today: string): WriteResult {
+/** `at` is the Events' timestamp: a batch passes one for all its commands, so one save is one time in History. */
+export function write(db: DatabaseSync, actor: string, command: Command, today: string, at: string = new Date().toISOString()): WriteResult {
   if (!isObject(command)) return badCommand("a command is a JSON object");
   if (!isKind(command.kind)) return badCommand(`unknown kind ${String(command.kind)}`);
   const kind = command.kind;
-  if (command.op === "comment") return inTransaction(db, (result) => result.ok, () => comment(db, actor, kind, command.id, command.text));
+  if (command.op === "comment") return inTransaction(db, (result) => result.ok, () => comment(db, actor, kind, command.id, command.text, at));
   if (command.fields !== undefined && !isObject(command.fields)) return badCommand("fields is a JSON object");
   const spec = ENTITIES[kind];
   const fields = command.fields ?? {};
@@ -98,7 +99,7 @@ export function write(db: DatabaseSync, actor: string, command: Command, today: 
   const typed = wrongTypes(kind, fields);
   if (typed.length > 0) return { ok: false, error: "invalid", violations: typed };
 
-  return inTransaction(db, (result) => result.ok, () => apply(db, actor, kind, command, fields, today));
+  return inTransaction(db, (result) => result.ok, () => apply(db, actor, kind, command, fields, today, at));
 }
 
 /**
@@ -121,7 +122,7 @@ export function inTransaction<T>(db: DatabaseSync, keep: (result: T) => boolean,
   }
 }
 
-function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fields: Row, today: string): WriteResult {
+function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fields: Row, today: string, at: string): WriteResult {
   const spec = ENTITIES[kind];
   const id = command.id ?? nextId(db, kind);
   const before = read(db, kind, id);
@@ -178,7 +179,7 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
   violations.push(...checkWrite(lookup(db), kind, read(db, kind, id) as Row));
   if (violations.length > 0) return { ok: false, error: "invalid", violations };
 
-  const timestamp = new Date().toISOString();
+  const timestamp = at;
   const append = db.prepare(
     "INSERT INTO event (timestamp, actor, entity_kind, entity, field, old, new, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
   );
@@ -210,7 +211,7 @@ function requiredFields(db: DatabaseSync, kind: Kind): string[] {
 const MAX_COMMENT = 10_000;
 
 /** A comment is one Event on its entity: field "comment", old null, the text as new and as reason. No row changes (SPEC.md §6.6, plan E-4). */
-function comment(db: DatabaseSync, actor: string, kind: Kind, id: string, text: unknown): WriteResult {
+function comment(db: DatabaseSync, actor: string, kind: Kind, id: string, text: unknown, at: string): WriteResult {
   if (read(db, "actor", actor) === undefined) return { ok: false, error: "unknown_actor", message: `no actor ${actor}` };
   if (typeof id !== "string" || read(db, kind, id) === undefined) return { ok: false, error: "not_found", message: `no ${kind} ${String(id)}` };
   if (typeof text !== "string" || text.trim() === "" || text.length > MAX_COMMENT) {
@@ -219,7 +220,7 @@ function comment(db: DatabaseSync, actor: string, kind: Kind, id: string, text: 
   const body = text.trim();
   const { lastInsertRowid } = db
     .prepare("INSERT INTO event (timestamp, actor, entity_kind, entity, field, old, new, reason) VALUES (?, ?, ?, ?, 'comment', NULL, ?, ?)")
-    .run(new Date().toISOString(), actor, kind, id, JSON.stringify(body), body);
+    .run(at, actor, kind, id, JSON.stringify(body), body);
   return { ok: true, entity: read(db, kind, id) as Row, events: readEvents(db, Number(lastInsertRowid) - 1) };
 }
 
