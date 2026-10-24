@@ -1,16 +1,15 @@
 import type { DatabaseSync } from "node:sqlite";
 import { ENTITIES, encode, goalieOwner, isKind, lookup, memoryLookup, read, readAll, readEvents, type EventRow, type Kind } from "./read.ts";
-import { configuredTimeZone, configuredToday } from "./config.ts";
 import { DEFAULT_VISIBILITY } from "./goal.ts";
-import { checkAuthor, checkTransition, checkWrite, REASONED, summaryLint, SYSTEM_FIELDS, type Row, type Violation } from "./rules.ts";
+import { checkAuthor, checkTransition, checkWrite, goalLints, REASONED, SYSTEM_FIELDS, type Row, type Violation } from "./rules.ts";
 
 /**
  * The one write path. The API, the MCP server, the app, and the seed call write(). Nothing else writes.
  * A write appends its Events and updates the current row in one transaction, or does neither (ADR 0002).
  */
 
-/** Values a create fills when the command leaves them out (SPEC.md §6.1, §12). */
-const DEFAULTS: Partial<Record<Kind, Row>> = {
+/** Values a create fills when the command leaves them out (SPEC.md §6.1, §12). The one home: options.ts offers them as the form's defaults. */
+export const DEFAULTS: Partial<Record<Kind, Row>> = {
   goal: { description: "", visibility: DEFAULT_VISIBILITY },
   user_settings: { favorite_views: [], appearance: "light" },
 };
@@ -78,7 +77,8 @@ function badCommand(message: string): WriteResult {
 /** Apply one command as `actor`. Every invariant is checked on the committed result, in the transaction. */
 const isObject = (value: unknown): value is Row => typeof value === "object" && value !== null && !Array.isArray(value);
 
-export function write(db: DatabaseSync, actor: string, command: Command): WriteResult {
+/** `today` is the org's day, from the caller: a route or the CLI reads configuration, the write path does not (Head of Engineering). */
+export function write(db: DatabaseSync, actor: string, command: Command, today: string): WriteResult {
   if (!isObject(command)) return badCommand("a command is a JSON object");
   if (!isKind(command.kind)) return badCommand(`unknown kind ${String(command.kind)}`);
   const kind = command.kind;
@@ -98,7 +98,7 @@ export function write(db: DatabaseSync, actor: string, command: Command): WriteR
   const typed = wrongTypes(kind, fields);
   if (typed.length > 0) return { ok: false, error: "invalid", violations: typed };
 
-  return inTransaction(db, (result) => result.ok, () => apply(db, actor, kind, command, fields));
+  return inTransaction(db, (result) => result.ok, () => apply(db, actor, kind, command, fields, today));
 }
 
 /**
@@ -121,7 +121,7 @@ export function inTransaction<T>(db: DatabaseSync, keep: (result: T) => boolean,
   }
 }
 
-function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fields: Row): WriteResult {
+function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fields: Row, today: string): WriteResult {
   const spec = ENTITIES[kind];
   const id = command.id ?? nextId(db, kind);
   const before = read(db, kind, id);
@@ -151,7 +151,7 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
   if (before !== undefined && changed.length === 0) return { ok: true, entity: before, events: [] };
 
   const reason = command.reason?.trim() || null;
-  const violations: Violation[] = [...(author ? checkAuthor(author, goalieOwner(db), kind, before, after) : []), ...checkTransition(kind, before, after, configuredToday(configuredTimeZone(db)), (id) => read(db, "goal", id))];
+  const violations: Violation[] = [...(author ? checkAuthor(author, goalieOwner(db), kind, before, after) : []), ...checkTransition(kind, before, after, today, (id) => read(db, "goal", id))];
   const needReason = changed.filter((f) => (REASONED[kind] ?? []).includes(f));
   if (needReason.length > 0 && reason === null) {
     violations.push({ rule: "reason-required", message: `a change to ${needReason.join(", ")} needs a reason.`, field: "reason" });
@@ -200,12 +200,15 @@ function requiredFields(db: DatabaseSync, kind: Kind): string[] {
   return columns.filter((c) => c.notnull === 1 && c.dflt_value === null && c.pk === 0 && c.name !== "version").map((c) => c.name);
 }
 
+/** A comment is read on every page load and sent over every open stream (Codebase QA). */
+const MAX_COMMENT = 10_000;
+
 /** A comment is one Event on its entity: field "comment", old null, the text as new and as reason. No row changes (SPEC.md §6.6, plan E-4). */
 function comment(db: DatabaseSync, actor: string, kind: Kind, id: string, text: unknown): WriteResult {
   if (read(db, "actor", actor) === undefined) return { ok: false, error: "unknown_actor", message: `no actor ${actor}` };
   if (typeof id !== "string" || read(db, kind, id) === undefined) return { ok: false, error: "not_found", message: `no ${kind} ${String(id)}` };
-  if (typeof text !== "string" || text.trim() === "") {
-    return { ok: false, error: "invalid", violations: [{ rule: "comment-text", message: "a comment has text.", field: "text" }] };
+  if (typeof text !== "string" || text.trim() === "" || text.length > MAX_COMMENT) {
+    return { ok: false, error: "invalid", violations: [{ rule: "comment-text", message: `a comment has text, at most ${MAX_COMMENT} characters.`, field: "text" }] };
   }
   const body = text.trim();
   const { lastInsertRowid } = db
@@ -235,6 +238,6 @@ export function checkStore(db: DatabaseSync): { goals: number; violations: Viola
   const store = memoryLookup(rows);
   const violations = (["actor", "org_unit", "priority", "goal"] as const).flatMap((kind) => rows[kind].flatMap((row) => checkWrite(store, kind, row)));
   const unique = [...new Map(violations.map((v) => [`${v.rule} ${v.message}`, v])).values()];
-  const lints = rows.goal.map(summaryLint).filter((l): l is string => l !== undefined);
+  const lints = rows.goal.flatMap((g) => goalLints(g).filter((h) => h.field === "summary").map((h) => `${g.id}: ${h.text}`));
   return { goals: rows.goal.length, violations: unique, lints };
 }

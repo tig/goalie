@@ -13,6 +13,9 @@ export const DATE_TYPES = ["Fantasy", "Ambition", "Committed"] as const;
 /** The states (SPEC.md §7.2). */
 export type State = "Backlog" | "In Progress" | "Completed" | "Completed Late" | "Did Not Meet" | "Deleted";
 
+/** The goal type a Promotion Milestone has (SPEC.md §6.1 type). The one home: rules.ts checks it, and FormOptions sends it to the app. */
+export const PROMOTION_MILESTONE_TYPE = "Milestone (Commit)";
+
 /** Work-item status values (D8): SPEC.md §6.1 State words. The one home: rules.ts checks them, options.ts offers them. */
 export const WORK_ITEM_STATUSES = ["Backlog", "In Progress", "Completed", "Deleted"] as const;
 
@@ -49,7 +52,7 @@ export function currentDate(goal: Row): string | undefined {
 const DATED = ["due_date", "changed_due_date", "date_type", "original_committed_date", "promotion_milestone", "plan", "plan_maturity", "committed_plan_version"] as const;
 
 /** True when a goal sets a date of its own. A goal with neither due_date nor date_type takes its parent's. */
-export const hasOwnDate = (goal: Row) => goal.due_date != null || goal.date_type != null;
+const hasOwnDate = (goal: Row) => goal.due_date != null || goal.date_type != null;
 
 /**
  * The goal as the rules and views read it (plan E-7): its own date, Date Type, Promotion Milestone, and plan,
@@ -86,13 +89,23 @@ export function committedDate(original: Row, getGoal: (id: string) => Row | unde
  */
 export function goalDates(goal: Row, own: boolean, getGoal: (id: string) => Row | undefined, today: string): GoalDate[] {
   const dates: GoalDate[] = [];
-  const committed = committedDate(goal, getGoal);
-  const slipDays = committed && day(committed.date) < day(today) ? daysBetween(committed.date, today) : undefined;
-  const withSlip = (date: GoalDate): GoalDate => (slipDays !== undefined ? { ...date, slipDays } : date);
-  if (committed?.kind === "Committed" && (own || slipDays !== undefined)) dates.push(withSlip(committed));
-  if (own && (goal.date_type === "Ambition" || goal.date_type === "Fantasy")) dates.push({ date: goal.due_date as string, kind: goal.date_type });
-  if (committed?.kind === "Promotion Milestone" && (own || slipDays !== undefined)) dates.push(withSlip(committed));
+  const judged = judgedDate(goal, getGoal, today);
+  if (judged?.kind === "Committed" && (own || judged.slipDays !== undefined)) dates.push(judged);
+  if (own) dates.push(...uncommittedDate(goal));
+  if (judged?.kind === "Promotion Milestone" && (own || judged.slipDays !== undefined)) dates.push(judged);
   return dates;
+}
+
+/** The date health is judged on (SPEC.md §6.1), with slipDays when it passed while the goal is open. The one home of a slip. */
+export function judgedDate(goal: Row, getGoal: (id: string) => Row | undefined, today: string): GoalDate | undefined {
+  const committed = committedDate(goal, getGoal);
+  if (committed === undefined) return undefined;
+  return day(committed.date) < day(today) && isOpen(goal) ? { ...committed, slipDays: daysBetween(committed.date, today) } : committed;
+}
+
+/** The goal's own Ambition or Fantasy date, when it has one. `goal` is resolved. */
+export function uncommittedDate(goal: Row): GoalDate[] {
+  return goal.date_type === "Ambition" || goal.date_type === "Fantasy" ? [{ date: goal.due_date as string, kind: goal.date_type }] : [];
 }
 
 /**

@@ -1,4 +1,5 @@
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
+import type { ApiActor } from "./api.ts";
 import type { Lookup, Row } from "./rules.ts";
 
 /**
@@ -83,13 +84,21 @@ export function readAll(db: DatabaseSync, kind: Kind): Row[] {
 }
 
 /** Read Events with a sequence greater than `after`, in sequence order. */
+/** The one Event decoder: old and new are stored as JSON. */
+function decodeEvent(row: Row): EventRow {
+  return { ...row, old: row.old == null ? null : JSON.parse(row.old as string), new: row.new == null ? null : JSON.parse(row.new as string) } as EventRow;
+}
+
 export function readEvents(db: DatabaseSync, after = 0): EventRow[] {
-  const rows = db.prepare("SELECT * FROM event WHERE sequence > ? ORDER BY sequence").all(after) as Row[];
-  return rows.map((row) => ({
-    ...row,
-    old: row.old == null ? null : JSON.parse(row.old as string),
-    new: row.new == null ? null : JSON.parse(row.new as string),
-  })) as EventRow[];
+  return (db.prepare("SELECT * FROM event WHERE sequence > ? ORDER BY sequence").all(after) as Row[]).map(decodeEvent);
+}
+
+/** The Events of the named entities, newest first, through the event_by_entity index. */
+export function readEntityEvents(db: DatabaseSync, refs: { kind: Kind; ids: string[] }[]): EventRow[] {
+  const rows = refs.flatMap(({ kind, ids }) =>
+    ids.length === 0 ? [] : (db.prepare("SELECT * FROM event WHERE entity_kind = ? AND entity IN (SELECT value FROM json_each(?))").all(kind, JSON.stringify(ids)) as Row[]),
+  );
+  return rows.sort((a, b) => (b.sequence as number) - (a.sequence as number)).map(decodeEvent);
 }
 
 /** Read the actor a verified token names. A human maps by subject, an agent by application id (ADR 0005). */
@@ -128,4 +137,14 @@ export function memoryLookup(rows: Partial<Record<Kind, Row[]>>): Lookup {
     get: (kind, id) => byId.get(kind)?.get(id),
     where: (kind, field, value) => [...(byId.get(kind)?.values() ?? [])].filter((r) => r[field] === value),
   };
+}
+
+/** Every actor, by id, with its kind (SPEC.md §6.4). */
+export function actorsById(db: DatabaseSync): Record<string, ApiActor> {
+  return Object.fromEntries(readAll(db, "actor").map((a) => [a.id, { id: a.id as string, name: a.display_name as string, kind: a.kind as ApiActor["kind"] }]));
+}
+
+/** True when the owner setting work_items is on (D7). */
+export function workItemsOn(db: DatabaseSync): boolean {
+  return (read(db, "owner_settings", "owner")?.settings as Row | undefined)?.work_items === true;
 }

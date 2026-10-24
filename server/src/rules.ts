@@ -4,7 +4,7 @@
  */
 
 import { isDate } from "./dates.ts";
-import { closesAs, COMPLETED_STATES, currentDate, DATE_TYPES, resolvedGoal, STATE_MOVES, WORK_ITEM_STATUSES, type State } from "./goal.ts";
+import { closesAs, COMPLETED_STATES, currentDate, DATE_TYPES, PROMOTION_MILESTONE_TYPE, resolvedGoal, STATE_MOVES, WORK_ITEM_STATUSES, type State } from "./goal.ts";
 
 export type Row = Record<string, unknown>;
 
@@ -52,7 +52,7 @@ function checkGoal(store: Lookup, own: Row): Violation[] {
       add("promotion-milestone", `${goal.id}: a Committed goal has no Promotion Milestone.`, "promotion_milestone");
     }
     // D1: a Promotion Milestone is committed on the plan of the goal it promotes.
-    if (goal.type !== "Milestone (Commit)" && (goal.plan_maturity !== "Pencil" || !goal.plan)) {
+    if (goal.type !== PROMOTION_MILESTONE_TYPE && (goal.plan_maturity !== "Pencil" || !goal.plan)) {
       add("committed-needs-pencil", `${goal.id}: a Committed date needs a Plan at Pencil.`, "plan_maturity");
     }
   } else if (goal.date_type != null) {
@@ -60,7 +60,7 @@ function checkGoal(store: Lookup, own: Row): Violation[] {
     if (milestone === undefined) {
       add("promotion-milestone", `${goal.id}: an ${goal.date_type} date needs a Promotion Milestone.`, "promotion_milestone");
     } else if (
-      milestone.type !== "Milestone (Commit)" ||
+      milestone.type !== PROMOTION_MILESTONE_TYPE ||
       milestone.date_type !== "Committed" ||
       !isHuman(store, milestone.owner) ||
       !((currentDate(milestone) as string) < (goal.due_date as string))
@@ -239,11 +239,6 @@ export function checkAuthor(actor: Row, owner: string | undefined, kind: string,
   return [];
 }
 
-/** Lint from SPEC.md §6.1: a summary has 5 words or more. It flags, it does not block. */
-export function summaryLint(goal: Row): string | undefined {
-  const words = String(goal.summary ?? "").trim().split(/\s+/).filter(Boolean);
-  return words.length >= 5 ? undefined : `${goal.id}: the summary has ${words.length} words; it needs 5 or more.`;
-}
 
 /** The §6.1 description parts, each with words that show it is there. A heuristic: it flags, it does not block. */
 const DESCRIPTION_PARTS: { words: RegExp; hint: string }[] = [

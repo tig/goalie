@@ -148,5 +148,6 @@
       "Deleted"
     ]
   },
-  "workItems": true
+  "workItems": true,
+  "promotionMilestoneType": "Milestone (Commit)"
 }

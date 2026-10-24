@@ -1,5 +1,6 @@
 import { serve } from "@hono/node-server";
 import { Hono, type Context } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
@@ -33,7 +34,18 @@ const TYPES: Record<string, string> = {
 /** The verified actor rides on each request after sign-in. */
 type Env = { Variables: { actor: ActorRef } };
 
-const refuse = (c: Context<Env>, status: 401 | 404, error: string, reason: string) => c.json<ApiError>({ error, reason }, status);
+/** The largest write body: a batch of goals, sub-goals, and work items fits many times over. */
+const MAX_BODY = 256 * 1024;
+
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).host;
+  } catch {
+    return undefined;
+  }
+};
+
+const refuse = (c: Context<Env>, status: 401 | 403 | 404 | 413 | 415, error: string, reason: string) => c.json<ApiError>({ error, reason }, status);
 
 /** The file under dist that path names, or undefined when there is none or the path leaves dist. */
 async function built(dist: string, path: string): Promise<Buffer | undefined> {
@@ -87,6 +99,19 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
   app.get("/api/options", (c) => c.json<FormOptions>(formOptions(db, c.get("actor").id, unit(), todayIn(db))));
   app.get("/api/work", (c) => c.json<WorkResponse>(workQueue(db, c.get("actor").id, todayIn(db), c.req.query("owner"))));
   app.get("/api/events", (c) => eventStream(c, db));
+  // A write is JSON from the app's own origin. A cross-site form can send neither (Codebase QA). The body is capped.
+  app.post(
+    "/api/commands",
+    async (c, next) => {
+      if (!(c.req.header("Content-Type") ?? "").toLowerCase().startsWith("application/json")) return refuse(c, 415, "bad_command", "a write is sent as application/json");
+      const origin = c.req.header("Origin");
+      const host = c.req.header("X-Forwarded-Host") ?? c.req.header("Host");
+      if (origin !== undefined && origin !== "null" && hostOf(origin) !== host) return refuse(c, 403, "forbidden", `a write from ${origin} is refused`);
+      if (origin === "null") return refuse(c, 403, "forbidden", "a write from an opaque origin is refused");
+      await next();
+    },
+    bodyLimit({ maxSize: MAX_BODY, onError: (c) => refuse(c, 413, "bad_command", `a request body is at most ${MAX_BODY / 1024} KB`) }),
+  );
   app.post("/api/commands", async (c) => {
     const request: unknown = await c.req.json().catch(() => undefined);
     const answer = runCommands(db, c.get("actor").id, request, todayIn(db));

@@ -1,7 +1,8 @@
+import type { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { configuredIssuers, resolveActor } from "./auth.ts";
-import { configuredDatabase } from "./config.ts";
+import { configuredDatabase, configuredTimeZone, configuredToday } from "./config.ts";
 import { openStore } from "./store.ts";
 import { seed, type SeedFile } from "./seed.ts";
 import { isKind, read, readEvents } from "./read.ts";
@@ -25,7 +26,7 @@ async function main(args: string[]): Promise<number> {
       if (rest[0] !== "--as" || !rest[1]) return usage();
       const command = stdinJson();
       if (command === undefined) return badInput("stdin is not JSON");
-      const result = write(db, rest[1], command as Command);
+      const result = write(db, rest[1], command as Command, today(db));
       print(result);
       return result.ok ? 0 : 2;
     }
@@ -41,7 +42,7 @@ async function main(args: string[]): Promise<number> {
     case "seed": {
       const file = jsonFile(rest[0] ?? fileURLToPath(new URL("../seed/excaliwire.json", import.meta.url)));
       if (file === undefined) return badInput("the seed file is not JSON");
-      const result = seed(db, file as SeedFile);
+      const result = seed(db, file as SeedFile, today(db));
       print(result);
       return result.ok ? 0 : 2;
     }
@@ -78,6 +79,9 @@ function badInput(message: string): number {
   print({ ok: false, error: "bad_command", message });
   return 2;
 }
+
+/** The org's day, read once at the edge and passed to the write path. */
+const today = (db: DatabaseSync) => configuredToday(configuredTimeZone(db));
 
 function print(value: unknown): void {
   process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);

@@ -34,7 +34,7 @@ function all(db: DatabaseSync, sql: string, ...params: string[]): Row[] {
 }
 
 /** When each goal started, as a day in `timeZone`: its first move to In Progress, else its first Event. One query. */
-export function startedAll(db: DatabaseSync, timeZone: string): Map<string, string> {
+function startedAll(db: DatabaseSync, timeZone: string): Map<string, string> {
   const rows = all(
     db,
     `SELECT entity,
@@ -43,6 +43,18 @@ export function startedAll(db: DatabaseSync, timeZone: string): Map<string, stri
      FROM event e WHERE entity_kind = 'goal' GROUP BY entity`,
   );
   return new Map(rows.map((r) => [r.entity as string, dateIn(Date.parse((r.moved ?? r.first) as string), timeZone)]));
+}
+
+/** When one goal started, as a day in `timeZone`. It reads that goal's Events through the event_by_entity index. */
+export function startedOf(db: DatabaseSync, id: string, timeZone: string): string | undefined {
+  const row = db
+    .prepare(
+      `SELECT (SELECT timestamp FROM event WHERE entity_kind = 'goal' AND entity = ? AND field = 'state' AND new = '"In Progress"' ORDER BY sequence LIMIT 1) AS moved,
+         (SELECT MIN(timestamp) FROM event WHERE entity_kind = 'goal' AND entity = ?) AS first`,
+    )
+    .get(id, id) as Row;
+  const at = (row.moved ?? row.first) as string | null;
+  return at ? dateIn(Date.parse(at), timeZone) : undefined;
 }
 
 /** A goal's own date and Date Type, to compare a sub-goal with its parent. */

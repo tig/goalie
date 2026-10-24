@@ -1,17 +1,16 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { FormOptions, PlanMaturity } from "./api.ts";
-import { DEFAULT_VISIBILITY, WORK_ITEM_STATUSES } from "./goal.ts";
-import { actorsById, workItemsOn } from "./goalpage.ts";
+import { PROMOTION_MILESTONE_TYPE, WORK_ITEM_STATUSES } from "./goal.ts";
 import { isCurrentPeriod } from "./priorities.ts";
-import { read, readAll } from "./read.ts";
-import { nextIds } from "./write.ts";
+import { actorsById, read, readAll, workItemsOn } from "./read.ts";
+import { DEFAULTS, nextIds } from "./write.ts";
 
 /**
  * What New goal, + Sub-goal, and + Work item offer (plan B3, design N1 to N16), with the defaults the server writes.
  * Choices are the SPEC.md §6.1 and §12 defaults until owner settings name others.
  */
 
-const TYPES = ["Milestone (Commit)", "Milestone (Launch)", "Metric (Business)", "Metric (Customer)", "Metric (Operational Excellence)"];
+const TYPES = [PROMOTION_MILESTONE_TYPE, "Milestone (Launch)", "Metric (Business)", "Metric (Customer)", "Metric (Operational Excellence)"];
 const SEVERITIES = ["sev1", "sev2", "sev3"];
 const LEVELS = ["Company", "Program or Function", "Team", "Individual"];
 const PLAN_MATURITIES: PlanMaturity[] = ["Watercolor", "Crayon", "Pencil"];
@@ -34,18 +33,19 @@ export function formOptions(db: DatabaseSync, me: string, orgUnit: string, today
       .sort((a, b) => (a.rank as number) - (b.rank as number))
       .map((p) => ({ id: p.id as string, rank: p.rank as number, title: p.title as string })),
     defaults: {
-      description: "",
+      description: DEFAULTS.goal?.description as string,
       org_unit: orgUnit,
       level,
       type: "Milestone (Launch)",
       severity: "sev2",
       state: "In Progress",
       origination: "New",
-      visibility: DEFAULT_VISIBILITY,
+      visibility: DEFAULTS.goal?.visibility as string,
       // SPEC.md names no default plan maturity. The least firm is the honest start.
       plan_maturity: "Watercolor",
     },
     choices: { type: TYPES, severity: SEVERITIES, level: LEVELS, plan_maturity: PLAN_MATURITIES, workItemStatus: [...WORK_ITEM_STATUSES] },
     workItems: workItemsOn(db),
+    promotionMilestoneType: PROMOTION_MILESTONE_TYPE,
   };
 }

@@ -1,27 +1,16 @@
 import type { DatabaseSync } from "node:sqlite";
-import type { ApiActor, ApiEvent, ApiWorkItem, GoalDate, GoalPageResponse, Health, StoredGoal, SubGoalCard } from "./api.ts";
-import { toApiWorkItem } from "./commands.ts";
+import type { ApiEvent, ApiWorkItem, GoalDate, GoalPageResponse, Health, StoredGoal, SubGoalCard } from "./api.ts";
 import { toApiEvent } from "./live.ts";
-import { day, daysBetween } from "./dates.ts";
-import { closesAs, committedDate, currentDate, goalDates, isOpen, resolvedGoal, type State } from "./goal.ts";
-import { startedAll } from "./priorities.ts";
-import { read, readAll, type EventRow } from "./read.ts";
+import { toApiWorkItem } from "./work.ts";
+import { closesAs, currentDate, goalDates, isOpen, judgedDate, resolvedGoal, uncommittedDate, type State } from "./goal.ts";
+import { startedOf } from "./priorities.ts";
+import { actorsById, read, readAll, readEntityEvents, workItemsOn } from "./read.ts";
 import { goalLints, type Row } from "./rules.ts";
 
 /**
  * The goal page (plan B3, design G1 to G24). One read per kind into Maps, then the response. No query per row.
  * It returns plain data. The app lays it out and labels it.
  */
-
-/** Every actor, by id, with its kind (SPEC.md §6.4). */
-export function actorsById(db: DatabaseSync): Record<string, ApiActor> {
-  return Object.fromEntries(readAll(db, "actor").map((a) => [a.id, { id: a.id as string, name: a.display_name as string, kind: a.kind as ApiActor["kind"] }]));
-}
-
-/** True when the owner setting work_items is on (D7). */
-export function workItemsOn(db: DatabaseSync): boolean {
-  return (read(db, "owner_settings", "owner")?.settings as Row | undefined)?.work_items === true;
-}
 
 const isLive = (item: Row) => item.status !== "Deleted";
 
@@ -35,18 +24,15 @@ export function goalPage(db: DatabaseSync, id: string, me: string, today: string
   const on = workItemsOn(db);
   const items = on ? readAll(db, "work_item") : [];
   const itemsOf = (key: string) => items.filter((w) => w.goal === key);
-  const childrenOf = (key: string) => [...goals.values()].filter((g) => g.parent === key);
+  const children = new Map<string, Row[]>();
+  for (const g of goals.values()) if (typeof g.parent === "string") children.set(g.parent, [...(children.get(g.parent) ?? []), g]);
+  const childrenOf = (key: string) => children.get(key) ?? [];
   /** A goal and every goal under it. */
   const tree = (key: string): string[] => [key, ...childrenOf(key).flatMap((g) => tree(g.id as string))];
 
   // G5: the date health is judged on first, then the goal's own uncommitted date.
-  const judged = committedDate(stored, getGoal);
-  const dates: GoalDate[] = [];
-  if (judged) {
-    const slipDays = day(judged.date) < day(today) && isOpen(stored) ? daysBetween(judged.date, today) : undefined;
-    dates.push(slipDays === undefined ? judged : { ...judged, slipDays });
-  }
-  if (goal.date_type === "Ambition" || goal.date_type === "Fantasy") dates.push({ date: goal.due_date as string, kind: goal.date_type });
+  const judged = judgedDate(stored, getGoal, today);
+  const dates: GoalDate[] = [...(judged ? [judged] : []), ...uncommittedDate(goal)];
 
   // G15: the state a close records now. One home: goal.ts closesAs, which rules.ts checks too.
   const closing = stored.state === "In Progress" ? closesAs(goal, today) : null;
@@ -56,6 +42,7 @@ export function goalPage(db: DatabaseSync, id: string, me: string, today: string
   const promotionMilestone = pm && {
     id: pm.id as string,
     summary: pm.summary as string,
+    version: pm.version as number,
     state: pm.state as State,
     date: currentDate(pm) as string,
     openSubGoals: childrenOf(pm.id as string).filter(isOpen).length,
@@ -81,13 +68,10 @@ export function goalPage(db: DatabaseSync, id: string, me: string, today: string
 
   const workItems: ApiWorkItem[] | null = on ? itemsOf(id).map((w) => toApiWorkItem(w, today)) : null;
   const itemIds = (workItems ?? []).map((w) => w.id);
-  const events: ApiEvent[] = (
-    db
-      .prepare(
-        `SELECT * FROM event WHERE (entity_kind = 'goal' AND entity = ?) OR (entity_kind = 'work_item' AND entity IN (SELECT value FROM json_each(?))) ORDER BY sequence DESC`,
-      )
-      .all(id, JSON.stringify(itemIds)) as Row[]
-  ).map((row) => toApiEvent({ ...row, old: row.old == null ? null : JSON.parse(row.old as string), new: row.new == null ? null : JSON.parse(row.new as string) } as EventRow));
+  const events: ApiEvent[] = readEntityEvents(db, [
+    { kind: "goal", ids: [id] },
+    { kind: "work_item", ids: itemIds },
+  ]).map(toApiEvent);
 
   const unit = read(db, "org_unit", stored.org_unit as string);
   const priority = typeof stored.priority === "string" ? read(db, "priority", stored.priority) : undefined;
@@ -99,7 +83,7 @@ export function goalPage(db: DatabaseSync, id: string, me: string, today: string
     goal: stored as StoredGoal,
     dates,
     inherited: goal.inherited,
-    started: startedAll(db, timeZone).get(id) ?? today,
+    started: startedOf(db, id, timeZone) ?? today,
     closesAs: closing,
     promotionMilestone: promotionMilestone ?? null,
     parent: parent ? { id: parent.id as string, summary: parent.summary as string } : null,
