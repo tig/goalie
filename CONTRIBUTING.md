@@ -44,7 +44,7 @@ You must not put a second server language here.
 `GOALIE_WEB_DIST` is the folder of the built web app. The default is `server/web/dist`.
 `GOALIE_ISSUERS` is the issuer list ([ADR 0005](docs/adr/0005-auth-and-identity.md)). It is a JSON list of `{"issuer", "audience"}`, with optional `jwks_uri` or inline `jwks`.
 Unset means no issuer, so every token is refused.
-The Excaliwire deployment sets `[{"issuer": "https://login.microsoftonline.com/8136e28b-aee3-4d34-ab49-c0da1a468e3a/v2.0", "audience": "<the GOALIE app id>"}]`. Keys come from the issuer's discovery document.
+A deployment's issuer list lives with its host configuration, not in this repo. Keys come from the issuer's discovery document.
 Tests do not need Entra. `server/tests/sign_token.mjs` signs tokens with a fresh key, and the test sets a test issuer with that key inline in `jwks`.
 Every token is still verified: RS256 signature, issuer, audience, and expiry.
 `node src/cli.ts` is a local tool against the `GOALIE_DB` file: `write --as <actor>`, `read <kind> <id>`, `events [after]`, `seed`, `check`, and `whoami`. It is not reachable over HTTP.

@@ -243,6 +243,8 @@ class CiTenets(unittest.TestCase):
         self.assertIn("Host configuration lives in excaliwire/operations.", contributing)
         self.assertNotIn("goalie.excaliwire.com", contributing)
         self.assertNotIn("129.212.164.158", contributing)
+        # Review E8: a deployment's identity tenant lives with its host configuration.
+        self.assertNotIn("login.microsoftonline.com/", contributing)
 
     def test_the_publish_carries_the_built_web_app(self) -> None:
         # ADR 0010: the same Node process serves the built React app, so a publish without server/web/dist is refused.
