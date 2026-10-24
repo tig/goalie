@@ -469,7 +469,6 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 .newgoal{max-width:1180px}
 .newgoal h1{margin:0 0 16px}
 .nglayout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:20px;align-items:start}
-@media (max-width:960px){.nglayout{grid-template-columns:minmax(0,1fr) 260px}}
 .ngform{display:flex;flex-direction:column;gap:14px;min-width:0}
 .ngcard h2{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:800;margin:0 0 14px}
 .ngnum{width:24px;height:24px;border-radius:50%;background:var(--brand);color:var(--brand-ink);font-size:12px;font-weight:800;display:inline-flex;align-items:center;justify-content:center}
@@ -501,8 +500,6 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 .btn.create{height:44px;justify-content:center;font-size:14px}
 .cancel{align-self:center;font-size:13px;font-weight:700;color:var(--link)}
 .newgoal-btn,.btn.newgoal{text-decoration:none}
-.phone .nglayout{grid-template-columns:1fr}
-.phone .ngrail{position:static}
 .phone .morechips{grid-template-columns:1fr 1fr}
 .ngcard input[type=radio]{width:auto;padding:0}
 .ngcard>.flabel,.ngcard .planbox>.flabel{display:block;margin:4px 0 4px}
@@ -594,10 +591,13 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 @media (pointer:coarse){
 .ngcard input:not([type=radio]),.ngcard select,.ngcard textarea{min-height:44px}
 .prow{min-height:44px}}
-.phone .ngtopcount{display:block;margin:0 0 10px;color:var(--red-ink)}
-.phone .newgoal{padding-bottom:84px}
-.phone .btn.create{position:fixed;left:16px;right:16px;bottom:12px;height:48px;z-index:40;box-shadow:0 6px 20px var(--tip-shadow)}
-.phone .nglayout{grid-template-columns:minmax(0,1fr)}
 .qdone>.linkbtn{color:var(--mute)}
 .qdone>.linkbtn:hover{color:var(--ink)}
 .phone .radio{height:auto;min-height:36px;padding:6px 12px;border-radius:14px}
+/* N15, N15a: under 960 px of page New goal takes the phone layout: the form full width, the checks as a count at the top, Create as a fixed 48 px bar. */
+@media (max-width:960px){
+.nglayout{grid-template-columns:minmax(0,1fr)}
+.ngrail{position:static}
+.ngtopcount{display:block;margin:0 0 10px;color:var(--red-ink)}
+main.newgoal{padding-bottom:84px}
+.btn.create{position:fixed;left:16px;right:16px;bottom:12px;height:48px;z-index:40;box-shadow:0 6px 20px var(--tip-shadow)}}
