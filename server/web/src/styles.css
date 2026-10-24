@@ -66,6 +66,7 @@ h1{font-size:26px;font-weight:800;margin:0 0 20px}
 .chip.lit{box-shadow:inset 3px 0 0 var(--hc, var(--cut));background:var(--hover)}
 .chip[data-health="RED"]{--hc:var(--red)}.chip[data-health="YELLOW"]{--hc:var(--yellow)}.chip[data-health="GREEN"]{--hc:var(--green)}
 
+.search svg{flex:none}
 .search{display:flex;align-items:center;gap:8px;height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--cut);background:var(--card);color:var(--mute);width:240px;flex:none;box-sizing:border-box}
 .search:focus-within{border-color:var(--focus)}
 .search input{border:0;outline:0;background:none;font:600 13px var(--font);color:var(--ink);width:100%;min-width:0}
@@ -118,7 +119,9 @@ h1{font-size:26px;font-weight:800;margin:0 0 20px}
 .tlwrap{position:relative}
 .scroll{overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none}
 .scroll::-webkit-scrollbar{display:none}
-.scroll:focus-visible{outline-offset:-3px;border-radius:12px}
+/* The timeline's focus ring goes round the whole timeline, not along its scrolled edge. */
+.scroll:focus-visible{outline:none}
+.tlwrap:has(.scroll:focus-visible){outline:3px solid var(--focus);outline-offset:2px;border-radius:12px}
 .scroll.dragging,.scroll.dragging *{cursor:grabbing}
 .fade{position:absolute;top:0;bottom:0;width:28px;pointer-events:none;opacity:0;z-index:9;transition:opacity .12s ease}
 .fade.before{left:calc(var(--left) + var(--gap));background:linear-gradient(to right,var(--card),transparent)}
@@ -275,7 +278,8 @@ background-size:2px 100%,100% 100%;background-repeat:no-repeat;background-positi
 /* On touch every control answers a 44 px tap, even when it draws smaller (rule 29). No parent clips the tap area. */
 @media (pointer:coarse){
 .vtab,.gbtn,.btn,.count,.q,.morebtn,.chip-x,.av{position:relative}
-.vtab::after,.gbtn::after,.btn::after,.count::after,.q::after,.morebtn::after,.chip-x::after,.av::after{content:"";position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}}
+.meter span[role="button"]{position:relative}
+.vtab::after,.gbtn::after,.btn::after,.count::after,.q::after,.morebtn::after,.chip-x::after,.av::after,.meter span[role="button"]::after{content:"";position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}}
 .tip.name{transform:translateX(-50%);white-space:nowrap;padding:6px 10px}
 
 .phonesum{margin:0 0 12px}.phonesum .counts{margin:0;font-size:16px}

@@ -155,6 +155,8 @@ function Home({ data }: { data: PrioritiesResponse }) {
     );
   };
   const step = (direction: -1 | 1) =>
+    // The Calendar stops at December 9999 (review Q10).
+    !(view === "calendar" && direction > 0 && month.later > "9999-12-31") &&
     change({ from: view === "calendar" ? (direction < 0 ? month.earlier : month.later) : moveFrom(range.first, screen.zoom, direction) });
   const today = () => {
     change({ from: undefined });

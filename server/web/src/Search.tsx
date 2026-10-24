@@ -30,7 +30,16 @@ export function Search({ q, health, onSearch, onClear }: Props) {
         <span className={`chip-filter ${health}`}>
           <HealthDot health={health} word={false} />
           {health}
-          <button type="button" className="chip-x" aria-label="Show all" onClick={onClear}>
+          <button
+            type="button"
+            className="chip-x"
+            aria-label="Show all"
+            onClick={(e) => {
+              // Focus stays in the search box, not on the page body, when the chip goes.
+              (e.currentTarget.closest("form")?.querySelector("input") as HTMLInputElement | null)?.focus();
+              onClear();
+            }}
+          >
             ×
           </button>
         </span>

@@ -1,7 +1,6 @@
 import { useCallback, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { ActorRef, GoalDate, Health } from "../../src/api.ts";
-import { dateLabel, slipLabel } from "./model/labels.ts";
+import type { ActorRef, Health } from "../../src/api.ts";
 import { placePopover, popoverWidth } from "./model/popover.ts";
 import { useDismiss } from "./useScreen.ts";
 
@@ -46,6 +45,8 @@ export function Avatar({ actor, mine = false }: { actor: ActorRef; mine?: boolea
       className={`av${mine ? " mine" : ""}`}
       style={{ background: `var(--av-${n}-bg)`, color: `var(--av-${n}-ink)` }}
       title={actor.name}
+      role="img"
+      aria-label={actor.name}
       onClick={(e) => {
         e.stopPropagation();
         const r = e.currentTarget.getBoundingClientRect();
@@ -76,23 +77,14 @@ export function HealthDot({ health, word = true }: { health: Health; word?: bool
   return (
     <>
       <span className={`hdot ${health ?? "none"}`} style={{ background: health ? look(health).bar : "transparent" }} aria-hidden="true" />
-      {word ? <span className={`hword ${health ?? "none"}${word === "shown" ? " shown" : ""}`}>{health ?? "no health"}</span> : <Hidden>{health ?? "no health"}</Hidden>}
+      {/* "no health" is not a SPEC word (rule 13): a goal with no health shows the hollow circle, and the words are for a screen reader only. */}
+      {word && health ? <span className={`hword ${health}${word === "shown" ? " shown" : ""}`}>{health}</span> : <Hidden>{health ?? "no health"}</Hidden>}
     </>
   );
 }
 
 /** The Priority rank as a plain number. An empty slot keeps the columns aligned on rows with no rank. */
 export const Rank = ({ rank }: { rank?: number }) => <span className="rnum">{rank ?? ""}</span>;
-
-/** A goal date with its Date Type, and its slip. It does not wrap inside. */
-export function DateMark({ date, today }: { date: GoalDate; today: string }) {
-  return (
-    <span className="date">
-      {dateLabel(date, today)}
-      {date.slipDays !== undefined && <span className="late"> {slipLabel(date.slipDays)}</span>}
-    </span>
-  );
-}
 
 /**
  * A ? icon and its help card. A click or Enter opens it, a second click, Escape, or a click outside closes it. Pointing at it also shows it.
