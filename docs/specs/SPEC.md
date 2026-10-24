@@ -173,12 +173,12 @@ Structured fields are state, date type, health, PTG, rank, and every other field
 | `org_unit` | → Org Unit | yes | The unit the goal belongs to. |
 | `level` | Enum **(configurable)** | yes | Default: `Company` · `Program or Function` · `Team` · `Individual`. Agrees with the org unit's level. |
 | `type` | Enum **(configurable)** | yes | Default: `Milestone (Commit)`, a planning goal (reaching a committed state, a signed-off plan, a date for a date; every Promotion Milestone has this type) · `Milestone (Launch)`, a launch or delivery · `Metric (Business)` · `Metric (Customer)` · `Metric (Operational Excellence)`. Types let reviewers check whether a unit has the right mix of goals. |
-| `due_date` | Date | yes | The date the goal will be met. If the exact day is unknown, use the end of the relevant period, e.g. the end of the fiscal quarter **(configurable calendar)**. What the date means depends on `date_type`. |
+| `due_date` | Date | yes | The date the goal will be met. If the exact day is unknown, use the end of the relevant period, e.g. the end of the fiscal quarter **(configurable calendar)**. What the date means depends on `date_type`. A sub-goal may leave `due_date` and `date_type` empty: it then takes its parent's date, Date Type, Promotion Milestone, and plan, until it sets its own. |
 | `date_type` | `Committed` · `Ambition` · `Fantasy` | yes | See [§5 (Date types)](#s5) (invariant). |
 | `promotion_milestone` | → Goal | if `date_type` ≠ Committed | The linked goal has `type = Milestone (Commit)`, `date_type = Committed`, a due date before this goal's, and a human owner (invariant). Empty when Committed. |
 | `plan` | → Doc (hosted Markdown) or external link | when Committed; recommended before | The plan behind the goal, in whatever form it takes: a hosted Markdown plan, a 5Ps doc, a PR/FAQ, a Working Backwards doc, etc. (see *Tig's Toolbox for Product Management* in [§14 (Sources)](#s14)). Hosted plans are versioned, so the plan can be viewed as it stood at commit time. The pinned version is `committed_plan_version`. |
 | `committed_plan_version` | Doc version | auto, when first Committed | Set when `date_type` first becomes Committed (invariant). It is the plan's Doc version at that moment. Later edits to the Doc must not change it. |
-| `plan_maturity` | `Watercolor` · `Crayon` · `Pencil` | yes | Committed needs Pencil (invariant). If a team asks for a committed date on a Crayon plan, push back on the plan, not the date. |
+| `plan_maturity` | `Watercolor` · `Crayon` · `Pencil` | yes | Committed needs Pencil (invariant). A Promotion Milestone (`Milestone (Commit)`) is exempt: it is committed on the plan of the goal it promotes. If a team asks for a committed date on a Crayon plan, push back on the plan, not the date. |
 | `work_product` | List of typed links | optional | Repo / PR / milestone, doc folder, deployed URL, metric dashboard or query. Agents follow these to gather evidence for health. Lint: missing on an in-progress `Milestone (Launch)`. |
 | `original_committed_date` | Date, set by the system | auto | Recorded when `date_type` first becomes Committed. Not editable afterwards (invariant). A deployment can let the GOALIE owner, and no one else, correct a genuine data-entry error, with a logged reason. |
 | `changed_due_date` | Date | optional; only when Committed | The current expected date after a slip. Each change has a reason (invariant) and is logged. No silent re-baselines. |
@@ -188,7 +188,7 @@ Structured fields are state, date type, health, PTG, rank, and every other field
 | `health` | `GREEN` · `YELLOW` · `RED` | while In Progress | **GREEN:** on track; risks understood and mitigated; the owner believes the date will be hit. **YELLOW:** real unknowns or blockers, but there's still a credible path to the date. This is the status that demands action while there is time. **RED:** the date isn't credible without intervention, or there's no path to green. Health is judged against the committed date. For an uncommitted goal, that means its Promotion Milestone's date. |
 | `path_to_green` | Structured: steps + criteria + trigger | when YELLOW or RED (invariant) | A good PTG has: (1) steps, each with a **named human owner** and (2) a **date** (a date for a date is OK); (3) **criteria for returning to GREEN** that can be tested without debate; (4) for YELLOW, the **trigger that turns it RED**, and what happens then. Lint: any part missing. Archived into history on return to GREEN. |
 | `origination` | `New` · `Carryover` · `Repeating` | yes | New this period; carried over with a revised date; repeated with new targets. |
-| `parent` | → Goal | optional | The goal this one contributes to (e.g. Team → Program → Company). |
+| `parent` | → Goal | optional | The goal this one contributes to (e.g. Team → Program → Company). A sub-goal with no date of its own takes its parent's (see `due_date`). |
 | `visibility` | Enum | default: organization-wide | Restricting it is a logged exception. |
 
 ### 6.2 Org Unit
@@ -238,7 +238,7 @@ Every change to a goal, a Doc, a work item, or a priority, and every comment, is
 ### 6.7 Work Item (optional extension)
 <a id="s6-7"></a>
 
-A lighter record for the work under a goal: `id`, `title`, `owner` (an actor, and it can be an agent), `status`, `due_date`, links. It is linked to a goal. This extension doesn't copy the goal schema. Agents can use the state of linked work items as evidence for a goal's health. When the extension is on, work items are the group's list of work under a goal (invariant for a deployment that enables the extension). A human can file a work item with no agent (invariant for a deployment that enables the extension). The extension stays optional ([§13 (Requirements)](#s13)).
+A lighter record for the work under a goal: `id`, `title`, `owner` (an actor, and it can be an agent), `status`, `due_date`, links. It is linked to a goal. This extension doesn't copy the goal schema. Agents can use the state of linked work items as evidence for a goal's health. When the extension is on, work items are the group's list of work under a goal (invariant for a deployment that enables the extension). A human can file a work item with no agent (invariant for a deployment that enables the extension). The extension stays optional ([§13 (Requirements)](#s13)). The owner setting `work_items` turns it on; the default is off. `status` is one of the State words `Backlog`, `In Progress`, `Completed`, `Deleted`.
 
 ### 6.8 Example record
 

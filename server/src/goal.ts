@@ -40,10 +40,32 @@ export function currentDate(goal: Row): string | undefined {
   return typeof date === "string" ? date : undefined;
 }
 
+/** The fields a sub-goal with no date of its own takes from its parent (D2, DD3). */
+const DATED = ["due_date", "changed_due_date", "date_type", "original_committed_date", "promotion_milestone", "plan", "plan_maturity", "committed_plan_version"] as const;
+
+/** True when a goal sets a date of its own. A goal with neither due_date nor date_type takes its parent's. */
+export const hasOwnDate = (goal: Row) => goal.due_date != null || goal.date_type != null;
+
+/**
+ * The goal as the rules and views read it (plan E-7): its own date, Date Type, Promotion Milestone, and plan,
+ * or, when it sets no date, those of the nearest ancestor that does. `inherited` says which.
+ * This is the one home of that resolution.
+ */
+export function resolvedGoal(goal: Row, getGoal: (id: string) => Row | undefined): Row & { inherited: boolean } {
+  if (hasOwnDate(goal)) return { ...goal, inherited: false };
+  const seen = new Set<unknown>([goal.id]);
+  for (let at = typeof goal.parent === "string" ? getGoal(goal.parent) : undefined; at !== undefined && !seen.has(at.id); at = typeof at.parent === "string" ? getGoal(at.parent) : undefined) {
+    seen.add(at.id);
+    if (hasOwnDate(at)) return { ...goal, ...Object.fromEntries(DATED.map((f) => [f, at[f] ?? null])), inherited: true };
+  }
+  return { ...goal, inherited: true };
+}
+
 type CommittedDate = { date: string; kind: "Committed" | "Promotion Milestone" };
 
-/** The committed date health is judged against (SPEC.md §6.1): its own, else its Promotion Milestone's. */
-export function committedDate(goal: Row, getGoal: (id: string) => Row | undefined): CommittedDate | undefined {
+/** The committed date health is judged against (SPEC.md §6.1): its own, else its Promotion Milestone's. A sub-goal with no date reads its parent's (D2). */
+export function committedDate(original: Row, getGoal: (id: string) => Row | undefined): CommittedDate | undefined {
+  const goal = resolvedGoal(original, getGoal);
   if (goal.date_type === "Committed") {
     const date = currentDate(goal);
     return date === undefined ? undefined : { date, kind: "Committed" };

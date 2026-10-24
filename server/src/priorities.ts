@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { ApiGoal, ApiPriority, ApiSummary, GoalDate, Health, PathToGreen, PrioritiesResponse, PtgStep } from "./api.ts";
 import { dateIn, day, daysBetween } from "./dates.ts";
-import { committedDate, currentDate, isOpen, OPEN_STATES, type State } from "./goal.ts";
+import { committedDate, currentDate, isOpen, OPEN_STATES, resolvedGoal, type State } from "./goal.ts";
 import { read, readAll } from "./read.ts";
 import type { Row } from "./rules.ts";
 
@@ -71,6 +71,8 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, todayIso: stri
   // Load once and build from memory.
   const goals = new Map(readAll(db, "goal").map((g) => [g.id as string, g]));
   const getGoal = (id: string) => goals.get(id);
+  /** A sub-goal with no date of its own reads its parent's (D2). */
+  const resolved = (goal: Row) => resolvedGoal(goal, getGoal);
   const started = startedAll(db, timeZone);
   const names = new Map(readAll(db, "actor").map((a) => [a.id as string, a.display_name as string]));
   const actor = (id: string) => ({ id, name: names.get(id) ?? id });
@@ -110,7 +112,7 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, todayIso: stri
       owner: actor(goal.owner as string),
       state: goal.state as State,
       health,
-      dates: datesOf(goal, !parent || ownDate(goal) !== ownDate(parent)),
+      dates: datesOf(resolved(goal), !parent || ownDate(resolved(goal)) !== ownDate(resolved(parent))),
       started: started.get(goal.id as string) ?? todayIso,
       ...(ptg ? { ptg } : {}),
       counted: funded && !parent && goal.state === "In Progress",
@@ -136,7 +138,8 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, todayIso: stri
 
   let nextPromotion: ApiSummary["nextPromotion"];
   for (const goal of tops.flat().flatMap(inView)) {
-    const milestone = typeof goal.promotion_milestone === "string" ? goals.get(goal.promotion_milestone) : undefined;
+    const pm = resolved(goal).promotion_milestone;
+    const milestone = typeof pm === "string" ? goals.get(pm) : undefined;
     if (!milestone || !isOpen(milestone)) continue;
     const date = currentDate(milestone);
     if (date === undefined || day(date) < today || (nextPromotion && day(date) >= day(nextPromotion.date))) continue;

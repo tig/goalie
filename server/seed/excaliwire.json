@@ -42,7 +42,8 @@
         "fields": {
           "owner": "tig",
           "settings": {
-            "goal_key_prefix": "XW"
+            "goal_key_prefix": "XW",
+            "work_items": true
           }
         }
       }

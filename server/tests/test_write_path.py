@@ -156,7 +156,7 @@ class WritePathTests(unittest.TestCase):
         self.rejected(create("goal", "GOAL-43", {**EXAMPLE, "due_date": None}, "Planned"), "date-and-date-type")
 
     def test_committed_needs_pencil(self) -> None:
-        self.rejected(create("goal", "GOAL-58", committed_milestone(plan_maturity="Crayon"), "Planned"), "committed-needs-pencil")
+        self.rejected(create("goal", "GOAL-58", committed_milestone(type="Milestone (Launch)", plan_maturity="Crayon"), "Planned"), "committed-needs-pencil")
 
     def test_date_state_and_health_changes_need_a_reason(self) -> None:
         self.rejected(create("goal", "GOAL-42", EXAMPLE), "reason-required")
@@ -185,10 +185,10 @@ class WritePathTests(unittest.TestCase):
 
     def test_rejected_write_appends_no_event_and_changes_no_row(self) -> None:
         count = len(self.store.events())
-        self.rejected(update("goal", "GOAL-57", 1, {"plan_maturity": "Crayon"}, "Rethink"), "committed-needs-pencil")
+        self.rejected(update("goal", "GOAL-7", 1, {"plan_maturity": "Crayon"}, "Rethink"), "committed-needs-pencil")
         self.assertEqual(len(self.store.events()), count)
-        self.assertEqual(self.store.read("goal", "GOAL-57")["plan_maturity"], "Pencil")
-        self.assertEqual(self.store.read("goal", "GOAL-57")["version"], 1)
+        self.assertEqual(self.store.read("goal", "GOAL-7")["plan_maturity"], "Pencil")
+        self.assertEqual(self.store.read("goal", "GOAL-7")["version"], 1)
 
     def test_unknown_actor_cannot_write(self) -> None:
         result = self.store.write("mallory", create("org_unit", "team/x", {"name": "X", "level": "Team", "owner": JANE}))
@@ -237,6 +237,60 @@ class WritePathTests(unittest.TestCase):
         result = self.store.run("write", "--as", JANE, stdin={"op": "create", "kind": "doc", "fields": ["kind"]})[1]
         self.assertEqual(result["error"], "bad_command", result)
 
+    # B2: the rules for the goal page and goal creation (docs/engineering/goal-page-and-create.md, Rules).
+
+    def test_a_promotion_milestone_is_committed_without_a_pencil_plan(self) -> None:
+        # D1, plan E-6: a Milestone (Commit) is exempt. Any other Committed goal still needs Pencil.
+        self.ok(create("goal", "GOAL-58", committed_milestone(plan_maturity="Crayon"), "Planned"))
+        result = self.rejected(create("goal", "GOAL-59", committed_milestone(type="Milestone (Launch)", plan_maturity="Crayon"), "Planned"), "committed-needs-pencil")
+        self.assertEqual(result["violations"][0]["field"], "plan_maturity")
+
+    def test_a_sub_goal_takes_its_parents_date_until_it_sets_its_own(self) -> None:
+        # D2, plan E-7: null due_date and date_type resolve from the nearest ancestor.
+        inherit = {**committed_milestone(type="Milestone (Launch)", summary="Write the release notes for launch", parent="GOAL-57", plan_maturity="Crayon"), "due_date": None, "date_type": None, "plan": None}
+        self.ok(create("goal", "GOAL-60", inherit, "Planned"))
+        self.ok(create("goal", "GOAL-61", {**inherit, "parent": "GOAL-60"}, "Planned"))
+        self.ok(update("goal", "GOAL-60", 1, {"state": "Completed", "health": None}, "Done"))
+
+    def test_a_goal_with_no_parent_has_its_own_date(self) -> None:
+        result = self.rejected(create("goal", "GOAL-60", {**EXAMPLE, "parent": None, "due_date": None, "date_type": None}, "Planned"), "date-and-date-type")
+        self.assertEqual(result["violations"][0]["field"], "due_date")
+        self.rejected(create("goal", "GOAL-61", {**EXAMPLE, "date_type": None}, "Planned"), "date-and-date-type")
+
+    def test_a_sub_goal_on_an_uncommitted_date_shares_its_parents_milestone(self) -> None:
+        self.ok(create("goal", "GOAL-42", EXAMPLE, "Planned"))
+        sub = {**EXAMPLE, "summary": "Draw the onboarding screens", "parent": "GOAL-42", "due_date": None, "date_type": None, "promotion_milestone": None}
+        self.ok(create("goal", "GOAL-43", sub, "Planned"))
+
+    def test_a_path_to_green_has_steps_with_owners_and_dates_and_criteria(self) -> None:
+        # D6: the PathToGreen shape.
+        step = {"text": "Hire a designer", "owner": JANE, "date": "2026-11-01"}
+        for ptg in (
+            "Hire a designer",
+            {"steps": [], "criteria": "Designer starts"},
+            {"steps": [{**step, "owner": "nobody"}], "criteria": "Designer starts"},
+            {"steps": [{**step, "date": "2026-13-01"}], "criteria": "Designer starts"},
+            {"steps": [{**step, "text": " "}], "criteria": "Designer starts"},
+            {"steps": [step], "criteria": ""},
+        ):
+            result = self.rejected(update("goal", "GOAL-57", 1, {"health": "RED", "path_to_green": ptg}, "At risk"), "ptg-when-yellow-or-red")
+            self.assertEqual(result["violations"][-1]["field"], "path_to_green", ptg)
+        self.ok(update("goal", "GOAL-57", 1, {"health": "YELLOW", "path_to_green": {"steps": [step], "criteria": "Designer starts"}}, "At risk"))
+
+    def test_completed_is_on_or_before_the_original_committed_date(self) -> None:
+        # §7.2, completed-on-time. Today is pinned to 2026-10-23.
+        self.rejected(update("goal", "GOAL-57", 1, {"state": "Completed Late", "health": None}, "Done"), "completed-on-time")
+        self.ok(create("goal", "GOAL-58", committed_milestone(due_date="2026-10-01"), "Planned"))
+        result = self.rejected(update("goal", "GOAL-58", 1, {"state": "Completed", "health": None}, "Done"), "completed-on-time")
+        self.assertEqual(result["violations"][-1]["field"], "state")
+        self.ok(update("goal", "GOAL-58", 1, {"state": "Completed Late", "health": None}, "Done"))
+
+    def test_a_promotion_to_ambition_needs_a_new_milestone(self) -> None:
+        # §5: promotion-new-milestone.
+        self.ok(create("goal", "GOAL-42", {**EXAMPLE, "date_type": "Fantasy"}, "Planned"))
+        result = self.rejected(update("goal", "GOAL-42", 1, {"date_type": "Ambition"}, "Promote"), "promotion-new-milestone")
+        self.assertEqual(result["violations"][-1]["field"], "promotion_milestone")
+
     def test_a_committed_date_moves_only_by_a_slip(self) -> None:
         # Review Q1: rewriting due_date in place would erase the slip (SPEC.md §6.1: no silent re-baselines).
         result = self.rejected(update("goal", "GOAL-57", 1, {"due_date": "2026-12-15"}, "New date"), "no-silent-re-baseline")
@@ -278,7 +332,8 @@ class WritePathTests(unittest.TestCase):
         self.ok(create("goal", "GOAL-42", {**EXAMPLE, "date_type": "Fantasy"}, "Planned"))
         committed = {"date_type": "Committed", "promotion_milestone": None, "plan_maturity": "Pencil"}
         self.rejected(update("goal", "GOAL-42", 1, committed, "Promote"), "date-lifecycle")
-        self.ok(update("goal", "GOAL-42", 1, {"date_type": "Ambition"}, "Promote"))
+        self.ok(create("goal", "GOAL-58", committed_milestone(due_date="2026-12-15"), "Next milestone"))
+        self.ok(update("goal", "GOAL-42", 1, {"date_type": "Ambition", "promotion_milestone": "GOAL-58"}, "Promote"))
         self.ok(update("goal", "GOAL-42", 2, committed, "Promote"))
 
     def test_only_a_committed_goal_is_completed(self) -> None:
@@ -343,6 +398,64 @@ class BootstrapTests(unittest.TestCase):
         result = store.write("tig", create("actor", "tig", {"kind": "human", "display_name": "Tig"}))
         self.assertTrue(result["ok"], result)
         self.assertEqual(store.events()[0]["actor"], "tig")
+
+
+class WorkItemTests(unittest.TestCase):
+    """The work-item extension (SPEC.md §6.7, D7, D8)."""
+
+    def setUp(self) -> None:
+        self.store = Store()
+        self.addCleanup(self.store.close)
+        for actor, command in [
+            (JANE, create("actor", JANE, {"kind": "human", "display_name": "Jane"})),
+            (JANE, create("actor", "bot", {"kind": "agent", "display_name": "Bot", "operator": JANE})),
+            (JANE, create("actor", "bot2", {"kind": "agent", "display_name": "Bot 2", "operator": JANE})),
+            (JANE, create("org_unit", "company", {"name": "Example", "level": "Company", "owner": JANE})),
+            (JANE, create("owner_settings", "owner", {"owner": JANE, "settings": {"work_items": True}})),
+            (JANE, create("goal", "GOAL-1", committed_milestone(org_unit="company", level="Company"), "Planned")),
+        ]:
+            result = self.store.write(actor, command)
+            assert result["ok"], (command, result)
+        self.item = {"goal": "GOAL-1", "title": "Draw the goal page", "owner": "bot", "status": "In Progress", "due_date": "2026-11-02"}
+
+    def refused(self, actor: str, command: dict[str, Any], rule: str, field: str | None = None) -> Any:
+        result = self.store.write(actor, command)
+        self.assertFalse(result["ok"], result)
+        violation = next((v for v in result.get("violations", []) if v["rule"] == rule), None)
+        self.assertIsNotNone(violation, result)
+        if field:
+            self.assertEqual(violation["field"], field)
+        return result
+
+    def test_a_human_files_a_work_item_with_a_four_digit_key(self) -> None:
+        result = self.store.write(JANE, create("work_item", None, self.item, "Filed"))
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["entity"]["id"], "WI-0001")
+
+    def test_work_items_are_refused_when_the_extension_is_off(self) -> None:
+        settings = self.store.read("owner_settings", "owner")
+        assert self.store.write(JANE, update("owner_settings", "owner", settings["version"], {"settings": {}}))["ok"]
+        self.refused(JANE, create("work_item", "WI-0001", self.item, "Filed"), "work-items-off")
+
+    def test_status_is_a_state_word(self) -> None:
+        self.refused(JANE, create("work_item", "WI-0001", {**self.item, "status": "Done"}, "Filed"), "work-item-status", "status")
+
+    def test_a_due_date_is_a_real_date(self) -> None:
+        self.refused(JANE, create("work_item", "WI-0001", {**self.item, "due_date": "2026-02-30"}, "Filed"), "real-date", "due_date")
+
+    def test_status_owner_and_due_date_changes_need_a_reason(self) -> None:
+        assert self.store.write(JANE, create("work_item", "WI-0001", self.item, "Filed"))["ok"]
+        for change in ({"status": "Completed"}, {"owner": JANE}, {"due_date": "2026-11-09"}):
+            self.refused(JANE, update("work_item", "WI-0001", 1, change), "reason-required")
+        self.assertTrue(self.store.write(JANE, update("work_item", "WI-0001", 1, {"status": "Completed"}, "Shipped"))["ok"])
+
+    def test_an_agent_writes_only_the_work_items_it_owns(self) -> None:
+        assert self.store.write(JANE, create("work_item", "WI-0001", self.item, "Filed"))["ok"]
+        self.assertTrue(self.store.write("bot", update("work_item", "WI-0001", 1, {"status": "Completed"}, "Shipped"))["ok"])
+        self.refused("bot2", update("work_item", "WI-0001", 2, {"title": "Taken over"}), "agent-own-work-items", "owner")
+        self.refused("bot", update("work_item", "WI-0001", 2, {"owner": "bot2"}, "Hand off"), "agent-own-work-items", "owner")
+        self.assertTrue(self.store.write("bot2", create("work_item", "WI-0002", {**self.item, "owner": "bot2"}, "Filed"))["ok"])
+        self.refused("bot2", create("work_item", "WI-0003", self.item, "Filed"), "agent-own-work-items", "owner")
 
 
 class PermissionTests(unittest.TestCase):
