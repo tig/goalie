@@ -2,6 +2,7 @@ import { useState, type CSSProperties } from "react";
 import type { ApiActor, ApiEvent, ApiWorkItem, GoalPageResponse, Health, SubGoalCard } from "../../src/api.ts";
 import { shortDate } from "../../src/dates.ts";
 import { postCommands, useJson } from "./data.ts";
+import { AddSubGoal, AddWorkItem, useTick } from "./GoalAdd.tsx";
 import { ClosePanel, DescriptionPanel, FieldsPanel, HealthPanel, PromotePanel, PursuePanel, SlipPanel, type PanelName } from "./GoalPanels.tsx";
 import { commentBatch } from "./model/commands.ts";
 import { comments, dateBar, eventValue, fieldLabel, filterEvents, groupWorkItems, HISTORY_FILTERS, type HistoryFilter } from "./model/goalpage.ts";
@@ -52,7 +53,7 @@ const when = (ts: string) => time.format(new Date(ts));
 function Goal({ data, back, reload }: { data: GoalPageResponse; back: React.ReactNode; reload: () => void }) {
   const { goal, actors, today } = data;
   // One panel at a time (G9). A saved panel reloads the page, so every section shows the stored state.
-  const [panel, setPanel] = useState<{ name: PanelName; health?: Exclude<Health, null> } | null>(null);
+  const [panel, setPanel] = useState<{ name: PanelName | "subgoal" | "workitem"; health?: Exclude<Health, null> } | null>(null);
   const done = (saved: boolean) => {
     setPanel(null);
     if (saved) reload();
@@ -221,15 +222,21 @@ function Goal({ data, back, reload }: { data: GoalPageResponse; back: React.Reac
         )}
         {panel?.name === "fields" ? <FieldsPanel data={data} onDone={done} /> : <Fields data={data} onEdit={() => setPanel({ name: "fields" })} />}
       </div>
-      {data.subGoals.length > 0 && (
-        <section className="gsubs">
-          <h2>Sub-goals</h2>
-          {data.subGoals.map((c) => (
-            <SubGoal key={c.id} card={c} data={data} />
-          ))}
-        </section>
+      <section className="gsubs">
+        <h2>
+          Sub-goals
+          <button type="button" className="btn primary" onClick={() => setPanel({ name: "subgoal" })}>
+            + Sub-goal
+          </button>
+        </h2>
+        {panel?.name === "subgoal" && <AddSubGoal data={data} onDone={done} />}
+        {data.subGoals.map((c) => (
+          <SubGoal key={c.id} card={c} data={data} />
+        ))}
+      </section>
+      {data.workItems && (
+        <WorkItems items={data.workItems} data={data} adding={panel?.name === "workitem"} onAdd={() => setPanel({ name: "workitem" })} onDone={done} reload={reload} />
       )}
-      {data.workItems && <WorkItems items={data.workItems} data={data} />}
       <Talk data={data} reload={reload} />
     </main>
   );
@@ -338,14 +345,19 @@ function Owner({ actor, me }: { actor: ApiActor; me: string }) {
   );
 }
 
-function WorkItems({ items, data }: { items: ApiWorkItem[]; data: GoalPageResponse }) {
+function WorkItems({ items, data, adding, onAdd, onDone, reload }: { items: ApiWorkItem[]; data: GoalPageResponse; adding: boolean; onAdd: () => void; onDone: (saved: boolean) => void; reload: () => void }) {
   const [closed, setClosed] = useState<Record<string, boolean>>({ Completed: true });
   const live = items.filter((i) => i.status !== "Deleted");
+  const { ticked, tick, box } = useTick(reload);
   return (
     <section className="gwork">
       <h2>
         Work items <span className="muted">{live.length}</span>
+        <button type="button" className="btn primary" onClick={onAdd}>
+          + Work item
+        </button>
       </h2>
+      {adding && <AddWorkItem data={data} statuses={["Backlog", "In Progress", "Completed", "Deleted"]} onDone={onDone} />}
       {groupWorkItems(live).map((g) => (
         <div key={g.status} className="wgroup">
           <button type="button" className="wghead" aria-expanded={!closed[g.status]} onClick={() => setClosed((c) => ({ ...c, [g.status]: !c[g.status] }))}>
@@ -354,11 +366,18 @@ function WorkItems({ items, data }: { items: ApiWorkItem[]; data: GoalPageRespon
           {!closed[g.status] &&
             g.items.map((i) => (
               <div key={i.id} className={`wrow${i.status === "Completed" ? " done" : ""}`}>
-                <input type="checkbox" checked={i.status === "Completed"} readOnly aria-label={`${i.title} is Completed`} />
+                <input
+                  type="checkbox"
+                  checked={i.status === "Completed" || ticked?.id === i.id}
+                  disabled={i.status === "Completed"}
+                  onChange={() => tick(i)}
+                  aria-label={`Mark ${i.title} Completed`}
+                />
                 <span className="wtitle">{i.title}</span>
                 <Owner actor={data.actors[i.owner] ?? { id: i.owner, name: i.owner, kind: "human" }} me={data.me.id} />
                 <span className="wstatus small">{i.status}</span>
                 <span className={`wdue small${i.late ? " late" : ""}`}>{i.due_date ? `${shortDate(i.due_date, data.today)}${i.late ? " late" : ""}` : ""}</span>
+                {box(i)}
               </div>
             ))}
         </div>

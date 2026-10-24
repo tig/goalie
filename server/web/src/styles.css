@@ -279,6 +279,7 @@ background-size:2px 100%,100% 100%;background-repeat:no-repeat;background-positi
 @media (pointer:coarse){
 .vtab,.gbtn,.btn,.count,.q,.morebtn,.chip-x,.av{position:relative}
 .meter span[role="button"]{position:relative}
+.help{position:relative;z-index:2}
 .vtab::after,.gbtn::after,.btn::after,.count::after,.q::after,.morebtn::after,.chip-x::after,.av::after,.meter span[role="button"]::after{content:"";position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}}
 .tip.name{transform:translateX(-50%);white-space:nowrap;padding:6px 10px}
 
@@ -455,3 +456,11 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 .commentbox{display:flex;flex-direction:column;align-items:flex-start;gap:8px;margin:12px 0 0}
 .phone .fgrid{grid-template-columns:1fr}
 .phone .gactions .btn{height:40px}
+.gsubs h2,.gwork h2{display:flex;align-items:center;gap:10px}
+.gsubs h2 .btn,.gwork h2 .btn{margin-left:auto}
+.addrow{margin:0 0 10px}
+.addgrid{display:grid;grid-template-columns:2fr 1fr;gap:0 12px}
+.addgrid.four{grid-template-columns:2fr 1fr 1fr 1fr}
+.tickreason{grid-column:2/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:0 0 8px}
+.tickreason input{flex:1;min-width:160px;font:500 13px var(--font);border:1px solid var(--cut);border-radius:10px;padding:7px 10px}
+.phone .addgrid,.phone .addgrid.four{grid-template-columns:1fr}

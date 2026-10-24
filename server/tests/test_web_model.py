@@ -350,14 +350,14 @@ class ScrollTests(unittest.TestCase):
 
 class GoalPageTests(unittest.TestCase):
     def test_work_items_group_by_status_in_order(self) -> None:
-        groups = run('const items = [...page("XW-0003").workItems, { id: "WI-0009", status: "Deleted" }]; return goalpage.groupWorkItems(items).map((g) => [g.status, g.items.map((i) => i.id)]);')
-        self.assertEqual(groups, [["In Progress", ["WI-0001", "WI-0002"]], ["Backlog", ["WI-0003"]], ["Completed", ["WI-0004"]]])
+        items = [{"id": "WI-0001", "status": "Completed"}, {"id": "WI-0002", "status": "In Progress"}, {"id": "WI-0003", "status": "Backlog"}, {"id": "WI-0004", "status": "In Progress"}, {"id": "WI-0009", "status": "Deleted"}]
+        groups = run(f'return goalpage.groupWorkItems({json.dumps(items)}).map((g) => [g.status, g.items.map((i) => i.id)]);')
+        self.assertEqual(groups, [["In Progress", ["WI-0002", "WI-0004"]], ["Backlog", ["WI-0003"]], ["Completed", ["WI-0001"]]])
 
     def test_history_filters_by_kind_of_change(self) -> None:
-        counts = run('const e = page("XW-0003").events; return ["All", "Dates", "Health", "State", "Comments"].map((f) => goalpage.filterEvents(e, f).length);')
-        self.assertEqual(counts[4], 1)  # type: ignore[index]
-        self.assertEqual(counts[3], 1)  # type: ignore[index]
-        self.assertGreater(counts[0], counts[1])  # type: ignore[index]
+        fields = ["summary", "due_date", "date_type", "changed_due_date", "health", "path_to_green", "state", "comment", "owner"]
+        counts = run(f'const e = {json.dumps([{"field": f} for f in fields])}; return ["All", "Dates", "Health", "State", "Comments"].map((f) => goalpage.filterEvents(e, f).length);')
+        self.assertEqual(counts, [9, 3, 2, 1, 1])
 
     def test_an_event_value_reads_as_words(self) -> None:
         values = run('return [goalpage.eventValue(null), goalpage.eventValue("GREEN"), goalpage.eventValue(3), goalpage.eventValue({ steps: [1, 2], criteria: "x" }), goalpage.eventValue([{ repo: "github.com/tig/goalie" }])];')
@@ -380,7 +380,8 @@ class GoalPageTests(unittest.TestCase):
         self.assertEqual((bar["marks"][0]["at"], bar["start"], bar["today"]), (0, 100, 100))  # type: ignore[index]
 
     def test_comments_are_the_comment_events(self) -> None:
-        self.assertEqual(run('return goalpage.comments(page("XW-0003").events).map((e) => e.actor);'), ["tig"])
+        events = [{"field": "comment", "actor": "tig"}, {"field": "health", "actor": "chelsea"}, {"field": "comment", "actor": "chelsea"}]
+        self.assertEqual(run(f'return goalpage.comments({json.dumps(events)}).map((e) => e.actor);'), ["tig", "chelsea"])
 
 
 class CommandTests(unittest.TestCase):
@@ -420,6 +421,25 @@ class CommandTests(unittest.TestCase):
 
     def test_a_comment_is_one_comment_command(self) -> None:
         self.assertEqual(run('return commands.commentBatch("goal", "XW-0003", " Looks right. ");'), {"commands": [{"op": "comment", "kind": "goal", "id": "XW-0003", "text": "Looks right."}]})
+
+    def test_a_sub_goal_on_its_parents_date_sends_no_date(self) -> None:
+        b = run('return commands.subGoalBatch(page("XW-0003").goal, { summary: "Load the tree", owner: "chelsea" });')
+        self.assertEqual(b, {"commands": [{"op": "create", "kind": "goal", "ref": "$s1", "fields": {"summary": "Load the tree", "owner": "chelsea", "parent": "XW-0003", "org_unit": "excaliwire", "level": "Company", "state": "Backlog"}, "reason": "Sub-goal of XW-0003"}]})
+
+    def test_an_uncommitted_sub_goal_brings_its_own_milestone_in_the_create_order(self) -> None:
+        b = run('return commands.subGoalBatch(page("XW-0004").goal, { summary: "Open a goal", owner: "chelsea", date: { due_date: "2026-12-01", date_type: "Ambition" }, milestone: { summary: "Commit a date for Open a goal", due_date: "2026-11-20", owner: "chelsea" } });')
+        c = b["commands"]  # type: ignore[index]
+        self.assertEqual([(x["op"], x.get("ref") or x.get("id")) for x in c], [("create", "$m1"), ("create", "$s1"), ("update", "$m1")])
+        self.assertEqual(c[1]["fields"]["promotion_milestone"], "$m1")
+        self.assertEqual((c[2]["base_version"], c[2]["fields"]), (1, {"parent": "$s1"}))
+
+    def test_a_work_item_is_filed(self) -> None:
+        b = run('return commands.workItemBatch("XW-0003", { title: "Draw the board", owner: "frontend-engineer", status: "In Progress", due_date: null });')
+        self.assertEqual(b, {"commands": [{"op": "create", "kind": "work_item", "fields": {"goal": "XW-0003", "title": "Draw the board", "owner": "frontend-engineer", "status": "In Progress", "due_date": None}, "reason": "Filed"}]})
+
+    def test_ticking_a_work_item_is_a_status_change_with_a_reason(self) -> None:
+        b = run('return commands.workItemStatusBatch({ id: "WI-0001", version: 1 }, "Completed", "Shipped");')
+        self.assertEqual(b, {"commands": [{"op": "update", "kind": "work_item", "id": "WI-0001", "base_version": 1, "fields": {"status": "Completed"}, "reason": "Shipped"}]})
 
     def test_a_stale_save_keeps_the_typed_values_beside_the_current_ones(self) -> None:
         m = run('const g = page("XW-0003").goal; return commands.staleMerge({ severity: "sev2", health: "YELLOW" }, { ...g, version: 4, severity: "sev3" });')
