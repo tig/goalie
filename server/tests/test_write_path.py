@@ -405,6 +405,17 @@ class PermissionTests(unittest.TestCase):
         self.refused("tig", create("draft", "DRAFT-2", {**draft, "actor": "tig"}), "draft-by-its-agent")
         self.assertTrue(self.store.write("bot", create("draft", "DRAFT-3", {**draft, "actor": "bot"}))["ok"])
 
+    def test_only_a_drafts_own_agent_updates_it(self) -> None:
+        # Codebase QA: another agent, or a human, could rewrite an agent's Draft.
+        assert self.store.write("tig", create("actor", "bot3", {"kind": "agent", "display_name": "Bot 3", "operator": "tig"}))["ok"]
+        draft = {"entity": "GOAL-1", "actor": "bot", "base_version": 1, "change": {"health": "YELLOW"}, "reason": "Evidence"}
+        assert self.store.write("bot", create("draft", "DRAFT-1", draft))["ok"]
+        self.refused("bot3", update("draft", "DRAFT-1", 1, {"change": {"health": "RED"}, "actor": "bot3"}), "draft-by-its-agent")
+        self.refused("bot3", update("draft", "DRAFT-1", 1, {"change": {"health": "RED"}}), "draft-by-its-agent")
+        self.refused(JANE, update("draft", "DRAFT-1", 1, {"change": {"health": "RED"}}, "edited"), "draft-by-its-agent")
+        self.refused("bot", update("draft", "DRAFT-1", 1, {"actor": "bot3"}), "draft-by-its-agent")
+        self.assertEqual(self.store.read("draft", "DRAFT-1")["change"], {"health": "YELLOW"})
+        self.assertTrue(self.store.write("bot", update("draft", "DRAFT-1", 1, {"change": {"health": "RED"}}, "More evidence"))["ok"])
 
 class CliInputTests(unittest.TestCase):
     """Review Q11: the local tool answers bad stdin with a named rejection, not a crash."""

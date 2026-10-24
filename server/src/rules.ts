@@ -184,8 +184,9 @@ export function checkAuthor(actor: Row, owner: string | undefined, kind: string,
   if ((kind === "actor" || kind === "org_unit") && (actor.kind !== "human" || (owner !== undefined && actor.id !== owner))) {
     return [{ rule: "owner-writes-actors", message: `${actor.id}: only the GOALIE owner writes actors and org units.` }];
   }
-  if (kind === "draft" && before === undefined && (actor.kind !== "agent" || after.actor !== actor.id)) {
-    return [{ rule: "draft-by-its-agent", message: `${actor.id}: an agent proposes a Draft as itself.` }];
+  // A Draft is its agent's proposal (SPEC.md §6.9). Only that agent writes it, and its actor never changes.
+  if (kind === "draft" && (actor.kind !== "agent" || after.actor !== actor.id || (before !== undefined && before.actor !== actor.id))) {
+    return [{ rule: "draft-by-its-agent", message: `${actor.id}: only the agent that proposed a Draft writes it.` }];
   }
   if (kind === "owner_settings" && actor.id !== (before ?? after).owner) {
     return [{ rule: "owner-settings", message: `${actor.id}: only the GOALIE owner changes owner settings.` }];
