@@ -59,6 +59,7 @@ The default host is `127.0.0.1`.
 `GET /api/priorities` answers the Priorities view as JSON for the verified actor. The shape is `PrioritiesResponse` in `server/src/api.ts`. The app filters and draws it.
 `GET /api/goals/:id` answers one goal's page (`GoalPageResponse`). `GET /api/options` answers what New goal offers (`FormOptions`). `GET /api/work` answers every work item, or one actor's with `?owner=`.
 `POST /api/commands` writes: a list of commands, in order, in one transaction (`CommandsRequest`). With `check: true` it runs the batch, rolls it back, and answers the same.
+`GET /api/events` streams each committed goal and work item Event as Server-Sent Events ([ADR 0007](docs/adr/0007-live-update.md)). `id` is the sequence. `Last-Event-ID` resumes from the log. A rolled-back or `check` batch sends nothing. A write from `node src/cli.ts` runs in another process and is not streamed.
 Every other `/api/` path answers 404. An `/api/` request with no verified token answers 401 with `{"error", "reason"}`.
 `GET /assets/*` answers a file of the build. Any other path that names a file, such as `/main.js`, answers 404. Every other path answers the build's `index.html`, so the app routes in the browser.
 A page or asset request with no verified token answers 401 with the sign-in page. The sign-in page loads the shared Excaliwire chrome from `/_xw/`. Host configuration serves `/_xw/`.
