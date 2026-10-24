@@ -50,7 +50,7 @@ export function promoteToAmbition(goal: StoredGoal, milestone: NewMilestone, new
     commands: [
       // The milestone that was met is completed first (G14).
       ...(met ? completes(met, reason) : []),
-      { op: "create", kind: "goal", ref: "$m", fields: { ...milestone, type: milestoneType, date_type: "Committed", org_unit: goal.org_unit, level: goal.level, ...kept(goal), ...pursued(goal.health, goal.path_to_green) }, reason },
+      { op: "create", kind: "goal", ref: "$m", fields: { ...milestone, type: milestoneType, date_type: "Committed", org_unit: goal.org_unit, level: goal.level, ...kept(goal), parent: goal.id, ...pursued(goal.health, goal.path_to_green) }, reason },
       { op: "update", kind: "goal", id: goal.id, base_version: goal.version, fields: { date_type: "Ambition", promotion_milestone: "$m", ...date }, reason },
     ],
   };
@@ -253,4 +253,11 @@ export function refusals(answer: CommandsResponse, batch: CommandsRequest): (Api
   if (answer.ok) return [];
   if (answer.error !== "invalid") return [{ rule: answer.error, message: answer.error === "stale" ? "" : answer.message, place: commandPlace(batch, answer.at) }];
   return (answer.all ?? answer.violations.map((v) => ({ ...v, at: answer.at }))).map(({ at, ...v }) => ({ ...v, place: commandPlace(batch, at) }));
+}
+
+/** POST /api/commands answers with CommandsResponse, but a 403, 413, or 415 answers ApiError ({ error, reason }). That one reads as a refusal with its reason (QA F1). */
+export function commandsAnswer(body: unknown): CommandsResponse {
+  const b = body as { ok?: unknown; error?: unknown; reason?: string } | null;
+  if (typeof b?.ok === "boolean") return b as CommandsResponse;
+  return { ok: false, at: 0, error: "bad_command", message: b?.reason ?? String(b?.error ?? "The server refused the save.") };
 }

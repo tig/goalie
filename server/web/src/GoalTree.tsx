@@ -96,7 +96,7 @@ export function GoalTree(props: TreeProps) {
             {props.mark !== false && <HealthDot health={g.health} />}
             {/* The title opens the goal page. The count chip alone opens and closes the tree (rule 19). */}
             <Link to={goalPath(g.id)} className="title">
-              {g.summary}
+              <span className="clamp">{g.summary}</span>
             </Link>
             <span className="slot">
               {kids > 0 && (

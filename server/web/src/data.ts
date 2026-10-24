@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ApiError, CommandsRequest, CommandsResponse } from "../../src/api.ts";
+import { commandsAnswer } from "./model/commands.ts";
 
 /** Reading the API. Every read is one GET with the actor's session; the server holds the rules. */
 
@@ -40,7 +41,7 @@ export function useJson<T>(url: string): [Loaded<T>, () => void] {
 export async function postCommands(batch: CommandsRequest): Promise<{ status: number; body: CommandsResponse }> {
   try {
     const reply = await fetch("/api/commands", { method: "POST", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify(batch) });
-    return { status: reply.status, body: await reply.json() };
+    return { status: reply.status, body: commandsAnswer(await reply.json()) };
   } catch (e) {
     return { status: 0, body: { ok: false, at: 0, error: "bad_command", message: (e as Error).message } };
   }

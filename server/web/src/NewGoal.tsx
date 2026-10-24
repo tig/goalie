@@ -189,9 +189,10 @@ function Form({ options, parent, back }: { options: FormOptions; parent?: string
       {back}
       <h1>New goal</h1>
       {/* On a phone the rail's checks are a one-line count at the top (N15). */}
-      {refused && (
-        <button type="button" className="linkbtn ngtopcount" onClick={() => document.querySelector(".ngmake")?.scrollIntoView({ behavior: "smooth" })}>
-          {count(violations.length, "check")} to fix
+      {/* The count stands whenever the rail has an answer (QA F4). */}
+      {shown && (
+        <button type="button" className={`linkbtn ngtopcount${refused ? "" : " good"}`} onClick={() => document.querySelector(".ngmake")?.scrollIntoView({ behavior: "smooth" })}>
+          {refused ? `${count(violations.length, "check")} to fix` : "✓ Every check passes"}
         </button>
       )}
       <div className="nglayout">

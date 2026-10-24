@@ -454,6 +454,16 @@ class GoalPageTests(unittest.TestCase):
             "Chelsea, Tig, Ann, or an owner of a goal above it can change this goal. You can comment.",
         ])
 
+    def test_a_promote_that_makes_the_next_milestone_is_promoted_not_created(self) -> None:
+        w = {"timestamp": "t1", "actor": "chelsea", "reason": "Plan drafted"}
+        events = [
+            {**w, "sequence": 6, "entity": "XW-0003", "field": "promotion_milestone", "old": "XW-0004", "new": "XW-0021"},
+            {**w, "sequence": 5, "entity": "XW-0003", "field": "date_type", "old": "Fantasy", "new": "Ambition"},
+            {**w, "sequence": 4, "entity": "XW-0021", "field": "summary", "old": None, "new": "Commit"},
+            {**w, "sequence": 3, "entity": "XW-0004", "field": "state", "old": "In Progress", "new": "Completed"},
+        ]
+        self.assertEqual(run(f"return goalpage.groupEvents({json.dumps(events)}).map((g) => [g.created, g.promoted]);"), [[False, {"milestone": "XW-0004"}]])
+
     def test_a_value_reads_as_names_and_dates(self) -> None:
         ctx = {"actors": {"tig": {"name": "Tig"}}, "names": {"PRI-3": "Priority 3 Run Excaliwire on GOALIE", "excaliwire": "Excaliwire"}}
         v = run(f'const c = {json.dumps(ctx)}; return [goalpage.eventValue("2026-11-30", "due_date", c), goalpage.eventValue("PRI-3", "priority", c), goalpage.eventValue("excaliwire", "org_unit", c), goalpage.eventValue("tig", "owner", c), goalpage.eventValue("organization-wide", "visibility", c)];')
@@ -497,6 +507,7 @@ class CommandTests(unittest.TestCase):
         self.assertEqual([x["op"] for x in c], ["create", "update"])
         self.assertEqual((c[0]["ref"], c[0]["fields"]["type"], c[0]["fields"]["date_type"]), ("$m", "Milestone (Commit)", "Committed"))
         self.assertEqual(c[1]["fields"], {"date_type": "Ambition", "promotion_milestone": "$m", "due_date": "2026-12-15"})
+        self.assertEqual(c[0]["fields"]["parent"], "XW-0003")  # Q18: the next milestone sits under its goal, as New goal's does
 
     def test_promoting_fantasy_completes_the_met_milestone_first(self) -> None:
         c = run('return commands.promoteToAmbition(page("XW-0003").goal, { summary: "Next", due_date: "2026-12-01", owner: "chelsea" }, "2026-11-30", "Met", "Milestone (Commit)", { id: "XW-0004", version: 2 }).commands;')
@@ -554,6 +565,10 @@ class CommandTests(unittest.TestCase):
         ],
         "workItems": [{"title": "Sketch it", "goal": 1, "owner": "frontend-engineer", "due_date": None}],
     }
+
+    def test_an_answer_with_a_reason_and_no_message_still_says_why(self) -> None:
+        got = run('return [commands.commandsAnswer({ error: "forbidden", reason: "No verified actor." }), commands.commandsAnswer({ ok: true, ids: {} })];')
+        self.assertEqual(got, [{"ok": False, "at": 0, "error": "bad_command", "message": "No verified actor."}, {"ok": True, "ids": {}}])
 
     def test_a_new_goal_is_sent_in_the_create_order(self) -> None:
         b = run(f"return commands.createBatch({json.dumps(self.FORM)});")
