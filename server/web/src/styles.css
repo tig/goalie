@@ -413,3 +413,41 @@ button.chev:hover{background:var(--grid);color:var(--ink)}
 .phone .gfields dl{grid-template-columns:1fr}
 .phone .wrow{grid-template-columns:20px minmax(0,1fr);row-gap:2px;padding:6px 0}
 .phone .wrow>.wowner,.phone .wrow>.wstatus,.phone .wrow>.wdue{grid-column:2;text-align:left}
+
+/* Goal page panels (G9 to G19): one at a time, in place. */
+.btn.primary{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.btn.primary:hover{filter:brightness(.97)}
+.btn[disabled]{opacity:.6;cursor:default}
+button.hopt{font:inherit;font-size:12px;font-weight:800;color:var(--mute);background:none;border:0;cursor:pointer}
+button.hopt+button.hopt{border-left:1px solid var(--cut)}
+.hopt:hover{background:var(--control)}
+.hopt.chosen.GREEN{box-shadow:inset 0 0 0 2px var(--green)}.hopt.chosen.YELLOW{box-shadow:inset 0 0 0 2px var(--yellow)}.hopt.chosen.RED{box-shadow:inset 0 0 0 2px var(--red)}
+.gactions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.gactions:empty{display:none}
+.panel{margin-top:14px;padding:16px 18px;border-radius:14px;background:var(--sub-bg);box-shadow:inset 0 0 0 1px var(--line)}
+.panel.YELLOW{background:var(--yellow-bg)}.panel.RED{background:var(--red-bg)}.panel.GREEN{background:var(--green-bg)}
+.card>.panel:first-child{margin-top:0}
+.gtwo>.panel{margin-top:0}
+.panel h3{font-size:15px;font-weight:800;margin:0 0 10px}
+.stale{margin:0 0 10px;padding:10px 12px;border-radius:10px;background:var(--card);font-size:13px;font-weight:700;box-shadow:inset 3px 0 0 var(--yellow)}
+.ferror{margin:4px 0 8px;font-size:12px;font-weight:700;color:var(--red-ink)}
+.fcurrent{margin:2px 0 0;font-size:12px;color:var(--mute)}
+.field{display:flex;flex-direction:column;gap:4px;margin:0 0 10px}
+.flabel{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
+.panel input,.panel select,.panel textarea,.commentbox textarea{font:500 13px var(--font);color:var(--ink);background:var(--card);border:1px solid var(--cut);border-radius:10px;padding:7px 10px;box-sizing:border-box;width:100%}
+.panel input:focus,.panel select:focus,.panel textarea:focus,.commentbox textarea:focus{outline:2px solid var(--focus);outline-offset:0}
+.panel textarea.desc{min-height:140px}
+.ptgedit .steps td{border-top:0;padding:3px 8px 3px 0}
+.linkbtn{font:inherit;font-size:13px;font-weight:700;color:var(--link);background:none;border:0;padding:4px 0;cursor:pointer}
+.pactions{display:flex;gap:8px;margin-top:4px}
+.radios{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.radio{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--cut);background:var(--card);font-size:13px;font-weight:700;cursor:pointer}
+.radio input{width:auto;margin:0}
+.radio.on{border-color:var(--ink)}
+.pmbox{padding:12px 14px;margin:0 0 10px;border-radius:12px;background:#efeafc}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+.pencil{margin-left:auto;width:28px;height:28px;border-radius:50%;border:0;background:none;color:var(--mute);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.pencil:hover{background:var(--control);color:var(--ink)}
+.commentbox{display:flex;flex-direction:column;align-items:flex-start;gap:8px;margin:12px 0 0}
+.phone .fgrid{grid-template-columns:1fr}
+.phone .gactions .btn{height:40px}

@@ -1,7 +1,9 @@
 import { useState, type CSSProperties } from "react";
-import type { ApiActor, ApiEvent, ApiWorkItem, GoalPageResponse, SubGoalCard } from "../../src/api.ts";
+import type { ApiActor, ApiEvent, ApiWorkItem, GoalPageResponse, Health, SubGoalCard } from "../../src/api.ts";
 import { shortDate } from "../../src/dates.ts";
-import { useJson } from "./data.ts";
+import { postCommands, useJson } from "./data.ts";
+import { ClosePanel, DescriptionPanel, FieldsPanel, HealthPanel, PromotePanel, PursuePanel, SlipPanel, type PanelName } from "./GoalPanels.tsx";
+import { commentBatch } from "./model/commands.ts";
 import { comments, dateBar, eventValue, fieldLabel, filterEvents, groupWorkItems, HISTORY_FILTERS, type HistoryFilter } from "./model/goalpage.ts";
 import { dateLabel, slipLabel } from "./model/labels.ts";
 import { backPath, goalPath } from "./model/route.ts";
@@ -13,7 +15,7 @@ import { homeSearch, Link } from "./router.tsx";
  * This part draws the goal. The panels that change it come next, each as one batch to POST /api/commands.
  */
 export function GoalPage({ goalKey, viewName }: { goalKey: string; viewName: string }) {
-  const [loaded] = useJson<GoalPageResponse>(`/api/goals/${encodeURIComponent(goalKey)}`);
+  const [loaded, reload] = useJson<GoalPageResponse>(`/api/goals/${encodeURIComponent(goalKey)}`);
   const back = (
     <Link to={backPath(homeSearch())} className="back">
       ‹ {viewName}
@@ -41,14 +43,21 @@ export function GoalPage({ goalKey, viewName }: { goalKey: string; viewName: str
       </main>
     );
   }
-  return <Goal data={loaded.data} back={back} />;
+  return <Goal key={`${loaded.data.goal.id}-${loaded.data.goal.version}-${loaded.data.events.length}`} data={loaded.data} back={back} reload={reload} />;
 }
 
 const time = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const when = (ts: string) => time.format(new Date(ts));
 
-function Goal({ data, back }: { data: GoalPageResponse; back: React.ReactNode }) {
+function Goal({ data, back, reload }: { data: GoalPageResponse; back: React.ReactNode; reload: () => void }) {
   const { goal, actors, today } = data;
+  // One panel at a time (G9). A saved panel reloads the page, so every section shows the stored state.
+  const [panel, setPanel] = useState<{ name: PanelName; health?: Exclude<Health, null> } | null>(null);
+  const done = (saved: boolean) => {
+    setPanel(null);
+    if (saved) reload();
+  };
+  const closable = goal.state === "In Progress" || goal.state === "Backlog";
   const owner = actors[goal.owner] ?? { id: goal.owner, name: goal.owner, kind: "human" as const };
   const [judged, ...others] = data.dates;
   const open = goal.state === "In Progress";
@@ -89,12 +98,21 @@ function Goal({ data, back }: { data: GoalPageResponse; back: React.ReactNode })
             <div className="ghealth" role="group" aria-label="Health">
               <span className="lbl">Health</span>
               <span className="hpick">
-                {(["GREEN", "YELLOW", "RED"] as const).map((h) => (
-                  <span key={h} className={`hopt ${h}${goal.health === h ? " on" : ""}`} aria-current={goal.health === h || undefined}>
-                    <HealthDot health={h} word={false} />
-                    {h}
-                  </span>
-                ))}
+                {(["GREEN", "YELLOW", "RED"] as const).map((h) => {
+                  const chosen = panel?.name === "health" && panel.health === h;
+                  return (
+                    <button
+                      key={h}
+                      type="button"
+                      className={`hopt ${h}${goal.health === h && !panel?.health ? " on" : ""}${chosen ? " chosen" : ""}`}
+                      aria-pressed={goal.health === h}
+                      onClick={() => (h === goal.health ? setPanel(null) : setPanel({ name: "health", health: h }))}
+                    >
+                      <HealthDot health={h} word={false} />
+                      {h}
+                    </button>
+                  );
+                })}
               </span>
             </div>
           )}
@@ -123,12 +141,43 @@ function Goal({ data, back }: { data: GoalPageResponse; back: React.ReactNode })
           </p>
         ))}
         {data.dates.length > 0 && <DateBar data={data} />}
+        {/* The actions name their object; one that does not apply is not drawn (G7). */}
+        <div className="gactions">
+          {goal.state === "Backlog" && (
+            <button type="button" className="btn" onClick={() => setPanel({ name: "pursue" })}>
+              Pursue
+            </button>
+          )}
+          {open && goal.date_type === "Committed" && (
+            <button type="button" className="btn" onClick={() => setPanel({ name: "slip" })}>
+              Record a slip
+            </button>
+          )}
+          {closable && (goal.date_type === "Ambition" || goal.date_type === "Fantasy") && (
+            <button type="button" className="btn" onClick={() => setPanel({ name: "promote" })}>
+              Promote date
+            </button>
+          )}
+          {closable && (
+            <button type="button" className="btn" onClick={() => setPanel({ name: "close" })}>
+              Close goal
+            </button>
+          )}
+        </div>
+        {panel?.name === "health" && panel.health && <HealthPanel data={data} health={panel.health} onDone={done} />}
+        {panel?.name === "slip" && <SlipPanel data={data} onDone={done} />}
+        {panel?.name === "promote" && <PromotePanel data={data} onDone={done} />}
+        {panel?.name === "close" && <ClosePanel data={data} onDone={done} />}
+        {panel?.name === "pursue" && <PursuePanel data={data} onDone={done} />}
       </section>
       {/* The place for Drafts (G8). It draws nothing in the MLP. */}
       <div className="draftslot" />
       {goal.path_to_green && (
         <section className={`card gptg ${goal.health ?? ""}`}>
-          <div className="lbl">Path to Green (PTG)</div>
+          <div className="lbl">
+            Path to Green (PTG)
+            {open && goal.health && goal.health !== "GREEN" && <Pencil label="Edit Path to Green" onClick={() => setPanel({ name: "health", health: goal.health as "YELLOW" | "RED" })} />}
+          </div>
           <table className="steps">
             <thead>
               <tr>
@@ -158,12 +207,19 @@ function Goal({ data, back }: { data: GoalPageResponse; back: React.ReactNode })
         </section>
       )}
       <div className="gtwo">
-        <section className="card gdesc">
-          <div className="lbl">Description</div>
-          {goal.description ? goal.description.split(/\n{2,}/).map((p, i) => <p key={i}>{p}</p>) : <p className="muted">None</p>}
-          {hint("description")}
-        </section>
-        <Fields data={data} />
+        {panel?.name === "description" ? (
+          <DescriptionPanel data={data} onDone={done} />
+        ) : (
+          <section className="card gdesc">
+            <div className="lbl">
+              Description
+              <Pencil label="Edit Description" onClick={() => setPanel({ name: "description" })} />
+            </div>
+            {goal.description ? goal.description.split(/\n{2,}/).map((p, i) => <p key={i}>{p}</p>) : <p className="muted">None</p>}
+            {hint("description")}
+          </section>
+        )}
+        {panel?.name === "fields" ? <FieldsPanel data={data} onDone={done} /> : <Fields data={data} onEdit={() => setPanel({ name: "fields" })} />}
       </div>
       {data.subGoals.length > 0 && (
         <section className="gsubs">
@@ -174,7 +230,7 @@ function Goal({ data, back }: { data: GoalPageResponse; back: React.ReactNode })
         </section>
       )}
       {data.workItems && <WorkItems items={data.workItems} data={data} />}
-      <Talk data={data} />
+      <Talk data={data} reload={reload} />
     </main>
   );
 }
@@ -194,7 +250,18 @@ function DateBar({ data }: { data: GoalPageResponse }) {
   );
 }
 
-function Fields({ data }: { data: GoalPageResponse }) {
+/** The pencil icon that makes a card editable in place. */
+function Pencil({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button type="button" className="pencil" aria-label={label} onClick={onClick}>
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M11 2.5 13.5 5 6 12.5 3 13l.5-3z" />
+      </svg>
+    </button>
+  );
+}
+
+function Fields({ data, onEdit }: { data: GoalPageResponse; onEdit: () => void }) {
   const { goal, today } = data;
   const none = <span className="muted">None</span>;
   const dateOr = (d: string | null) => (d ? <span className="date">{shortDate(d, today)}</span> : none);
@@ -214,7 +281,10 @@ function Fields({ data }: { data: GoalPageResponse }) {
   ];
   return (
     <section className="card gfields">
-      <div className="lbl">Fields</div>
+      <div className="lbl">
+        Fields
+        <Pencil label="Edit Fields" onClick={onEdit} />
+      </div>
       <dl>
         {rows.map(([field, value]) => (
           <div key={field}>
@@ -321,8 +391,10 @@ function EventRow({ e, data }: { e: ApiEvent; data: GoalPageResponse }) {
 }
 
 /** Comments and History, each with its count. Comments opens first (design: Comments and History). */
-function Talk({ data }: { data: GoalPageResponse }) {
+function Talk({ data, reload }: { data: GoalPageResponse; reload: () => void }) {
   const [tab, setTab] = useState<"Comments" | "History">("Comments");
+  const [text, setText] = useState("");
+  const [error, setError] = useState<string>();
   const [filter, setFilter] = useState<HistoryFilter>("All");
   const said = comments(data.events);
   const shown = tab === "Comments" ? said : filterEvents(data.events, filter);
@@ -343,6 +415,25 @@ function Talk({ data }: { data: GoalPageResponse }) {
             </button>
           ))}
         </p>
+      )}
+      {tab === "Comments" && (
+        <form
+          className="commentbox"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const { body } = await postCommands(commentBatch("goal", data.goal.id, text));
+            if (body.ok) {
+              setText("");
+              reload();
+            } else setError(body.error === "invalid" ? body.violations.map((v) => v.message).join(" ") : body.error === "stale" ? "" : body.message);
+          }}
+        >
+          <textarea rows={3} value={text} onChange={(e) => setText(e.target.value)} aria-label="Comment" />
+          {error && <p className="ferror">{error}</p>}
+          <button type="submit" className="btn primary">
+            Comment
+          </button>
+        </form>
       )}
       <ul className="events" style={{ "--n": shown.length } as CSSProperties}>
         {shown.map((e) => (

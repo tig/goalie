@@ -13,7 +13,7 @@ FIXTURE = Path(__file__).resolve().parents[1] / "web" / "fixtures" / "priorities
 
 def run(body: str) -> object:
     """Run an ES module that imports the model as `m` and the seed fixture as `api`, and return what it prints as JSON."""
-    imports = "".join(f'import * as {name} from "{(MODEL / f"{name}.ts").as_uri()}";\n' for name in ("query", "filter", "timeline", "calendar", "popover", "labels", "scroll", "route", "goalpage"))
+    imports = "".join(f'import * as {name} from "{(MODEL / f"{name}.ts").as_uri()}";\n' for name in ("query", "filter", "timeline", "calendar", "popover", "labels", "scroll", "route", "goalpage", "commands"))
     script = f"""{imports}
 import {{ readFileSync }} from "node:fs";
 const api = JSON.parse(readFileSync({json.dumps(str(FIXTURE))}, "utf-8"));
@@ -381,6 +381,49 @@ class GoalPageTests(unittest.TestCase):
 
     def test_comments_are_the_comment_events(self) -> None:
         self.assertEqual(run('return goalpage.comments(page("XW-0003").events).map((e) => e.actor);'), ["tig"])
+
+
+class CommandTests(unittest.TestCase):
+    """Each goal-page panel saves one CommandsRequest (docs/engineering/goal-page-and-create.md, Edits from the goal page)."""
+
+    def test_health_with_a_path_to_green_is_one_update(self) -> None:
+        b = run('const g = page("XW-0003").goal; return commands.healthBatch(g, "YELLOW", { steps: [{ text: "Load the tree", owner: "chelsea", date: "2026-10-30" }], criteria: "Tree loaded", trigger: "Not loaded by Nov 2" }, "Seed is late");')
+        self.assertEqual(b, {"commands": [{"op": "update", "kind": "goal", "id": "XW-0003", "base_version": 1, "fields": {"health": "YELLOW", "path_to_green": {"steps": [{"text": "Load the tree", "owner": "chelsea", "date": "2026-10-30"}], "criteria": "Tree loaded", "trigger": "Not loaded by Nov 2"}}, "reason": "Seed is late"}]})
+
+    def test_back_to_green_drops_the_path_to_green(self) -> None:
+        b = run('return commands.healthBatch(page("XW-0001").goal, "GREEN", null, "Done");')
+        self.assertEqual(b["commands"][0]["fields"], {"health": "GREEN", "path_to_green": None})  # type: ignore[index]
+
+    def test_a_slip_sets_the_changed_due_date_with_health(self) -> None:
+        b = run('const g = page("XW-0001").goal; return commands.slipBatch(g, "2026-11-20", "RED", g.path_to_green, "Canon slipped");')
+        self.assertEqual(sorted(b["commands"][0]["fields"]), ["changed_due_date", "health", "path_to_green"])  # type: ignore[index]
+        self.assertEqual(b["commands"][0]["fields"]["changed_due_date"], "2026-11-20")  # type: ignore[index]
+
+    def test_promoting_fantasy_makes_a_new_milestone_first(self) -> None:
+        b = run('const g = page("XW-0003").goal; return commands.promoteBatch(g, { summary: "Commit a date for the launch", due_date: "2026-12-01", owner: "chelsea" }, "2026-12-15", "Plan is clearer");')
+        c = b["commands"]  # type: ignore[index]
+        self.assertEqual([x["op"] for x in c], ["create", "update"])
+        self.assertEqual((c[0]["ref"], c[0]["fields"]["type"], c[0]["fields"]["date_type"]), ("$m", "Milestone (Commit)", "Committed"))
+        self.assertEqual(c[1]["fields"], {"date_type": "Ambition", "promotion_milestone": "$m", "due_date": "2026-12-15"})
+
+    def test_promoting_ambition_to_committed_is_one_update(self) -> None:
+        b = run('const g = { ...page("XW-0003").goal, date_type: "Ambition" }; return commands.promoteBatch(g, null, "2026-11-30", "At Pencil");')
+        self.assertEqual(b["commands"][0]["fields"], {"date_type": "Committed", "promotion_milestone": None})  # type: ignore[index]
+
+    def test_close_and_pursue_set_the_state(self) -> None:
+        c = run('const g = page("XW-0003").goal; return [commands.closeBatch(g, "Did Not Meet", "Dropped").commands[0].fields, commands.pursueBatch({ ...g, state: "Backlog" }, "GREEN", "Starting").commands[0].fields];')
+        self.assertEqual(c, [{"state": "Did Not Meet"}, {"state": "In Progress", "health": "GREEN"}])
+
+    def test_fields_send_only_what_changed(self) -> None:
+        b = run('const g = page("XW-0003").goal; return commands.fieldsBatch(g, { ...g, severity: "sev2", plan: g.plan }, "Lower");')
+        self.assertEqual(b["commands"][0]["fields"], {"severity": "sev2"})  # type: ignore[index]
+
+    def test_a_comment_is_one_comment_command(self) -> None:
+        self.assertEqual(run('return commands.commentBatch("goal", "XW-0003", " Looks right. ");'), {"commands": [{"op": "comment", "kind": "goal", "id": "XW-0003", "text": "Looks right."}]})
+
+    def test_a_stale_save_keeps_the_typed_values_beside_the_current_ones(self) -> None:
+        m = run('const g = page("XW-0003").goal; return commands.staleMerge({ severity: "sev2", health: "YELLOW" }, { ...g, version: 4, severity: "sev3" });')
+        self.assertEqual(m, {"base_version": 4, "current": {"severity": "sev3", "health": "GREEN"}})
 
 
 class RouteTests(unittest.TestCase):
