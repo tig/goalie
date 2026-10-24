@@ -599,5 +599,29 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 .nglayout{grid-template-columns:minmax(0,1fr)}
 .ngrail{position:static}
 .ngtopcount{display:block;margin:0 0 10px;color:var(--red-ink)}
+.ngtopcount.good{color:var(--green-ink)}
 main.newgoal{padding-bottom:84px}
 .btn.create{position:fixed;left:16px;right:16px;bottom:12px;height:48px;z-index:40;box-shadow:0 6px 20px var(--tip-shadow)}}
+/* G25: read-only health is its shape and word (rule 10); the line names who may change the goal. */
+.hread{display:inline-flex;align-items:center;gap:6px;font-weight:700}
+.gwho{color:var(--mute);margin:10px 0 0;display:flex;flex-wrap:wrap;align-items:center;gap:0 2px}
+.gwhoname{display:inline-flex;align-items:center;gap:4px;color:var(--ink)}
+/* Rule 29 on touch (QA U10): a sub-goal card taps its title; a text link that wraps answers a 44 px band. */
+@media (pointer:coarse){
+.gsub{position:relative}.gsub .title::after{content:"";position:absolute;inset:0}
+.gmeta a,.gfields a,.gpm{position:relative;display:inline-block}
+.gmeta a::after,.gfields a::after,.gpm::after{content:"";position:absolute;left:0;right:0;top:50%;height:max(100%,44px);transform:translateY(-50%)}
+/* A link that clips its text (ellipsis, line clamp) cannot draw outside itself, so it grows a clear border or padding and gives the space back. A line clamp would show a third line in padding, so the title clamps an inner span. */
+.wgoal{padding:13px 0;margin:-13px 0;position:relative;z-index:1}
+.goal a.title{display:block;overflow:visible;padding:13px 0;margin:-13px 0}
+.goal a.title>.clamp{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.phone .goal a.title>.clamp{-webkit-line-clamp:3}
+/* Rows of small controls keep their 44 px areas apart. */
+.chips{row-gap:16px}.gtalk .chips{margin-top:18px}
+.counts{margin:22px 0 28px;display:flex;flex-wrap:wrap;align-items:center;column-gap:10px;row-gap:18px}
+.fchip,.chev,.qowner,.qdone .linkbtn,.wtick,.cancel{position:relative}
+.fchip::after,.chev::after,.qowner::after,.qdone .linkbtn::after,.wtick::after,.cancel::after{content:"";position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}
+.wtick{display:inline-flex;align-items:center;justify-content:center}
+.chev{z-index:8}
+.zoom .gbtn{min-width:44px}
+.search input{min-height:44px}}

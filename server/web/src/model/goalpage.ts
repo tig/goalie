@@ -69,13 +69,14 @@ export function groupEvents(events: ApiEvent[]): EventGroup[] {
     else groups.push({ events: [e], created: false, promoted: null });
   }
   for (const g of groups) {
-    g.created = g.events.some((e) => (e.field === "summary" || e.field === "title") && (e.old === null || e.old === undefined));
     const up = g.events.find((e) => e.field === "date_type" && UNCOMMITTED.includes(e.old) && e.new !== e.old);
     if (up) {
       const met = g.events.find((e) => e.entity === up.entity && e.field === "promotion_milestone")?.old;
       const completed = g.events.some((e) => e.entity === met && e.field === "state" && e.new === "Completed");
       g.promoted = { milestone: completed && typeof met === "string" ? met : null };
     }
+    // A Promote from Fantasy also creates the next milestone; the row is the Promote (QA F2).
+    g.created = !g.promoted && g.events.some((e) => (e.field === "summary" || e.field === "title") && (e.old === null || e.old === undefined));
   }
   return groups;
 }
