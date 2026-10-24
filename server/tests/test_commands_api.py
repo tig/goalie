@@ -201,6 +201,13 @@ class CommandsApiTests(unittest.TestCase):
         self.assertEqual(states, [(None, "Backlog"), ("Backlog", "In Progress")])
         self.assertEqual(self.store.read("goal", "XW-0012")["state"], "In Progress")
 
+    def test_one_save_is_one_time(self) -> None:
+        # Frontend Engineer: History groups a write by actor, time, and reason, so every Event of one batch shares one timestamp.
+        status, body = self.send(create_batch() + [{"op": "comment", "kind": "goal", "id": "$goal", "text": "Made in one save."}])
+        self.assertEqual(status, 200, body)
+        self.assertGreater(len(body["events"]), 20)
+        self.assertEqual(len({e["timestamp"] for e in body["events"]}), 1)
+
     def test_a_comment_is_one_event_with_no_row_change(self) -> None:
         version = self.store.read("goal", "XW-0003")["version"]
         status, body = self.send([{"op": "comment", "kind": "goal", "id": "XW-0003", "text": "The spine is in."}])
