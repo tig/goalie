@@ -119,9 +119,26 @@ Work items:
 30. Two tabs change the same work item. The second save against the old version is rejected and shows the current work item.
 31. A comment on a work item appears on that work item.
 
+Who changes a goal ([SPEC.md §6.1, rule `owners-change-goal`](../specs/SPEC.md#s6-1)):
+
+The seed: Tig owns XW-0001 and XW-0002 and is the GOALIE owner. Chelsea owns XW-0003, XW-0004, and XW-0005 to XW-0011 (parent XW-0004). The test adds Galahad, a human who owns no goal, and an agent operated by Chelsea.
+
+33. Galahad sets XW-0001's health from RED to GREEN with a reason. The API answers 422 with `error: "invalid"` and one violation whose `rule` is `owners-change-goal`. XW-0001 and its version do not change, and no Event is written.
+34. Galahad's write to any one of these XW-0001 fields is refused the same way: `health`, `path_to_green`, `state`, `due_date`, `date_type`, `changed_due_date`, `promotion_milestone`, `summary`, `description`, `owner`, `parent`, `priority`, `plan`, `plan_maturity`, `severity`, `type`, `level`, `org_unit`, `origination`, `work_product`, `visibility`.
+35. Galahad comments on XW-0001. The comment is accepted and shows on XW-0001.
+36. Chelsea changes XW-0007's health with a PTG and a reason: accepted (she owns it). Chelsea changes XW-0001's health: refused with `owners-change-goal` (she owns no goal above it and is not the GOALIE owner).
+37. A new human owns a goal whose parent is XW-0007. Chelsea changes that goal's health: accepted (she owns XW-0007 and XW-0004 above it).
+38. Tig changes XW-0007's health: accepted (he is the GOALIE owner).
+39. Galahad creates a goal with parent XW-0007: refused with `owners-change-goal`. Galahad creates a goal with no parent: accepted.
+40. Galahad approves a Draft on XW-0001: refused with `owners-change-goal`. A Draft is MLP 5; this check runs when Drafts land.
+41. A refused write in a batch with other commands stores nothing. The answer names the command that was refused (`at`).
+42. Galahad opens XW-0001's goal page. Health, PTG, dates, Date Type, state, and every other field show as read text, with no edit control, no Slip, Promote, or Close, and no + Sub-goal. The comment box is open and works. One muted line says who may change the goal: its owner, the owners above it, and the GOALIE owner, by avatar.
+43. Chelsea opens XW-0007's goal page and sees the edit controls. Tig sees them on every goal.
+44. The page decides read-only from what the server sends with the goal (`mayChange` on `GET /api/goals/:id` for the signed-in actor, from the same rule), not from its own copy of the rule ([ADR 0010](../adr/0010-app-shape.md) as amended: rules live on the server). If the page shows a control anyway and the save is refused, the 422 message shows at the control in spec words.
+
 Words:
 
-32. Every label on the goal page and the form is a word in SPEC.md §4, §6, §8.2, or §9 ([interaction-rules.md](../design/interaction-rules.md) rule 13), or is a D5 word. Any other label goes on the words list below.
+45. Every label on the goal page and the form is a word in SPEC.md §4, §6, §8.2, or §9 ([interaction-rules.md](../design/interaction-rules.md) rule 13), or is a D5 word. Any other label goes on the words list below.
 
 ## 5. Out of scope
 
@@ -170,6 +187,7 @@ Spec impact, for later (Tig reviews these with the pull request):
 - §4: New goal, Sub-goal, Slip, Promote, Close (D5). Slip, Promote, and Close are already in USERS_MANUAL.md Appendix A.
 - §6.7 and §12: the status list (D8) and the `work_items` owner setting (D7).
 - #12 and the #1 stage table: the UI slice of Stage 5 moves into the MLP.
+- §6.1 and §8.1: rule `owners-change-goal`, decided by Chelsea on 2026-10-24, written into SPEC.md in this branch. The phrase "a goal above it" is not a §4 term; it means a goal reached by following `parent` (§6.1), the closest existing word. The fields it covers beyond health, state, dates, and PTG are the Product Manager's call: every field a human writes, so one rule covers the goal.
 
 Issue drift, for the Chief of Staff to correct:
 
