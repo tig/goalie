@@ -35,7 +35,7 @@ If you only read one section, read **§4 Rules**.
 | **Work Product** | Links to where the output lives: repo, PR, docs, deployed URL, metric dashboard. |
 | **Severity** | `sev1` critical / urgent / blocking · `sev2` important · `sev3` nice to have. How much the goal matters on its own terms. |
 | **Priority** | An entry in an org unit's short, **ranked** list of current priorities. Goals map to one. Lower entries are starved on purpose. |
-| **Health** | **GREEN:** on track. **YELLOW:** at risk, but there's still a credible path to the date. **RED:** the date isn't credible without intervention. |
+| **Health** | **GREEN** (On track): on track. **YELLOW** (At risk): at risk, but there's still a credible path to the date. **RED** (Off track): the date isn't credible without intervention. The screen shows the label in brackets. |
 | **Path to Green (PTG)** | The written recovery plan for a YELLOW or RED goal. |
 | **Draft** | A change an agent proposes. It shows on the goal immediately. It does nothing until a human approves it. |
 | **Presence** | Who is viewing or editing a goal right now. A human or an agent. |
