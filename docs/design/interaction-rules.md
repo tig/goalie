@@ -123,6 +123,14 @@ NG5. The rail keeps the Preview, "Create will make" without keys, and "To save",
 NG6. Create reads "Create goal" and shows no key before save. It is drawn muted while "To save" has lines left; a press scrolls to the first unmet field.
 NG7. On a phone, and under 960 px of page, New goal is one column: the foundation card, then the Details card. "To save: N to go" is a line at the top that opens the checklist, and Create is a 48 px bar fixed to the bottom; the page keeps bottom padding of the bar plus 16 px. Every field and tile is at least 44 px tall.
 
+GL1. The goal page is two columns at 1100 px and wider (design GP2, Chelsea 2026-10-25): a main column (at most 760 px) with what the goal is and the work under it, and a 300 px properties column that stays on screen. Under 1100 px it is one column, with a compact properties block after the title and "All properties" for the rest.
+GL2. A breadcrumb above both columns names where the goal sits: its Priority, each goal above, this goal. It replaces "‹ Priorities" and the Parent link.
+GL3. The main column, in order: key, title, the "Needs you" line ("Nothing needs you now" when nothing applies), the read-only line for a viewer who may not change it, the action panel slot, Description, Path to Green (YELLOW or RED only), Sub-goals, Work items, Activity. Sections, not cards. Every multi-field action (Pursue, Record a slip, Promote date, Close goal, a health change) opens its panel in the slot under the title.
+GL4. Work items are compact 36 px rows: a named status circle under a "Status" heading, the title, the owner's avatar and first name, the date ("late", "today"). Status chips with counts filter them; Completed is closed until its chip is pressed.
+GL5. Activity is one stream of comments and changes, newest first, with All, Comments, and Changes chips and the comment box at its top. Values read in words: names, not ids; dates as "Dec 15, 2026"; a Path to Green change says what changed in it.
+GL6. The properties column, in order: Health; Health judged on, with its labelled date bar and Record a slip or Promote date; State with Pursue or Close goal; Owner (name written); Priority; Plan with its maturity; Family; More properties (folded, three values shown). A one-field property edits in place in the column with a reason line.
+GL7. Family is a small tree from the parent down: the parent, this goal (bold, with its health bar), its sub-goals, and "N more sub-goals" for its siblings. The Promotion Milestone shows on the Health judged on row ("◆ backed by XW-nnnn"), and a goal that is a milestone says "◆ backs XW-nnnn's date" on its own line, never on a branch. No other relation is drawn; there are no dependency links.
+
 ## Work items page
 
 W1. The top bar has two pages: Home and Work items. The page you are on is filled.
