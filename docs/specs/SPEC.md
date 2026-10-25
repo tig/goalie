@@ -120,7 +120,7 @@ The User's Manual ([§11 (User's Manual)](#s11)) repeats these definitions, so t
 | **Doc** | A page a human opens and writes: a plan or the User's Manual ([§6.5 (Doc)](#s6-5), [§11 (User's Manual)](#s11)). It is not only a stored body. |
 | **Plan Maturity** | **Watercolor:** broad strokes, soft edges. **Crayon:** main parts clear, lines thick, details flexible. **Pencil:** precise and ready to execute; two readers would picture the same thing. |
 | **Work Product** | Where the output of the work lives (repo, PR, doc folder, deployed URL, metric dashboard). |
-| **Health** | GREEN / YELLOW / RED ([§6.1 (Goal)](#s6-1)). |
+| **Health** | GREEN / YELLOW / RED ([§6.1 (Goal)](#s6-1)). On a screen each value carries its label: GREEN *On track*, YELLOW *At risk*, RED *Off track*. |
 | **Path to Green (PTG)** | The written recovery plan for a YELLOW or RED goal ([§6.1 (Goal)](#s6-1)). |
 | **Actor** | A human or an agent that reads or changes GOALIE data. Every change is attributed to an actor. |
 | **Draft** | An agent's proposed change to an entity. It is visible on that entity as soon as the agent creates it. It must not take effect until a human approves it ([§6.9 (Draft)](#s6-9)). Approving or rejecting a Draft is its own Event, with an actor and a reason. |
@@ -185,7 +185,7 @@ Structured fields are state, date type, health, PTG, rank, and every other field
 | `severity` | Enum **(configurable)** | yes | Default `sev1` critical / urgent / blocking · `sev2` important · `sev3` nice to have. Says how critical the goal is, not where it ranks (see `priority`). |
 | `priority` | → Priority | optional; usually only for Company, Program, or Function goals | The current priority this goal serves. It links to an entry in an org unit's ranked Priority list ([§6.3 (Priority)](#s6-3)), typically the goal's own unit or an ancestor's. Goals under a starved priority, or with no priority, are expected to get less. Reviews and rollups make that visible, so the starvation is deliberate rather than accidental. |
 | `state` | Enum ([§7.2 (State lifecycle)](#s7-2)) | yes | `Backlog` · `In Progress` · `Completed` · `Completed Late` · `Did Not Meet` · `Deleted`. Each change has a reason (invariant). |
-| `health` | `GREEN` · `YELLOW` · `RED` | while In Progress | **GREEN:** on track; risks understood and mitigated; the owner believes the date will be hit. **YELLOW:** real unknowns or blockers, but there's still a credible path to the date. This is the status that demands action while there is time. **RED:** the date isn't credible without intervention, or there's no path to green. Health is judged against the committed date. For an uncommitted goal, that means its Promotion Milestone's date. |
+| `health` | `GREEN` · `YELLOW` · `RED` | while In Progress | **GREEN:** on track; risks understood and mitigated; the owner believes the date will be hit. **YELLOW:** real unknowns or blockers, but there's still a credible path to the date. This is the status that demands action while there is time. **RED:** the date isn't credible without intervention, or there's no path to green. Health is judged against the committed date. For an uncommitted goal, that means its Promotion Milestone's date. **Labels:** a screen shows GREEN as *On track*, YELLOW as *At risk*, and RED as *Off track*. The stored value stays `GREEN`, `YELLOW`, or `RED`. |
 | `path_to_green` | Structured: steps + criteria + trigger | when YELLOW or RED (invariant) | A good PTG has: (1) steps, each with a **named human owner** and (2) a **date** (a date for a date is OK); (3) **criteria for returning to GREEN** that can be tested without debate; (4) for YELLOW, the **trigger that turns it RED**, and what happens then. Lint: any part missing. Archived into history on return to GREEN. |
 | `origination` | `New` · `Carryover` · `Repeating` | yes | New this period; carried over with a revised date; repeated with new targets. |
 | `parent` | → Goal | optional | The goal this one contributes to (e.g. Team → Program → Company). A sub-goal with no date of its own takes its parent's (see `due_date`). |
@@ -231,6 +231,8 @@ The list's owner is the org unit's owner. Re-ranking is a normal, logged decisio
 ### 6.4 Actor
 
 `id`, `kind` (`human` | `agent`), `display_name`. For agents, also `operator`, the human responsible for that agent. Only humans can own goals or org units.
+
+A deployment has one actor for each human and each agent that uses it. Only the GOALIE owner adds or changes an actor. Adding or changing an actor is an Event, with the GOALIE owner as its actor ([§6.6 (Events)](#s6-6)). A person or an agent with no actor is refused; GOALIE does not add an actor on sign-in.
 
 ### 6.5 Doc
 <a id="s6-5"></a>
