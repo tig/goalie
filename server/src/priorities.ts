@@ -45,16 +45,15 @@ function startedAll(db: DatabaseSync, timeZone: string): Map<string, string> {
   return new Map(rows.map((r) => [r.entity as string, dateIn(Date.parse((r.moved ?? r.first) as string), timeZone)]));
 }
 
-/** When one goal started, as a day in `timeZone`. It reads that goal's Events through the event_by_entity index. */
+/**
+ * When one goal started, as a day in `timeZone`: its first move to In Progress, through the event_by_entity index.
+ * Undefined when it never moved there, so a Backlog goal has no start (Codebase QA N6).
+ */
 export function startedOf(db: DatabaseSync, id: string, timeZone: string): string | undefined {
   const row = db
-    .prepare(
-      `SELECT (SELECT timestamp FROM event WHERE entity_kind = 'goal' AND entity = ? AND field = 'state' AND new = '"In Progress"' ORDER BY sequence LIMIT 1) AS moved,
-         (SELECT MIN(timestamp) FROM event WHERE entity_kind = 'goal' AND entity = ?) AS first`,
-    )
-    .get(id, id) as Row;
-  const at = (row.moved ?? row.first) as string | null;
-  return at ? dateIn(Date.parse(at), timeZone) : undefined;
+    .prepare(`SELECT timestamp FROM event WHERE entity_kind = 'goal' AND entity = ? AND field = 'state' AND new = '"In Progress"' ORDER BY sequence LIMIT 1`)
+    .get(id) as Row | undefined;
+  return typeof row?.timestamp === "string" ? dateIn(Date.parse(row.timestamp), timeZone) : undefined;
 }
 
 /** A goal's own date and Date Type, to compare a sub-goal with its parent. */
