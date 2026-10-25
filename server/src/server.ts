@@ -5,9 +5,9 @@ import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
-import type { ActorRef, ApiError, CommandsResponse, FormOptions, GoalPageResponse, PrioritiesResponse, WorkResponse } from "./api.ts";
+import type { ActorRef, ApiError, CommandsResponse, FormOptions, GoalEventsResponse, GoalPageResponse, PrioritiesResponse, WorkResponse } from "./api.ts";
 import { runCommands } from "./commands.ts";
-import { goalPage } from "./goalpage.ts";
+import { goalEvents, goalPage } from "./goalpage.ts";
 import { eventStream } from "./live.ts";
 import { formOptions } from "./options.ts";
 import { configuredIssuers, resolveActor, type Issuer } from "./auth.ts";
@@ -46,7 +46,7 @@ const hostOf = (url: string) => {
   }
 };
 
-const refuse = (c: Context<Env>, status: 401 | 403 | 404 | 413 | 415, error: string, reason: string) => c.json<ApiError>({ error, reason }, status);
+const refuse = (c: Context<Env>, status: 400 | 401 | 403 | 404 | 413 | 415, error: string, reason: string) => c.json<ApiError>({ error, reason }, status);
 
 /** The file under dist that path names, or undefined when there is none or the path leaves dist. */
 async function built(dist: string, path: string): Promise<Buffer | undefined> {
@@ -96,6 +96,12 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
   app.get("/api/goals/:id", (c) => {
     const page = goalPage(db, c.req.param("id"), c.get("actor").id, ...todayAndZone(db));
     return page ? c.json<GoalPageResponse>(page) : refuse(c, 404, "not_found", `no goal ${c.req.param("id")}`);
+  });
+  app.get("/api/goals/:id/events", (c) => {
+    const before = Number(c.req.query("before"));
+    if (!Number.isSafeInteger(before) || before < 1) return refuse(c, 400, "bad_request", "before is the sequence of an Event: a whole number");
+    const page = goalEvents(db, c.req.param("id"), before);
+    return page ? c.json<GoalEventsResponse>(page) : refuse(c, 404, "not_found", `no goal ${c.req.param("id")}`);
   });
   app.get("/api/options", (c) => c.json<FormOptions>(formOptions(db, c.get("actor").id, unit(), todayIn(db))));
   app.get("/api/work", (c) => {

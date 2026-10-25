@@ -158,6 +158,9 @@ export type SubGoalCard = GoalRef & {
 };
 
 /** GET /api/goals/:id. 404 with ApiError when there is no such goal. A Deleted goal answers like any other (SPEC.md §8.1). */
+/** GET /api/goals/:id/events?before=<sequence>: the next 100 older Events of the goal's history, newest first (D1). olderEvents as on GoalPageResponse. */
+export type GoalEventsResponse = { events: ApiEvent[]; olderEvents: number | null };
+
 export type GoalPageResponse = {
   me: ApiActor;
   today: string;
@@ -188,8 +191,13 @@ export type GoalPageResponse = {
   subGoals: SubGoalCard[];
   /** Null when the owner setting work_items is off (D7). */
   workItems: ApiWorkItem[] | null;
-  /** The goal's Events and its work items' Events, newest first. Comments are among them. */
+  /** The goal's history, newest first: its Events, its current and former Promotion Milestones' Events, and its work items' Events. Comments are among them. Past 1,000 Events, only the newest 100 (D1). */
   events: ApiEvent[];
+  /** Null when `events` is the whole history. Otherwise the sequence of the oldest Event sent: GET /api/goals/:id/events?before=<it> sends the next page. */
+  olderEvents: number | null;
+  /** How many Events and how many comments the whole history holds, paged or not. */
+  eventCount: number;
+  commentCount: number;
   /** What waits on the signed-in actor here (G3a). */
   needsYou: { lateWorkItems: string[]; missingPtg: boolean };
   /** Lints: flagged, never blocked (SPEC.md §8.1). The app shows the text as a muted hint at the field. */
