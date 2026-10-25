@@ -140,6 +140,71 @@ Words:
 
 45. Every label on the goal page and the form is a word in SPEC.md §4, §6, §8.2, or §9 ([interaction-rules.md](../design/interaction-rules.md) rule 13), or is a D5 word. Any other label goes on the words list below.
 
+## New goal: required and optional fields
+
+Source: [SPEC.md §6.1](../specs/SPEC.md#s6-1), [server/src/write.ts](../../server/src/write.ts) (`DEFAULTS`, the `required-field` and `reason-required` checks), [server/src/rules.ts](../../server/src/rules.ts) (`checkGoal`), and [server/src/options.ts](../../server/src/options.ts) (the form's defaults), at chelsea/mlp 4468090.
+Measured on 2026-10-24 by create commands against a copy of the preview store. An empty create returns `required-field` for summary, owner, org unit, level, type, plan maturity, severity, state, and origination, and `date-and-date-type`.
+
+Bad news first: the server defaults only two fields, `description` ("") and `visibility` (organization-wide). Every other default lives in the form (options.ts). A create through the API, or by an agent's Draft, must send seven fields a person never chose (org unit, level, type, severity, state, origination, plan maturity). The form also defaults State to In Progress, which makes Health required at create. [SPEC.md §7.2](../specs/SPEC.md#s7-2) starts every goal at Backlog.
+
+What the server requires to create a goal:
+
+| Field | Server | Form today | Recommendation |
+| --- | --- | --- | --- |
+| `summary` | Required. A summary under 5 words, or with no verb, saves with a hint. | Asked, card 1 | Ask first. |
+| `owner` | Required. One human. | Pre-filled: the signed-in person | Ask, pre-filled. |
+| `due_date` and `date_type` | Required, or inherited from the parent (D2). | Asked, card 3. Date Type has no default. | Ask. A sub-goal may leave them blank and inherit. |
+| `promotion_milestone` | Required when the Date Type is Ambition or Fantasy: a Milestone (Commit) goal, Committed, dated before this date, with a human owner. | Opens in place, pre-filled (D3) | Ask, in place, only for Ambition or Fantasy. |
+| `plan` and `plan_maturity` Pencil | Required when the Date Type is Committed, except for a Milestone (Commit) (D1). | Opens in place for Committed | Ask, in place, only for Committed. |
+| `health` | Required when State is In Progress. | Asked on every goal, card 3 | Ask only when State is In Progress. |
+| `path_to_green` | Required when Health is YELLOW or RED. A missing trigger on YELLOW is a hint. | Opens for YELLOW or RED | Ask, in place, only for YELLOW or RED. |
+| reason | Required on every create (`reason-required`). | Not asked. The form sends "New goal" or "Sub-goal of <key>". | Keep. The person does not write it. |
+| `org_unit` | Required. | Pre-filled: the view's org unit | Default on the server. |
+| `level` | Required. | Pre-filled: the org unit's level | Default on the server. |
+| `type` | Required. | Pre-filled: Milestone (Launch) | Default on the server. |
+| `severity` | Required. | Pre-filled: sev2 | Default on the server. |
+| `state` | Required. | Pre-filled: In Progress | Default on the server to Backlog (§7.2). |
+| `origination` | Required. | Pre-filled: New | Default on the server. |
+| `plan_maturity` | Required on every goal. | Pre-filled: Watercolor | Default on the server to Watercolor. |
+
+What the server defaults:
+
+| Field | Default |
+| --- | --- |
+| `description` | "" (empty). Each missing part (a) to (d) of §6.1 shows as a hint, not a block. |
+| `visibility` | organization-wide |
+| `id` | The next key with the owner's prefix, for example XW-0012 |
+| `version` | 1 |
+| `original_committed_date`, `committed_plan_version` | Set by the system when the Date Type is Committed. A command must not send them. |
+
+Optional at create, and a person can add them after save on the goal page:
+
+| Field | Note |
+| --- | --- |
+| `description` | Defaulted empty. The four §6.1 parts are hints. |
+| `priority` | Optional. Usually only for Company, Program, or Function goals. |
+| `parent` | Optional. Set when the goal is created from a goal page (+ Sub-goal). |
+| `plan` | Optional until the Date Type is Committed. |
+| `work_product` | Optional. A hint when the goal is an In Progress Milestone (Launch) with none. |
+| `health` and `path_to_green` | Not needed for a Backlog goal. Asked when the goal moves to In Progress. |
+| Sub-goals | Each is its own goal. Added on the create form (Q-C2) or with + Sub-goal after save. |
+| Work items | Not goal fields. Filed with + Work item after save. |
+
+What the form asks today that the server does not need to create a goal:
+
+1. Description, as half of card 1. The server defaults it empty.
+2. Priority, as half of card 2.
+3. Health, on every goal. It is needed only because the form defaults State to In Progress.
+4. The "More fields" card: type, severity, state, origination, level, visibility, and work product. The server needs five of them but none needs a person's choice.
+5. The sub-goal card (4) and the work-item card (5). They are separate creates in the same save.
+
+Decisions (Product Manager, on Chelsea's "foundation first"):
+
+- **N-F1.** The foundation is what the server cannot default: summary, owner, date, and Date Type, plus the one thing the Date Type opens (a Promotion Milestone for Ambition or Fantasy, a plan at Pencil for Committed). New goal shows these first, alone, and can save with only them.
+- **N-F2.** The details come after the foundation, folded, each showing its default: description, priority, type, severity, level, origination, visibility, work product. Sub-goals and work items follow them. All of these can also be added after save on the goal page.
+- **N-F3.** A new goal starts at Backlog, as in §7.2. Health and a PTG are asked when the owner moves it to In Progress, on the goal page or in the details. This removes Health from the foundation.
+- **N-F4.** The defaults move from options.ts into the server's `DEFAULTS` in write.ts: org unit (the view's), level (the org unit's), type Milestone (Launch), severity sev2, state Backlog, origination New, plan maturity Watercolor. The form reads them from there, as it does today. A create through the API then needs only the foundation. One home for each default (AGENTS.md, DRY).
+
 ## 5. Out of scope
 
 1. The rest of [#12 (Epic 12: Work items)](https://github.com/tig/goalie/issues/12): import from GitHub Issues, intake by MCP or email, links to GitHub as Work Product, and work items as evidence for health Drafts (MLP 6). A work item's links are plain URLs in the MLP.
