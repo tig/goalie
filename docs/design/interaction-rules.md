@@ -60,6 +60,7 @@ The screens are a React app in `server/web/`. It reads `GET /api/priorities` and
 23c. One goal's edge labels at one edge are one block, a tight list (Chelsea, 2026-10-25): one label per line, 2 px apart, in date order, each with its arrow, starting at the top of that goal's row, so it reads as a list when the marks are scrolled away. The bands of rule 23 do not apply at the edge. The row grows to fit the list. A sub-goal's labels stay in its own row.
 23a. A Promotion Milestone date is a diamond. A goal's own Committed date is a bar. A parent and a sub-goal on one day tell apart (review X12).
 23b. A goal that started after its Committed date passed draws its health bar under the slip, from that date to today (review Q6).
+23c. One goal's edge labels at one edge are one block, a tight list (Chelsea, 2026-10-25): one label per line, 2 px apart, in date order, each with its arrow, starting at the top of that goal's row, so it reads as a list when the marks are scrolled away. The bands of rule 23 do not apply at the edge. The row grows to fit the list. A sub-goal's labels stay in its own row.
 
 ## Highlight and selection
 

@@ -56,7 +56,7 @@ class QueryTests(unittest.TestCase):
         self.assertEqual(run("return query.screenQuery(query.parseScreen('?view=list&from=2026-09-01&zoom=months&q=a%20b&health=RED'));"), "?health=RED&q=a%20b&zoom=months&from=2026-09-01&view=list")
 
     def test_a_value_that_is_not_valid_is_ignored(self) -> None:
-        screen = run('return query.parseScreen("?health=PINK&zoom=days&from=2026-13-45&view=grid&q=%20%20");')
+        screen = run('return query.parseScreen("?health=PINK&zoom=hours&from=2026-13-45&view=grid&q=%20%20");')
         self.assertEqual(screen, {"zoom": "weeks", "view": "timeline"})
 
     def test_the_default_screen_has_no_query(self) -> None:
@@ -139,6 +139,13 @@ class TimelineTests(unittest.TestCase):
         sizes = run('return ["weeks", "months", "quarters"].map((z) => { const w = timeline.timelineWindow(api.funded, "2026-10-23", z); return [w.weeks, w.openPx, w.weeks * w.weekPx, w.open]; });')
         self.assertEqual(sizes, [[65, 26 * 84, 65 * 84, "2026-09-28"], [130, 52 * 30, 130 * 30, "2026-09-28"], [260, 104 * 14, 260 * 14, "2026-09-28"]])
 
+    def test_days_zoom_draws_28_px_a_day_with_a_label_each_day(self) -> None:
+        w = run('const w = timeline.timelineWindow(api.funded, "2026-10-23", "days"); return [w.weekPx, w.start, w.labels.slice(0, 3).map((l) => l.label), w.labels.find((l) => l.label.startsWith("Sep"))?.label, w.labels.length, w.weeks * 7, w.earlier, w.later, w.open];')
+        self.assertEqual(w, [196, "2026-08-17", ["Aug 17", "", "19"], "Sep 1", 105, 105, "2026-09-21", "2026-10-05", "2026-09-28"])
+        # A month label is wider than a day, so the next day gives way: "Sep 1" never reads with "2" as "Sep 12".
+        after = run('const w = timeline.timelineWindow(api.funded, "2026-10-23", "days"); const i = w.labels.findIndex((l) => l.label === "Sep 1"); return w.labels.slice(i, i + 3).map((l) => l.label);')
+        self.assertEqual(after, ["Sep 1", "", "3"])
+
     def test_the_board_opens_inside_its_scroll_range(self) -> None:
         self.assertEqual(run("return [timeline.openScroll(2184, 2300, 816, 5460, 1208), timeline.openScroll(2184, 2300, 816, 2500, 1200), timeline.openScroll(-5, 0, 816, 2500, 1200)];"), [2184, 1300, 0])
 
@@ -215,6 +222,12 @@ class TimelineTests(unittest.TestCase):
         # QA R15, measured at 768 Weeks, scroll 2024: the board shows 2024 to 2281; the slip label fit neither side and was cut 100 px at the right.
         placed = self.lanes([{"key": "tick", "atPx": 2218, "text": "Committed Oct 1 · slip 23 days", "outside": None}], {"left": 2024, "right": 2281})
         self.assertEqual(placed, {"before": [], "after": ["tick"], "inside": []})
+
+    def test_an_edge_list_from_one_band_keeps_the_other_bands_labels_clear(self) -> None:
+        # Rule 23c: an edge list has no bands, so a label above may not run into a list made of a label below.
+        placed = self.lanes([{"key": "tick", "atPx": 1600, "text": "Promotion Milestone Nov 6", "outside": None, "band": "above"}, {"key": "end", "atPx": 2400, "text": "Fantasy Nov 30", "outside": None, "band": "below"}])
+        self.assertEqual(placed["after"], ["end"])  # type: ignore[index]
+        self.assertNotIn({"key": "tick", "side": "right"}, placed["inside"])  # type: ignore[index]
 
     def test_two_marks_past_one_edge_become_one_label(self) -> None:
         placed = self.lanes([{"key": "end", "atPx": 300, "text": "Fantasy Nov 30", "outside": None}, {"key": "tick", "atPx": 100, "text": "Promotion Milestone Nov 6", "outside": None}])

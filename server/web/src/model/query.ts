@@ -3,7 +3,7 @@ import { isDate } from "../../../src/dates.ts";
 
 /** The screen state lives in the URL query, so a link reopens the same screen. A value that is not valid is ignored. */
 
-export const ZOOM_ORDER = ["weeks", "months", "quarters"] as const;
+export const ZOOM_ORDER = ["days", "weeks", "months", "quarters"] as const;
 export type Zoom = (typeof ZOOM_ORDER)[number];
 
 const VIEWS = ["timeline", "list", "calendar"] as const;

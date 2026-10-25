@@ -15,6 +15,8 @@ const LEAD_DAYS = 14;
  * `step` the weeks one press of Earlier or Later moves, `labels` what the axis names.
  */
 const ZOOMS = {
+  // Rule 21a: days, 28 px a day, a label each day (Chelsea, 2026-10-25).
+  days: { week: 196, past: 6, future: 9, visible: 4, step: 1, labels: "day" },
   weeks: { week: 84, past: 26, future: 39, visible: 13, step: 4, labels: "week" },
   months: { week: 30, past: 52, future: 78, visible: 34, step: 13, labels: "month" },
   quarters: { week: 14, past: 104, future: 156, visible: 65, step: 26, labels: "other month" },
@@ -62,6 +64,16 @@ function monthLabels(start: string, end: string, today: string, every: number): 
   return out;
 }
 
+/** Rule 21a: at days, each day is named by its number; the 1st of a month and the first label also name the month: "Aug 17", "18", ..., "Sep 1". */
+function dayLabels(start: string, days: number): { date: string; label: string }[] {
+  return Array.from({ length: days }, (_, i) => {
+    const date = addDays(start, i);
+    const t = day(date);
+    const n = new Date(t).getUTCDate();
+    return { date, label: i === 0 || n === 1 ? `${MONTH.format(t)} ${n}` : String(n) };
+  }).map((d, i, all) => (i > 0 && /\D/.test(all[i - 1].label) ? { ...d, label: "" } : d));
+}
+
 /** The window opens on one week: two weeks before today unless `from` names another, or earlier to show a Committed date that passed in the last 10 weeks. */
 export function timelineWindow(priorities: { goals: ApiGoal[] }[], today: string, zoom: Zoom, from?: string): TimelineWindow {
   const scale = ZOOMS[zoom];
@@ -81,7 +93,9 @@ export function timelineWindow(priorities: { goals: ApiGoal[] }[], today: string
   const span = day(end) - day(start);
   const pos = (date: string) => (100 * (Math.min(Math.max(day(date), day(start)), day(end)) - day(start))) / span;
   const labels =
-    scale.labels === "week"
+    scale.labels === "day"
+      ? dayLabels(start, weeks * 7).map((d) => ({ at: pos(d.date), label: d.label }))
+      : scale.labels === "week"
       ? Array.from({ length: weeks }, (_, i) => addDays(start, i * 7)).map((d) => ({ at: pos(d), label: shortDate(d, today) }))
       : monthLabels(start, end, today, scale.labels === "month" ? 1 : 2).map((m) => ({ at: pos(m.date), label: m.label }));
   return {
@@ -160,7 +174,17 @@ export type LaneMark = { key: string; atPx: number; text: string; outside: "befo
  * Each other mark labels to its right, else to its left.
  */
 export function placeLaneLabels(marks: LaneMark[], view: { left: number; right: number }): Placed {
-  const bands = [...new Set(marks.map((m) => m.band ?? "above"))].map((band) => placeBand(marks.filter((m) => (m.band ?? "above") === band), view));
+  const names = [...new Set(marks.map((m) => m.band ?? "above"))];
+  const inBand = (band: string) => marks.filter((m) => (m.band ?? "above") === band);
+  // Rule 23c: an edge list has no bands, so each band also keeps clear of the other bands' edge labels: a second pass reserves them.
+  const first = names.map((band) => placeBand(inBand(band), view));
+  const edge = (side: "before" | "after") => marks.filter((m) => first.some((b) => b[side].includes(m.key)));
+  // The list starts at the top of the row: its first line meets the labels above the bar, and a second line reaches the labels below it.
+  const others = (side: "before" | "after", band: string) => {
+    const list = edge(side);
+    return band === "below" && list.length < 2 ? [] : list.filter((m) => (m.band ?? "above") !== band);
+  };
+  const bands = names.map((band) => placeBand(inBand(band), view, { before: others("before", band), after: others("after", band) }));
   const order = (keys: string[]) => [...marks].sort((a, b) => a.atPx - b.atPx).map((m) => m.key).filter((k) => keys.includes(k));
   return {
     before: order(bands.flatMap((b) => b.before)),
@@ -172,18 +196,19 @@ export function placeLaneLabels(marks: LaneMark[], view: { left: number; right: 
 type Placed = { before: string[]; after: string[]; inside: { key: string; side: "left" | "right" }[] };
 
 /** placeLaneLabels for the labels of one band. */
-function placeBand(marks: LaneMark[], view: { left: number; right: number }): Placed {
+function placeBand(marks: LaneMark[], view: { left: number; right: number }, others: { before: LaneMark[]; after: LaneMark[] } = { before: [], after: [] }): Placed {
   const sorted = [...marks].sort((a, b) => a.atPx - b.atPx);
   const before = new Set(sorted.filter((m) => m.outside === "before" || (!m.outside && m.atPx < view.left)).map((m) => m.key));
   const after = new Set(sorted.filter((m) => m.outside === "after" || (!m.outside && m.atPx > view.right)).map((m) => m.key));
-  const reserve = (keys: Set<string>) => {
-    const text = sorted.filter((m) => keys.has(m.key)).map((m) => m.text).join(" · ");
-    return keys.size ? EDGE_INSET + labelWidth(text) + LABEL_GAP : 0;
+  // An edge list is as wide as its longest line (rule 23c).
+  const reserve = (keys: Set<string>, side: "before" | "after") => {
+    const texts = [...sorted.filter((m) => keys.has(m.key)), ...others[side]].map((m) => labelWidth(m.text));
+    return texts.length ? EDGE_INSET + Math.max(...texts) + LABEL_GAP : 0;
   };
   let inner = view;
   for (let changed = true; changed; ) {
     changed = false;
-    inner = { left: view.left + reserve(before), right: view.right - reserve(after) };
+    inner = { left: view.left + reserve(before, "before"), right: view.right - reserve(after, "after") };
     for (const m of sorted) {
       if (before.has(m.key) || after.has(m.key)) continue;
       // A label that fits on neither side of its mark joins the nearer edge label, so it is whole and covers nothing.
