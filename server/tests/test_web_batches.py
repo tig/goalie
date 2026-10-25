@@ -12,12 +12,13 @@ from goalie_cli import Store, update
 from live_server import get, post, running_server, signed
 
 COMMANDS = (Path(__file__).resolve().parents[1] / "web" / "src" / "model" / "commands.ts").as_uri()
+NEWGOAL = (Path(__file__).resolve().parents[1] / "web" / "src" / "model" / "newgoal.ts").as_uri()
 
 
 def build(body: str, **inputs: Any) -> dict[str, Any]:
     """Run an ES module with the app's batch builders as `commands` and each input as a const, and return the batch it builds."""
     consts = "".join(f"const {k} = {json.dumps(v)};\n" for k, v in inputs.items())
-    script = f'import * as commands from "{COMMANDS}";\n{consts}process.stdout.write(JSON.stringify((() => {{ {body} }})()));'
+    script = f'import * as commands from "{COMMANDS}";\nimport * as newgoal from "{NEWGOAL}";\n{consts}process.stdout.write(JSON.stringify((() => {{ {body} }})()));'
     proc = subprocess.run(["node", "--no-warnings", "--input-type=module", "-e", script], capture_output=True, text=True, timeout=30)
     if proc.returncode != 0:
         raise AssertionError(proc.stderr)
@@ -133,6 +134,20 @@ class WebBatchTests(unittest.TestCase):
         key = self.send(build("return commands.createBatch(form);", form=form))["ids"]["$goal"]
         goal = self.read(f"/api/goals/{key}")["goal"]
         self.assertEqual((goal["parent"], goal["due_date"], goal["date_type"]), ("XW-0004", None, None))
+
+    def test_new_goal_in_progress_yellow_lists_its_path_to_green(self) -> None:
+        options = self.read("/api/options")
+        form = {
+            "summary": "Open the second office in Lisbon", "description": "", "owner": "chelsea", "priority": None, "due_date": "2027-05-01", "date_type": "Fantasy",
+            "health": "YELLOW", "path_to_green": {"steps": [{"text": "", "owner": "chelsea", "date": ""}], "criteria": ""}, "plan": None, "plan_maturity": options["defaults"]["plan_maturity"],
+            "more": {**{k: options["defaults"][k] for k in ("type", "severity", "origination", "level", "visibility", "org_unit")}, "state": "In Progress"},
+            "milestone": {"summary": "Commit a date for the office", "due_date": "2026-12-01", "owner": "chelsea"},
+            "milestoneType": self.types()["milestone"], "subGoals": [], "workItems": [], "priorityPicked": True,
+        }
+        batch = build("return { ...commands.createBatch(form), check: true };", form=form)
+        answer = json.loads(post(self.proc, self.port, "/api/commands", batch, self.auth).body)
+        keys = build("return newgoal.toSave(form, answer, true, batch).filter((l) => !l.done).map((l) => l.key);", form=form, answer=answer, batch=batch)
+        self.assertIn("path_to_green", keys, answer)
 
     def test_health_with_a_path_to_green_is_stored(self) -> None:
         goal = self.read("/api/goals/XW-0003")["goal"]

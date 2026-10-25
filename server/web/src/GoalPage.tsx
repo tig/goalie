@@ -17,6 +17,13 @@ import { homeSearch, Link } from "./router.tsx";
  */
 export function GoalPage({ goalKey, viewName }: { goalKey: string; viewName: string }) {
   const [loaded, reload] = useJson<GoalPageResponse>(`/api/goals/${encodeURIComponent(goalKey)}`);
+  // G26: the saved line lives above the keyed Goal, which remounts after every save (QA N1). Another goal starts without it.
+  const [status, setStatus] = useState<Status>({ text: "", where: "head" });
+  const [shownFor, setShownFor] = useState(goalKey);
+  if (shownFor !== goalKey) {
+    setShownFor(goalKey);
+    setStatus({ text: "", where: "head" });
+  }
   const back = (
     <Link to={backPath(homeSearch())} className="back">
       ‹ {viewName}
@@ -44,8 +51,10 @@ export function GoalPage({ goalKey, viewName }: { goalKey: string; viewName: str
       </main>
     );
   }
-  return <Goal key={`${loaded.data.goal.id}-${loaded.data.goal.version}-${loaded.data.events.length}`} data={loaded.data} back={back} reload={reload} />;
+  return <Goal key={`${loaded.data.goal.id}-${loaded.data.goal.version}-${loaded.data.events.length}`} data={loaded.data} back={back} reload={reload} status={status} setStatus={setStatus} />;
 }
+
+type Status = { text: string; where: "head" | "subs" | "work" };
 
 /** A date with its year, as on the goal page's header (design check: rule 14). */
 const yearDate = (date: string) => eventValue(date, "due_date");
@@ -53,10 +62,9 @@ const yearDate = (date: string) => eventValue(date, "due_date");
 const time = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const when = (ts: string) => time.format(new Date(ts));
 
-function Goal({ data, back, reload }: { data: GoalPageResponse; back: React.ReactNode; reload: () => void }) {
+function Goal({ data, back, reload, status, setStatus }: { data: GoalPageResponse; back: React.ReactNode; reload: () => void; status: Status; setStatus: (s: Status | ((s: Status) => Status)) => void }) {
   const { goal, actors, today } = data;
   // One panel at a time (G9). A saved panel reloads the page, so every section shows the stored state.
-  const [status, setStatus] = useState<{ text: string; where: "head" | "subs" | "work" }>({ text: "", where: "head" });
   const [panel, openPanel] = useState<{ name: PanelName | "subgoal" | "workitem"; health?: Exclude<Health, null> } | null>(null);
   const setPanel = (next: typeof panel) => {
     setStatus((s) => ({ ...s, text: "" }));
@@ -308,15 +316,15 @@ function DateBar({ data }: { data: GoalPageResponse }) {
   }, []);
   // Each mark is labelled under it: the start, Today, and each date (design check: G6).
   const labels = [
-    { key: "start", at: bar.start, text: `In Progress since ${shortDate(data.started, data.today)}`, align: "start" as const },
-    ...(Math.abs(bar.today - bar.start) > 12 ? [{ key: "today", at: bar.today, text: "Today", align: "center" as const }] : []),
+    ...(bar.start !== null && data.started ? [{ key: "start", at: bar.start, text: `In Progress since ${shortDate(data.started, data.today)}`, align: "start" as const }] : []),
+    ...(bar.start === null || Math.abs(bar.today - bar.start) > 12 ? [{ key: "today", at: bar.today, text: "Today", align: bar.start === null && bar.today < 5 ? ("start" as const) : ("center" as const) }] : []),
     ...bar.marks.map((m) => ({ key: m.kind, at: m.at, text: shortDate(m.date, data.today), align: m.at > 85 ? ("end" as const) : ("center" as const) })),
   ];
   const rows = labelRows(labels, width || 1000);
   return (
     <div className={`datebar${rows.includes(1) ? " two" : ""}`} aria-hidden="true" ref={measured}>
       <span className="dbtrack" />
-      <span className="dbfill" style={{ left: `${bar.start}%`, width: `${Math.max(0, bar.today - bar.start)}%` }} />
+      {bar.start !== null && <span className="dbfill" style={{ left: `${bar.start}%`, width: `${Math.max(0, bar.today - bar.start)}%` }} />}
       <span className="dbtoday" style={{ left: `${bar.today}%` }} />
       {bar.marks.map((m) => (
         <span key={m.kind} className={`dbmark ${m.kind === "Promotion Milestone" ? "pm" : m.kind}`} style={{ left: `${m.at}%` }} />
@@ -448,13 +456,16 @@ function WorkItems({ items, data, adding, onAdd, onDone, reload, status }: { ite
           {!closed[g.status] &&
             g.items.map((i) => (
               <div key={i.id} className={`wrow${i.status === "Completed" ? " done" : ""}`}>
-                <input
-                  type="checkbox"
-                  checked={i.status === "Completed" || ticked?.id === i.id}
-                  disabled={i.status === "Completed"}
-                  onChange={() => tick(i)}
-                  aria-label={`Mark ${i.title} Completed`}
-                />
+                {/* The tick's label is its 44 px tap area on touch (rule 29, QA U10). */}
+                <label className="wtick">
+                  <input
+                    type="checkbox"
+                    checked={i.status === "Completed" || ticked?.id === i.id}
+                    disabled={i.status === "Completed"}
+                    onChange={() => tick(i)}
+                    aria-label={`Mark ${i.title} Completed`}
+                  />
+                </label>
                 <span className="wtitle">{i.title}</span>
                 <Owner actor={data.actors[i.owner] ?? { id: i.owner, name: i.owner, kind: "human" }} me={data.me.id} />
                 <span className="wstatus small">{i.status}</span>

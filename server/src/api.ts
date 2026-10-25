@@ -166,8 +166,8 @@ export type GoalPageResponse = {
   dates: GoalDate[];
   /** True when the goal takes its parent's date and Date Type (D2). */
   inherited: boolean;
-  /** When the goal started: its first move to In Progress, else its first Event. */
-  started: string;
+  /** When the goal started: its first move to In Progress. Null when it never moved there (Codebase QA N6). */
+  started: string | null;
   /** The state a Close would record now: Completed, or Completed Late against original_committed_date (G15). Null when the goal cannot be completed. */
   closesAs: "Completed" | "Completed Late" | null;
   /** Rule owners-change-goal (SPEC.md §6.1): true when the signed-in actor may change this goal. Anyone may comment. */

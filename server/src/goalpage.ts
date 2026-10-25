@@ -89,7 +89,7 @@ export function goalPage(db: DatabaseSync, id: string, me: string, today: string
     goal: stored as StoredGoal,
     dates,
     inherited: goal.inherited,
-    started: startedOf(db, id, timeZone) ?? today,
+    started: startedOf(db, id, timeZone) ?? null,
     closesAs: closing,
     closesAsPromoted: closesAsPromoted(stored, today),
     mayChange: mayChangeGoal(me, goalieOwner(db), stored, getGoal),

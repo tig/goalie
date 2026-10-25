@@ -61,6 +61,7 @@ export function runCommands(db: DatabaseSync, actor: string, request: unknown, t
       const all: (ApiViolation & { at: number })[] = [];
       let first: { at: number; violations: ApiViolation[] } | undefined;
       const refused = new Set<string>();
+      const skipped = new Set<string>();
       // NF2: a check carries each goal's lints, by command, from the row as written (or as sent, when refused).
       const hints = new Map<number, BatchHint[]>();
       const lint = (at: number, command: Command, result: WriteResult) => {
@@ -82,6 +83,8 @@ export function runCommands(db: DatabaseSync, actor: string, request: unknown, t
       };
       commands.forEach((raw, at) => {
         const ref = isObject(raw) && isRef(raw.ref) ? raw.ref : undefined;
+        // The entity this command changes, as a key when its ref is known. A skipped command leaves it unchecked for the rest of the batch.
+        const target = isObject(raw) && typeof raw.id === "string" ? (isRef(raw.id) ? ids[raw.id] : raw.id) : undefined;
         let command: Command;
         try {
           command = resolve(at, raw, ids, refused);
@@ -90,10 +93,16 @@ export function runCommands(db: DatabaseSync, actor: string, request: unknown, t
           if (error instanceof Skip) {
             // Codebase QA Q11: say which commands a check could not run, so the rail knows more checks follow.
             if (ref) refused.add(ref);
+            if (target) skipped.add(target);
             all.push({ rule: "not-checked", message: `not checked yet: it names ${error.ref}, whose create was refused`, at });
             return;
           }
           throw error;
+        }
+        // Codebase QA N4: a later command on an entity a skipped command changed would answer stale and hide every refusal.
+        if (check && target && skipped.has(target)) {
+          all.push({ rule: "not-checked", message: `not checked yet: it changes ${target} after a command that could not be checked`, at });
+          return;
         }
         if (command.op === "create" && command.kind === "goal" && command.fields.state === "In Progress") {
           // A check first tests the create in its final state, so every In Progress rule runs, in a savepoint it always rolls back.
