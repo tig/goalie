@@ -35,6 +35,10 @@ class DateTests(unittest.TestCase):
         cases = '[{ summary: "", due_date: "", date_type: "" }, { summary: "Ship", due_date: "", date_type: "Fantasy" }, { summary: "Ship", due_date: "2027-01-01", date_type: "" }, { summary: "Ship", due_date: "2027-01-01", date_type: "Fantasy" }]'
         self.assertEqual(run(f"return {cases}.map(labels.stillMissing);"), ["Write a summary, and choose a date and a Date Type.", "Choose a date.", "Choose a Date Type.", ""])
 
+    def test_health_reads_in_chelseas_three_words_everywhere(self) -> None:
+        got = run('return [["GREEN", "YELLOW", "RED"].map(labels.healthWord), goalpage.eventValue("YELLOW", "health"), labels.healthWord(null)];')
+        self.assertEqual(got, [["On track", "At risk", "Off track"], "At risk", "None"])
+
     def test_a_date_label_carries_its_date_type(self) -> None:
         self.assertEqual(run('return labels.dateLabel({ date: "2026-11-06", kind: "Promotion Milestone" }, "2026-10-23");'), "Promotion Milestone Nov 6")
 

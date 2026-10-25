@@ -5,6 +5,7 @@ import { postCommands, useJson } from "./data.ts";
 import { PtgFields } from "./GoalPanels.tsx";
 import { createBatch, goalTypes, type NewGoalForm, type NewMilestone, type SubGoalRow } from "./model/commands.ts";
 import { eventValue, fieldLabel } from "./model/goalpage.ts";
+import { healthWord } from "./model/labels.ts";
 import { countLine, detailsLine, makes, placeOf, ruleAnswer, toSave, type SaveLine } from "./model/newgoal.ts";
 import { backPath, goalPath } from "./model/route.ts";
 import { Avatar, HealthDot, Help } from "./parts.tsx";
@@ -491,8 +492,8 @@ function Details({ open, setOpen, form, set, options, humans, shares, miss }: Pa
                 <span className="hpick">
                   {HEALTHS.map((h) => (
                     <button key={h.health} type="button" className={`hopt ${h.health}${form.health === h.health ? " on" : ""}`} aria-pressed={form.health === h.health} onClick={() => set({ health: h.health })}>
-                      <HealthDot health={h.health} word={false} />
-                      {h.health}
+                      <HealthDot health={h.health} word="beside" />
+                      {healthWord(h.health)}
                     </button>
                   ))}
                 </span>

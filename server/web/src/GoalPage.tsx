@@ -6,7 +6,7 @@ import { AddSubGoal, AddWorkItem, useTick } from "./GoalAdd.tsx";
 import { ClosePanel, DescriptionPanel, FieldsPanel, HealthPanel, PromotePanel, PursuePanel, SlipPanel, type Done, type PanelName } from "./GoalPanels.tsx";
 import { commentBatch } from "./model/commands.ts";
 import { changeParts, comments, createdFields, historyNames, joinPages, dateBar, labelRows, eventValue, fieldLabel, filterEvents, groupEvents, groupWorkItems, HISTORY_FILTERS, type EventGroup, type HistoryFilter, type Names } from "./model/goalpage.ts";
-import { dateLabel, slipLabel } from "./model/labels.ts";
+import { dateLabel, healthWord, slipLabel } from "./model/labels.ts";
 import { backPath, goalPath } from "./model/route.ts";
 import { Avatar, HealthDot } from "./parts.tsx";
 import { homeSearch, Link } from "./router.tsx";
@@ -142,8 +142,8 @@ function Goal({ data, back, reload, status, setStatus }: { data: GoalPageRespons
                       aria-pressed={goal.health === h}
                       onClick={() => (h === goal.health ? setPanel(null) : setPanel({ name: "health", health: h }))}
                     >
-                      <HealthDot health={h} word={false} />
-                      {h}
+                      <HealthDot health={h} word="beside" />
+                      {healthWord(h)}
                     </button>
                   );
                 })}
@@ -236,11 +236,11 @@ function Goal({ data, back, reload, status, setStatus }: { data: GoalPageRespons
             </tbody>
           </table>
           <p className="note">
-            <b>Criteria for GREEN</b> {goal.path_to_green.criteria || <span className="muted">None</span>}
+            <b>When it is On track again</b> {goal.path_to_green.criteria || <span className="muted">None</span>}
           </p>
           {goal.health === "YELLOW" && (
             <p className="note">
-              <b>Trigger for RED</b> {goal.path_to_green.trigger || <span className="muted">None</span>}
+              <b>What makes it Off track</b> {goal.path_to_green.trigger || <span className="muted">None</span>}
             </p>
           )}
         </section>

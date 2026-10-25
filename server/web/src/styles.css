@@ -669,7 +669,6 @@ select.wstatus{height:28px;border:1px solid var(--cut);border-radius:8px;backgro
 /* Rule 24b: each count is its shape, number, meaning, then the word, smaller and muted. */
 .count .cnum{font-size:18px;font-weight:800}
 .count .cmean{font-size:14px;font-weight:700}
-.count .cword{font-size:12px;font-weight:700;color:var(--mute)}
 .phonesum .counts{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
 /* NG1: "+ New goal" in the top bar, before the avatar. */
 .btn.topnew{margin-left:auto;height:32px;display:inline-flex;align-items:center;gap:6px;text-decoration:none}
