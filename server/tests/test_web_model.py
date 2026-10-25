@@ -473,6 +473,13 @@ class GoalPageTests(unittest.TestCase):
         ]
         self.assertEqual(run(f"return goalpage.groupEvents({json.dumps(events)}).map((g) => [g.created, g.promoted]);"), [[False, {"milestone": "XW-0004"}]])
 
+    def test_an_older_page_joins_the_history_once_and_one_save_stays_one_row(self) -> None:
+        w = {"timestamp": "t1", "actor": "chelsea", "reason": "Met", "entity": "XW-0003"}
+        newer = [{**w, "sequence": 9, "field": "state", "old": "In Progress", "new": "Completed"}, {**w, "sequence": 8, "field": "health", "old": "GREEN", "new": None}]
+        older = [{**w, "sequence": 8, "field": "health", "old": "GREEN", "new": None}, {**w, "sequence": 7, "field": "date_type", "old": "Ambition", "new": "Committed"}, {"sequence": 6, "timestamp": "t0", "actor": "tig", "reason": "Hi", "entity": "XW-0003", "field": "comment", "new": "Hi"}]
+        got = run(f"const all = goalpage.joinPages({json.dumps(newer)}, {json.dumps(older)}); return [all.map((e) => e.sequence), goalpage.groupEvents(all).map((g) => g.events.length)];")
+        self.assertEqual(got, [[9, 8, 7, 6], [3, 1]])
+
     def test_a_value_reads_as_names_and_dates(self) -> None:
         ctx = {"actors": {"tig": {"name": "Tig"}}, "names": {"PRI-3": "Priority 3 Run Excaliwire on GOALIE", "excaliwire": "Excaliwire"}}
         v = run(f'const c = {json.dumps(ctx)}; return [goalpage.eventValue("2026-11-30", "due_date", c), goalpage.eventValue("PRI-3", "priority", c), goalpage.eventValue("excaliwire", "org_unit", c), goalpage.eventValue("tig", "owner", c), goalpage.eventValue("organization-wide", "visibility", c)];')

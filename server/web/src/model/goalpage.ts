@@ -59,6 +59,12 @@ export type EventGroup = { events: ApiEvent[]; created: boolean; promoted: { mil
 
 const UNCOMMITTED: readonly unknown[] = ["Fantasy", "Ambition"];
 
+/** D1: an older page of History joins the Events already shown, each Event once, newest first, so a save split across pages groups as one row. */
+export function joinPages(shown: ApiEvent[], older: ApiEvent[]): ApiEvent[] {
+  const seen = new Set(shown.map((e) => e.sequence));
+  return [...shown, ...older.filter((e) => !seen.has(e.sequence))].sort((a, b) => b.sequence - a.sequence);
+}
+
 /** History rows (design check, N6a): one row per write, newest first. A comment is always its own row. */
 export function groupEvents(events: ApiEvent[]): EventGroup[] {
   const groups: EventGroup[] = [];
