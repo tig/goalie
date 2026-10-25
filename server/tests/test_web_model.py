@@ -144,11 +144,14 @@ class TimelineTests(unittest.TestCase):
         self.assertEqual(sizes, [[65, 26 * 84, 65 * 84, "2026-09-28"], [130, 52 * 30, 130 * 30, "2026-09-28"], [260, 104 * 14, 260 * 14, "2026-09-28"]])
 
     def test_days_zoom_draws_28_px_a_day_with_a_label_each_day(self) -> None:
-        w = run('const w = timeline.timelineWindow(api.funded, "2026-10-23", "days"); return [w.weekPx, w.start, w.labels.slice(0, 3).map((l) => l.label), w.labels.find((l) => l.label.startsWith("Sep"))?.label, w.labels.length, w.weeks * 7, w.earlier, w.later, w.open];')
-        self.assertEqual(w, [196, "2026-08-17", ["Aug 17", "", "19"], "Sep 1", 105, 105, "2026-09-21", "2026-10-05", "2026-09-28"])
-        # A month label is wider than a day, so the next day gives way: "Sep 1" never reads with "2" as "Sep 12".
-        after = run('const w = timeline.timelineWindow(api.funded, "2026-10-23", "days"); const i = w.labels.findIndex((l) => l.label === "Sep 1"); return w.labels.slice(i, i + 3).map((l) => l.label);')
-        self.assertEqual(after, ["Sep 1", "", "3"])
+        w = run('const w = timeline.timelineWindow(api.funded, "2026-10-23", "days"); return [w.weekPx, w.start, w.labels.slice(0, 3).map((l) => l.label), w.labels.length, w.weeks * 7, w.earlier, w.later, w.open];')
+        self.assertEqual(w, [196, "2026-08-17", ["17", "18", "19"], 105, 105, "2026-09-21", "2026-10-05", "2026-09-28"])
+
+    def test_days_zoom_names_months_in_a_band_above_the_days(self) -> None:
+        # Rule 21a (98b32be): every day keeps its number; the month's short name sits above, from the 1st and at the start.
+        m = run('const w = timeline.timelineWindow(api.funded, "2026-10-23", "days"); return w.months.map((x) => [x.date, x.label]);')
+        self.assertEqual(m, [["2026-08-17", "Aug"], ["2026-09-01", "Sep"], ["2026-10-01", "Oct"], ["2026-11-01", "Nov"]])
+        self.assertEqual(run('return timeline.timelineWindow(api.funded, "2026-10-23", "weeks").months;'), [])
 
     def test_the_board_opens_inside_its_scroll_range(self) -> None:
         self.assertEqual(run("return [timeline.openScroll(2184, 2300, 816, 5460, 1208), timeline.openScroll(2184, 2300, 816, 2500, 1200), timeline.openScroll(-5, 0, 816, 2500, 1200)];"), [2184, 1300, 0])

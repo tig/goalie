@@ -40,6 +40,8 @@ export type TimelineWindow = {
   later: string;
   todayAt: number;
   labels: { at: number; label: string }[];
+  /** At days, the month names in the band above the day numbers (rule 21a); empty at every other zoom. */
+  months: { at: number; date: string; label: string }[];
   /** A day's position across the board, held to its edges. */
   pos: (date: string) => number;
 };
@@ -64,14 +66,18 @@ function monthLabels(start: string, end: string, today: string, every: number): 
   return out;
 }
 
-/** Rule 21a: at days, each day is named by its number; the 1st of a month and the first label also name the month: "Aug 17", "18", ..., "Sep 1". */
+/** Rule 21a: at days, every day is named by its number, and the month's short name sits in a band above, from the 1st and at the start. */
 function dayLabels(start: string, days: number): { date: string; label: string }[] {
   return Array.from({ length: days }, (_, i) => {
     const date = addDays(start, i);
-    const t = day(date);
-    const n = new Date(t).getUTCDate();
-    return { date, label: i === 0 || n === 1 ? `${MONTH.format(t)} ${n}` : String(n) };
-  }).map((d, i, all) => (i > 0 && /\D/.test(all[i - 1].label) ? { ...d, label: "" } : d));
+    return { date, label: String(new Date(day(date)).getUTCDate()) };
+  });
+}
+
+function monthBand(start: string, days: number): { date: string; label: string }[] {
+  return dayLabels(start, days)
+    .filter((d, i) => i === 0 || d.label === "1")
+    .map((d) => ({ date: d.date, label: MONTH.format(day(d.date)) }));
 }
 
 /** The window opens on one week: two weeks before today unless `from` names another, or earlier to show a Committed date that passed in the last 10 weeks. */
@@ -112,6 +118,7 @@ export function timelineWindow(priorities: { goals: ApiGoal[] }[], today: string
     later: addDays(open, scale.step * 7),
     todayAt: pos(today),
     labels,
+    months: scale.labels === "day" ? monthBand(start, weeks * 7).map((m) => ({ at: pos(m.date), ...m })) : [],
     pos,
   };
 }
