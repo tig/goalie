@@ -103,6 +103,21 @@ class CommandsApiTests(unittest.TestCase):
         self.assertEqual(status, 422)
         self.assertEqual({v["rule"] for v in body["all"]}, {"committed-needs-pencil", "health-while-in-progress"})
 
+    def test_a_check_skips_later_commands_on_an_entity_a_skipped_command_changed(self) -> None:
+        # Codebase QA N4, measured by the Frontend Engineer: the later update answered stale and hid every refusal.
+        milestone = {**MILESTONE, "state": "Backlog"}
+        goal = {**GOAL, "state": "In Progress", "health": "YELLOW", "path_to_green": {"steps": [], "criteria": ""}, "promotion_milestone": "$m"}
+        batch = [
+            {"op": "create", "kind": "goal", "ref": "$m", "fields": milestone, "reason": "Planned"},
+            {"op": "create", "kind": "goal", "ref": "$goal", "fields": goal, "reason": "Planned"},
+            {"op": "update", "kind": "goal", "id": "$m", "base_version": 1, "fields": {"parent": "$goal"}, "reason": "Planned"},
+            {"op": "update", "kind": "goal", "id": "$m", "base_version": 2, "fields": {"state": "In Progress", "health": "GREEN"}, "reason": "Started"},
+        ]
+        status, body = self.send(batch, check=True)
+        self.assertEqual((status, body["error"]), (422, "invalid"), body)
+        self.assertIn("ptg-when-yellow-or-red", [v["rule"] for v in body["all"] if v["at"] == 1])
+        self.assertEqual(sorted(v["at"] for v in body["all"] if v["rule"] == "not-checked"), [2, 3])
+
     def test_a_check_and_a_save_give_the_same_versions(self) -> None:
         # Frontend Engineer: an In Progress create is version 2 after a save (Backlog, then In Progress), so a later update by ref names version 2.
         batch = [
