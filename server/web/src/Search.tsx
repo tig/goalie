@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Health } from "../../src/api.ts";
+import { healthWord } from "./model/labels.ts";
 import { HealthDot } from "./parts.tsx";
 
 type Props = {
@@ -28,8 +29,8 @@ export function Search({ q, health, onSearch, onClear }: Props) {
       </svg>
       {health && (
         <span className={`chip-filter ${health}`}>
-          <HealthDot health={health} word={false} />
-          {health}
+          <HealthDot health={health} word="beside" />
+          {healthWord(health)}
           <button
             type="button"
             className="chip-x"

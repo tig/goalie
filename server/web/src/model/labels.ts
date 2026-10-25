@@ -53,3 +53,18 @@ export function stillMissing(form: { summary: string; due_date: string; date_typ
   if (write) return "Write a summary.";
   return choose ? `Choose ${choose}.` : "";
 }
+
+/**
+ * Health as a person reads it (Chelsea, 2026-10-25): three short words on every screen. The stored value stays GREEN, YELLOW, or RED (SPEC.md §6.1).
+ * The full meanings live in the ? help and in screen-reader labels.
+ */
+export const HEALTH_WORDS = { GREEN: "On track", YELLOW: "At risk", RED: "Off track" } as const;
+
+/** The SPEC.md §6.1 meaning of each health, for the ? help and screen readers. */
+export const HEALTH_MEANINGS = {
+  GREEN: "On track. The risks are understood and the owner believes the date will be hit.",
+  YELLOW: "Real unknowns or blockers, with a credible path to the date.",
+  RED: "The date is not credible without help, or there is no Path to Green.",
+} as const;
+
+export const healthWord = (health: string | null | undefined) => (health && health in HEALTH_WORDS ? HEALTH_WORDS[health as keyof typeof HEALTH_WORDS] : "None");

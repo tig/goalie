@@ -26,8 +26,8 @@ const WORDS: Record<string, [string, string]> = {
   plan_maturity: ["Plan at Pencil", "A Committed date needs a plan at Pencil."],
   priority: ["Priority, or None", "Choose a Priority, or None. With None, it will not show on Priorities."],
   owner: ["Owner", "Choose one human owner."],
-  health: ["Health", "An In Progress goal needs a health: GREEN, YELLOW, or RED."],
-  path_to_green: ["Path to Green", "A YELLOW or RED goal needs a Path to Green: a step with an owner and a date, and criteria for GREEN."],
+  health: ["Health", "An In Progress goal needs a health: On track, At risk, or Off track."],
+  path_to_green: ["Path to Green", "An At risk or Off track goal needs a Path to Green: a step with an owner and a date, and when it is On track again."],
 };
 
 /** Keys that belong to the Details card: they show only once it is opened and changed (NF14). */

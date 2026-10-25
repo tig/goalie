@@ -1,3 +1,4 @@
+import { healthWord } from "./model/labels.ts";
 import { useCallback, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { ActorRef, Health } from "../../src/api.ts";
@@ -73,12 +74,13 @@ const Hidden = ({ children }: { children: ReactNode }) => <span className="vh">{
  * The health as a mark of its color and its own shape, so color is not the only cue (rule 10): GREEN a circle, YELLOW a triangle, RED a square.
  * No health is a hollow circle. The word is there for a screen reader, and on a phone it shows beside the mark. `shown` writes it on every screen, as in the List's Health column.
  */
-export function HealthDot({ health, word = true }: { health: Health; word?: boolean | "shown" }) {
+export function HealthDot({ health, word = true }: { health: Health; word?: boolean | "shown" | "beside" }) {
   return (
     <>
       <span className={`hdot ${health ?? "none"}`} style={{ background: health ? look(health).bar : "transparent" }} aria-hidden="true" />
       {/* "no health" is not a SPEC word (rule 13): a goal with no health shows the hollow circle, and the words are for a screen reader only. */}
-      {word && health ? <span className={`hword ${health}${word === "shown" ? " shown" : ""}`}>{health}</span> : <Hidden>{health ?? "no health"}</Hidden>}
+      {/* "beside": the word is written next to the mark already, so the mark adds no hidden text (no "On track On track"). */}
+      {word === "beside" ? null : word && health ? <span className={`hword ${health}${word === "shown" ? " shown" : ""}`}>{healthWord(health)}</span> : <Hidden>{health ? healthWord(health) : "no health"}</Hidden>}
     </>
   );
 }

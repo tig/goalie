@@ -4,6 +4,7 @@ import { addDays, shortDate } from "../../src/dates.ts";
 import { postCommands, useJson } from "./data.ts";
 import { closeBatch, fieldsBatch, goalTypes, healthBatch, promoteAndClose, promoteToAmbition, promoteToCommitted, pursueBatch, savedStatus, slipBatch, staleMerge } from "./model/commands.ts";
 import { eventValue, fieldLabel, humans } from "./model/goalpage.ts";
+import { healthWord } from "./model/labels.ts";
 import { HealthDot } from "./parts.tsx";
 
 /**
@@ -131,13 +132,13 @@ export function PtgFields({ value, onChange, health, people, me, error }: { valu
       </button>
       {error}
       <label className="field">
-        <span className="flabel">Criteria for GREEN</span>
+        <span className="flabel">When it is On track again</span>
         <textarea rows={2} value={value.criteria} placeholder="Testable without debate" onChange={(e) => onChange({ ...value, criteria: e.target.value })} />
       </label>
       {health === "YELLOW" && (
         <label className="field">
-          <span className="flabel">Trigger for RED</span>
-          <textarea rows={2} value={value.trigger ?? ""} placeholder="What turns it RED, and what happens then" onChange={(e) => onChange({ ...value, trigger: e.target.value })} />
+          <span className="flabel">What makes it Off track</span>
+          <textarea rows={2} value={value.trigger ?? ""} placeholder="What makes it Off track, and what happens then" onChange={(e) => onChange({ ...value, trigger: e.target.value })} />
         </label>
       )}
     </div>
@@ -160,7 +161,7 @@ export function HealthPanel({ data, health, onDone }: { data: GoalPageResponse; 
   const typed = { health, path_to_green: health === "GREEN" ? null : ptg };
   return (
     <Shell
-      title={health === "GREEN" ? "GREEN" : `${health} needs a Path to Green (PTG)`}
+      title={health === "GREEN" ? healthWord(health) : `${healthWord(health)} needs a Path to Green`}
       tone={health}
       saved={saved}
       fields={["path_to_green", "reason", "health"]}
@@ -206,8 +207,8 @@ export function SlipPanel({ data, onDone }: { data: GoalPageResponse; onDone: Do
       <span className="hpick small">
         {(["YELLOW", "RED"] as const).map((h) => (
           <button key={h} type="button" className={`hopt ${h}${health === h ? " on" : ""}`} aria-pressed={health === h} onClick={() => setHealth(h)}>
-            <HealthDot health={h} word={false} />
-            {h}
+            <HealthDot health={h} word="beside" />
+            {healthWord(h)}
           </button>
         ))}
       </span>
@@ -349,8 +350,8 @@ export function PursuePanel({ data, onDone }: { data: GoalPageResponse; onDone: 
       <span className="hpick small">
         {(["GREEN", "YELLOW", "RED"] as const).map((h) => (
           <button key={h} type="button" className={`hopt ${h}${health === h ? " on" : ""}`} aria-pressed={health === h} onClick={() => setHealth(h)}>
-            <HealthDot health={h} word={false} />
-            {h}
+            <HealthDot health={h} word="beside" />
+            {healthWord(h)}
           </button>
         ))}
       </span>

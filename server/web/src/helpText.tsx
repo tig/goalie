@@ -4,9 +4,9 @@ export const HELP = {
   committed: (
     <>
       <div><b>Committed dates</b> counts the goals in progress on this list by their health. A Committed date is a promise. Health is judged against it, or against the Promotion Milestone's date.</div>
-      <div><b>GREEN</b> On track. The risks are understood and the owner believes the date will be hit.</div>
-      <div><b>YELLOW</b> Real unknowns or blockers, with a credible path to the date. This is the time to act.</div>
-      <div><b>RED</b> The date is not credible without help, or there is no Path to Green.</div>
+      <div><b>On track</b> The risks are understood and the owner believes the date will be hit.</div>
+      <div><b>At risk</b> Real unknowns or blockers, with a credible path to the date. This is the time to act.</div>
+      <div><b>Off track</b> The date is not credible without help, or there is no Path to Green.</div>
       <div>A <b>slip</b> is a Committed date that passed before the goal was met.</div>
       <div>Point at a health to highlight its goals. Click it to show only those goals. Click it again to show all.</div>
     </>

@@ -96,6 +96,27 @@ function LaneMarks({ lane, goal, today, view, board }: { lane: Lane; goal: GoalR
   return <>{parts}</>;
 }
 
+/** The month band at days: the month on screen at the left edge, pinned there, then each 1st that follows on screen. */
+function MonthBand({ months, board, view }: { months: TimelineWindow["months"]; board: number; view: View }) {
+  const px = (m: { at: number }) => (m.at / 100) * board;
+  const current = [...months].reverse().find((m) => px(m) <= view.left) ?? months[0];
+  const pinnedEnd = view.left + 12 + labelWidth(current.label) + 8;
+  return (
+    <>
+      <span className="mband" style={{ left: view.left + 12 }}>
+        {current.label}
+      </span>
+      {months
+        .filter((m) => m !== current && px(m) > pinnedEnd && px(m) < view.right - labelWidth(m.label))
+        .map((m) => (
+          <span key={m.date} className="mband" style={{ left: pct(m.at) }}>
+            {m.label}
+          </span>
+        ))}
+    </>
+  );
+}
+
 type Props = Omit<TreeProps, "cells" | "blank"> & {
   window: TimelineWindow;
   /** Bumped by Today, to scroll back even when the window did not change. */
@@ -250,6 +271,10 @@ export function TimelineView({ window: w, home, onRange, ...tree }: Props) {
                     {l.label}
                   </span>
                 ))}
+                {/* Rule 21a: at days the month names sit in a band above the day numbers; the month at the left edge is pinned there. */}
+                {w.months.length > 0 && (
+                  <MonthBand months={w.months} board={board} view={view} />
+                )}
               </div>
             </div>
             <div className="tlbody">

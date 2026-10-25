@@ -1,5 +1,6 @@
 import type { ApiActor, ApiEvent, ApiWorkItem, WorkItemStatus } from "../../../src/api.ts";
 import { day, DAY, isDate } from "../../../src/dates.ts";
+import { healthWord } from "./labels.ts";
 import { labelWidth } from "./timeline.ts";
 
 /** The goal page's pure parts: work items by status (G23), the history filters, and how an Event's values read. */
@@ -39,6 +40,7 @@ export function eventValue(value: unknown, field?: string, ctx: Names = {}): str
     const text: string = value;
     if (/^\d{4}-/.test(text) && isDate(text)) return DATE_YEAR.format(day(text));
     if (field === "visibility") return text.charAt(0).toUpperCase() + text.slice(1);
+    if (field === "health") return healthWord(text);
     return text;
   }
   if (Array.isArray(value)) return value.map((v) => (typeof v === "object" && v ? Object.values(v).join(" ") : String(v))).join(", ");
