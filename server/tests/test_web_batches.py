@@ -122,6 +122,18 @@ class WebBatchTests(unittest.TestCase):
         self.assertEqual(got[0], ["milestone"])
         self.assertGreater(got[1], 0)
 
+    def test_a_new_goal_under_a_parent_saves_with_the_parents_date(self) -> None:
+        options = self.read("/api/options")
+        form = {
+            "summary": "Write the help text for the export", "description": "", "owner": "chelsea", "priority": None, "due_date": "", "date_type": "",
+            "health": None, "path_to_green": None, "plan": None, "plan_maturity": options["defaults"]["plan_maturity"],
+            "more": {**{k: options["defaults"][k] for k in ("type", "severity", "origination", "level", "visibility", "org_unit")}, "state": "Backlog"},
+            "milestone": None, "milestoneType": self.types()["milestone"], "parent": "XW-0004", "subGoals": [], "workItems": [],
+        }
+        key = self.send(build("return commands.createBatch(form);", form=form))["ids"]["$goal"]
+        goal = self.read(f"/api/goals/{key}")["goal"]
+        self.assertEqual((goal["parent"], goal["due_date"], goal["date_type"]), ("XW-0004", None, None))
+
     def test_health_with_a_path_to_green_is_stored(self) -> None:
         goal = self.read("/api/goals/XW-0003")["goal"]
         ptg = {"steps": [{"text": "Load the tree", "owner": "chelsea", "date": "2026-10-30"}], "criteria": "The tree is loaded", "trigger": "Not loaded by Nov 2"}

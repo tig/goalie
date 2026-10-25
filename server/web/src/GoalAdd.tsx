@@ -1,8 +1,9 @@
 import { useState } from "react";
-import type { ApiActor, ApiViolation, ApiWorkItem, CommandsRequest, FormOptions, GoalPageResponse, WorkItemStatus } from "../../src/api.ts";
+import type { ApiActor, ApiViolation, ApiWorkItem, CommandsRequest, CommandsResponse, FormOptions, GoalPageResponse, WorkItemStatus } from "../../src/api.ts";
 import { addDays } from "../../src/dates.ts";
 import { postCommands, useJson } from "./data.ts";
-import { goalTypes, subGoalBatch, workItemBatch, workItemStatusBatch, type SubGoalRow } from "./model/commands.ts";
+import type { Done } from "./GoalPanels.tsx";
+import { goalTypes, savedStatus, subGoalBatch, workItemBatch, workItemStatusBatch, type SubGoalRow } from "./model/commands.ts";
 import { humans } from "./model/goalpage.ts";
 import { dateLabel } from "./model/labels.ts";
 
@@ -11,14 +12,14 @@ import { dateLabel } from "./model/labels.ts";
 type Result = { saving: boolean; violations: ApiViolation[]; message?: string };
 
 /** Post a batch. A 200 calls onSaved; a refusal keeps the typed values and names what broke. */
-function usePost(onSaved: () => void): [Result, (batch: CommandsRequest) => Promise<void>] {
+function usePost(onSaved: (answer: CommandsResponse) => void): [Result, (batch: CommandsRequest) => Promise<void>] {
   const [result, setResult] = useState<Result>({ saving: false, violations: [] });
   const post = async (batch: CommandsRequest) => {
     setResult({ saving: true, violations: [] });
     const { body } = await postCommands(batch);
     if (body.ok) {
       setResult({ saving: false, violations: [] });
-      onSaved();
+      onSaved(body);
     } else if (body.error === "invalid") setResult({ saving: false, violations: body.violations });
     else setResult({ saving: false, violations: [], message: body.error === "stale" ? "Someone saved this after you opened it." : body.message });
   };
@@ -42,7 +43,7 @@ const people = (data: GoalPageResponse): ApiActor[] => humans(data.actors);
  * G20: one add row at the top of the sub-goals. Its date starts as this goal's (D2), written out.
  * Its own Ambition or Fantasy date opens its own Promotion Milestone, as on the New goal form (N6).
  */
-export function AddSubGoal({ data, onDone }: { data: GoalPageResponse; onDone: (saved: boolean) => void }) {
+export function AddSubGoal({ data, onDone }: { data: GoalPageResponse; onDone: Done }) {
   const [options] = useJson<FormOptions>("/api/options");
   const { goal, today } = data;
   const [summary, setSummary] = useState("");
@@ -50,7 +51,7 @@ export function AddSubGoal({ data, onDone }: { data: GoalPageResponse; onDone: (
   const [own, setOwn] = useState(false);
   const [date, setDate] = useState({ due_date: goal.due_date ?? today, date_type: (goal.date_type ?? "Committed") as "Committed" | "Ambition" | "Fantasy" });
   const [ms, setMs] = useState({ summary: "", due_date: addDays(today, 14), owner: goal.owner });
-  const [result, post] = usePost(() => onDone(true));
+  const [result, post] = usePost((b) => onDone(true, savedStatus("subgoal", b)));
   const parentDate = data.dates.find((d) => d.kind !== "Promotion Milestone") ?? data.dates[0];
   const uncommitted = own && date.date_type !== "Committed";
   const row: SubGoalRow = { summary, owner, ...(own ? { date } : {}), ...(uncommitted ? { milestone: { ...ms, summary: ms.summary || `Commit a date for ${summary}` } } : {}) };
@@ -127,12 +128,12 @@ export function AddSubGoal({ data, onDone }: { data: GoalPageResponse; onDone: (
 }
 
 /** G22: one add row for a work item. The owner may be a human or an agent. It starts In Progress; its reason is "Filed". */
-export function AddWorkItem({ data, statuses, onDone }: { data: GoalPageResponse; statuses: WorkItemStatus[]; onDone: (saved: boolean) => void }) {
+export function AddWorkItem({ data, statuses, onDone }: { data: GoalPageResponse; statuses: WorkItemStatus[]; onDone: Done }) {
   const [title, setTitle] = useState("");
   const [owner, setOwner] = useState(data.me.id);
   const [status, setStatus] = useState<WorkItemStatus>("In Progress");
   const [due, setDue] = useState("");
-  const [result, post] = usePost(() => onDone(true));
+  const [result, post] = usePost((b) => onDone(true, savedStatus("workitem", b)));
   return (
     <section className="panel addrow" aria-label="Work item">
       <div className="addgrid four">
@@ -184,32 +185,41 @@ export function AddWorkItem({ data, statuses, onDone }: { data: GoalPageResponse
  * Enter saves; Escape undoes the tick.
  */
 export function useTick(onSaved: () => void) {
-  const [ticked, setTicked] = useState<ApiWorkItem | null>(null);
+  // The item being moved and the status it moves to; the tick moves it to Completed (G24), the picker to any status (QA U6).
+  const [moving, setMoving] = useState<{ item: ApiWorkItem; status: WorkItemStatus } | null>(null);
   const [reason, setReason] = useState("");
   const [result, post] = usePost(() => {
-    setTicked(null);
+    setMoving(null);
     setReason("");
     onSaved();
   });
+  const save = () => moving && post(workItemStatusBatch(moving.item, moving.status, reason));
   const box = (item: ApiWorkItem) =>
-    ticked?.id === item.id ? (
+    moving?.item.id === item.id ? (
       <div className="tickreason">
         <input
           value={reason}
-          placeholder="Reason"
+          placeholder={`Reason for ${moving.status}`}
           aria-label="Reason"
           autoFocus
           onChange={(e) => setReason(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") post(workItemStatusBatch(item, "Completed", reason));
-            if (e.key === "Escape") setTicked(null);
+            if (e.key === "Enter") save();
+            if (e.key === "Escape") setMoving(null);
           }}
         />
-        <button type="button" className="btn primary" disabled={result.saving} onClick={() => post(workItemStatusBatch(item, "Completed", reason))}>
+        <button type="button" className="btn primary" disabled={result.saving} onClick={save}>
           Save
         </button>
         <Errors result={result} />
       </div>
     ) : null;
-  return { ticked, tick: (item: ApiWorkItem) => setTicked(ticked?.id === item.id ? null : item), box };
+  const ticked = moving?.status === "Completed" ? moving.item : null;
+  return {
+    ticked,
+    tick: (item: ApiWorkItem) => setMoving(ticked?.id === item.id ? null : { item, status: "Completed" }),
+    move: (item: ApiWorkItem, status: WorkItemStatus) => setMoving(status === item.status ? null : { item, status }),
+    chosen: (item: ApiWorkItem) => (moving?.item.id === item.id ? moving.status : item.status),
+    box,
+  };
 }
