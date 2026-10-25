@@ -321,6 +321,14 @@ class WritePathTests(unittest.TestCase):
         self.assertEqual(result["violations"][-1]["field"], "state")
         self.ok(update("goal", "GOAL-58", 1, {"state": "Completed Late", "health": None}, "Done"))
 
+    def test_a_close_clears_health_and_the_history_keeps_it(self) -> None:
+        # D3, Codebase QA P4: health is kept while In Progress (SPEC.md §6.1). A close that leaves it out clears it, through the API too.
+        self.ok(create("goal", "GOAL-58", committed_milestone(due_date="2026-10-01"), "Planned"))
+        result = self.ok(update("goal", "GOAL-58", 1, {"state": "Completed Late"}, "Done"))
+        self.assertIsNone(result["entity"]["health"])
+        health = next(e for e in result["events"] if e["field"] == "health")
+        self.assertEqual((health["old"], health["new"]), ("GREEN", None))
+
     def test_a_sub_goal_closes_on_time_against_its_parents_date(self) -> None:
         # Head of Engineering: the rule and the goal page each had a copy, and they differed for a sub-goal with its parent's date.
         self.ok(create("goal", "GOAL-58", committed_milestone(type="Milestone (Launch)", due_date="2026-10-01"), "Planned"))
@@ -550,6 +558,19 @@ class PermissionTests(unittest.TestCase):
         self.refused(JANE, update("actor", JANE, 1, {"subject": "sub-other"}), "owner-writes-actors")
         self.refused(JANE, update("org_unit", "company", 1, {"name": "Renamed"}), "owner-writes-actors")
         self.assertEqual(self.store.read("actor", "tig")["subject"], "sub-tig")
+
+    def test_one_subject_or_app_id_maps_to_one_actor(self) -> None:
+        # ADR 0005: one subject maps to one actor. Codebase QA P6: the refusal is a rule in words, not SQLite text.
+        for command, field in [
+            (update("actor", JANE, 1, {"subject": "sub-tig"}), "subject"),
+            (create("actor", "bot2", {"kind": "agent", "display_name": "Bot 2", "operator": "tig", "app_id": "app-bot"}), "app_id"),
+        ]:
+            result = self.store.write("tig", command)
+            self.assertFalse(result["ok"], result)
+            violation = next(v for v in result.get("violations", []) if v["rule"] == "one-actor-per-sign-in")
+            self.assertEqual(violation["field"], field)
+            self.assertNotIn("UNIQUE", violation["message"])
+        self.assertEqual(self.store.read("actor", JANE)["subject"], "sub-jane")
 
     def test_the_goalie_owner_writes_actors_and_org_units(self) -> None:
         self.assertTrue(self.store.write("tig", update("actor", JANE, 1, {"subject": "sub-jane-2"}))["ok"])

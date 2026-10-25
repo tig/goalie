@@ -2,25 +2,12 @@
   "about": [
     "The Excaliwire seed: the org unit, Tig and Chelsea, and the goal tree on tig/goalie#47.",
     "node src/cli.ts seed loads it through the write path, in one transaction. Each write is made as its `as` actor.",
-    "Chelsea runs the load. Tig writes the owner settings and the org unit, because only the GOALIE owner may (ADR 0011).",
+    "Chelsea runs the load. Tig writes the actors, the owner settings, and the org unit, because only the GOALIE owner may (ADR 0005, ADR 0011). Tig is the first actor, so he adds himself.",
     "Values marked Placeholder are not in #47. The pull request for #48 lists them for Tig."
   ],
   "writes": [
     {
-      "as": "chelsea",
-      "command": {
-        "op": "create",
-        "kind": "actor",
-        "id": "chelsea",
-        "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)",
-        "fields": {
-          "kind": "human",
-          "display_name": "Chelsea"
-        }
-      }
-    },
-    {
-      "as": "chelsea",
+      "as": "tig",
       "command": {
         "op": "create",
         "kind": "actor",
@@ -45,6 +32,19 @@
             "goal_key_prefix": "XW",
             "work_items": true
           }
+        }
+      }
+    },
+    {
+      "as": "tig",
+      "command": {
+        "op": "create",
+        "kind": "actor",
+        "id": "chelsea",
+        "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)",
+        "fields": {
+          "kind": "human",
+          "display_name": "Chelsea"
         }
       }
     },
