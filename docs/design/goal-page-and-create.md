@@ -177,6 +177,7 @@ Written on 2026-10-25 from Chelsea's note: the goal page with work items feels b
 
 ### Frame
 
+- **GP2-0. Health words.** On this page, and on every board from 2026-10-25, health reads "On track", "At risk", "Off track" with its shape (Chelsea; GREEN, YELLOW, RED in SPEC.md). The Health control's three parts, the Family health marks' names, panel titles ("At risk needs a Path to Green"), and Activity rows ("Health: On track → At risk") use them.
 - **GP2-1. Breadcrumb.** Above both columns, one line names where the goal sits: its Priority, then each goal above it, then this goal, each a link, joined by "›". A middle step that does not fit is cut to its first words with an ellipsis, and its tooltip holds the whole summary; the Priority and this goal are never cut. A goal with no Priority starts the line at its top goal. It replaces "‹ Priorities" and the "Parent" link (G1). The browser's Back still returns to the view with its filter and window (rule 5b).
 - **GP2-2. Two columns at 1100 px and wider:** main on the left (1fr, at most 760 px) and properties on the right (300 px). The properties column stays on screen while the main column scrolls (`position: sticky`, under the top bar), and scrolls inside itself when taller than the screen. Under 1100 px it is one column (GP2-14).
 
