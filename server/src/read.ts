@@ -83,22 +83,46 @@ export function readAll(db: DatabaseSync, kind: Kind): Row[] {
   return (db.prepare(`SELECT * FROM ${kind} ORDER BY id`).all() as Row[]).map((row) => decode(kind, row) as Row);
 }
 
-/** Read Events with a sequence greater than `after`, in sequence order. */
 /** The one Event decoder: old and new are stored as JSON. */
 function decodeEvent(row: Row): EventRow {
   return { ...row, old: row.old == null ? null : JSON.parse(row.old as string), new: row.new == null ? null : JSON.parse(row.new as string) } as EventRow;
 }
 
+/** Read Events with a sequence greater than `after`, in sequence order. */
 export function readEvents(db: DatabaseSync, after = 0): EventRow[] {
   return (db.prepare("SELECT * FROM event WHERE sequence > ? ORDER BY sequence").all(after) as Row[]).map(decodeEvent);
 }
 
-/** The Events of the named entities, newest first, through the event_by_entity index. */
-export function readEntityEvents(db: DatabaseSync, refs: { kind: Kind; ids: string[] }[]): EventRow[] {
-  const rows = refs.flatMap(({ kind, ids }) =>
-    ids.length === 0 ? [] : (db.prepare("SELECT * FROM event WHERE entity_kind = ? AND entity IN (SELECT value FROM json_each(?))").all(kind, JSON.stringify(ids)) as Row[]),
-  );
-  return rows.sort((a, b) => (b.sequence as number) - (a.sequence as number)).map(decodeEvent);
+/** The entities whose Events make one history: a kind and its keys. */
+export type EntityRefs = { kind: Kind; ids: string[] }[];
+
+/** One SELECT per kind through the event_by_entity index, joined, for Events older than `before`. */
+function entityEvents(refs: EntityRefs, columns: string, before: number): { sql: string; params: SQLInputValue[] } {
+  const parts = refs.filter((r) => r.ids.length > 0);
+  const one = `SELECT ${columns} FROM event WHERE entity_kind = ? AND entity IN (SELECT value FROM json_each(?)) AND sequence < ?`;
+  return { sql: parts.length === 0 ? `SELECT ${columns} FROM event WHERE 0` : parts.map(() => one).join(" UNION ALL "), params: parts.flatMap((r) => [r.kind, JSON.stringify(r.ids), before]) };
+}
+
+/** The Events of the named entities, newest first: all of them, or `limit` of them older than `before` (D1). */
+export function readEntityEvents(db: DatabaseSync, refs: EntityRefs, page: { before: number; limit: number } = { before: Number.MAX_SAFE_INTEGER, limit: -1 }): EventRow[] {
+  const { sql, params } = entityEvents(refs, "*", page.before);
+  return (db.prepare(`${sql} ORDER BY sequence DESC LIMIT ?`).all(...params, page.limit) as Row[]).map(decodeEvent);
+}
+
+/** How many Events the named entities have, and how many of them are comments. */
+export function countEntityEvents(db: DatabaseSync, refs: EntityRefs): { events: number; comments: number } {
+  const { sql, params } = entityEvents(refs, "field", Number.MAX_SAFE_INTEGER);
+  const row = db.prepare(`SELECT COUNT(*) AS events, COALESCE(SUM(field = 'comment'), 0) AS comments FROM (${sql})`).get(...params) as Row;
+  return { events: row.events as number, comments: row.comments as number };
+}
+
+/** Every goal that is or was this goal's Promotion Milestone, from its promotion_milestone Events and its row (N6a). */
+export function milestonesOf(db: DatabaseSync, goal: Row): string[] {
+  const rows = (db.prepare("SELECT old, new FROM event WHERE entity_kind = 'goal' AND entity = ? AND field = 'promotion_milestone'").all(goal.id as string) as Row[]).map(decodeEvent);
+  const milestones = new Set<string>(typeof goal.promotion_milestone === "string" ? [goal.promotion_milestone] : []);
+  for (const e of rows) for (const v of [e.old, e.new]) if (typeof v === "string") milestones.add(v);
+  milestones.delete(goal.id as string);
+  return [...milestones];
 }
 
 /** Read the actor a verified token names. A human maps by subject, an agent by application id (ADR 0005). */
