@@ -150,6 +150,59 @@ Shown only when the owner setting `work_items` is on (D7).
 - Description, then Fields (one column), then sub-goal cards full width, then work items (each row two lines: title, then owner, status, and date), then the tabs.
 - Panels open full width in place. A table of PTG steps becomes one card per step.
 
+## Screen 1b: the goal page, main column and properties (v2)
+
+Written on 2026-10-25 from Chelsea's note: the goal page with work items feels badly organized; borrow from Linear's issue page; show how goals relate. It changes the layout of Screen 1. The behaviors of G3a to G26 (Needs you, health and PTG, the four action panels, Saved, who may change it, sub-goals, work items, comments, history) stay; only where they sit changes. Relations are the ones the date model has: the Priority, the parent and sub-goals, and the Promotion Milestone. There are no dependency links.
+
+```
+| Priority 3 Run Excaliwire on GOALIE › Tig, Chelsea… › Run the MLP prototype › Open a goal…  |
+| ┌ MAIN (1fr, at most 760) ──────────────────────────┐ ┌ PROPERTIES (300, sticky) ─────────┐ |
+| │ XW-0007                                           │ │ Health    ● GREEN|▲ YELLOW|■ RED │ |
+| │ Open a goal and keep it true            (26 px)   │ │ Judged on Nov 6, 2026 Committed  │ |
+| │ ! Needs you: 1 work item past its date            │ │   [=====|----------]  ◆ backed by│ |
+| │ [ action panel opens here: PTG, Slip, Promote… ]  │ │ State     Backlog   Pursue        │ |
+| │ Description ✎                                     │ │ Owner     (C) Chelsea             │ |
+| │ Path to Green (when YELLOW or RED)                │ │ Priority  3 Run Excaliwire…       │ |
+| │ Sub-goals 0                     + Add sub-goal    │ │ Plan      issues/50 · Pencil      │ |
+| │ Work items 33     In Progress 2 · Backlog 2 · …   │ │ Record a slip · Close goal        │ |
+| │  ○ Review the goal page build    (C) Oct 29       │ │ ─ Family ───────────────────────  │ |
+| │  + Add work item                                  │ │ Priority 3 Run Excaliwire…        │ |
+| │ Activity   All · Comments · Changes               │ │  └ Tig, Chelsea, and agents…      │ |
+| │  [Comment …]                                      │ │     └ Run the MLP prototype       │ |
+| │  Chelsea · Oct 24 · Created …                     │ │        ├ ● Open a goal… (this)    │ |
+| └───────────────────────────────────────────────────┘ │        └ 6 more sub-goals         │ |
+|                                                       │ ─ More properties ▸ ────────────  │ |
+|                                                       └──────────────────────────────────┘ |
+```
+
+### Frame
+
+- **GP2-1. Breadcrumb.** Above both columns, one line names where the goal sits: its Priority, then each goal above it, then this goal, each a link, joined by "›". A middle step that does not fit is cut to its first words with an ellipsis, and its tooltip holds the whole summary; the Priority and this goal are never cut. A goal with no Priority starts the line at its top goal. It replaces "‹ Priorities" and the "Parent" link (G1). The browser's Back still returns to the view with its filter and window (rule 5b).
+- **GP2-2. Two columns at 1100 px and wider:** main on the left (1fr, at most 760 px) and properties on the right (300 px). The properties column stays on screen while the main column scrolls (`position: sticky`, under the top bar), and scrolls inside itself when taller than the screen. Under 1100 px it is one column (GP2-14).
+
+### Main column: what the goal is and the work under it
+
+In this order, each a section with a 15 px heading, separated by space, not cards (one card per page reads as a document; sections read as one page).
+- **GP2-3. Header:** the key (muted, 13 px), the summary as the title (26 px, 800, up to three lines), then the "Needs you" line (G3a), which names the owner's next action and anything late or waiting, each a link to it (the walks found it in 0 of 4 pages), then the read-only line (G25) for a viewer who may not change the goal.
+- **GP2-4. Action panel slot:** Pursue, Record a slip, Promote date, Close goal, and a health change open their panel here, at the top of the main column, under the title, one at a time (G9, G13 to G16). The sidebar is too narrow for them, and the top of the main column is where the eye already is.
+- **GP2-5. Description**, plain text with its pencil; the hints for its missing parts under it, for owners only (G18, G25), in plain muted text that does not look like a link.
+- **GP2-6. Path to Green**, only when the goal is YELLOW or RED: its steps, criteria, and trigger, with its pencil (G12).
+- **GP2-7. Sub-goals**, with their count: the Home tree's rows (health mark, title, date only when it differs, else "This goal's date · shares XW-nnnn", owner, progress of their work items) and, as the last row, "+ Add sub-goal" which opens the add row in place. With none, the section is the one "+ Add sub-goal" row; no empty heading floats alone.
+- **GP2-8. Work items**, with their count and, beside the heading, the counts by status as small filter chips ("In Progress 2 · Backlog 2 · Completed 29"); the open statuses show, and Completed opens from its chip. Rows are compact, 36 px: a status circle (empty Backlog, half In Progress, checked Completed; it opens the status picker with its reason, U6), the title, the owner's avatar (agent ring), and the date ("late" past due). No cards around groups. The last row is "+ Add work item". A row's title opens it in place under the row (G24).
+- **GP2-9. Activity**, last: one stream of comments and changes, newest first, with chips All, Comments, Changes. The comment box sits at the top of the stream. A save is one row (GP7). Values read in words, never raw: names not ids ("Priority 2 Grow the XW team", "Excaliwire"), dates as "Dec 15, 2026", and a Path to Green change shows what changed in it ("Step 1 date Nov 6 → Nov 13"), never "1 step → 1 step" (the walks: people opened History to answer who changed health and why, and read 20+ rows). It replaces the Comments and History tabs.
+
+### Properties column: what the goal is set to, and how it relates
+
+A list of rows, each a 12 px muted label on the left and its value on the right. For an owner a value is a control: a click edits it in place in the sidebar, with one reason line and Save, when it is one field (Owner, Priority, Plan, Plan Maturity, and every row under More properties). A change that needs more than one field opens its panel in the main column (GP2-4).
+- **GP2-10. Status rows, first:** Health (the three-part control, or the shape and word for a viewer who may not change it); "Judged on", the date health is judged on with its Date Type, and the small date bar under it, every mark labelled with its date; the goal's own date when it differs, lighter; then State with its next action as a text button beside it (Pursue, or Close goal). Record a slip and Promote date sit as text buttons under the date rows when they apply (G7).
+- **GP2-11. People and place:** Owner (avatar and name, written, not only a tooltip), Priority (rank and title, a link), Plan (a link) with its Plan Maturity. These sit high because Tig looks for Plan and Plan Maturity, the Committed gate, first; Type, Severity, Origination, and Visibility read as noise to Galahad and go under More properties.
+- **GP2-12. Family:** a small tree of where this goal sits, drawn like the Home tree at 13 px: the Priority, each goal above, this goal (bold, with a 3 px bar of its health color), and this goal's sub-goals (or their count). The parent's other sub-goals show as one line, "N more sub-goals", which opens them. The Promotion Milestone shows on the Judged on row, not in the tree: "◆ backed by XW-0004 Run the MLP prototype…", a link, with its own health mark. A goal that is another goal's Promotion Milestone says so under Family: "◆ backs XW-0003 Tig, Chelsea…". Nothing else is drawn as a relation.
+- **GP2-13. More properties**, folded, closed by default, showing three values when closed: Type, Level, Org unit, Severity, Origination, Visibility, Work Product, Original Committed Date, Changed due date. Open, each is a row like the ones above.
+
+### Narrow and phone
+
+- **GP2-14. Under 1100 px and on a phone, one column:** breadcrumb (on a phone only the last goal above, as "‹ <summary>"), header, then a compact properties block (Health as a full-width 44 px control, Judged on with the date bar, State with its action, Owner, Priority), then "All properties" which opens the rest including Family, then the main sections in the GP2 order. Action panels open under the header. Every control is at least 44 px tall on touch.
+
 ## Screen 2: New goal (foundation first)
 
 Rewritten on 2026-10-24 from the usability test ([docs/research/new-goal-usability.md](../research/new-goal-usability.md)) and the product spec's N-F1 to N-F4. It replaces N1 to N16. N6a (a made milestone starts with its goal's State and health), N13 (leave guard), and N15a (phone layout under 960 px) stay.
