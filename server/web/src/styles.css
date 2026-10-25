@@ -128,7 +128,7 @@ h1{font-size:26px;font-weight:800;margin:0 0 20px}
 .fade.after{right:0;background:linear-gradient(to left,var(--card),transparent)}
 .more-before>.fade.before,.more-after>.fade.after{opacity:1}
 .tl{position:relative;width:calc(var(--left) + var(--gap) + var(--weeks) * var(--week))}
-.tlbody>.cut{background:var(--card)}
+.tlbody>.cut{background:var(--card);z-index:2}
 .row.note{min-height:40px}.row.note .lane{background:none}.row.note .title{font-weight:500;font-size:13px}
 .row>.left,.axis>.corner{position:sticky;left:0;z-index:7;background:var(--card);padding-right:var(--gap);box-shadow:10px 0 10px -10px var(--tip-shadow)}
 .axis{display:grid;grid-template-columns:calc(var(--left) + var(--gap)) calc(var(--weeks) * var(--week));height:52px}
@@ -161,8 +161,7 @@ h1{font-size:26px;font-weight:800;margin:0 0 20px}
 .chev.open svg{transform:rotate(180deg)}
 .row.parent:hover .chev{background:var(--grid);color:var(--ink)}
 .lane{position:relative;height:100%;min-height:40px;
-background-image:linear-gradient(var(--today),var(--today)),repeating-linear-gradient(to right,var(--grid) 0 1px,transparent 1px var(--week));
-background-size:2px 100%,100% 100%;background-repeat:no-repeat;background-position:calc(var(--weeks) * var(--week) * var(--now) / 100 - 1px) 0,0 0}
+background-image:repeating-linear-gradient(to right,var(--grid) 0 1px,transparent 1px var(--week))}
 .seg{position:absolute;top:50%;height:20px;margin-top:-10px;z-index:2}
 .d1 .seg,.d2 .seg{height:12px;margin-top:-6px}
 .seg.first{border-radius:999px 0 0 999px}.seg.last{border-radius:0 999px 999px 0}.seg.first.last{border-radius:999px}
@@ -678,3 +677,17 @@ select.wstatus{height:28px;border:1px solid var(--cut);border-radius:8px;backgro
 .phone .topnewword{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 @media (pointer:coarse){.dhead{min-height:44px}.btn.create{min-height:48px}}
 @media (pointer:coarse){.phonesum .counts{gap:0}.phonesum .count{min-height:44px}}
+.goal>.row{cursor:pointer}.goal>.row:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+/* Rule 20: one today line from the axis to the bottom of the last row, through the cut line, in front of the grid, rows, highlight, and bars;
+   label text (z 4, on its halo) and the pinned goal column (z 7) stay in front of it. */
+.nowline{position:absolute;top:52px;bottom:0;width:2px;left:calc(var(--left) + var(--gap) + var(--weeks) * var(--week) * var(--now) / 100 - 1px);background:var(--today);z-index:3;pointer-events:none}
+.ticklbl,.endlbl,.edge{z-index:4}
+/* Rule 21a: days, a line each day, weekends in --sub-bg. The board starts on a Monday. */
+.z-days .lane{background-image:repeating-linear-gradient(to right,var(--grid) 0 1px,transparent 1px calc(var(--week) / 7)),repeating-linear-gradient(to right,transparent 0 calc(var(--week) * 5 / 7),var(--sub-bg) calc(var(--week) * 5 / 7) var(--week))}
+.z-days .wk{font-size:11px;margin-left:3px}
+/* Rule 23c: an edge list, one label per line, 2 px apart, from the top of the row. */
+.edge.list{top:4px;bottom:auto;display:flex;flex-direction:column;gap:2px;line-height:14px;font-weight:700}
+.edge.list.after{align-items:flex-end}
+.edge.list>.eline{position:static;font-size:inherit}
+.edge.list>.endlbl{font-weight:600}
+.edgespace{display:block;width:1px}

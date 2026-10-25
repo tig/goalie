@@ -3,7 +3,7 @@ import type { ActorRef, Health } from "../../src/api.ts";
 import { isLit, type GoalRow, type PriorityRow } from "./model/filter.ts";
 import { dateLabel, listDates, slipLabel } from "./model/labels.ts";
 import { goalPath } from "./model/route.ts";
-import { Link } from "./router.tsx";
+import { Link, navigate } from "./router.tsx";
 import { Avatar, CHEVRON, HealthDot, look, Rank } from "./parts.tsx";
 
 /** The x of the health dot's center at a level: the rank column, the gap, the indent, half the dot. The sizes are CSS variables on .board. */
@@ -90,12 +90,18 @@ export function GoalTree(props: TreeProps) {
           className={`row d${Math.min(g.depth, 2)}${g.match ? "" : " ctx"}${lit ? " lit" : ""}${kids ? " parent" : ""}`}
           data-health={g.health ?? ""}
           style={{ "--depth": g.depth, "--hc": look(g.health).bar } as CSSProperties}
+          // Rule 19: a press anywhere on the row opens the goal, except on the count chip and the controls in it; the end of a pan is swallowed before it gets here (rule 20d).
+          role="link"
+          tabIndex={0}
+          aria-label={g.summary}
+          onClick={(e) => !(e.target as Element).closest("button, a, input, select") && navigate(goalPath(g.id))}
+          onKeyDown={(e) => e.key === "Enter" && e.target === e.currentTarget && navigate(goalPath(g.id))}
         >
           <div className={`left${guide}`} style={passing}>
             <Rank rank={rank} />
             {props.mark !== false && <HealthDot health={g.health} />}
             {/* The title opens the goal page. The count chip alone opens and closes the tree (rule 19). */}
-            <Link to={goalPath(g.id)} className="title">
+            <Link to={goalPath(g.id)} className="title" tabIndex={-1}>
               <span className="clamp">{g.summary}</span>
             </Link>
             <span className="slot">

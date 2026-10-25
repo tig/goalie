@@ -35,23 +35,28 @@ function SideLabel({ cls, at, side, color, children }: { cls: string; at: number
 
 type Labeled = LaneMark & { cls: string; color?: string };
 
-/** One label at an edge of the screen for every mark past it, in date order, with an arrow (rule 23). */
-function EdgeLabel({ side, band, marks, view }: { side: "before" | "after"; band: "above" | "below"; marks: Labeled[]; view: View }) {
+/**
+ * Rule 23c: one goal's labels at one edge are one block, a tight list: one per line, 2 px apart, in date order, each with its arrow,
+ * from the top of the row (Chelsea, 2026-10-25). The bands of rule 23 do not apply at the edge.
+ */
+function EdgeList({ side, marks, view }: { side: "before" | "after"; marks: Labeled[]; view: View }) {
   if (!marks.length) return null;
-  const parts = marks.map((m, i) => (
-    <span key={m.key} className={m.cls} style={{ color: m.color }}>
-      {i > 0 && " · "}
-      {m.text}
-    </span>
-  ));
   return (
-    <span className={`edge ${side} ${band}`} style={{ left: side === "before" ? view.left + EDGE_INSET : view.right - EDGE_INSET }}>
-      {side === "before" && "← "}
-      {parts}
-      {side === "after" && " →"}
+    <span className={`edge list ${side}`} style={{ left: side === "before" ? view.left + EDGE_INSET : view.right - EDGE_INSET }}>
+      {marks.map((m) => (
+        <span key={m.key} className={`${m.cls} eline`} style={{ color: m.color }}>
+          {side === "before" && "← "}
+          {m.text}
+          {side === "after" && " →"}
+        </span>
+      ))}
     </span>
   );
 }
+
+/** The row grows to fit its longest edge list. */
+const EDGE_LINE = 14;
+const EDGE_GAP = 2;
 
 function LaneMarks({ lane, goal, today, view, board }: { lane: Lane; goal: GoalRow; today: string; view: View; board: number }) {
   const l = look(goal.health);
@@ -75,7 +80,7 @@ function LaneMarks({ lane, goal, today, view, board }: { lane: Lane; goal: GoalR
     labeled.push({ key: "end", atPx: (lane.end.at / 100) * board, text: dateLabel(lane.end.date, today), outside: lane.end.outside, band: "below", cls: `endlbl ${lane.end.date.kind}` });
   }
   const placed = placeLaneLabels(labeled, view);
-  const byKey = (keys: string[], band: "above" | "below") => labeled.filter((m) => keys.includes(m.key) && m.band === band);
+  const inOrder = (keys: string[]) => keys.map((k) => labeled.find((m) => m.key === k)).filter((m) => m !== undefined);
   for (const { key, side } of placed.inside) {
     const m = labeled.find((x) => x.key === key) as Labeled;
     parts.push(
@@ -84,10 +89,10 @@ function LaneMarks({ lane, goal, today, view, board }: { lane: Lane; goal: GoalR
       </SideLabel>,
     );
   }
-  for (const band of ["above", "below"] as const) {
-    parts.push(<EdgeLabel key={`eb-${band}`} side="before" band={band} marks={byKey(placed.before, band)} view={view} />);
-    parts.push(<EdgeLabel key={`ea-${band}`} side="after" band={band} marks={byKey(placed.after, band)} view={view} />);
-  }
+  parts.push(<EdgeList key="eb" side="before" marks={inOrder(placed.before)} view={view} />);
+  parts.push(<EdgeList key="ea" side="after" marks={inOrder(placed.after)} view={view} />);
+  const lines = Math.max(placed.before.length, placed.after.length);
+  if (lines > 1) parts.push(<span key="space" className="edgespace" style={{ height: lines * EDGE_LINE + (lines - 1) * EDGE_GAP + 8 }} aria-hidden="true" />);
   return <>{parts}</>;
 }
 
@@ -225,6 +230,8 @@ export function TimelineView({ window: w, home, onRange, ...tree }: Props) {
       <div className={`tlwrap${edges.before ? " more-before" : ""}${edges.after ? " more-after" : ""}`}>
         <div className={`scroll${dragging ? " dragging" : ""}`} ref={scroller} tabIndex={0} aria-label="Timeline">
           <div className={`tl z-${w.zoom}`} style={style}>
+            {/* Rule 20: the today line is one line in front of every row, like a playhead. It never takes a press. */}
+            <span className="nowline" aria-hidden="true" />
             <div className="axis">
               {/* The goal column's titles, on the line of the week labels (rule 25d). */}
               <div className="corner colhead">
