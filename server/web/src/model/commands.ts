@@ -210,9 +210,9 @@ export function createBatch(form: NewGoalForm, check = false): CommandsRequest {
     },
     reason,
   });
-  if (uncommitted) commands.push({ op: "update", kind: "goal", id: "$m", base_version: 1, fields: { parent: "$goal" }, reason });
-  // N6a: the milestone is pursued with this goal's health. It moves after it joins the goal, so its version is the same in a check and a save.
-  if (uncommitted && form.health) commands.push({ op: "update", kind: "goal", id: "$m", base_version: 2, fields: pursued(form.health, form.path_to_green), reason });
+  // The milestone joins this goal and, with a health, is pursued with it (N6a), in one update: a check that skips it
+  // (because this goal's create was refused) leaves no later command on a version it never reached (QA N4: that answered stale and hid every refusal).
+  if (uncommitted) commands.push({ op: "update", kind: "goal", id: "$m", base_version: 1, fields: { parent: "$goal", ...(form.health ? pursued(form.health, form.path_to_green) : {}) }, reason });
   for (const s of own) {
     const ref = `$s${s.i + 1}` as `$${string}`;
     commands.push({

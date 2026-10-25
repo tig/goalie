@@ -613,18 +613,18 @@ class CommandTests(unittest.TestCase):
         b = run(f"return commands.createBatch({json.dumps(self.FORM)});")
         steps = [(c["op"], c["kind"], c.get("ref") or c.get("id")) for c in b["commands"]]  # type: ignore[index]
         self.assertEqual(steps, [
-            ("create", "goal", "$m"), ("create", "goal", "$m1"), ("create", "goal", "$goal"), ("update", "goal", "$m"), ("update", "goal", "$m"),
+            ("create", "goal", "$m"), ("create", "goal", "$m1"), ("create", "goal", "$goal"), ("update", "goal", "$m"),
             ("create", "goal", "$s1"), ("create", "goal", "$s2"), ("update", "goal", "$m1"), ("create", "work_item", None),
         ])
 
     def test_a_new_promotion_milestone_is_pursued_with_the_goals_health(self) -> None:
         c = run(f"return commands.createBatch({json.dumps(self.FORM)}).commands;")
         self.assertEqual(c[0]["fields"]["state"], "Backlog")  # type: ignore[index]
-        self.assertEqual((c[4]["base_version"], c[4]["fields"]), (2, {"state": "In Progress", "health": "GREEN"}))  # type: ignore[index]
+        self.assertEqual((c[3]["base_version"], c[3]["fields"]), (1, {"parent": "$goal", "state": "In Progress", "health": "GREEN"}))  # type: ignore[index]
 
     def test_each_create_names_its_refs(self) -> None:
         c = run(f"return commands.createBatch({json.dumps(self.FORM)}).commands;")
-        goal, s1, s2, wi = c[2], c[5], c[6], c[8]  # type: ignore[index]
+        goal, s1, s2, wi = c[2], c[4], c[5], c[7]  # type: ignore[index]
         self.assertEqual((goal["fields"]["promotion_milestone"], goal["fields"]["priority"], goal["fields"]["date_type"]), ("$m", "PRI-3", "Fantasy"))
         self.assertNotIn("due_date", s1["fields"])
         self.assertEqual((s1["fields"]["parent"], s2["fields"]["promotion_milestone"]), ("$goal", "$m1"))
@@ -638,7 +638,7 @@ class CommandTests(unittest.TestCase):
 
     def test_a_refusal_points_back_to_its_part_of_the_form(self) -> None:
         places = run(f"const b = commands.createBatch({json.dumps(self.FORM)}); return b.commands.map((_, i) => commands.commandPlace(b, i));")
-        self.assertEqual(places, ["milestone", "sub:1", "goal", "milestone", "milestone", "sub:0", "sub:1", "sub:1", "workitem:0"])
+        self.assertEqual(places, ["milestone", "sub:1", "goal", "milestone", "sub:0", "sub:1", "sub:1", "workitem:0"])
 
     def test_a_new_goal_under_a_parent_names_it(self) -> None:
         form = {**self.FORM, "parent": "XW-0003", "subGoals": [], "workItems": []}

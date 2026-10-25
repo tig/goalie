@@ -456,13 +456,16 @@ function WorkItems({ items, data, adding, onAdd, onDone, reload, status }: { ite
           {!closed[g.status] &&
             g.items.map((i) => (
               <div key={i.id} className={`wrow${i.status === "Completed" ? " done" : ""}`}>
-                <input
-                  type="checkbox"
-                  checked={i.status === "Completed" || ticked?.id === i.id}
-                  disabled={i.status === "Completed"}
-                  onChange={() => tick(i)}
-                  aria-label={`Mark ${i.title} Completed`}
-                />
+                {/* The tick's label is its 44 px tap area on touch (rule 29, QA U10). */}
+                <label className="wtick">
+                  <input
+                    type="checkbox"
+                    checked={i.status === "Completed" || ticked?.id === i.id}
+                    disabled={i.status === "Completed"}
+                    onChange={() => tick(i)}
+                    aria-label={`Mark ${i.title} Completed`}
+                  />
+                </label>
                 <span className="wtitle">{i.title}</span>
                 <Owner actor={data.actors[i.owner] ?? { id: i.owner, name: i.owner, kind: "human" }} me={data.me.id} />
                 <span className="wstatus small">{i.status}</span>

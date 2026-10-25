@@ -629,8 +629,8 @@ main.newgoal{padding-bottom:84px}
 .zoom .gbtn{min-width:44px}
 .search input{min-height:44px}}
 .gstatus{margin:8px 0 0;font-size:13px;font-weight:600;color:var(--green-ink)}.gstatus:empty{margin:0}
-.wstatus{height:28px;border:1px solid var(--cut);border-radius:8px;background:var(--card);padding:0 6px}
-@media (pointer:coarse){.wstatus{min-height:44px;position:relative;z-index:2}}
+select.wstatus{height:28px;border:1px solid var(--cut);border-radius:8px;background:var(--card);padding:0 6px}
+@media (pointer:coarse){select.wstatus{min-height:44px;position:relative;z-index:2}}
 .qwho{display:inline-flex;align-items:baseline;flex-wrap:wrap}.qop{color:var(--mute);font-weight:500;font-size:14px}
 .phone .qwho{flex-direction:column;align-items:flex-start}.phone .qcomma{display:none}.phone .qop{font-size:13px}
 /* New goal v2 (NF1 to NF18). */
