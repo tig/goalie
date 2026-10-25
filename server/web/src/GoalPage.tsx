@@ -1,11 +1,11 @@
 import { useCallback, useState, type CSSProperties } from "react";
-import type { ApiActor, ApiWorkItem, GoalPageResponse, Health, SubGoalCard } from "../../src/api.ts";
+import type { ApiActor, ApiEvent, ApiWorkItem, GoalEventsResponse, GoalPageResponse, Health, SubGoalCard } from "../../src/api.ts";
 import { shortDate } from "../../src/dates.ts";
-import { postCommands, useJson } from "./data.ts";
+import { getJson, postCommands, useJson } from "./data.ts";
 import { AddSubGoal, AddWorkItem, useTick } from "./GoalAdd.tsx";
 import { ClosePanel, DescriptionPanel, FieldsPanel, HealthPanel, PromotePanel, PursuePanel, SlipPanel, type Done, type PanelName } from "./GoalPanels.tsx";
 import { commentBatch } from "./model/commands.ts";
-import { changeParts, comments, createdFields, historyNames, dateBar, labelRows, eventValue, fieldLabel, filterEvents, groupEvents, groupWorkItems, HISTORY_FILTERS, type EventGroup, type HistoryFilter, type Names } from "./model/goalpage.ts";
+import { changeParts, comments, createdFields, historyNames, joinPages, dateBar, labelRows, eventValue, fieldLabel, filterEvents, groupEvents, groupWorkItems, HISTORY_FILTERS, type EventGroup, type HistoryFilter, type Names } from "./model/goalpage.ts";
 import { dateLabel, slipLabel } from "./model/labels.ts";
 import { backPath, goalPath } from "./model/route.ts";
 import { Avatar, HealthDot } from "./parts.tsx";
@@ -570,14 +570,29 @@ function Talk({ data, reload }: { data: GoalPageResponse; reload: () => void }) 
   const [text, setText] = useState("");
   const [error, setError] = useState<string>();
   const [filter, setFilter] = useState<HistoryFilter>("All");
-  const said = comments(data.events);
-  const shown = tab === "Comments" ? said : filterEvents(data.events, filter);
+  // D1: past 1,000 Events the page holds the newest 100; "Show older" joins the next page, and its comments join the Comments tab.
+  const [older, setOlder] = useState<ApiEvent[]>([]);
+  const [cursor, setCursor] = useState(data.olderEvents);
+  const [loading, setLoading] = useState<string>();
+  const events = joinPages(data.events, older);
+  const said = comments(events);
+  const shown = tab === "Comments" ? said : filterEvents(events, filter);
+  const more = async () => {
+    if (cursor === null) return;
+    setLoading("…");
+    const page = await getJson<GoalEventsResponse>(`/api/goals/${encodeURIComponent(data.goal.id)}/events?before=${cursor}`);
+    if (page.state === "ok") {
+      setOlder((o) => joinPages(o, page.data.events));
+      setCursor(page.data.olderEvents);
+      setLoading(undefined);
+    } else setLoading(page.state === "refused" ? page.reason : "");
+  };
   return (
     <section className="gtalk">
       <span className="tabs" role="tablist">
         {(["Comments", "History"] as const).map((t) => (
           <button key={t} type="button" role="tab" aria-selected={tab === t} className={`vtab${tab === t ? " on" : ""}`} onClick={() => setTab(t)}>
-            {t} <span className="muted">{t === "Comments" ? said.length : data.events.length}</span>
+            {t} <span className="muted">{t === "Comments" ? data.commentCount : data.eventCount}</span>
           </button>
         ))}
       </span>
@@ -615,6 +630,14 @@ function Talk({ data, reload }: { data: GoalPageResponse; reload: () => void }) 
           <EventRow key={g.events[0].sequence} group={g} data={data} />
         ))}
       </ul>
+      {cursor !== null && (
+        <p className="olderrow">
+          <button type="button" className="btn" onClick={more} disabled={loading === "…"} aria-busy={loading === "…"}>
+            Show older
+          </button>
+          {loading && loading !== "…" && <span className="ferror">{loading}</span>}
+        </p>
+      )}
     </section>
   );
 }
