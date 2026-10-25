@@ -1182,6 +1182,9 @@
       "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
     }
   ],
+  "olderEvents": null,
+  "eventCount": 86,
+  "commentCount": 0,
   "needsYou": {
     "lateWorkItems": [],
     "missingPtg": false
