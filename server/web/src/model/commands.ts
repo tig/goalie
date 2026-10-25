@@ -67,8 +67,8 @@ export function promoteToCommitted(goal: StoredGoal, milestone: MetMilestone, ne
   };
 }
 
-/** Close goal (G15): the state the close records, with a reason. */
-export const closeBatch = (goal: StoredGoal, state: StoredGoal["state"], reason: string) => update(goal, { state }, reason);
+/** Close goal (G15): the state the close records, with a reason. A closed goal has no health (review D3); History keeps the last one. */
+export const closeBatch = (goal: StoredGoal, state: StoredGoal["state"], reason: string) => update(goal, { state, health: null }, reason);
 
 /** Promote and close (G15): the Promotion Milestone is completed, the Ambition goal is Committed on its own date, then closed as the server computes. */
 export function promoteAndClose(goal: StoredGoal, milestone: MetMilestone, state: StoredGoal["state"], reason: string): CommandsRequest {
@@ -76,7 +76,7 @@ export function promoteAndClose(goal: StoredGoal, milestone: MetMilestone, state
     commands: [
       ...completes(milestone, reason),
       { op: "update", kind: "goal", id: goal.id, base_version: goal.version, fields: { date_type: "Committed", promotion_milestone: null }, reason },
-      { op: "update", kind: "goal", id: goal.id, base_version: goal.version + 1, fields: { state }, reason },
+      { op: "update", kind: "goal", id: goal.id, base_version: goal.version + 1, fields: { state, health: null }, reason },
     ],
   };
 }
@@ -269,7 +269,7 @@ export function commandsAnswer(body: unknown): CommandsResponse {
   return { ok: false, at: 0, error: "bad_command", message: b?.reason ?? String(b?.error ?? "The server refused the save.") };
 }
 
-export type SavedAction = "subgoal" | "workitem" | "promote" | "promote-close" | "slip" | "close";
+type SavedAction = "subgoal" | "workitem" | "promote" | "promote-close" | "slip" | "close";
 
 /** G26: after a save that adds or moves something out of view, one line says what happened, naming the new key from the answer. */
 export function savedStatus(action: SavedAction, answer: CommandsResponse, x: { to?: string; state?: string; date?: string } = {}): string {

@@ -41,8 +41,10 @@ export function useJson<T>(url: string): [Loaded<T>, () => void] {
 export async function postCommands(batch: CommandsRequest): Promise<{ status: number; body: CommandsResponse }> {
   try {
     const reply = await fetch("/api/commands", { method: "POST", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify(batch) });
-    return { status: reply.status, body: commandsAnswer(await reply.json()) };
-  } catch (e) {
-    return { status: 0, body: { ok: false, at: 0, error: "bad_command", message: (e as Error).message } };
+    // A reply that is not JSON (a proxy's error page) reads as a refusal in plain words, not a parse error (QA N7).
+    const body = await reply.json().catch(() => ({ error: "bad_command", reason: `The server could not take the save (${reply.status}). Try again.` }));
+    return { status: reply.status, body: commandsAnswer(body) };
+  } catch {
+    return { status: 0, body: { ok: false, at: 0, error: "bad_command", message: "GOALIE could not reach the server. Try again." } };
   }
 }

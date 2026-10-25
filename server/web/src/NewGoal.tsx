@@ -126,19 +126,24 @@ function Form({ options, parent, under, back }: { options: FormOptions; parent?:
   // The server is asked once every foundation field has a value: a rule about a part not yet filled is never shown (NF15).
   const ready = Boolean(form.summary.trim() && form.owner && (parent || (form.due_date && form.date_type && (!uncommitted || milestone.due_date))));
 
+  const [leftSummary, setLeftSummary] = useState(false);
+  // The server is also asked once Summary is left, for its hint alone (QA N3); its refusals show only once the form is ready.
+  const asking = ready || Boolean(leftSummary && form.summary.trim());
   const [check, setCheck] = useState<CommandsResponse | null>(null);
   useEffect(() => {
-    if (!ready) return;
+    if (!asking) return;
     let live = true;
     const timer = setTimeout(async () => {
       const { body } = await postCommands(createBatch(sent, true));
+      // QA N8: a check refused for any reason but a broken rule is logged, and the rail says so.
+      if (!body.ok && body.error !== "invalid") console.warn("New goal check refused", body);
       if (live) setCheck(body);
     }, CHECK_DELAY);
     return () => {
       live = false;
       clearTimeout(timer);
     };
-  }, [sent, ready]);
+  }, [sent, asking]);
 
   const [result, setResult] = useState<CommandsResponse | null>(null);
   const [saving, setSaving] = useState(false);
@@ -153,7 +158,6 @@ function Form({ options, parent, under, back }: { options: FormOptions; parent?:
     return l ? <p className="ferror">{l.sentence}</p> : null;
   };
   // NF2: the summary hint is the server's lint for this goal, shown once the person leaves the field. It never blocks.
-  const [leftSummary, setLeftSummary] = useState(false);
   const goalAt = batch.commands.findIndex((c) => c.op === "create" && c.kind === "goal" && c.ref === "$goal");
   const hints = (check && "hints" in check ? check.hints : undefined) ?? [];
   const summaryHint = leftSummary && form.summary.trim() ? hints.find((h) => h.at === goalAt && h.field === "summary")?.text : undefined;
@@ -194,6 +198,8 @@ function Form({ options, parent, under, back }: { options: FormOptions; parent?:
   const [msOpen, setMsOpen] = useState(false);
   const priority = options.priorities.find((p) => p.id === form.priority);
   const toGo = left.length ? `To save: ${left.length} to go` : "Ready to create";
+  // QA N8: a check or save refused for a reason other than a rule (stale, not found, the server down) shows at the top of the rail.
+  const stopped = answer && !answer.ok && answer.error !== "invalid" ? (answer.error === "stale" ? "Someone saved a goal this form uses. Reload the page and try again." : answer.message) : null;
 
   return (
     <main className="newgoal">
@@ -378,6 +384,7 @@ function Form({ options, parent, under, back }: { options: FormOptions; parent?:
             )}
           </div>
           <div className="card ngmake">
+            {stopped && <p className="ferror">{stopped}</p>}
             <div className="lbl">Create will make</div>
             <p className="small">{makes(sent)}</p>
             <div className="lbl">{toGo}</div>
