@@ -1,10 +1,10 @@
 import type { DatabaseSync } from "node:sqlite";
-import type { ApiEvent, ApiWorkItem, GoalDate, GoalPageResponse, Health, StoredGoal, SubGoalCard } from "./api.ts";
+import type { ApiEvent, ApiWorkItem, GoalDate, GoalEventsResponse, GoalPageResponse, Health, StoredGoal, SubGoalCard } from "./api.ts";
 import { toApiEvent } from "./live.ts";
 import { toApiWorkItem } from "./work.ts";
 import { above, changers, closesAs, closesAsPromoted, currentDate, mayChangeGoal, goalDates, isOpen, judgedDate, resolvedGoal, uncommittedDate, type State } from "./goal.ts";
 import { startedOf } from "./priorities.ts";
-import { actorsById, goalieOwner, read, readAll, readEntityEvents, workItemsOn } from "./read.ts";
+import { actorsById, countEntityEvents, goalieOwner, milestonesOf, read, readAll, readEntityEvents, workItemsOn, type EntityRefs } from "./read.ts";
 import { goalLints, type Row } from "./rules.ts";
 
 /**
@@ -13,6 +13,26 @@ import { goalLints, type Row } from "./rules.ts";
  */
 
 const isLive = (item: Row) => item.status !== "Deleted";
+
+/** D1: a history this long or shorter is sent whole. A longer one is sent a page at a time, newest first. */
+const HISTORY_WHOLE = 1_000;
+const HISTORY_PAGE = 100;
+
+/** A goal's history: the goal, every goal that is or was its Promotion Milestone (N6a), and its work items. */
+function historyOf(db: DatabaseSync, stored: Row, itemIds: string[]): EntityRefs {
+  return [{ kind: "goal", ids: [stored.id as string, ...milestonesOf(db, stored)] }, { kind: "work_item", ids: itemIds }];
+}
+
+/** GET /api/goals/:id/events: the next page of the goal's history, older than `before`. */
+export function goalEvents(db: DatabaseSync, id: string, before: number): GoalEventsResponse | undefined {
+  const stored = read(db, "goal", id);
+  if (stored === undefined) return undefined;
+  const itemIds = workItemsOn(db) ? readAll(db, "work_item").filter((w) => w.goal === id).map((w) => w.id as string) : [];
+  // One more than a page, to know whether older Events wait.
+  const rows = readEntityEvents(db, historyOf(db, stored, itemIds), { before, limit: HISTORY_PAGE + 1 });
+  const events = rows.slice(0, HISTORY_PAGE).map(toApiEvent);
+  return { events, olderEvents: rows.length > HISTORY_PAGE ? events[events.length - 1].sequence : null };
+}
 
 export function goalPage(db: DatabaseSync, id: string, me: string, today: string, timeZone: string): GoalPageResponse | undefined {
   const goals = new Map(readAll(db, "goal").map((g) => [g.id as string, g]));
@@ -68,15 +88,11 @@ export function goalPage(db: DatabaseSync, id: string, me: string, today: string
 
   const workItems: ApiWorkItem[] | null = on ? itemsOf(id).map((w) => toApiWorkItem(w, today)) : null;
   const itemIds = (workItems ?? []).map((w) => w.id);
-  // N6a: the history holds every goal that is or was this goal's Promotion Milestone, so a Promote row can name the one it completed.
-  const own = readEntityEvents(db, [{ kind: "goal", ids: [id] }]);
-  const milestones = new Set<string>(typeof stored.promotion_milestone === "string" ? [stored.promotion_milestone] : []);
-  for (const e of own) if (e.field === "promotion_milestone") for (const v of [e.old, e.new]) if (typeof v === "string") milestones.add(v);
-  milestones.delete(id);
-  // Codebase QA Q14: the goal's own Events are read once, and only the others are read again.
-  const events: ApiEvent[] = [...own, ...readEntityEvents(db, [{ kind: "goal", ids: [...milestones] }, { kind: "work_item", ids: itemIds }])]
-    .sort((a, b) => b.sequence - a.sequence)
-    .map(toApiEvent);
+  const history = historyOf(db, stored, itemIds);
+  const counts = countEntityEvents(db, history);
+  // D1: past 1,000 Events the page sends the newest 100, and the app asks for the rest (Codebase QA: 4,327 KB at 3,000 comments).
+  const paged = counts.events > HISTORY_WHOLE;
+  const events: ApiEvent[] = readEntityEvents(db, history, paged ? { before: Number.MAX_SAFE_INTEGER, limit: HISTORY_PAGE } : undefined).map(toApiEvent);
 
   const unit = read(db, "org_unit", stored.org_unit as string);
   const priority = typeof stored.priority === "string" ? read(db, "priority", stored.priority) : undefined;
@@ -103,6 +119,9 @@ export function goalPage(db: DatabaseSync, id: string, me: string, today: string
     subGoals,
     workItems,
     events,
+    olderEvents: paged ? events[events.length - 1].sequence : null,
+    eventCount: counts.events,
+    commentCount: counts.comments,
     needsYou: {
       lateWorkItems: (workItems ?? []).filter((w) => w.late && w.owner === me).map((w) => w.id),
       missingPtg: stored.owner === me && (health === "YELLOW" || health === "RED") && stored.path_to_green == null,
