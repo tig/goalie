@@ -186,6 +186,11 @@ The GOALIE owner inspects these each quarter and changes the configuration, revi
 5. File a work item when your deployment uses that list. The list is optional.
 6. Open the goal's history to see who changed what, and why. The current fields are not the whole record.
 
+**Add a person or an agent**
+1. The GOALIE owner adds the actor: a human, or an agent with its human operator.
+2. The GOALIE owner maps the human's sign-in to their actor before they first sign in. Until then GOALIE refuses them.
+3. The addition is recorded as an Event under the GOALIE owner's name.
+
 **Approve or reject a Draft**
 1. Open the goal. The Draft is already visible.
 2. Read the change and the reason.

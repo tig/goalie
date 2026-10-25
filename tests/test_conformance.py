@@ -84,13 +84,13 @@ class ConformanceTests(unittest.TestCase):
         189: ("test_yellow_or_red_goal_has_a_path_to_green",),
         207: ("test_org_unit_has_a_named_human_owner",),
         219: ("test_priority_ranks_are_unique",),
-        238: ("test_doc_is_a_page", "test_doc_is_a_page"),
-        240: (
+        240: ("test_doc_is_a_page", "test_doc_is_a_page"),
+        242: (
             "test_markdown_edit_is_not_lost",
             "test_markdown_edit_is_not_lost",
             "test_saved_doc_version_comes_from_the_merged_text",
         ),
-        245: (
+        247: (
             "test_event_sequence_only_increases",
             "test_views_and_agents_share_one_stream",
             "test_client_resumes_from_the_last_sequence",
@@ -99,7 +99,7 @@ class ConformanceTests(unittest.TestCase):
             "test_comment_is_an_event_on_the_entity",
             "test_draft_appears_live_and_does_not_take_effect_until_approval",
         ),
-        247: (
+        249: (
             "test_every_change_is_an_event",
             "test_history_is_readable_on_the_record",
             "test_history_is_readable_on_the_record",
@@ -107,37 +107,37 @@ class ConformanceTests(unittest.TestCase):
             "test_history_is_readable_on_the_record",
             "test_history_is_readable_on_the_record",
         ),
-        252: (
+        254: (
             "test_work_items_are_the_list_under_the_goal",
             "test_human_can_file_a_work_item_with_no_agent",
         ),
-        283: (
+        285: (
             "test_draft_appears_live_and_does_not_take_effect_until_approval",
             "test_draft_appears_live_and_does_not_take_effect_until_approval",
             "test_stale_draft_approval_is_rejected",
         ),
-        359: (
+        361: (
             "test_structured_fields_are_not_merged",
             "test_structured_fields_are_not_merged",
         ),
-        360: (
+        362: (
             "test_write_names_the_version_it_read",
             "test_write_names_the_version_it_read",
         ),
-        361: ("test_commit_check_is_one_server_transaction",),
-        365: ("test_deleted_goal_stays_findable",),
-        371: ("test_view_is_a_screen_plus_a_saved_definition",),
-        377: ("test_between_reviews_work_starts_at_my_goals",),
-        378: ("test_committed_change_appears_within_the_live_update_time",),
-        379: (
+        363: ("test_commit_check_is_one_server_transaction",),
+        367: ("test_deleted_goal_stays_findable",),
+        373: ("test_view_is_a_screen_plus_a_saved_definition",),
+        379: ("test_between_reviews_work_starts_at_my_goals",),
+        380: ("test_committed_change_appears_within_the_live_update_time",),
+        381: (
             "test_client_resumes_from_the_last_sequence",
             "test_client_resumes_from_the_last_sequence",
         ),
-        380: ("test_view_shows_presence",),
-        472: ("test_only_the_goalie_owner_changes_owner_settings",),
-        490: ("test_a_user_changes_only_their_own_settings",),
+        382: ("test_view_shows_presence",),
+        474: ("test_only_the_goalie_owner_changes_owner_settings",),
+        492: ("test_a_user_changes_only_their_own_settings",),
         196: ("test_only_owners_change_a_goal", "test_only_owners_change_a_goal"),
-        358: ("test_only_owners_change_a_goal",),
+        360: ("test_only_owners_change_a_goal",),
     }
 
     SKIP_WHY = {

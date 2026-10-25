@@ -1,8 +1,10 @@
 # 0005. Auth and identity
 
-**Status:** Accepted
+**Status:** Proposed. The amendment of 2026-10-25 waits on Tig. The record before it was Accepted on 2026-10-01.
 
 **Date:** 2026-10-01
+
+**Amended:** 2026-10-25. The first deployment has more than one human actor. Tig and Chelsea sign in to the same deployment. This replaces the rule that the first deployment has one human actor.
 
 ## Context
 
@@ -33,7 +35,13 @@ GOALIE maps that token's subject to one human actor.
 An agent token has `idtyp` of `app`.
 GOALIE maps that token's application id to one agent actor.
 The agent row must name its operator, and that operator must be a human actor.
-The first deployment has one human actor, the GOALIE owner, who is the Excaliwire, Inc. user.
+The first deployment has more than one human actor.
+Its human actors are Tig, the GOALIE owner, and Chelsea.
+Each maps from the subject of an Entra ID token in the Excaliwire tenant.
+One subject maps to one human actor, and one human actor has one subject per issuer.
+Only the GOALIE owner adds a human actor or an agent actor, or changes one.
+Adding or changing an actor is an Event, with the GOALIE owner as its actor ([SPEC.md](../specs/SPEC.md) §6.4, §6.6).
+A person whose subject maps to no actor is refused, and is not added on sign-in.
 GOALIE must not store a password for a human.
 Every read and every write must resolve to one actor.
 No request is anonymous.
@@ -48,3 +56,7 @@ An agent token must not be accepted as a human, and a human token must not be ac
 The client secret for the gate stays out of this repo.
 Adding an issuer is a configuration change to the issuer list.
 Owner settings and user settings use this same actor ([0011](0011-owner-and-user-settings.md)).
+Each human actor has their own user settings. Two human actors read the same store and see the same goals.
+The GOALIE owner is named in owner settings. It is one of the human actors, not the only one.
+A new person needs their subject before they can sign in. The GOALIE owner reads it from the Entra ID tenant and adds the actor.
+The seed names the human actors. Their subjects are set on the deployment's host, so the repo does not carry them.
