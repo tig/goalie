@@ -42,7 +42,7 @@ class GoalPageApiTests(unittest.TestCase):
             reply = post(proc, port, "/api/commands", {"commands": promote}, auth)
             assert reply.status == 200, reply.body
             cls.ambition = json.loads(reply.body)["ids"]
-            cls.replies = {key: page(key) for key in ("XW-0001", "XW-0002", "XW-0003", "XW-0004", "XW-0007", cls.ambition["$on_time"], cls.ambition["$late"], cls.ambition["$crayon"])}
+            cls.replies = {key: page(key) for key in ("XW-0001", "XW-0002", "XW-0003", "XW-0004", "XW-0006", "XW-0007", cls.ambition["$on_time"], cls.ambition["$late"], cls.ambition["$crayon"])}
             cls.missing = page("XW-0999")
             cls.anonymous = get(proc, port, "/api/goals/XW-0003")
         cls.pages: dict[str, dict[str, Any]] = {key: json.loads(reply.body) for key, reply in cls.replies.items()}
@@ -111,6 +111,12 @@ class GoalPageApiTests(unittest.TestCase):
         self.assertIsNone(self.pages[self.ambition["$on_time"]]["closesAs"])
         for key in ("XW-0002", "XW-0003"):
             self.assertIsNone(self.pages[key]["closesAsPromoted"], key)
+
+    def test_started_is_the_first_move_to_in_progress(self) -> None:
+        # Codebase QA N6: a Backlog goal read "In Progress since" the day it was made.
+        self.assertIsNone(self.pages["XW-0006"]["started"])
+        self.assertEqual(self.pages["XW-0006"]["goal"]["state"], "Backlog")
+        self.assertRegex(self.pages["XW-0001"]["started"], r"^\d{4}-\d{2}-\d{2}$")
 
     def test_work_items_and_their_events_show_on_their_goal(self) -> None:
         page = self.pages["XW-0007"]
