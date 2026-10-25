@@ -390,6 +390,10 @@ class GoalPageTests(unittest.TestCase):
         self.assertEqual(run(f"return goalpage.labelRows({labels}, 310);"), [0, 1, 0])  # a phone
         self.assertEqual(run(f"return goalpage.labelRows({labels}, 990);"), [0, 0, 0])  # 1440
 
+    def test_a_goal_never_in_progress_has_no_start_on_the_bar(self) -> None:
+        bar = run('return goalpage.dateBar(null, "2026-10-25", [{ date: "2026-12-11", kind: "Committed" }]);')
+        self.assertEqual((bar["start"], bar["today"], [round(m["at"]) for m in bar["marks"]]), (None, 0, [100]))  # type: ignore[index]
+
     def test_a_date_before_the_start_widens_the_bar(self) -> None:
         bar = run('return goalpage.dateBar("2026-10-23", "2026-10-23", [{ date: "2026-10-01", kind: "Committed" }]);')
         self.assertEqual((bar["marks"][0]["at"], bar["start"], bar["today"]), (0, 100, 100))  # type: ignore[index]

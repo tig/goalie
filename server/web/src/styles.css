@@ -660,3 +660,9 @@ main.newgoal{padding-bottom:84px}
 .phone .tiles{grid-template-columns:1fr}
 .phone .drow{grid-template-columns:minmax(0,1fr) auto}.phone .dvalue{grid-column:1;grid-row:2}
 @media (pointer:coarse){.tosave li .linkbtn,.ngtopcount{min-height:44px;min-width:44px;display:flex;align-items:center}}
+/* Rule 29 on touch (QA N2): the top bar's pages, the Completed fold, and the Details rows' links and help keep 44 px areas apart. */
+@media (pointer:coarse){
+.tab,.drow>.linkbtn{position:relative}
+.tab::after,.drow>.linkbtn::after{content:"";position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}
+.wghead{min-height:44px;align-items:center}
+.drow{min-height:52px;padding:4px 0}}

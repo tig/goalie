@@ -133,12 +133,13 @@ export const fieldLabel = (field: string) => LABELS[field] ?? field;
  * The header's date bar (G6): where the start, today, and each date sit, in percent from the first of them to the last.
  * It is a picture of the dates above it, not a control.
  */
-export function dateBar(started: string, today: string, dates: { date: string; kind: string }[]): { start: number; today: number; marks: { at: number; date: string; kind: string }[] } {
+export function dateBar(started: string | null, today: string, dates: { date: string; kind: string }[]): { start: number | null; today: number; marks: { at: number; date: string; kind: string }[] } {
   const t = day;
-  const from = Math.min(t(started), t(today), ...dates.map((d) => t(d.date)));
+  // A goal that never went In Progress has no start (QA N6): the bar runs from today or its first date.
+  const from = Math.min(...(started ? [t(started)] : []), t(today), ...dates.map((d) => t(d.date)));
   const to = Math.max(from + DAY, t(today), ...dates.map((d) => t(d.date)));
   const at = (d: string) => (100 * (t(d) - from)) / (to - from);
-  return { start: at(started), today: at(today), marks: dates.map((d) => ({ at: at(d.date), date: d.date, kind: d.kind })) };
+  return { start: started ? at(started) : null, today: at(today), marks: dates.map((d) => ({ at: at(d.date), date: d.date, kind: d.kind })) };
 }
 
 /** Date bar labels (G6): each label's row, 0 or 1. A label that would touch the one before it in its row drops to the other row. `width` is the bar in pixels. */
