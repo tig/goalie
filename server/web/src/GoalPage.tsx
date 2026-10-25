@@ -388,6 +388,8 @@ function Fields({ data, onEdit }: { data: GoalPageResponse; onEdit?: () => void 
 }
 
 function SubGoal({ card, data }: { card: SubGoalCard; data: GoalPageResponse }) {
+  // The goal's own date, not its Promotion Milestone's: the one a sub-goal with no date of its own takes (D2).
+  const ownDate = data.dates.find((d) => d.kind !== "Promotion Milestone");
   const owner = data.actors[card.owner] ?? { id: card.owner, name: card.owner };
   const done = card.workItems && card.workItems.total > 0 ? card.workItems.completed / card.workItems.total : 0;
   return (
@@ -404,7 +406,14 @@ function SubGoal({ card, data }: { card: SubGoalCard; data: GoalPageResponse }) 
             <span className="date">{card.dates.map((d) => dateLabel(d, data.today)).join(" · ")}</span>
           ) : (
             // QA U1: a sub-goal on this goal's date says so, and shares this goal's Promotion Milestone when the date is uncommitted (G21).
-            <span className="muted">This goal's date{data.goal.promotion_milestone ? ` · shares ${data.goal.promotion_milestone}` : ""}</span>
+            <span>
+              {/* QA U1: the date itself, then whose it is: "Fantasy Feb 28, 2027 · this goal's date · shares XW-0012". */}
+              {ownDate && `${ownDate.kind} ${yearDate(ownDate.date)} `}
+              <span className="muted">
+                {ownDate ? "· this goal's date" : "This goal's date"}
+                {data.goal.promotion_milestone ? ` · shares ${data.goal.promotion_milestone}` : ""}
+              </span>
+            </span>
           )}
           {card.workItems && card.workItems.total > 0 && (
             <span className="progress">

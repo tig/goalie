@@ -8,7 +8,7 @@ import { fieldLabel } from "./goalpage.ts";
  */
 
 /** The form's parts that this module reads. A form from a parent (NF9) takes the parent's date, so it has no date of its own to fill. */
-export type Foundation = Pick<NewGoalForm, "summary" | "owner" | "due_date" | "date_type" | "milestone" | "subGoals" | "workItems"> & {
+type Foundation = Pick<NewGoalForm, "summary" | "owner" | "due_date" | "date_type" | "milestone" | "subGoals" | "workItems"> & {
   parent?: string | null;
   /** NF4a: a Priority, or None, was chosen. Priority has no default, so leaving it untouched is not a choice. */
   priorityPicked?: boolean;
@@ -57,7 +57,8 @@ function words(key: string): [string, string] {
 export function toSave(form: Foundation, answer: CommandsResponse | null, details: boolean, batch?: CommandsRequest): SaveLine[] {
   // The batch only places each refusal on its command; a bare form gets the fields that shape it.
   const sent = batch ?? createBatch({ description: "", priority: null, health: null, path_to_green: null, plan: null, plan_maturity: "Watercolor", milestoneType: "", more: {}, ...form } as unknown as NewGoalForm);
-  const refused = answer && !answer.ok ? refusals(answer, sent) : [];
+  // Only broken rules become lines; a stale or not-found answer shows once, at the top of the rail (QA N8).
+  const refused = answer && !answer.ok && answer.error === "invalid" ? refusals(answer, sent) : [];
   const keys = new Set(refused.map((v) => keyOf(v.place, v.field, v.rule)));
   const line = (key: string, filled: boolean): SaveLine => {
     const [text, sentence] = words(key);

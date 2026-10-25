@@ -537,7 +537,11 @@ class CommandTests(unittest.TestCase):
 
     def test_close_and_pursue_set_the_state(self) -> None:
         c = run('const g = page("XW-0003").goal; return [commands.closeBatch(g, "Did Not Meet", "Dropped").commands[0].fields, commands.pursueBatch({ ...g, state: "Backlog" }, "GREEN", "Starting").commands[0].fields];')
-        self.assertEqual(c, [{"state": "Did Not Meet"}, {"state": "In Progress", "health": "GREEN"}])
+        self.assertEqual(c, [{"state": "Did Not Meet", "health": None}, {"state": "In Progress", "health": "GREEN"}])  # review D3: a close clears health; History keeps it
+
+    def test_promote_and_close_clears_health_as_it_closes(self) -> None:
+        c = run('const g = { ...page("XW-0003").goal, date_type: "Ambition" }; return commands.promoteAndClose(g, { id: "XW-0004", version: 3, state: "In Progress" }, "Completed", "Shipped").commands.at(-1).fields;')
+        self.assertEqual(c, {"state": "Completed", "health": None})
 
     def test_fields_send_only_what_changed(self) -> None:
         b = run('const g = page("XW-0003").goal; return commands.fieldsBatch(g, { ...g, severity: "sev2", plan: g.plan }, "Lower");')
@@ -577,6 +581,17 @@ class CommandTests(unittest.TestCase):
         ],
         "workItems": [{"title": "Sketch it", "goal": 1, "owner": "frontend-engineer", "due_date": None}],
     }
+
+    def test_a_save_answered_with_a_page_not_json_says_so_in_plain_words(self) -> None:
+        data = (MODEL.parent / "data.ts").as_uri()
+        script = f"""import {{ postCommands }} from "{data}";
+globalThis.fetch = async () => new Response("<html>Bad Gateway</html>", {{ status: 502, statusText: "Bad Gateway" }});
+const a = await postCommands({{ commands: [] }});
+globalThis.fetch = async () => {{ throw new TypeError("Failed to fetch"); }};
+const b = await postCommands({{ commands: [] }});
+process.stdout.write(JSON.stringify([a.body.message, b.body.message]));"""
+        proc = subprocess.run(["node", "--no-warnings", "--input-type=module", "-e", script], capture_output=True, text=True, timeout=30, cwd=MODEL.parents[2])
+        self.assertEqual(json.loads(proc.stdout or "null"), ["The server could not take the save (502). Try again.", "GOALIE could not reach the server. Try again."], proc.stderr)
 
     def test_an_answer_with_a_reason_and_no_message_still_says_why(self) -> None:
         got = run('return [commands.commandsAnswer({ error: "forbidden", reason: "No verified actor." }), commands.commandsAnswer({ ok: true, ids: {} })];')
@@ -713,6 +728,10 @@ class NewGoalV2Tests(unittest.TestCase):
         self.assertEqual(self.lines(form, answer, True)[-1], ["health", "Health", False])
         said = run(f"return newgoal.toSave({json.dumps({**self.BASE, **form})}, {json.dumps(answer)}, false).map((l) => l.sentence);")
         self.assertEqual(said[-2], "A Committed date needs a plan at Pencil.")  # type: ignore[index]
+
+    def test_a_stale_answer_is_no_line(self) -> None:
+        form = {"summary": "Ship it", "due_date": "2027-02-26", "date_type": "Committed", "priorityPicked": True}
+        self.assertEqual([l[0] for l in self.lines(form, {"ok": False, "at": 3, "error": "stale", "current": {}})], ["summary", "due_date", "date_type", "plan_maturity", "priority"])  # type: ignore[union-attr]
 
     def test_create_will_make_names_what_without_keys(self) -> None:
         form = {**self.BASE, "date_type": "Fantasy", "subGoals": [{"summary": "a", "owner": "chelsea"}, {"summary": "b", "owner": "chelsea"}], "workItems": [{"title": "t", "goal": 0, "owner": "chelsea", "due_date": None}]}
