@@ -232,6 +232,8 @@ The list's owner is the org unit's owner. Re-ranking is a normal, logged decisio
 
 `id`, `kind` (`human` | `agent`), `display_name`. For agents, also `operator`, the human responsible for that agent. Only humans can own goals or org units.
 
+A deployment has one actor for each human and each agent that uses it. Only the GOALIE owner adds or changes an actor. Adding or changing an actor is an Event, with the GOALIE owner as its actor ([§6.6 (Events)](#s6-6)). A person or an agent with no actor is refused; GOALIE does not add an actor on sign-in.
+
 ### 6.5 Doc
 <a id="s6-5"></a>
 

@@ -12,7 +12,7 @@ Every other file under `docs/` runs no CI commands.
 - [0002. Storage](0002-storage.md). Accepted 2026-10-01.
 - [0003. API style](0003-api-style.md). Accepted 2026-10-01.
 - [0004. MCP hosting](0004-mcp-hosting.md). Accepted 2026-10-01.
-- [0005. Auth and identity](0005-auth-and-identity.md). Accepted 2026-10-01.
+- [0005. Auth and identity](0005-auth-and-identity.md). Accepted 2026-10-01. Amendment of 2026-10-25 (more than one human actor) Proposed.
 - [0006. Deployment target](0006-deployment-target.md). Accepted 2026-10-01.
 - [0007. Live-update transport and resume](0007-live-update.md). Accepted 2026-10-01.
 - [0008. Concurrent Markdown](0008-concurrent-markdown.md). Accepted 2026-10-01.
