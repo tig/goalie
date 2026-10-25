@@ -5,7 +5,7 @@ import { postCommands, useJson } from "./data.ts";
 import { PtgFields } from "./GoalPanels.tsx";
 import { createBatch, goalTypes, type NewGoalForm, type NewMilestone, type SubGoalRow } from "./model/commands.ts";
 import { eventValue, fieldLabel } from "./model/goalpage.ts";
-import { detailsLine, makes, placeOf, toSave, type SaveLine } from "./model/newgoal.ts";
+import { countLine, detailsLine, makes, placeOf, ruleAnswer, toSave, type SaveLine } from "./model/newgoal.ts";
 import { backPath, goalPath } from "./model/route.ts";
 import { Avatar, HealthDot, Help } from "./parts.tsx";
 import { homeSearch, Link, navigate } from "./router.tsx";
@@ -130,6 +130,8 @@ function Form({ options, parent, under, back }: { options: FormOptions; parent?:
   // The server is also asked once Summary is left, for its hint alone (QA N3); its refusals show only once the form is ready.
   const asking = ready || Boolean(leftSummary && form.summary.trim());
   const [check, setCheck] = useState<CommandsResponse | null>(null);
+  // QA P1: the last answer that judged the rules; a check that could not run keeps it.
+  const [rules, setRules] = useState<CommandsResponse | null>(null);
   useEffect(() => {
     if (!asking) return;
     let live = true;
@@ -137,7 +139,10 @@ function Form({ options, parent, under, back }: { options: FormOptions; parent?:
       const { body } = await postCommands(createBatch(sent, true));
       // QA N8: a check refused for any reason but a broken rule is logged, and the rail says so.
       if (!body.ok && body.error !== "invalid") console.warn("New goal check refused", body);
-      if (live) setCheck(body);
+      if (live) {
+        setCheck(body);
+        if (body.ok || body.error === "invalid") setRules(body);
+      }
     }, CHECK_DELAY);
     return () => {
       live = false;
@@ -148,15 +153,24 @@ function Form({ options, parent, under, back }: { options: FormOptions; parent?:
   const [result, setResult] = useState<CommandsResponse | null>(null);
   const [saving, setSaving] = useState(false);
   const [pressed, setPressed] = useState(false);
-  const answer = ready ? (result ?? check) : null;
+  const latest = ready ? (result ?? check) : null;
+  const answer = ready ? ruleAnswer(latest, rules) : null;
+  const couldNot = Boolean(latest && !latest.ok && latest.error !== "invalid");
   // A press shows the Details card's refusals too, so a save never fails with nothing listed.
   const lines = toSave({ ...sent, priorityPicked: picked }, answer, detailsTouched || pressed, batch);
   const left = lines.filter((l) => !l.done);
   // NF15: after a press, each unmet line shows its sentence at its own field, in --red-ink.
+  const missing = (key: string) => (pressed ? left.find((x) => x.key === key) : undefined);
   const miss = (key: string) => {
-    const l = pressed ? left.find((x) => x.key === key) : undefined;
-    return l ? <p className="ferror">{l.sentence}</p> : null;
+    const l = missing(key);
+    return l ? (
+      <p className="ferror" id={`ng-err-${key}`} role="alert">
+        {l.sentence}
+      </p>
+    ) : null;
   };
+  // QA P7: an unmet field says so to a screen reader and points at its sentence.
+  const invalid = (key: string) => (missing(key) ? { "aria-invalid": true, "aria-describedby": `ng-err-${key}` } : {});
   // NF2: the summary hint is the server's lint for this goal, shown once the person leaves the field. It never blocks.
   const goalAt = batch.commands.findIndex((c) => c.op === "create" && c.kind === "goal" && c.ref === "$goal");
   const hints = (check && "hints" in check ? check.hints : undefined) ?? [];
@@ -197,16 +211,16 @@ function Form({ options, parent, under, back }: { options: FormOptions; parent?:
   const owner = options.actors.find((a) => a.id === form.owner) ?? me;
   const [msOpen, setMsOpen] = useState(false);
   const priority = options.priorities.find((p) => p.id === form.priority);
-  const toGo = left.length ? `To save: ${left.length} to go` : "Ready to create";
+  const toGo = countLine(left.length, couldNot);
   // QA N8: a check or save refused for a reason other than a rule (stale, not found, the server down) shows at the top of the rail.
-  const stopped = answer && !answer.ok && answer.error !== "invalid" ? (answer.error === "stale" ? "Someone saved a goal this form uses. Reload the page and try again." : answer.message) : null;
+  const stopped = latest && couldNot && !latest.ok && latest.error !== "invalid" ? (latest.error === "stale" ? "Someone saved a goal this form uses. Reload the page and try again." : latest.message) : null;
 
   return (
     <main className="newgoal">
       {back}
       <h1>New goal</h1>
       {/* NF18: on a phone and under 960 px, the count is a line at the top that opens the checklist. */}
-      <button type="button" className={`linkbtn ngtopcount${left.length ? (pressed ? " miss" : "") : " good"}`} onClick={() => document.querySelector(".ngmake")?.scrollIntoView({ behavior: "smooth" })}>
+      <button type="button" className={`linkbtn ngtopcount${couldNot ? " miss" : left.length ? (pressed ? " miss" : "") : " good"}`} onClick={() => document.querySelector(".ngmake")?.scrollIntoView({ behavior: "smooth" })}>
         {toGo}
       </button>
       <div className="nglayout">
@@ -216,7 +230,7 @@ function Form({ options, parent, under, back }: { options: FormOptions; parent?:
             {under && <p className="ngunder">Under {under.goal.summary}</p>}
             <label className="field" id="ng-summary">
               <span className="flabel">Summary</span>
-              <input value={form.summary} onChange={(e) => set({ summary: e.target.value })} onBlur={() => setLeftSummary(true)} placeholder="Start with a verb: Launch, Reduce, Increase" autoFocus />
+              <input {...invalid("summary")} value={form.summary} onChange={(e) => set({ summary: e.target.value })} onBlur={() => setLeftSummary(true)} placeholder="Start with a verb: Launch, Reduce, Increase" autoFocus />
               {miss("summary")}
               {summaryHint && <p className="hint">{summaryHint}</p>}
             </label>
@@ -247,13 +261,13 @@ function Form({ options, parent, under, back }: { options: FormOptions; parent?:
               <>
                 <label className="field" id="ng-due_date">
                   <span className="flabel">Date</span>
-                  <input type="date" value={form.due_date} onChange={(e) => set({ due_date: e.target.value })} />
+                  <input {...invalid("due_date")} type="date" value={form.due_date} onChange={(e) => set({ due_date: e.target.value })} />
                   {form.due_date && <span className="small">{shortDate(form.due_date, "0000")}</span>}
                   {miss("due_date")}
                 </label>
                 <div className="field" id="ng-date_type">
                   <span className="flabel">How firm is the date?</span>
-                  <div className="tiles" role="radiogroup" aria-label="Date Type">
+                  <div className="tiles" role="radiogroup" aria-label="Date Type" {...invalid("date_type")}>
                     {DATE_TYPES.map((d) => (
                       <button key={d.type} type="button" role="radio" aria-checked={form.date_type === d.type} className={`tile${form.date_type === d.type ? " on" : ""}`} onClick={() => set({ date_type: d.type })}>
                         <b>{d.type}</b>
@@ -270,7 +284,7 @@ function Form({ options, parent, under, back }: { options: FormOptions; parent?:
                     <p className="small">A promise to make this goal's date firmer by a Committed date.</p>
                     <label className="field">
                       <span className="flabel">Commit this goal's date by</span>
-                      <input type="date" value={milestone.due_date} min={addDays(today, 1)} max={form.due_date || undefined} onChange={(e) => setMilestone({ due_date: e.target.value })} />
+                      <input {...invalid("milestone_date")} type="date" value={milestone.due_date} min={addDays(today, 1)} max={form.due_date || undefined} onChange={(e) => setMilestone({ due_date: e.target.value })} />
                       {milestone.due_date && <span className="small">{shortDate(milestone.due_date, "0000")}</span>}
                       <span className="small muted">Pick the date by which you will know the real date.</span>
                       {miss("milestone_date")}
@@ -310,7 +324,7 @@ function Form({ options, parent, under, back }: { options: FormOptions; parent?:
                       <input value={form.plan ?? ""} placeholder="A link to the plan" onChange={(e) => set({ plan: e.target.value || null })} />
                     </label>
                     <span className="flabel">Plan Maturity</span>
-                    <div className="tiles" role="radiogroup" aria-label="Plan Maturity">
+                    <div className="tiles" role="radiogroup" aria-label="Plan Maturity" {...invalid("plan_maturity")}>
                       {options.choices.plan_maturity.map((m) => (
                         <button key={m} type="button" role="radio" aria-checked={form.plan_maturity === m} className={`tile${form.plan_maturity === m ? " on" : ""}`} onClick={() => set({ plan_maturity: m })}>
                           <b>{m}</b>
@@ -331,7 +345,7 @@ function Form({ options, parent, under, back }: { options: FormOptions; parent?:
                 )}
                 <span className="flabel">Priority</span>
                 {/* NF4a: a deliberate choice, none chosen. Home lists only goals mapped to a Priority. */}
-                <div className="prows" role="radiogroup" aria-label="Priority" id="ng-priority">
+                <div className="prows" role="radiogroup" aria-label="Priority" id="ng-priority" {...invalid("priority")}>
                   {[{ id: null, rank: null, title: "None" }, ...options.priorities].map((p) => (
                     <label key={p.id ?? "none"} className={`prow${picked && form.priority === p.id ? " on" : ""}`}>
                       <input
@@ -398,7 +412,7 @@ function Form({ options, parent, under, back }: { options: FormOptions; parent?:
               ))}
             </ul>
           </div>
-          <button type="button" className={`btn primary create${left.length ? " muted" : ""}`} aria-disabled={left.length > 0} onClick={create} disabled={saving} aria-busy={saving}>
+          <button type="button" className={`btn primary create${left.length || couldNot ? " muted" : ""}`} aria-disabled={left.length > 0 || couldNot} onClick={create} disabled={saving} aria-busy={saving}>
             Create goal
           </button>
           <a

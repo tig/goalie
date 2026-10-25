@@ -83,6 +83,12 @@ export function toSave(form: Foundation, answer: CommandsResponse | null, detail
 /** Whether a command's refusal is on the foundation card or the Details card, for scrolling to the first unmet field. */
 export const placeOf = (key: string) => (DETAIL.test(key) ? "details" : key);
 
+/** QA P1: the answer the list reads. A check that could not run (stale, the server down) keeps the last answer that judged the rules. */
+export const ruleAnswer = (latest: CommandsResponse | null, last: CommandsResponse | null) => (latest && (latest.ok || latest.error === "invalid") ? latest : last);
+
+/** The rail's count. It never says "Ready to create" when the latest check could not run. */
+export const countLine = (left: number, couldNotCheck: boolean) => (couldNotCheck ? "Could not check" : left ? `To save: ${left} to go` : "Ready to create");
+
 /** NF14: "Create will make", without keys: keys follow the server's create order and change as the form changes (NF17). */
 export function makes(form: Foundation): string {
   const n = (k: number, word: string) => `${k} ${word}${k === 1 ? "" : "s"}`;
