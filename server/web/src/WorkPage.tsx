@@ -94,7 +94,10 @@ function Queues({ work, reload, single }: { work: WorkResponse; reload: () => vo
             const shut = closed[key] ?? done;
             const rows = g.items.map((i) => (
               <div key={i.id} className={`wrow qrow${i.status === "Completed" ? " done" : ""}`}>
-                <input type="checkbox" checked={i.status === "Completed" || ticked?.id === i.id} disabled={i.status === "Completed"} onChange={() => tick(i)} aria-label={`Mark ${i.title} Completed`} />
+                {/* The tick's label is its 44 px tap area on touch (rule 29). */}
+                <label className="wtick">
+                  <input type="checkbox" checked={i.status === "Completed" || ticked?.id === i.id} disabled={i.status === "Completed"} onChange={() => tick(i)} aria-label={`Mark ${i.title} Completed`} />
+                </label>
                 <span className="wtitle">{i.title}</span>
                 <Link to={goalPath(i.goal)} className="wgoal small">
                   {work.goals[i.goal]?.summary ?? i.goal}

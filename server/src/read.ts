@@ -141,7 +141,12 @@ export function memoryLookup(rows: Partial<Record<Kind, Row[]>>): Lookup {
 
 /** Every actor, by id, with its kind (SPEC.md §6.4). */
 export function actorsById(db: DatabaseSync): Record<string, ApiActor> {
-  return Object.fromEntries(readAll(db, "actor").map((a) => [a.id, { id: a.id as string, name: a.display_name as string, kind: a.kind as ApiActor["kind"] }]));
+  return Object.fromEntries(
+    readAll(db, "actor").map((a) => [
+      a.id,
+      { id: a.id as string, name: a.display_name as string, kind: a.kind as ApiActor["kind"], ...(a.kind === "agent" && typeof a.operator === "string" ? { operator: a.operator } : {}) },
+    ]),
+  );
 }
 
 /** True when the owner setting work_items is on (D7). */

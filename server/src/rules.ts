@@ -80,7 +80,7 @@ function checkGoal(store: Lookup, own: Row): Violation[] {
     add("parent-not-cycle", `${goal.id}: a goal cannot be its own ancestor.`, "parent");
   }
   if (goal.state === "In Progress" && goal.health == null) {
-    add("health-while-in-progress", `${goal.id}: an In Progress goal has a health.`, "health");
+    add("health-while-in-progress", "An In Progress goal needs a health: GREEN, YELLOW, or RED.", "health");
   }
   if ((goal.health === "YELLOW" || goal.health === "RED") && !isPathToGreen(store, goal.path_to_green)) {
     add(
@@ -268,7 +268,7 @@ const DESCRIPTION_PARTS: { words: RegExp; hint: string }[] = [
 export function goalLints(goal: Row): { field: string; text: string }[] {
   const hints: { field: string; text: string }[] = [];
   const words = String(goal.summary ?? "").trim().split(/\s+/).filter(Boolean).length;
-  if (words < 5) hints.push({ field: "summary", text: `The summary has ${words} words. Use 5 or more, starting with a verb.` });
+  if (words < 5) hints.push({ field: "summary", text: "A good summary has a verb and 5 words or more." });
   const description = String(goal.description ?? "");
   for (const part of DESCRIPTION_PARTS) if (!part.words.test(description)) hints.push({ field: "description", text: part.hint });
   const ptg = goal.path_to_green as { trigger?: unknown } | null;

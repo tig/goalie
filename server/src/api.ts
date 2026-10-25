@@ -77,7 +77,7 @@ export type Origination = "New" | "Carryover" | "Repeating";
 export type ActorKind = "human" | "agent";
 
 /** An actor with its kind, so the app draws a human and an agent apart (SPEC.md §6.4). */
-export type ApiActor = ActorRef & { kind: ActorKind };
+export type ApiActor = ActorRef & { kind: ActorKind; /** An agent's operating human (SPEC.md §6.4). Absent on a human. */ operator?: string };
 
 /** A goal named from another goal: its key and summary. */
 export type GoalRef = { id: string; summary: string };
@@ -233,18 +233,22 @@ export type ApiCommand =
  */
 export type CommandsRequest = { commands: ApiCommand[]; check?: true };
 
+/** A lint on a goal in a check (NF2): flagged, never blocked. `at` is the command's index. Only a check carries them. */
+export type BatchHint = { at: number; field: string; text: string };
+
 /** A broken rule. `field` names the field it points to, when there is one. */
 export type ApiViolation = { rule: string; message: string; field?: string };
 
 /**
  * The answer to POST /api/commands. `at` is the index of the command that failed.
  * With check: true, an invalid answer also carries `all`: every violation of every refused command, each with its `at`.
+ * A check also carries `hints`: every lint of every goal it writes, each with its `at`, on an ok and an invalid answer.
  * HTTP: 200 ok, 409 stale or exists, 422 invalid, 404 not_found, 400 bad_command, 403 unknown_actor.
  */
 export type CommandsResponse =
-  | { ok: true; ids: Record<Ref, string>; events: ApiEvent[] }
+  | { ok: true; ids: Record<Ref, string>; events: ApiEvent[]; hints?: BatchHint[] }
   | { ok: false; at: number; error: "stale"; current: StoredGoal | ApiWorkItem }
-  | { ok: false; at: number; error: "invalid"; violations: ApiViolation[]; all?: (ApiViolation & { at: number })[] }
+  | { ok: false; at: number; error: "invalid"; violations: ApiViolation[]; all?: (ApiViolation & { at: number })[]; hints?: BatchHint[] }
   | { ok: false; at: number; error: "not_found" | "exists" | "bad_command" | "unknown_actor"; message: string };
 
 /** GET /api/work, or GET /api/work?owner=<actor id> for one actor's queue. Every work item, or that actor's, with the goals and actors they name. */

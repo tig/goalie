@@ -32,18 +32,8 @@ export function formOptions(db: DatabaseSync, me: string, orgUnit: string, today
       .filter((p) => p.org_unit === orgUnit && p.status === "Current" && isCurrentPeriod(p.period as string, today))
       .sort((a, b) => (a.rank as number) - (b.rank as number))
       .map((p) => ({ id: p.id as string, rank: p.rank as number, title: p.title as string })),
-    defaults: {
-      description: DEFAULTS.goal?.description as string,
-      org_unit: orgUnit,
-      level,
-      type: "Milestone (Launch)",
-      severity: "sev2",
-      state: "In Progress",
-      origination: "New",
-      visibility: DEFAULTS.goal?.visibility as string,
-      // SPEC.md names no default plan maturity. The least firm is the honest start.
-      plan_maturity: "Watercolor",
-    },
+    // The one home of these defaults is write.ts DEFAULTS (N-F4); only the org unit's own values are added here.
+    defaults: { ...(DEFAULTS.goal as FormOptions["defaults"]), org_unit: orgUnit, level },
     choices: { type: TYPES, severity: SEVERITIES, level: LEVELS, plan_maturity: PLAN_MATURITIES, workItemStatus: [...WORK_ITEM_STATUSES] },
     workItems: workItemsOn(db),
     promotionMilestoneType: PROMOTION_MILESTONE_TYPE,

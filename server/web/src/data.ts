@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ApiError, CommandsRequest, CommandsResponse } from "../../src/api.ts";
+import { commandsAnswer } from "./model/commands.ts";
 
 /** Reading the API. Every read is one GET with the actor's session; the server holds the rules. */
 
-export type Loaded<T> = { state: "loading" } | { state: "ok"; data: T } | { state: "refused"; status: number; reason: string };
+type Loaded<T> = { state: "loading" } | { state: "ok"; data: T } | { state: "refused"; status: number; reason: string };
 
-export async function getJson<T>(url: string): Promise<Loaded<T>> {
+async function getJson<T>(url: string): Promise<Loaded<T>> {
   try {
     const reply = await fetch(url, { headers: { accept: "application/json" } });
     if (reply.ok) return { state: "ok", data: (await reply.json()) as T };
@@ -40,7 +41,7 @@ export function useJson<T>(url: string): [Loaded<T>, () => void] {
 export async function postCommands(batch: CommandsRequest): Promise<{ status: number; body: CommandsResponse }> {
   try {
     const reply = await fetch("/api/commands", { method: "POST", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify(batch) });
-    return { status: reply.status, body: await reply.json() };
+    return { status: reply.status, body: commandsAnswer(await reply.json()) };
   } catch (e) {
     return { status: 0, body: { ok: false, at: 0, error: "bad_command", message: (e as Error).message } };
   }

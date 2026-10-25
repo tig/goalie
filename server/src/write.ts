@@ -10,7 +10,8 @@ import { checkAuthor, checkTransition, checkWrite, goalLints, REASONED_KINDS, SY
 
 /** Values a create fills when the command leaves them out (SPEC.md §6.1, §12). The one home: options.ts offers them as the form's defaults. */
 export const DEFAULTS: Partial<Record<Kind, Row>> = {
-  goal: { description: "", visibility: DEFAULT_VISIBILITY },
+  // A new goal starts at Backlog (NF8, N-F3). SPEC.md names no default plan maturity; the least firm is the honest start.
+  goal: { description: "", visibility: DEFAULT_VISIBILITY, type: "Milestone (Launch)", severity: "sev2", state: "Backlog", origination: "New", plan_maturity: "Watercolor" },
   user_settings: { favorite_views: [], appearance: "light" },
 };
 

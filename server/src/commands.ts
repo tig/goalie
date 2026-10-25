@@ -1,9 +1,10 @@
 import type { DatabaseSync } from "node:sqlite";
-import type { ApiEvent, ApiViolation, CommandsResponse, Ref, StoredGoal } from "./api.ts";
+import type { ApiEvent, ApiViolation, BatchHint, CommandsResponse, Ref, StoredGoal } from "./api.ts";
 import { publish, toApiEvent } from "./live.ts";
 import { toApiWorkItem } from "./work.ts";
-import type { Row } from "./rules.ts";
-import { inTransaction, write, type Command, type WriteResult } from "./write.ts";
+import { read } from "./read.ts";
+import { goalLints, type Row } from "./rules.ts";
+import { DEFAULTS, inTransaction, write, type Command, type WriteResult } from "./write.ts";
 
 /**
  * The batch behind POST /api/commands (plan E-1). The commands run in order through write(), in one transaction.
@@ -60,8 +61,16 @@ export function runCommands(db: DatabaseSync, actor: string, request: unknown, t
       const all: (ApiViolation & { at: number })[] = [];
       let first: { at: number; violations: ApiViolation[] } | undefined;
       const refused = new Set<string>();
+      // NF2: a check carries each goal's lints, by command, from the row as written (or as sent, when refused).
+      const hints = new Map<number, BatchHint[]>();
+      const lint = (at: number, command: Command, result: WriteResult) => {
+        if (!check || command.kind !== "goal" || command.op === "comment") return;
+        const row = result.ok ? result.entity : command.op === "create" ? { ...DEFAULTS.goal, ...command.fields } : { ...read(db, "goal", command.id), ...command.fields };
+        hints.set(at, goalLints(row).map((h) => ({ ...h, at })));
+      };
       const run = (at: number, command: Command): Extract<WriteResult, { ok: true }> | undefined => {
         const result = write(db, actor, command, today, time);
+        lint(at, command, result);
         if (!result.ok) {
           if (!check || result.error !== "invalid") throw new Stop(failure(at, command.kind, result, today));
           first ??= { at, violations: result.violations };
@@ -91,6 +100,7 @@ export function runCommands(db: DatabaseSync, actor: string, request: unknown, t
           // Then it stores what a save stores, so a check and a save give the same keys and versions.
           if (check) {
             const probe = inTransaction(db, () => false, () => write(db, actor, command, today, time));
+            lint(at, command, probe);
             if (!probe.ok) {
               if (probe.error !== "invalid") throw new Stop(failure(at, command.kind, probe, today));
               first ??= { at, violations: probe.violations };
@@ -114,8 +124,9 @@ export function runCommands(db: DatabaseSync, actor: string, request: unknown, t
           else refused.add(ref);
         }
       });
-      if (first) return { status: 422, body: { ok: false, at: first.at, error: "invalid", violations: first.violations, all } };
-      return { status: 200, body: { ok: true, ids, events } };
+      const found = check ? { hints: [...hints.values()].flat() } : {};
+      if (first) return { status: 422, body: { ok: false, at: first.at, error: "invalid", violations: first.violations, all, ...found } };
+      return { status: 200, body: { ok: true, ids, events, ...found } };
     });
     // ADR 0007: only a committed batch is sent, and only once the outer COMMIT is done.
     if (outer && !check && answer.body.ok) publish(answer.body.events);
