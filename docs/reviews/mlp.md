@@ -21,7 +21,7 @@ Status words: **blocks** stops the merge, **open** is a real problem with a clea
 | not fixed at 2b58281 | 2 |
 | fixed in part at 2b58281 | 2 |
 | replaced by New goal v2 | 3 |
-| decision | 3 |
+| decided | 3 (D1 to D3) |
 | fixed | 36 |
 
 All three blocks from 5087caa are fixed: + Sub-goal saves, Promote saves, and every change needs a reason.
@@ -139,9 +139,9 @@ Not checked at 2b58281: + Add inside Details for sub-goals and work items (NF13)
 
 | # | Status | Question |
 | --- | --- | --- |
-| D1 | decision | History paging. The goal page sends every Event of the goal, its milestones, and its work items: 4,327 KB and 147 to 208 ms at 3,000 sub-goals, 3,000 comments, and 3,000 work items (18,019 rows). Was 1,241 KB at 3,000 comments in 5087caa. Lean: page it, newest first; the page size is the deciding number and I have not measured one |
-| D2 | decision | Visibility values. Any text is stored ("banana"). Lean: a fixed list in SPEC §6.1 |
-| D3 | decision | Health on close. Completed Late keeps its health. Lean: one rule for Completed and Completed Late |
+| D1 | decided 2026-10-25 | History paging. The goal page sends every Event of the goal, its milestones, and its work items: 4,327 KB and 147 to 208 ms at 3,000 sub-goals, 3,000 comments, and 3,000 work items (18,019 rows). Was 1,241 KB at 3,000 comments in 5087caa. Decided: the goal page sends the newest 100 Events once a goal has more than 1,000. Accepted for the MLP. Recheck at the next pin |
+| D2 | decided 2026-10-25 | Visibility values. Any text is stored ("banana"). Decided: visibility stays open text, no list yet |
+| D3 | decided 2026-10-25 | Health on close. Completed Late keeps its health. Decided: Close sends health null; the history keeps the old health. Recheck at the next pin |
 
 ## Standing checks
 
