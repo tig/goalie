@@ -135,9 +135,16 @@ function checkOrgUnit(store: Lookup, unit: Row): Violation[] {
 
 function checkActor(store: Lookup, actor: Row): Violation[] {
   const ok = actor.kind === "agent" ? isHuman(store, actor.operator) : actor.operator == null;
-  return ok
+  const found: Violation[] = ok
     ? []
     : [{ rule: "agent-operator", message: `${actor.id}: an agent names a human operator, and a human has none.`, field: "operator" }];
+  // ADR 0005: one sign-in maps to one actor. A human signs in by subject, an agent by app id (Codebase QA P6).
+  for (const field of ["subject", "app_id"] as const) {
+    if (actor[field] == null) continue;
+    const taken = store.where("actor", field, actor[field]).find((other) => other.id !== actor.id);
+    if (taken) found.push({ rule: "one-actor-per-sign-in", message: `${actor.id}: ${field === "subject" ? "subject" : "app id"} ${String(actor[field])} already maps to ${String(taken.id)}. One sign-in maps to one actor.`, field });
+  }
+  return found;
 }
 
 function checkPriority(store: Lookup, priority: Row): Violation[] {

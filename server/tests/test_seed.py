@@ -68,6 +68,12 @@ class SeedTests(unittest.TestCase):
             self.assertIn(event["actor"], ("tig", "chelsea"))
             self.assertTrue(event["reason"])
 
+    def test_the_goalie_owner_adds_every_actor(self) -> None:
+        # ADR 0005, amended 2026-10-25: adding an actor is an Event with the GOALIE owner as its actor (Codebase QA P3).
+        with sqlite3.connect(self.store.path) as db:
+            authors = {r[0] for r in db.execute("SELECT actor FROM event WHERE entity_kind = 'actor'")}
+        self.assertEqual(authors, {"tig"})
+
     def test_tig_writes_the_owner_settings(self) -> None:
         settings = self.store.read("owner_settings", "owner")
         self.assertEqual(settings["settings"]["goal_key_prefix"], "XW")

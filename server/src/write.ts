@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { ENTITIES, encode, goalieOwner, isKind, lookup, memoryLookup, read, readAll, readEvents, type EventRow, type Kind } from "./read.ts";
-import { DEFAULT_VISIBILITY } from "./goal.ts";
+import { DEFAULT_VISIBILITY, isOpen } from "./goal.ts";
 import { checkAuthor, checkTransition, checkWrite, goalLints, REASONED_KINDS, SYSTEM_FIELDS, type Row, type Violation } from "./rules.ts";
 
 /**
@@ -140,6 +140,8 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
     if (before === undefined) return { ok: false, error: "not_found", message: `no ${kind} ${id}` };
     if (command.base_version !== before.version) return { ok: false, error: "stale", current: before };
     after = { ...before, ...fields, version: (before.version as number) + 1 };
+    // D3, Codebase QA P4: health is kept while In Progress (SPEC.md §6.1). A close clears it; its Event keeps the old health in History.
+    if (kind === "goal" && before.state === "In Progress" && !isOpen(after)) after.health = null;
   } else {
     return badCommand("op must be create or update");
   }
@@ -174,7 +176,9 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
     // The schema holds the required fields and the enum values. Its refusal is a named rejection.
     const message = error instanceof Error ? error.message : String(error);
     if (!/constraint failed/i.test(message)) throw error;
-    return { ok: false, error: "invalid", violations: [...violations, { rule: "field-value", message }] };
+    // A rule that names the cause comes before the raw text (Codebase QA P6: one-actor-per-sign-in, not "UNIQUE constraint failed").
+    const named = checkWrite(lookup(db), kind, after);
+    return { ok: false, error: "invalid", violations: [...violations, ...(named.length > 0 ? named : [{ rule: "field-value", message }])] };
   }
   violations.push(...missingReferences(db, kind, id));
   violations.push(...checkWrite(lookup(db), kind, read(db, kind, id) as Row));
