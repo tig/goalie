@@ -6,7 +6,8 @@ import { commandsAnswer } from "./model/commands.ts";
 
 type Loaded<T> = { state: "loading" } | { state: "ok"; data: T } | { state: "refused"; status: number; reason: string };
 
-async function getJson<T>(url: string): Promise<Loaded<T>> {
+/** GET one resource; a refusal or a reply that is not JSON reads as refused, with its reason. */
+export async function getJson<T>(url: string): Promise<Loaded<T>> {
   try {
     const reply = await fetch(url, { headers: { accept: "application/json" } });
     if (reply.ok) return { state: "ok", data: (await reply.json()) as T };

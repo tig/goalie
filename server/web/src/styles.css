@@ -666,3 +666,4 @@ select.wstatus{height:28px;border:1px solid var(--cut);border-radius:8px;backgro
 .tab::after,.drow>.linkbtn::after{content:"";position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}
 .wghead{min-height:44px;align-items:center}
 .drow{min-height:52px;padding:4px 0}}
+.olderrow{display:flex;align-items:center;gap:10px;margin:10px 0 0}
