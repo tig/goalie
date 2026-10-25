@@ -25,7 +25,7 @@ Status words: **blocks** stops the merge, **open** is a real problem with a clea
 | fixed | 36 |
 
 All three blocks from 5087caa are fixed: + Sub-goal saves, Promote saves, and every change needs a reason.
-The worst open items: a check hides the rules of every command under a refused create (Q11); a slip can move a date earlier in two saves (Q12); Promote and close is offered where it cannot save (Q13).
+At 2b58281 the worst open items: 4 of 6 saved lines on the goal page are dropped before anyone sees them (N1, U3); the top-bar links are 34 px tall on touch, on every page (N2); the New goal summary hint never shows until the date is filled (N3).
 
 ## Recheck at 2b58281
 
