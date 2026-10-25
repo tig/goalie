@@ -19,6 +19,13 @@ const controls = ({ filter, onHealth, onHot }: Omit<Props, "data">) => ({
   hover: (h: Health) => ({ onPointerEnter: () => onHot(h), onPointerLeave: () => onHot(undefined), onFocus: () => onHot(h), onBlur: () => onHot(undefined) }),
 });
 
+/** Rule 24b: a short SPEC.md §6.1 meaning of each health. The ? help holds the full definitions. */
+const MEANS: Record<Exclude<Health, null>, string> = {
+  RED: "Not credible without help",
+  YELLOW: "Real unknowns, a credible path",
+  GREEN: "On track",
+};
+
 /** The health counts: controls that highlight and filter (rule 24). The Committed dates card draws them, and so does the line above Priorities on a phone. */
 export function HealthCounts({ data, ...props }: Props) {
   const { pick, hover } = controls(props);
@@ -27,7 +34,10 @@ export function HealthCounts({ data, ...props }: Props) {
       {HEALTHS.map((h) => (
         <button key={h} type="button" className={`count${props.filter.health === h ? " on" : ""}`} aria-pressed={props.filter.health === h} onClick={() => pick(h)} {...hover(h)}>
           <HealthDot health={h} word={false} />
-          {data.summary.counts[h]} {h}
+          <b className="cnum">{data.summary.counts[h]}</b>
+          {/* Rule 24b: what the health means leads; the word follows, smaller, as every other screen names it. */}
+          <span className="cmean">{MEANS[h]}</span>
+          <span className="cword"> · {h}</span>
         </button>
       ))}
     </p>

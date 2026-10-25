@@ -27,7 +27,7 @@ a{color:var(--link)}
 .logo{width:34px;height:34px;border-radius:11px;background:var(--brand);color:var(--brand-ink);display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:16px}
 .brand{font-weight:800;font-size:18px}.org{color:var(--mute)}
 .tab{height:34px;padding:0 16px;border-radius:999px;background:var(--brand);color:var(--brand-ink);font-weight:700;display:inline-flex;align-items:center;margin-left:16px}
-.me{margin-left:auto}
+.me{margin-left:12px}
 .av{width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex:none}
 .av.mine{box-shadow:0 0 0 2px var(--card),0 0 0 3.5px var(--ink)}
 .me .av{width:30px;height:30px;font-size:13px;box-shadow:none}
@@ -667,3 +667,14 @@ select.wstatus{height:28px;border:1px solid var(--cut);border-radius:8px;backgro
 .wghead{min-height:44px;align-items:center}
 .drow{min-height:52px;padding:4px 0}}
 .olderrow{display:flex;align-items:center;gap:10px;margin:10px 0 0}
+/* Rule 24b: each count is its shape, number, meaning, then the word, smaller and muted. */
+.count .cnum{font-size:18px;font-weight:800}
+.count .cmean{font-size:14px;font-weight:700}
+.count .cword{font-size:12px;font-weight:700;color:var(--mute)}
+.phonesum .counts{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+/* NG1: "+ New goal" in the top bar, before the avatar. */
+.btn.topnew{margin-left:auto;height:32px;display:inline-flex;align-items:center;gap:6px;text-decoration:none}
+.phone .btn.topnew{width:44px;height:44px;padding:0;justify-content:center;border-radius:999px}
+.phone .topnewword{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (pointer:coarse){.dhead{min-height:44px}.btn.create{min-height:48px}}
+@media (pointer:coarse){.phonesum .counts{gap:0}.phonesum .count{min-height:44px}}

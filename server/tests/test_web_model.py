@@ -740,6 +740,12 @@ class NewGoalV2Tests(unittest.TestCase):
         form = {"summary": "Ship it", "due_date": "2027-02-26", "date_type": "Committed", "priorityPicked": True}
         self.assertEqual([l[0] for l in self.lines(form, {"ok": False, "at": 3, "error": "stale", "current": {}})], ["summary", "due_date", "date_type", "plan_maturity", "priority"])  # type: ignore[union-attr]
 
+    def test_a_check_that_could_not_run_keeps_the_last_list_and_never_reads_ready(self) -> None:
+        invalid = {"ok": False, "at": 1, "error": "invalid", "violations": [], "all": [{"rule": "ptg-when-yellow-or-red", "message": "x", "field": "path_to_green", "at": 1}]}
+        stale = {"ok": False, "at": 3, "error": "stale", "current": {}}
+        got = run(f"return [newgoal.ruleAnswer({json.dumps(stale)}, {json.dumps(invalid)}).error, newgoal.ruleAnswer({json.dumps(invalid)}, null).error, newgoal.countLine(0, true), newgoal.countLine(0, false), newgoal.countLine(2, false)];")
+        self.assertEqual(got, ["invalid", "invalid", "Could not check", "Ready to create", "To save: 2 to go"])
+
     def test_create_will_make_names_what_without_keys(self) -> None:
         form = {**self.BASE, "date_type": "Fantasy", "subGoals": [{"summary": "a", "owner": "chelsea"}, {"summary": "b", "owner": "chelsea"}], "workItems": [{"title": "t", "goal": 0, "owner": "chelsea", "due_date": None}]}
         self.assertEqual(run(f"return newgoal.makes({json.dumps(form)});"), "This goal · its Promotion Milestone · 2 sub-goals · 1 work item")

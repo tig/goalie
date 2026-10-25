@@ -55,6 +55,15 @@ function TopBar({ data }: { data?: PrioritiesResponse }) {
       <span className="brand">{BRAND.app}</span>
       {data && <span className="org">/ {data.org.name}</span>}
       {data && <TopTabs />}
+      {/* NG1: New goal is in the top bar on every page, before the avatar; on a phone a 44 px + named "New goal". */}
+      {data && (
+        <Link to={newGoalPath()} className="btn primary topnew" aria-label="New goal">
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+            <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          <span className="topnewword">New goal</span>
+        </Link>
+      )}
       {data && (
         <span className="me">
           <Avatar actor={data.me} />
@@ -211,10 +220,6 @@ function Home({ data }: { data: PrioritiesResponse }) {
                 </button>
               ))}
             </span>
-            {/* On a phone New goal sits on the first row, after the view tabs. */}
-            <Link to={newGoalPath()} className="btn primary newgoal mob">
-              New goal
-            </Link>
             {/* When one row does not fit, a break puts the search box and the right cluster together on a second row (rule 25b). */}
             <span className="tbreak" aria-hidden="true" />
             {search}
@@ -248,10 +253,6 @@ function Home({ data }: { data: PrioritiesResponse }) {
                   </button>
                 </nav>
               )}
-              {/* New goal is in every view, last in the right cluster, so it never moves. */}
-              <Link to={newGoalPath()} className="btn primary newgoal desk">
-                New goal
-              </Link>
             </span>
           </div>
           {view === "timeline" && <TimelineView {...tree} window={window} home={home} onRange={setRange} />}
