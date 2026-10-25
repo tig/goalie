@@ -3,7 +3,7 @@ import type { ApiActor, ApiWorkItem, GoalPageResponse, Health, SubGoalCard } fro
 import { shortDate } from "../../src/dates.ts";
 import { postCommands, useJson } from "./data.ts";
 import { AddSubGoal, AddWorkItem, useTick } from "./GoalAdd.tsx";
-import { ClosePanel, DescriptionPanel, FieldsPanel, HealthPanel, PromotePanel, PursuePanel, SlipPanel, type PanelName } from "./GoalPanels.tsx";
+import { ClosePanel, DescriptionPanel, FieldsPanel, HealthPanel, PromotePanel, PursuePanel, SlipPanel, type Done, type PanelName } from "./GoalPanels.tsx";
 import { commentBatch } from "./model/commands.ts";
 import { changeParts, comments, createdFields, historyNames, dateBar, labelRows, eventValue, fieldLabel, filterEvents, groupEvents, groupWorkItems, HISTORY_FILTERS, type EventGroup, type HistoryFilter, type Names } from "./model/goalpage.ts";
 import { dateLabel, slipLabel } from "./model/labels.ts";
@@ -56,11 +56,24 @@ const when = (ts: string) => time.format(new Date(ts));
 function Goal({ data, back, reload }: { data: GoalPageResponse; back: React.ReactNode; reload: () => void }) {
   const { goal, actors, today } = data;
   // One panel at a time (G9). A saved panel reloads the page, so every section shows the stored state.
-  const [panel, setPanel] = useState<{ name: PanelName | "subgoal" | "workitem"; health?: Exclude<Health, null> } | null>(null);
-  const done = (saved: boolean) => {
+  const [status, setStatus] = useState<{ text: string; where: "head" | "subs" | "work" }>({ text: "", where: "head" });
+  const [panel, openPanel] = useState<{ name: PanelName | "subgoal" | "workitem"; health?: Exclude<Health, null> } | null>(null);
+  const setPanel = (next: typeof panel) => {
+    setStatus((s) => ({ ...s, text: "" }));
+    openPanel(next);
+  };
+  // G26: a save that adds or moves something out of view says so on one live line by the action; the next action clears it.
+  const done = (saved: boolean, text?: string) => {
+    const where = panel?.name === "subgoal" ? "subs" : panel?.name === "workitem" ? "work" : "head";
     setPanel(null);
+    setStatus({ text: saved ? (text ?? "") : "", where });
     if (saved) reload();
   };
+  const said = (where: "head" | "subs" | "work") => (
+    <p className="gstatus" role="status">
+      {status.where === where ? status.text : ""}
+    </p>
+  );
   const closable = goal.state === "In Progress" || goal.state === "Backlog";
   const owner = actors[goal.owner] ?? { id: goal.owner, name: goal.owner, kind: "human" as const };
   const [judged, ...others] = data.dates;
@@ -181,6 +194,7 @@ function Goal({ data, back, reload }: { data: GoalPageResponse; back: React.Reac
           )}
         </div>
         )}
+        {may && said("head")}
         {panel?.name === "health" && panel.health && <HealthPanel data={data} health={panel.health} onDone={done} />}
         {panel?.name === "slip" && <SlipPanel data={data} onDone={done} />}
         {panel?.name === "promote" && <PromotePanel data={data} onDone={done} />}
@@ -248,13 +262,14 @@ function Goal({ data, back, reload }: { data: GoalPageResponse; back: React.Reac
             </button>
           )}
         </h2>
+        {said("subs")}
         {panel?.name === "subgoal" && <AddSubGoal data={data} onDone={done} />}
         {data.subGoals.map((c) => (
           <SubGoal key={c.id} card={c} data={data} />
         ))}
       </section>
       {data.workItems && (
-        <WorkItems items={data.workItems} data={data} adding={panel?.name === "workitem"} onAdd={() => setPanel({ name: "workitem" })} onDone={done} reload={reload} />
+        <WorkItems items={data.workItems} data={data} adding={panel?.name === "workitem"} onAdd={() => setPanel({ name: "workitem" })} onDone={done} reload={reload} status={said("work")} />
       )}
       <Talk data={data} reload={reload} />
     </main>
@@ -377,7 +392,12 @@ function SubGoal({ card, data }: { card: SubGoalCard; data: GoalPageResponse }) 
         <span className="gsubmeta small">
           {card.promotionMilestone && <span className="pmtag">◆ Promotion Milestone</span>}
           {card.state !== "In Progress" && <span>{card.state}</span>}
-          {card.dates.length > 0 && <span className="date">{card.dates.map((d) => dateLabel(d, data.today)).join(" · ")}</span>}
+          {card.dates.length > 0 ? (
+            <span className="date">{card.dates.map((d) => dateLabel(d, data.today)).join(" · ")}</span>
+          ) : (
+            // QA U1: a sub-goal on this goal's date says so, and shares this goal's Promotion Milestone when the date is uncommitted (G21).
+            <span className="muted">This goal's date{data.goal.promotion_milestone ? ` · shares ${data.goal.promotion_milestone}` : ""}</span>
+          )}
           {card.workItems && card.workItems.total > 0 && (
             <span className="progress">
               <span className="pbar">
@@ -405,7 +425,7 @@ export function Owner({ actor, me }: { actor: ApiActor; me: string }) {
   );
 }
 
-function WorkItems({ items, data, adding, onAdd, onDone, reload }: { items: ApiWorkItem[]; data: GoalPageResponse; adding: boolean; onAdd: () => void; onDone: (saved: boolean) => void; reload: () => void }) {
+function WorkItems({ items, data, adding, onAdd, onDone, reload, status }: { items: ApiWorkItem[]; data: GoalPageResponse; adding: boolean; onAdd: () => void; onDone: Done; reload: () => void; status: React.ReactNode }) {
   const [closed, setClosed] = useState<Record<string, boolean>>({ Completed: true });
   const live = items.filter((i) => i.status !== "Deleted");
   const { ticked, tick, box } = useTick(reload);
@@ -417,6 +437,7 @@ function WorkItems({ items, data, adding, onAdd, onDone, reload }: { items: ApiW
           + Work item
         </button>
       </h2>
+      {status}
       {live.length === 0 && !adding && <p className="muted note">No work items yet.</p>}
       {adding && <AddWorkItem data={data} statuses={["Backlog", "In Progress", "Completed", "Deleted"]} onDone={onDone} />}
       {groupWorkItems(live).map((g) => (

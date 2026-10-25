@@ -181,7 +181,9 @@ export function createBatch(form: NewGoalForm, check = false): CommandsRequest {
   // Milestones and sub-goals start in Backlog and carry the form's required fields (severity, origination, visibility, plan maturity).
   const carried = kept({ ...form.more, plan_maturity: form.plan_maturity });
   const milestone = (m: NewMilestone) => ({ ...m, type: form.milestoneType, date_type: "Committed" as const, ...where, ...carried, state: "Backlog" as const });
-  const uncommitted = form.date_type !== "Committed" && form.milestone;
+  // NF9: a goal made under a parent takes the parent's date, Date Type, Priority, and milestone (D2), so it sends none of its own.
+  const inherit = Boolean(form.parent);
+  const uncommitted = !inherit && form.date_type !== "Committed" && form.milestone;
   // A sub-goal with its own uncommitted date and milestone gets the next milestone ref: $m1, $m2, ...
   let n = 0;
   const own = form.subGoals.map((row, i) => ({ row, i, ref: row.date && row.date.date_type !== "Committed" && row.milestone ? (`$m${++n}` as const) : null }));
@@ -196,9 +198,8 @@ export function createBatch(form: NewGoalForm, check = false): CommandsRequest {
       summary: form.summary,
       description: form.description,
       owner: form.owner,
-      ...(form.priority ? { priority: form.priority } : {}),
-      due_date: form.due_date,
-      date_type: form.date_type,
+      ...(form.priority && !inherit ? { priority: form.priority } : {}),
+      ...(inherit ? {} : { due_date: form.due_date, date_type: form.date_type }),
       ...(uncommitted ? { promotion_milestone: "$m" } : {}),
       ...(form.health ? { health: form.health, ...(form.health !== "GREEN" ? { path_to_green: form.path_to_green } : {}) } : {}),
       plan: form.plan,
@@ -266,4 +267,25 @@ export function commandsAnswer(body: unknown): CommandsResponse {
   const b = body as { ok?: unknown; error?: unknown; reason?: string } | null;
   if (typeof b?.ok === "boolean") return b as CommandsResponse;
   return { ok: false, at: 0, error: "bad_command", message: b?.reason ?? String(b?.error ?? "The server refused the save.") };
+}
+
+export type SavedAction = "subgoal" | "workitem" | "promote" | "promote-close" | "slip" | "close";
+
+/** G26: after a save that adds or moves something out of view, one line says what happened, naming the new key from the answer. */
+export function savedStatus(action: SavedAction, answer: CommandsResponse, x: { to?: string; state?: string; date?: string } = {}): string {
+  if (!answer.ok) return "";
+  switch (action) {
+    case "subgoal":
+      return `Added ${answer.ids["$s1"]} under this goal.`;
+    case "workitem":
+      return `Added ${answer.events.find((e) => e.entity_kind === "work_item" && e.field === "title")?.entity ?? "a work item"} to this goal.`;
+    case "promote":
+      return answer.ids["$m"] ? `Promoted to ${x.to}. ${answer.ids["$m"]} is the next Promotion Milestone.` : `Promoted to ${x.to}.`;
+    case "promote-close":
+      return `Promoted to Committed and closed as ${x.state}.`;
+    case "slip":
+      return `Recorded a slip to ${x.date}.`;
+    case "close":
+      return `Closed as ${x.state}.`;
+  }
 }

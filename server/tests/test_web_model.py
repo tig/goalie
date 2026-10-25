@@ -13,7 +13,7 @@ FIXTURE = Path(__file__).resolve().parents[1] / "web" / "fixtures" / "priorities
 
 def run(body: str) -> object:
     """Run an ES module that imports the model as `m` and the seed fixture as `api`, and return what it prints as JSON."""
-    imports = "".join(f'import * as {name} from "{(MODEL / f"{name}.ts").as_uri()}";\n' for name in ("query", "filter", "timeline", "calendar", "popover", "labels", "scroll", "route", "goalpage", "commands"))
+    imports = "".join(f'import * as {name} from "{(MODEL / f"{name}.ts").as_uri()}";\n' for name in ("query", "filter", "timeline", "calendar", "popover", "labels", "scroll", "route", "goalpage", "commands", "newgoal"))
     script = f"""{imports}
 import {{ readFileSync }} from "node:fs";
 const api = JSON.parse(readFileSync({json.dumps(str(FIXTURE))}, "utf-8"));
@@ -210,6 +210,11 @@ class TimelineTests(unittest.TestCase):
 
     def lanes(self, marks: list, view: dict = {"left": 1000, "right": 1800}) -> dict:
         return run(f"return timeline.placeLaneLabels({json.dumps(marks)}, {json.dumps(view)});")  # type: ignore[return-value]
+
+    def test_a_lone_label_that_fits_neither_side_goes_to_the_nearer_edge(self) -> None:
+        # QA R15, measured at 768 Weeks, scroll 2024: the board shows 2024 to 2281; the slip label fit neither side and was cut 100 px at the right.
+        placed = self.lanes([{"key": "tick", "atPx": 2218, "text": "Committed Oct 1 · slip 23 days", "outside": None}], {"left": 2024, "right": 2281})
+        self.assertEqual(placed, {"before": [], "after": ["tick"], "inside": []})
 
     def test_two_marks_past_one_edge_become_one_label(self) -> None:
         placed = self.lanes([{"key": "end", "atPx": 300, "text": "Fantasy Nov 30", "outside": None}, {"key": "tick", "atPx": 100, "text": "Promotion Milestone Nov 6", "outside": None}])
@@ -475,6 +480,9 @@ class GoalPageTests(unittest.TestCase):
         q = run(f"return goalpage.queues({json.dumps(items)}, {json.dumps(actors)}, 'chelsea').map((q) => [q.owner.id, q.groups.map((g) => [g.status, g.items.map((i) => i.id)])]);")
         self.assertEqual(q, [["chelsea", [["In Progress", ["WI-2"]]]], ["qa", [["In Progress", ["WI-3"]], ["Backlog", ["WI-1"]]]]])
 
+    def test_the_queue_order_holds_from_page_load(self) -> None:
+        self.assertEqual(run('return [goalpage.keepOrder(null, ["bob", "ann"]), goalpage.keepOrder(["bob", "ann"], ["ann", "cat", "bob"])];'), [["bob", "ann"], ["bob", "ann", "cat"]])
+
     def test_people_with_work_in_progress_come_first(self) -> None:
         items = [{"id": "1", "owner": "ann", "status": "Completed"}, {"id": "2", "owner": "bob", "status": "In Progress"}, {"id": "3", "owner": "me", "status": "Backlog"}, {"id": "4", "owner": "cat", "status": "In Progress"}]
         actors = {k: {"id": k, "name": k.title(), "kind": "human"} for k in ("ann", "bob", "cat", "me")}
@@ -576,6 +584,27 @@ class CommandTests(unittest.TestCase):
         got = run(f"const a = {json.dumps(answer)}; const b = commands.createBatch({json.dumps(self.FORM)}); return [commands.refusals(a, b).map((v) => v.rule), commands.notChecked(a)];")
         self.assertEqual(got, [["required-field"], 1])
 
+    def test_a_save_says_what_happened_naming_the_new_key(self) -> None:
+        ev = lambda kind, ent, field: {"entity_kind": kind, "entity": ent, "field": field, "old": None, "new": "x"}
+        cases = [
+            ("subgoal", {"ok": True, "ids": {"$s1": "XW-0020"}, "events": []}, {}),
+            ("workitem", {"ok": True, "ids": {}, "events": [ev("work_item", "WI-0050", "title")]}, {}),
+            ("promote", {"ok": True, "ids": {"$m": "XW-0021"}, "events": []}, {"to": "Ambition"}),
+            ("promote", {"ok": True, "ids": {}, "events": []}, {"to": "Committed"}),
+            ("close", {"ok": True, "ids": {}, "events": []}, {"state": "Completed Late"}),
+            ("promote-close", {"ok": True, "ids": {}, "events": []}, {"state": "Completed"}),
+            ("slip", {"ok": True, "ids": {}, "events": []}, {"date": "Dec 4, 2026"}),
+        ]
+        self.assertEqual(run(f"return {json.dumps(cases)}.map(([k, a, x]) => commands.savedStatus(k, a, x));"), [
+            "Added XW-0020 under this goal.",
+            "Added WI-0050 to this goal.",
+            "Promoted to Ambition. XW-0021 is the next Promotion Milestone.",
+            "Promoted to Committed.",
+            "Closed as Completed Late.",
+            "Promoted to Committed and closed as Completed.",
+            "Recorded a slip to Dec 4, 2026.",
+        ])
+
     def test_a_new_goal_is_sent_in_the_create_order(self) -> None:
         b = run(f"return commands.createBatch({json.dumps(self.FORM)});")
         steps = [(c["op"], c["kind"], c.get("ref") or c.get("id")) for c in b["commands"]]  # type: ignore[index]
@@ -611,6 +640,14 @@ class CommandTests(unittest.TestCase):
         form = {**self.FORM, "parent": "XW-0003", "subGoals": [], "workItems": []}
         self.assertEqual(run(f"return commands.createBatch({json.dumps(form)}).commands.find((c) => c.ref === '$goal').fields.parent;"), "XW-0003")
 
+    def test_a_new_goal_under_a_parent_takes_the_parents_date(self) -> None:
+        form = {**self.FORM, "parent": "XW-0004", "subGoals": [], "workItems": []}
+        c = run(f"return commands.createBatch({json.dumps(form)}).commands;")
+        self.assertEqual([(x["op"], x.get("ref")) for x in c], [("create", "$goal")])  # type: ignore[union-attr]
+        fields = c[0]["fields"]  # type: ignore[index]
+        self.assertEqual([k for k in ("due_date", "date_type", "priority", "promotion_milestone") if k in fields], [])
+        self.assertEqual(fields["parent"], "XW-0004")
+
     def test_every_create_carries_the_required_fields(self) -> None:
         c = run(f"return commands.createBatch({json.dumps(self.FORM)}).commands.filter((x) => x.op === 'create' && x.kind === 'goal');")
         for x in c:  # type: ignore[union-attr]
@@ -636,6 +673,51 @@ class RouteTests(unittest.TestCase):
 
     def test_a_goal_link_and_the_back_link(self) -> None:
         self.assertEqual(run('return [route.goalPath("XW-0003"), route.newGoalPath(), route.newGoalPath("XW-0003"), route.backPath("?view=list&health=RED"), route.backPath("")];'), ["/goals/XW-0003", "/goals/new", "/goals/new?parent=XW-0003", "/?view=list&health=RED", "/"])
+
+
+
+class NewGoalV2Tests(unittest.TestCase):
+    """New goal v2 (design NF1 to NF18): the To save list, Create will make, and the closed Details line."""
+
+    BASE = {"summary": "", "owner": "chelsea", "due_date": "", "date_type": "", "milestone": None, "subGoals": [], "workItems": []}
+
+    def lines(self, form: dict, answer: object = None, details: bool = False) -> object:
+        return run(f"return newgoal.toSave({json.dumps({**self.BASE, **form})}, {json.dumps(answer)}, {json.dumps(details)}).map((l) => [l.key, l.text, l.done]);")
+
+    def test_an_empty_form_lists_the_foundation_with_nothing_done(self) -> None:
+        self.assertEqual(self.lines({}), [["summary", "Summary", False], ["due_date", "Date", False], ["date_type", "Date Type", False], ["priority", "Priority, or None", False]])
+
+    def test_priority_is_met_once_picked_even_as_none_and_from_a_parent(self) -> None:
+        self.assertEqual(self.lines({"priorityPicked": True})[-1], ["priority", "Priority, or None", True])
+        self.assertEqual(self.lines({"summary": "Help text", "parent": "XW-0004"}), [["summary", "Summary", True]])
+
+    def test_an_uncommitted_date_adds_the_milestone_date_and_a_committed_one_the_plan(self) -> None:
+        fantasy = self.lines({"summary": "Ship it", "due_date": "2027-02-26", "date_type": "Fantasy", "milestone": {"summary": "Commit", "due_date": "", "owner": "chelsea"}})
+        self.assertEqual(fantasy, [["summary", "Summary", True], ["due_date", "Date", True], ["date_type", "Date Type", True], ["milestone_date", "Promotion Milestone date", False], ["priority", "Priority, or None", False]])
+        committed = self.lines({"summary": "Ship it", "due_date": "2027-02-26", "date_type": "Committed"}, {"ok": True, "ids": {}, "events": []})
+        self.assertEqual(committed[-2], ["plan_maturity", "Plan at Pencil", True])
+
+    def test_a_refusal_undoes_its_line_in_plain_words_and_details_wait_until_opened(self) -> None:
+        answer = {"ok": False, "at": 0, "error": "invalid", "violations": [], "all": [
+            {"rule": "committed-needs-pencil", "message": "XW-0012: a Committed date needs a Plan at Pencil.", "field": "plan_maturity", "at": 0},
+            {"rule": "health-while-in-progress", "message": "An In Progress goal needs a health: GREEN, YELLOW, or RED.", "field": "health", "at": 0},
+            {"rule": "not-checked", "message": "not checked yet: it names $m", "at": 1},
+        ]}
+        form = {"summary": "Ship it", "due_date": "2027-02-26", "date_type": "Committed"}
+        self.assertEqual(self.lines(form, answer)[-2], ["plan_maturity", "Plan at Pencil", False])
+        self.assertNotIn("health", [l[0] for l in self.lines(form, answer)])  # type: ignore[union-attr]
+        self.assertEqual(self.lines(form, answer, True)[-1], ["health", "Health", False])
+        said = run(f"return newgoal.toSave({json.dumps({**self.BASE, **form})}, {json.dumps(answer)}, false).map((l) => l.sentence);")
+        self.assertEqual(said[-2], "A Committed date needs a plan at Pencil.")  # type: ignore[index]
+
+    def test_create_will_make_names_what_without_keys(self) -> None:
+        form = {**self.BASE, "date_type": "Fantasy", "subGoals": [{"summary": "a", "owner": "chelsea"}, {"summary": "b", "owner": "chelsea"}], "workItems": [{"title": "t", "goal": 0, "owner": "chelsea", "due_date": None}]}
+        self.assertEqual(run(f"return newgoal.makes({json.dumps(form)});"), "This goal · its Promotion Milestone · 2 sub-goals · 1 work item")
+        self.assertEqual(run(f"return newgoal.makes({json.dumps({**self.BASE, 'date_type': 'Committed'})});"), "This goal")
+
+    def test_closed_details_show_five_values_then_how_many_more(self) -> None:
+        rows = [["Description", "None"], ["State", "Backlog"], ["Type", "Milestone (Launch)"], ["Severity", "sev2"], ["Origination", "New"], ["Visibility", "Organization-wide"], ["Work Product", "None"]]
+        self.assertEqual(run(f"return newgoal.detailsLine({json.dumps(rows)});"), "Description · None   State · Backlog   Type · Milestone (Launch)   Severity · sev2   Origination · New   and 2 more")
 
 
 if __name__ == "__main__":

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import type { ApiEvent, PrioritiesResponse, WorkResponse } from "../../src/api.ts";
+import type { ApiEvent, PrioritiesResponse, WorkItemStatus, WorkResponse } from "../../src/api.ts";
 import { shortDate } from "../../src/dates.ts";
 import { useJson } from "./data.ts";
 import { useTick } from "./GoalAdd.tsx";
 import { Owner } from "./GoalPage.tsx";
-import { queues } from "./model/goalpage.ts";
+import { keepOrder, queues } from "./model/goalpage.ts";
 import { goalPath, workPath } from "./model/route.ts";
 import { Link } from "./router.tsx";
 
@@ -75,17 +75,27 @@ function Due({ date, late, today, done }: { date: string | null; late: boolean; 
   );
 }
 
+const STATUSES: WorkItemStatus[] = ["Backlog", "In Progress", "Completed", "Deleted"];
+
 function Queues({ work, reload, single }: { work: WorkResponse; reload: () => void; single: boolean }) {
   const [closed, setClosed] = useState<Record<string, boolean>>({});
-  const { ticked, tick, box } = useTick(reload);
-  const list = queues(work.items, work.actors, work.me.id);
+  const { ticked, tick, move, chosen, box } = useTick(reload);
+  // QA U5: a save does not move a person's queue; the order from page load holds until the next visit.
+  const sorted = queues(work.items, work.actors, work.me.id);
+  const [first] = useState(() => sorted.map((q) => q.owner.id));
+  const order = keepOrder(first, sorted.map((q) => q.owner.id));
+  const list = order.map((id) => sorted.find((q) => q.owner.id === id)).filter((q) => q !== undefined);
   if (!list.length) return <p className="muted note">No work items yet.</p>;
   return (
     <>
       {list.map((q) => (
         <section key={q.owner.id} className="queue">
           <h2>
-            {single ? <Owner actor={q.owner} me={work.me.id} /> : <Link to={workPath(q.owner.id)} className="qowner"><Owner actor={q.owner} me={work.me.id} /></Link>}
+            <span className="qwho">
+              {single ? <Owner actor={q.owner} me={work.me.id} /> : <Link to={workPath(q.owner.id)} className="qowner"><Owner actor={q.owner} me={work.me.id} /></Link>}
+              {/* QA U4: a seat's queue names the human who operates it. */}
+              {q.owner.operator && <span className="qop"><span className="qcomma">,</span> operated by {work.actors[q.owner.operator]?.name ?? q.owner.operator}</span>}
+            </span>
             <span className="muted">{q.groups.reduce((n, g) => n + g.items.length, 0)}</span>
           </h2>
           {q.groups.map((g) => {
@@ -103,6 +113,12 @@ function Queues({ work, reload, single }: { work: WorkResponse; reload: () => vo
                   {work.goals[i.goal]?.summary ?? i.goal}
                 </Link>
                 <Due date={i.due_date} late={i.late} today={work.today} done={done} />
+                {/* QA U6: any status can be set here, each with its reason (product D8). */}
+                <select className="wstatus small" value={chosen(i)} aria-label={`Status of ${i.title}`} onChange={(e) => move(i, e.target.value as WorkItemStatus)}>
+                  {STATUSES.map((st) => (
+                    <option key={st}>{st}</option>
+                  ))}
+                </select>
                 {box(i)}
               </div>
             ));
