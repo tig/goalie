@@ -289,3 +289,32 @@ export function savedStatus(action: SavedAction, answer: CommandsResponse, x: { 
       return `Closed as ${x.state}.`;
   }
 }
+
+/** Drag to reorder Priorities (Chelsea, 2026-10-25): one batch, one update per Priority whose rank changes, all with one reason. The server checks 1 to n, no gap, no tie, when the batch ends. */
+export function rankBatch(priorities: { id: string; rank: number; version: number }[], order: string[], reason: string): CommandsRequest {
+  return {
+    commands: order.flatMap((id, i) => {
+      const p = priorities.find((x) => x.id === id);
+      return p && p.rank !== i + 1 ? [{ op: "update" as const, kind: "priority" as const, id, base_version: p.version, fields: { rank: i + 1 }, reason }] : [];
+    }),
+  };
+}
+
+/** A keyboard move: one place up (-1) or down (1), held inside the list. */
+export function moveIn(order: string[], id: string, by: -1 | 1): string[] {
+  const i = order.indexOf(id);
+  const j = i + by;
+  if (i < 0 || j < 0 || j >= order.length) return order;
+  const next = [...order];
+  [next[i], next[j]] = [next[j], next[i]];
+  return next;
+}
+
+/** A drop: the Priority lands at drop line `index`, 0 above the first, n below the last. */
+export function moveTo(order: string[], id: string, index: number): string[] {
+  const from = order.indexOf(id);
+  if (from < 0) return order;
+  const rest = order.filter((x) => x !== id);
+  const at = index > from ? index - 1 : index;
+  return [...rest.slice(0, at), id, ...rest.slice(at)];
+}

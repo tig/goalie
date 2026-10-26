@@ -663,6 +663,22 @@ process.stdout.write(JSON.stringify([a.body.message, b.body.message]));"""
             "Recorded a slip to Dec 4, 2026.",
         ])
 
+    def test_reordering_priorities_sends_one_batch_of_the_ranks_that_changed(self) -> None:
+        ps = [{"id": "PRI-1", "rank": 1, "version": 3}, {"id": "PRI-2", "rank": 2, "version": 1}, {"id": "PRI-3", "rank": 3, "version": 5}]
+        b = run(f"return commands.rankBatch({json.dumps(ps)}, ['PRI-1', 'PRI-3', 'PRI-2'], 'Ship first');")
+        self.assertEqual(b, {"commands": [
+            {"op": "update", "kind": "priority", "id": "PRI-3", "base_version": 5, "fields": {"rank": 2}, "reason": "Ship first"},
+            {"op": "update", "kind": "priority", "id": "PRI-2", "base_version": 1, "fields": {"rank": 3}, "reason": "Ship first"},
+        ]})
+
+    def test_a_dropped_priority_lands_at_the_drop_line(self) -> None:
+        got = run("return [commands.moveTo(['a', 'b', 'c'], 'a', 3), commands.moveTo(['a', 'b', 'c'], 'c', 0), commands.moveTo(['a', 'b', 'c'], 'b', 1), commands.moveTo(['a', 'b', 'c'], 'b', 2)];")
+        self.assertEqual(got, [["b", "c", "a"], ["c", "a", "b"], ["a", "b", "c"], ["a", "b", "c"]])
+
+    def test_a_priority_moves_one_place_with_the_keyboard(self) -> None:
+        got = run("return [commands.moveIn(['a', 'b', 'c'], 'c', -1), commands.moveIn(['a', 'b', 'c'], 'a', -1), commands.moveIn(['a', 'b', 'c'], 'a', 1)];")
+        self.assertEqual(got, [["a", "c", "b"], ["a", "b", "c"], ["b", "a", "c"]])
+
     def test_a_new_goal_is_sent_in_the_create_order(self) -> None:
         b = run(f"return commands.createBatch({json.dumps(self.FORM)});")
         steps = [(c["op"], c["kind"], c.get("ref") or c.get("id")) for c in b["commands"]]  # type: ignore[index]

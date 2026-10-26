@@ -6,6 +6,8 @@ import { calendarMonth } from "./model/calendar.ts";
 import { filterPriorities, isFiltering } from "./model/filter.ts";
 import { ZOOM_ORDER, type View } from "./model/query.ts";
 import { moveFrom, timelineWindow } from "./model/timeline.ts";
+import { rankBatch } from "./model/commands.ts";
+import { postCommands } from "./data.ts";
 import { Cards, HealthCounts } from "./Cards.tsx";
 import { CalendarView } from "./CalendarView.tsx";
 import { ListView } from "./ListView.tsx";
@@ -115,6 +117,8 @@ function Skeleton() {
 export function App() {
   usePhone();
   const [loaded, setLoaded] = useState<Load>({ state: "loading" });
+  // A reload after a save (rule 26) keeps the page on screen until the new answer arrives.
+  const [round, setRound] = useState(0);
   useEffect(() => {
     load().then(
       (result) => {
@@ -123,8 +127,8 @@ export function App() {
       },
       (e: Error) => setLoaded({ state: "refused", status: 0, reason: e.message }),
     );
-  }, []);
-  if (loaded.state === "ok") return <Pages data={loaded.data} />;
+  }, [round]);
+  if (loaded.state === "ok") return <Pages data={loaded.data} reload={() => setRound((n) => n + 1)} />;
   return (
     <>
       <TopBar />
@@ -142,7 +146,7 @@ export function App() {
 const VIEW_LABELS: Record<View, string> = { timeline: "Timeline", list: "List", calendar: "Calendar" };
 
 /** The page the URL names. Home stays the data source for every page until the goal API lands. */
-function Pages({ data }: { data: PrioritiesResponse }) {
+function Pages({ data, reload }: { data: PrioritiesResponse; reload: () => void }) {
   const route = useRoute();
   return (
     <>
@@ -154,13 +158,13 @@ function Pages({ data }: { data: PrioritiesResponse }) {
       ) : route.page === "new" ? (
         <NewGoal key={route.parent ?? ""} parent={route.parent} viewName={data.view.name} />
       ) : (
-        <Home data={data} />
+        <Home data={data} reload={reload} />
       )}
     </>
   );
 }
 
-function Home({ data }: { data: PrioritiesResponse }) {
+function Home({ data, reload }: { data: PrioritiesResponse; reload: () => void }) {
   const [screen, change] = useScreen();
   rememberHome(location.search);
   const [hot, setHot] = useState<Health | undefined>();
@@ -179,7 +183,21 @@ function Home({ data }: { data: PrioritiesResponse }) {
   const view: View = phone && screen.view === "timeline" ? "list" : screen.view;
 
   const search = <Search q={screen.q} health={screen.health} onSearch={(q) => change({ q }, Boolean(screen.q) === Boolean(q.trim()))} onClear={() => change({ health: undefined, q: undefined })} />;
-  const tree = { funded, backlog, me: data.me, today: data.today, filtering, selected: screen.health, hot };
+  // Rule 26: drag to reorder Priorities, only for an actor who may (mayRank) and with no filter on. One batch of the ranks that changed.
+  const rank =
+    data.mayRank && !filtering
+      ? {
+          save: async (order: string[], reason: string) => {
+            const { body } = await postCommands(rankBatch([...data.funded, ...data.backlog], order, reason));
+            if (body.ok) {
+              reload();
+              return undefined;
+            }
+            return body.error === "invalid" ? body.violations.map((v) => v.message).join(" ") : body.error === "stale" ? "Someone changed the Priorities after you opened the page. Reload and try again." : body.message;
+          },
+        }
+      : undefined;
+  const tree = { funded, backlog, me: data.me, today: data.today, filtering, selected: screen.health, hot, rank };
   const zoomAt = ZOOM_ORDER.indexOf(screen.zoom);
   const zoomStep = (to: number, label: string, sign: string) => {
     const zoom = ZOOM_ORDER[to];
