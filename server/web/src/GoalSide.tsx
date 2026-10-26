@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import type { FormOptions, GoalFields, GoalPageResponse, GoalRef, Health } from "../../src/api.ts";
+import type { FormOptions, GoalFields, GoalPageResponse, Health } from "../../src/api.ts";
 import { postCommands, useJson } from "./data.ts";
 import { fieldsBatch } from "./model/commands.ts";
 import { eventValue, fieldLabel } from "./model/goalpage.ts";
@@ -13,15 +13,11 @@ import { homeSearch, Link } from "./router.tsx";
  * The page reads who may change the goal from the server (mayChange); a one-field property edits in place with a reason line and Save.
  */
 
-/** Fields the server adds for v2; each shows nothing until it is there. */
-type V2 = { siblings?: GoalRef[]; backs?: GoalRef | null; above: { id: string; owner: string; summary?: string }[]; promotionMilestone: (GoalPageResponse["promotionMilestone"] & { health?: Health }) | null };
-const v2 = (data: GoalPageResponse) => data as GoalPageResponse & V2;
-
 const yearDate = (date: string) => eventValue(date, "due_date");
 
 /** GP2-1: Priority, each goal above (top first), this goal. A middle step is cut with an ellipsis and keeps its whole summary in its tooltip. */
 export function Crumbs({ data }: { data: GoalPageResponse }) {
-  const above = [...v2(data).above].reverse().map((g) => ({ id: g.id, summary: g.summary ?? (data.parent?.id === g.id ? data.parent.summary : g.id) }));
+  const above = [...data.above].reverse();
   const nearest = above[above.length - 1];
   return (
     <nav className="crumbs" aria-label="Where this goal sits">
@@ -134,7 +130,7 @@ export function Props({ data, reload, onAct, chosen, dateBar }: { data: GoalPage
   const open = goal.state === "In Progress";
   const closable = goal.state === "In Progress" || goal.state === "Backlog";
   const [judged, ...others] = data.dates;
-  const pm = v2(data).promotionMilestone;
+  const pm = data.promotionMilestone;
   const owner = data.actors[goal.owner] ?? { id: goal.owner, name: goal.owner };
   const humans = Object.values(data.actors).filter((a) => a.kind === "human");
   const [all, setAll] = useState(false);
@@ -174,7 +170,7 @@ export function Props({ data, reload, onAct, chosen, dateBar }: { data: GoalPage
           {dateBar}
           {pm && judged.kind === "Promotion Milestone" && (
             <Link to={goalPath(pm.id)} className="pbacked">
-              ◆ backed by {pm.id} {pm.health !== undefined && <HealthDot health={pm.health} word={false} />} {pm.summary}
+              ◆ backed by {pm.id} <HealthDot health={pm.health} word={false} /> {pm.summary}
             </Link>
           )}
           {others.map((d) => (
@@ -265,8 +261,8 @@ export function Props({ data, reload, onAct, chosen, dateBar }: { data: GoalPage
 /** GP2-12: where this goal sits, from the parent down: the parent, this goal (bold, with its health bar), its sub-goals, and its siblings as one line. */
 function Family({ data }: { data: GoalPageResponse }) {
   const { goal } = data;
-  const siblings = v2(data).siblings ?? [];
-  const backs = v2(data).backs;
+  const siblings = data.siblings;
+  const backs = data.backs;
   const [more, setMore] = useState(false);
   return (
     <div className="family">
