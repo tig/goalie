@@ -63,7 +63,7 @@
       }
     },
     {
-      "as": "chelsea",
+      "as": "tig",
       "command": {
         "op": "create",
         "kind": "priority",
@@ -79,7 +79,7 @@
       }
     },
     {
-      "as": "chelsea",
+      "as": "tig",
       "command": {
         "op": "create",
         "kind": "priority",
@@ -95,7 +95,7 @@
       }
     },
     {
-      "as": "chelsea",
+      "as": "tig",
       "command": {
         "op": "create",
         "kind": "priority",

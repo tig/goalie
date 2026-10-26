@@ -147,6 +147,22 @@ function checkActor(store: Lookup, actor: Row): Violation[] {
   return found;
 }
 
+/** SPEC.md §6.3: the org unit's owner, or the GOALIE owner, changes its Priorities. The one home: checkAuthor and the Priorities view's mayRank. */
+export function mayRankPriorities(actor: string, goalieOwner: string | undefined, unit: Row | undefined): boolean {
+  return actor === goalieOwner || (unit !== undefined && actor === unit.owner);
+}
+
+/** After a re-rank: an org unit's Current Priorities for one period rank 1 to n, with no tie and no gap. */
+export function checkRanks(store: Lookup, orgUnit: string, period: string): Violation[] {
+  const current = store.where("priority", "org_unit", orgUnit).filter((p) => p.status === "Current" && p.period === period);
+  const ties = current.flatMap((p) => checkPriority(store, p));
+  if (ties.length > 0) return [ties[0]];
+  const ranks = current.map((p) => p.rank as number).sort((a, b) => a - b);
+  return ranks.every((r, i) => r === i + 1)
+    ? []
+    : [{ rule: "ranks-one-to-n", message: `${orgUnit}: its ${current.length} Priorities for ${period} rank 1 to ${current.length}, with no gap. They rank ${ranks.join(", ")}.`, field: "rank" }];
+}
+
 function checkPriority(store: Lookup, priority: Row): Violation[] {
   if (priority.status !== "Current") return [];
   const tied = store
@@ -228,7 +244,8 @@ export function checkTransition(kind: string, before: Row | undefined, after: Ro
  * Who may write what (SPEC.md §6.9, §10, §12; ADR 0011). `actor` is the writer's row; `before` is the row the write replaces.
  * `owner` is the GOALIE owner, or undefined before the owner settings exist.
  */
-export function checkAuthor(actor: Row, owner: string | undefined, kind: string, before: Row | undefined, after: Row, getGoal: (id: string) => Row | undefined): Violation[] {
+export function checkAuthor(actor: Row, owner: string | undefined, kind: string, before: Row | undefined, after: Row, store: Pick<Lookup, "get">): Violation[] {
+  const getGoal = (id: string) => store.get("goal", id);
   if (actor.kind === "agent" && (kind === "goal" || kind === "priority")) {
     return [{ rule: "agent-writes-a-draft", message: `${actor.id} is an agent. An agent proposes a change to a ${kind} as a Draft.` }];
   }
@@ -239,6 +256,13 @@ export function checkAuthor(actor: Row, owner: string | undefined, kind: string,
     const allowed = (before === undefined || mayChangeGoal(id, owner, before, getGoal)) && (newParent === undefined || mayChangeGoal(id, owner, newParent, getGoal));
     if (!allowed) {
       return [{ rule: "owners-change-goal", message: `${id}: only the goal's owner, an owner of a goal above it, or the GOALIE owner changes it. Anyone may comment.` }];
+    }
+  }
+  // SPEC.md §6.3: the list's owner is the org unit's owner. A Priority moved to another unit needs the right on both.
+  if (kind === "priority") {
+    const units = new Set([before?.org_unit, after.org_unit].filter((u) => typeof u === "string"));
+    if (![...units].every((u) => mayRankPriorities(actor.id as string, owner, store.get("org_unit", u as string)))) {
+      return [{ rule: "owner-ranks-priorities", message: `${actor.id}: only the org unit's owner or the GOALIE owner changes its Priorities.` }];
     }
   }
   // An actor row maps a token to an actor, and an org unit holds the goals. A write there could take over another actor.

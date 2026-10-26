@@ -172,7 +172,8 @@ class PrioritiesDefinitionTests(unittest.TestCase):
             create("draft", "DR-1", {"entity": "XW-0001", "actor": "bot", "base_version": 1, "change": {"health": "YELLOW"}, "reason": "test"}, "Test data"),
             create("draft", "DR-2", {"entity": "XW-0091", "actor": "bot", "base_version": 1, "change": {"health": "YELLOW"}, "reason": "A goal outside the view"}, "Test data"),
         ]
-        for actor, command in [*(("chelsea", c) for c in writes), *(("bot", c) for c in drafts)]:
+        # SPEC.md §6.3: Tig owns excaliwire, so Tig writes its Priorities.
+        for actor, command in [*(("tig" if c["kind"] == "priority" else "chelsea", c) for c in writes), *(("bot", c) for c in drafts)]:
             result = cls.store.write(actor, command)
             assert result["ok"], (command, result)
         (reply,), _ = fetch(cls.store, "/api/priorities")
@@ -193,7 +194,7 @@ class PrioritiesDefinitionTests(unittest.TestCase):
         self.assertTrue(self.goals["XW-0090"]["counted"])
 
     def test_an_empty_priority_is_listed_below_the_cut_line_with_its_rank(self) -> None:
-        self.assertEqual(self.body["backlog"][0], {"id": "PRI-4", "rank": 4, "title": "An empty Priority", "goals": []})
+        self.assertEqual(self.body["backlog"][0], {"id": "PRI-4", "version": 1, "rank": 4, "title": "An empty Priority", "goals": []})
 
     def test_a_priority_of_another_period_is_not_listed(self) -> None:
         self.assertNotIn("PRI-OLD", json.dumps(self.body))

@@ -80,7 +80,8 @@ const isObject = (value: unknown): value is Row => typeof value === "object" && 
 
 /** `today` is the org's day, from the caller: a route or the CLI reads configuration, the write path does not (Head of Engineering). */
 /** `at` is the Events' timestamp: a batch passes one for all its commands, so one save is one time in History. */
-export function write(db: DatabaseSync, actor: string, command: Command, today: string, at: string = new Date().toISOString()): WriteResult {
+/** `defer` names store rules a batch checks once it ends instead, such as no-rank-ties while a re-rank swaps two ranks. */
+export function write(db: DatabaseSync, actor: string, command: Command, today: string, at: string = new Date().toISOString(), defer: readonly string[] = []): WriteResult {
   if (!isObject(command)) return badCommand("a command is a JSON object");
   if (!isKind(command.kind)) return badCommand(`unknown kind ${String(command.kind)}`);
   const kind = command.kind;
@@ -100,7 +101,7 @@ export function write(db: DatabaseSync, actor: string, command: Command, today: 
   const typed = wrongTypes(kind, fields);
   if (typed.length > 0) return { ok: false, error: "invalid", violations: typed };
 
-  return inTransaction(db, (result) => result.ok, () => apply(db, actor, kind, command, fields, today, at));
+  return inTransaction(db, (result) => result.ok, () => apply(db, actor, kind, command, fields, today, at, defer));
 }
 
 /**
@@ -123,7 +124,7 @@ export function inTransaction<T>(db: DatabaseSync, keep: (result: T) => boolean,
   }
 }
 
-function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fields: Row, today: string, at: string): WriteResult {
+function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fields: Row, today: string, at: string, defer: readonly string[]): WriteResult {
   const spec = ENTITIES[kind];
   const id = command.id ?? nextId(db, kind);
   const before = read(db, kind, id);
@@ -153,7 +154,7 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
   if (before !== undefined && changed.length === 0) return { ok: true, entity: before, events: [] };
 
   const reason = command.reason?.trim() || null;
-  const violations: Violation[] = [...(author ? checkAuthor(author, goalieOwner(db), kind, before, after, (key) => read(db, "goal", key)) : []), ...checkTransition(kind, before, after, today, (id) => read(db, "goal", id))];
+  const violations: Violation[] = [...(author ? checkAuthor(author, goalieOwner(db), kind, before, after, lookup(db)) : []), ...checkTransition(kind, before, after, today, (id) => read(db, "goal", id))];
   const needReason = REASONED_KINDS.includes(kind) ? changed : [];
   if (needReason.length > 0 && reason === null) {
     violations.push({ rule: "reason-required", message: `a change to ${needReason.map(fieldWords).join(", ")} needs a reason.`, field: "reason" });
@@ -181,7 +182,7 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
     return { ok: false, error: "invalid", violations: [...violations, ...(named.length > 0 ? named : [{ rule: "field-value", message }])] };
   }
   violations.push(...missingReferences(db, kind, id));
-  violations.push(...checkWrite(lookup(db), kind, read(db, kind, id) as Row));
+  violations.push(...checkWrite(lookup(db), kind, read(db, kind, id) as Row).filter((v) => !defer.includes(v.rule)));
   if (violations.length > 0) return { ok: false, error: "invalid", violations };
 
   const timestamp = at;

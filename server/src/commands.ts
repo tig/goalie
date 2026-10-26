@@ -1,9 +1,9 @@
 import type { DatabaseSync } from "node:sqlite";
-import type { ApiEvent, ApiViolation, BatchHint, CommandsResponse, Ref, StoredGoal } from "./api.ts";
+import type { ApiEvent, ApiViolation, BatchHint, CommandsResponse, Ref, StoredGoal, StoredPriority } from "./api.ts";
 import { publish, toApiEvent } from "./live.ts";
 import { toApiWorkItem } from "./work.ts";
-import { read } from "./read.ts";
-import { goalLints, type Row } from "./rules.ts";
+import { lookup, read } from "./read.ts";
+import { checkRanks, goalLints, type Row } from "./rules.ts";
 import { DEFAULTS, inTransaction, write, type Command, type WriteResult } from "./write.ts";
 
 /**
@@ -12,11 +12,14 @@ import { DEFAULTS, inTransaction, write, type Command, type WriteResult } from "
  * The MCP route will call runCommands too.
  */
 
-/** Only goals and work items are written through the API in the MLP (E-10). */
-const API_KINDS = ["goal", "work_item"] as const;
+/** Only goals and work items are written through the API in the MLP (E-10), and a Priority's rank, for drag to reorder on Home. */
+const API_KINDS = ["goal", "work_item", "priority"] as const;
 
 /** The fields that hold a goal key, so a ref may stand there. A ref anywhere else is plain text. */
-const KEY_FIELDS: Record<(typeof API_KINDS)[number], readonly string[]> = { goal: ["promotion_milestone", "parent"], work_item: ["goal"] };
+const KEY_FIELDS: Record<(typeof API_KINDS)[number], readonly string[]> = { goal: ["promotion_milestone", "parent"], work_item: ["goal"], priority: [] };
+
+/** A re-rank swaps ranks one command at a time, so a tie is checked once the batch ends (checkRanks). */
+const DEFERRED: Partial<Record<string, readonly string[]>> = { priority: ["no-rank-ties"] };
 
 type CommandsAnswer = { status: 200 | 400 | 403 | 404 | 409 | 422; body: CommandsResponse };
 
@@ -69,8 +72,14 @@ export function runCommands(db: DatabaseSync, actor: string, request: unknown, t
         const row = result.ok ? result.entity : command.op === "create" ? { ...DEFAULTS.goal, ...command.fields } : { ...read(db, "goal", command.id), ...command.fields };
         hints.set(at, goalLints(row).map((h) => ({ ...h, at })));
       };
+      // The org unit and period of each re-ranked Priority, with the last command that ranked it.
+      const ranked = new Map<string, { orgUnit: string; period: string; at: number }>();
       const run = (at: number, command: Command): Extract<WriteResult, { ok: true }> | undefined => {
-        const result = write(db, actor, command, today, time);
+        const result = write(db, actor, command, today, time, DEFERRED[command.kind]);
+        if (result.ok && command.kind === "priority") {
+          const { org_unit, period } = result.entity as { org_unit: string; period: string };
+          ranked.set(`${org_unit}\u0000${period}`, { orgUnit: org_unit, period, at });
+        }
         lint(at, command, result);
         if (!result.ok) {
           if (!check || result.error !== "invalid") throw new Stop(failure(at, command.kind, result, today));
@@ -133,6 +142,13 @@ export function runCommands(db: DatabaseSync, actor: string, request: unknown, t
           else refused.add(ref);
         }
       });
+      for (const { orgUnit, period, at } of ranked.values()) {
+        const violations = checkRanks(lookup(db), orgUnit, period);
+        if (violations.length === 0) continue;
+        if (!check) throw new Stop({ status: 422, body: { ok: false, at, error: "invalid", violations } });
+        first ??= { at, violations };
+        all.push(...violations.map((v) => ({ ...v, at })));
+      }
       const found = check ? { hints: [...hints.values()].flat() } : {};
       if (first) return { status: 422, body: { ok: false, at: first.at, error: "invalid", violations: first.violations, all, ...found } };
       return { status: 200, body: { ok: true, ids, events, ...found } };
@@ -157,6 +173,9 @@ function resolve(at: number, raw: unknown, ids: Record<Ref, string>, refused: Se
     if (!(value in ids)) throw bad(at, `unknown-ref: ${value} is used before the command that creates it`);
     return ids[value];
   };
+  if (kind === "priority" && (raw.op !== "update" || !isObject(raw.fields) || Object.keys(raw.fields).join() !== "rank")) {
+    throw bad(at, "api-kind: through the API a Priority takes only an update of its rank");
+  }
   if (raw.op === "comment") return { op: "comment", kind, id: key(raw.id) as string, text: raw.text as string };
   if (raw.op === "create" && raw.ref !== undefined && (!isRef(raw.ref) || raw.ref in ids || refused.has(raw.ref))) throw bad(at, `ref ${String(raw.ref)} must be "$" and a word, used once`);
   if (raw.fields !== undefined && !isObject(raw.fields)) throw bad(at, "fields is a JSON object");
@@ -171,7 +190,7 @@ function resolve(at: number, raw: unknown, ids: Record<Ref, string>, refused: Se
 function failure(at: number, kind: string, result: Exclude<WriteResult, { ok: true }>, today: string): CommandsAnswer {
   const status = STATUS[result.error];
   if (result.error === "stale") {
-    const current = kind === "work_item" ? toApiWorkItem(result.current, today) : (result.current as StoredGoal);
+    const current = kind === "work_item" ? toApiWorkItem(result.current, today) : kind === "priority" ? (result.current as StoredPriority) : (result.current as StoredGoal);
     return { status, body: { ok: false, at, error: "stale", current } };
   }
   if (result.error === "invalid") return { status, body: { ok: false, at, error: "invalid", violations: result.violations } };

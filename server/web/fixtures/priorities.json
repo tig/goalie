@@ -19,6 +19,7 @@
   "funded": [
     {
       "id": "PRI-1",
+      "version": 1,
       "rank": 1,
       "title": "Regenerate the E28 canon",
       "goals": [
@@ -54,6 +55,7 @@
     },
     {
       "id": "PRI-2",
+      "version": 1,
       "rank": 2,
       "title": "Grow the XW team",
       "goals": [
@@ -88,6 +90,7 @@
     },
     {
       "id": "PRI-3",
+      "version": 1,
       "rank": 3,
       "title": "Run Excaliwire on GOALIE",
       "goals": [
