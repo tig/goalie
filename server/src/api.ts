@@ -175,8 +175,12 @@ export type GoalPageResponse = {
   closesAs: "Completed" | "Completed Late" | null;
   /** Rule owners-change-goal (SPEC.md §6.1): true when the signed-in actor may change this goal. Anyone may comment. */
   mayChange: boolean;
-  /** The goals above this one through parent, nearest first, each with its owner's actor id (named in `actors`). Empty for a top goal. */
-  above: { id: string; owner: string }[];
+  /** The goals above this one through parent, nearest first, each with its owner's actor id (named in `actors`). Empty for a top goal. The breadcrumb (GP2-1). */
+  above: { id: string; owner: string; summary: string }[];
+  /** The parent's other sub-goals, not this goal, in the parent's order (GP2-12). Empty for a top goal. */
+  siblings: GoalRef[];
+  /** The goal whose Promotion Milestone this goal is (GP2-12). The first by key when more than one names it. Null when none does. */
+  backs: GoalRef | null;
   /** Who may change the goal, for its page's line (product check 42): the owner, owners above nearest first, the GOALIE owner last; at most three, no actor twice. */
   changers: Changer[];
   /** True when someone who may change the goal is not in `changers`. */
@@ -184,7 +188,7 @@ export type GoalPageResponse = {
   /** G15 Promote and close: the state an In Progress Ambition goal would close as, once promoted on its own date. Null otherwise. */
   closesAsPromoted: "Completed" | "Completed Late" | null;
   /** The goal's Promotion Milestone, and what is still open under it (G14). */
-  promotionMilestone: (GoalRef & { version: number; state: State; date: string; openSubGoals: number; openWorkItems: number }) | null;
+  promotionMilestone: (GoalRef & { version: number; state: State; health: Health | null; date: string; openSubGoals: number; openWorkItems: number }) | null;
   parent: GoalRef | null;
   priority: { id: string; rank: number; title: string } | null;
   orgUnit: { id: string; name: string; level: string };

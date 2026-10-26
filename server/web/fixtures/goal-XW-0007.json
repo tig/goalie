@@ -46,13 +46,42 @@
   "above": [
     {
       "id": "XW-0004",
-      "owner": "chelsea"
+      "owner": "chelsea",
+      "summary": "Run the MLP prototype at goalie.excaliwire.com with Excaliwire's real goals loaded"
     },
     {
       "id": "XW-0003",
-      "owner": "chelsea"
+      "owner": "chelsea",
+      "summary": "Tig, Chelsea, and agents use GOALIE to drive Excaliwire execution"
     }
   ],
+  "siblings": [
+    {
+      "id": "XW-0005",
+      "summary": "Stand up the spine: store, rules, sign-in, event log"
+    },
+    {
+      "id": "XW-0006",
+      "summary": "Show Priorities as Home, on a timeline"
+    },
+    {
+      "id": "XW-0008",
+      "summary": "Create a goal or a sub-goal"
+    },
+    {
+      "id": "XW-0009",
+      "summary": "Let an agent work in GOALIE: API, MCP, Drafts"
+    },
+    {
+      "id": "XW-0010",
+      "summary": "Draft health from GitHub with the evidence"
+    },
+    {
+      "id": "XW-0011",
+      "summary": "Load Excaliwire's goals and release"
+    }
+  ],
+  "backs": null,
   "changers": [
     {
       "actor": "chelsea",

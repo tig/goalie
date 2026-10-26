@@ -79,6 +79,19 @@ class GoalPageApiTests(unittest.TestCase):
         # G14: Promote completes the milestone in the same batch, so the page names its version.
         self.assertEqual(milestone["version"], self.store.read("goal", "XW-0004")["version"])
 
+    def test_goal_page_v2_names_the_family(self) -> None:
+        # GP2-1: the breadcrumb names each goal above, nearest first.
+        summary = lambda key: self.store.read("goal", key)["summary"]  # noqa: E731
+        self.assertEqual(self.pages["XW-0007"]["above"], [{"id": key, "owner": "chelsea", "summary": summary(key)} for key in ("XW-0004", "XW-0003")])
+        # GP2-12: the parent's other sub-goals, in the parent's order. A top goal has none.
+        self.assertEqual(self.pages["XW-0007"]["siblings"], [{"id": key, "summary": summary(key)} for key in ("XW-0005", "XW-0006", "XW-0008", "XW-0009", "XW-0010", "XW-0011")])
+        self.assertEqual(self.pages["XW-0003"]["siblings"], [])
+        # GP2-12: the goal whose Promotion Milestone this goal is.
+        self.assertEqual(self.pages["XW-0004"]["backs"], {"id": "XW-0003", "summary": summary("XW-0003")})
+        self.assertIsNone(self.pages["XW-0007"]["backs"])
+        # The milestone's own health mark on the Judged on row.
+        self.assertEqual(self.pages["XW-0003"]["promotionMilestone"]["health"], "GREEN")
+
     def test_the_page_links_up_and_names_its_priority_and_org_unit(self) -> None:
         self.assertEqual(self.pages["XW-0004"]["parent"]["id"], "XW-0003")
         self.assertIsNone(self.pages["XW-0003"]["parent"])
