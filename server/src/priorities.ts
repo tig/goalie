@@ -73,7 +73,7 @@ function firstStep(ptg: unknown, names: Map<string, string>): PtgStep | undefine
 }
 
 /** The view on `todayIso`, the org's calendar day. Event timestamps are UTC instants, read as days in `timeZone`. */
-export function prioritiesView(db: DatabaseSync, orgUnit: string, todayIso: string, timeZone: string): Omit<PrioritiesResponse, "me"> {
+export function prioritiesView(db: DatabaseSync, orgUnit: string, todayIso: string, timeZone: string): Omit<PrioritiesResponse, "me" | "mayRank"> {
   const today = day(todayIso);
   const unit = read(db, "org_unit", orgUnit);
   const org = { id: orgUnit, name: (unit?.name as string) ?? orgUnit, level: (unit?.level as string) ?? "" };
@@ -123,7 +123,7 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, todayIso: stri
 
   const cut = priorities.findIndex((p) => p.cut_line === true);
   const built = tops.map((list, i) => list.map((g) => goalOf(g, cut === -1 || i <= cut)));
-  const rows: ApiPriority[] = priorities.map((p, i) => ({ id: p.id as string, rank: p.rank as number, title: p.title as string, goals: built[i] }));
+  const rows: ApiPriority[] = priorities.map((p, i) => ({ id: p.id as string, version: p.version as number, rank: p.rank as number, title: p.title as string, goals: built[i] }));
   const funded = cut === -1 ? rows : rows.slice(0, cut + 1);
   const backlog = cut === -1 ? [] : rows.slice(cut + 1);
 

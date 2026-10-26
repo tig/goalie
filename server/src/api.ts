@@ -37,7 +37,8 @@ export type ApiGoal = {
   children: ApiGoal[];
 };
 
-export type ApiPriority = { id: string; rank: number; title: string; goals: ApiGoal[] };
+/** `version` is the base_version a re-rank sends. */
+export type ApiPriority = { id: string; version: number; rank: number; title: string; goals: ApiGoal[] };
 
 export type ApiSummary = {
   counts: { RED: number; YELLOW: number; GREEN: number };
@@ -55,6 +56,8 @@ export type PrioritiesResponse = {
   me: ActorRef;
   today: string;
   view: { name: string; columns: readonly string[] };
+  /** True when the signed-in actor may re-rank these Priorities: the org unit's owner or the GOALIE owner (SPEC.md §6.3). */
+  mayRank: boolean;
   /** Priorities above the cut line, in rank order. */
   funded: ApiPriority[];
   /** Priorities below the cut line, in rank order. */
@@ -114,6 +117,9 @@ export type GoalFields = {
 };
 
 /** A goal as stored: its key, its version, the fields the system sets, and its writable fields. */
+/** A Priority row as stored (SPEC.md §6.3). A stale re-rank answers it as `current`. */
+export type StoredPriority = { id: string; version: number; org_unit: string; period: string; rank: number; title: string; description: string | null; cut_line: boolean | null; status: "Current" | "Retired" };
+
 export type StoredGoal = GoalFields & {
   id: string;
   version: number;
@@ -259,7 +265,7 @@ export type ApiViolation = { rule: string; message: string; field?: string };
  */
 export type CommandsResponse =
   | { ok: true; ids: Record<Ref, string>; events: ApiEvent[]; hints?: BatchHint[] }
-  | { ok: false; at: number; error: "stale"; current: StoredGoal | ApiWorkItem }
+  | { ok: false; at: number; error: "stale"; current: StoredGoal | ApiWorkItem | StoredPriority }
   | { ok: false; at: number; error: "invalid"; violations: ApiViolation[]; all?: (ApiViolation & { at: number })[]; hints?: BatchHint[] }
   | { ok: false; at: number; error: "not_found" | "exists" | "bad_command" | "unknown_actor"; message: string };
 
