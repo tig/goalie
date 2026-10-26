@@ -12,19 +12,6 @@ export function groupWorkItems<T extends Pick<ApiWorkItem, "status">>(items: T[]
   return STATUS_ORDER.map((status) => ({ status, items: items.filter((i) => i.status === status) })).filter((g) => g.items.length > 0);
 }
 
-export const HISTORY_FILTERS = ["All", "Dates", "Health", "State", "Comments"] as const;
-export type HistoryFilter = (typeof HISTORY_FILTERS)[number];
-
-const FIELDS: Record<Exclude<HistoryFilter, "All">, string[]> = {
-  Dates: ["due_date", "changed_due_date", "date_type", "promotion_milestone", "original_committed_date"],
-  Health: ["health", "path_to_green"],
-  State: ["state"],
-  Comments: ["comment"],
-};
-
-export const filterEvents = (events: ApiEvent[], filter: HistoryFilter) => (filter === "All" ? events : events.filter((e) => FIELDS[filter].includes(e.field)));
-
-export const comments = (events: ApiEvent[]) => events.filter((e) => e.field === "comment");
 
 const DATE_YEAR = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 
@@ -60,6 +47,39 @@ export function eventValue(value: unknown, field?: string, ctx: Names = {}): str
 export type EventGroup = { events: ApiEvent[]; created: boolean; promoted: { milestone: string | null } | null };
 
 const UNCOMMITTED: readonly unknown[] = ["Fantasy", "Ambition"];
+
+type Ptg = { steps: { text: string; owner: string; date: string }[]; criteria?: string; trigger?: string } | null | undefined;
+
+/** GP2-9, GL5: what changed inside a Path to Green, one line per change, in words: "Step 1 date Nov 6, 2026 → Nov 13, 2026". */
+export function ptgChanges(old: Ptg, now: Ptg, ctx: Names = {}): string[] {
+  if (!now) return old ? ["Path to Green cleared"] : [];
+  const out: string[] = [];
+  const steps = Math.max(old?.steps.length ?? 0, now.steps.length);
+  for (let i = 0; i < steps; i++) {
+    const a = old?.steps[i];
+    const b = now.steps[i];
+    const n = `Step ${i + 1}`;
+    if (!a && b) out.push(`${n} added: ${b.text}`);
+    else if (a && !b) out.push(`${n} removed: ${a.text}`);
+    else if (a && b) {
+      if (a.text !== b.text) out.push(`${n}: ${a.text} → ${b.text}`);
+      if (a.owner !== b.owner) out.push(`${n} owner ${eventValue(a.owner, "owner", ctx)} → ${eventValue(b.owner, "owner", ctx)}`);
+      if (a.date !== b.date) out.push(`${n} date ${eventValue(a.date, "date", ctx)} → ${eventValue(b.date, "date", ctx)}`);
+    }
+  }
+  const text = (label: string, x?: string, y?: string) => {
+    if ((x ?? "") === (y ?? "")) return;
+    out.push(x ? (y ? `${label}: ${x} → ${y}` : `${label} cleared`) : `${label}: ${y}`);
+  };
+  text("When it is On track again", old?.criteria, now.criteria);
+  text("What makes it Off track", old?.trigger, now.trigger);
+  return out;
+}
+
+/** GP2-9, GL5: Activity's chips. One stream of comments and changes, newest first. */
+export const ACTIVITY = ["All", "Comments", "Changes"] as const;
+export type ActivityChip = (typeof ACTIVITY)[number];
+export const activity = (events: ApiEvent[], chip: ActivityChip) => (chip === "All" ? events : events.filter((e) => (e.field === "comment") === (chip === "Comments")));
 
 /** D1: an older page of History joins the Events already shown, each Event once, newest first, so a save split across pages groups as one row. */
 export function joinPages(shown: ApiEvent[], older: ApiEvent[]): ApiEvent[] {

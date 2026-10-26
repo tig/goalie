@@ -1,12 +1,13 @@
 import { useCallback, useState, type CSSProperties } from "react";
-import type { ApiActor, ApiEvent, ApiWorkItem, GoalEventsResponse, GoalPageResponse, Health, SubGoalCard } from "../../src/api.ts";
+import type { ApiActor, ApiEvent, ApiWorkItem, GoalEventsResponse, GoalPageResponse, Health, PathToGreen, SubGoalCard } from "../../src/api.ts";
 import { shortDate } from "../../src/dates.ts";
 import { getJson, postCommands, useJson } from "./data.ts";
 import { AddSubGoal, AddWorkItem, useTick } from "./GoalAdd.tsx";
-import { ClosePanel, DescriptionPanel, FieldsPanel, HealthPanel, PromotePanel, PursuePanel, SlipPanel, type Done, type PanelName } from "./GoalPanels.tsx";
+import { Crumbs, Props } from "./GoalSide.tsx";
+import { ClosePanel, DescriptionPanel, HealthPanel, PromotePanel, PursuePanel, SlipPanel, type Done, type PanelName } from "./GoalPanels.tsx";
 import { commentBatch } from "./model/commands.ts";
-import { changeParts, comments, createdFields, historyNames, joinPages, dateBar, labelRows, eventValue, fieldLabel, filterEvents, groupEvents, groupWorkItems, HISTORY_FILTERS, type EventGroup, type HistoryFilter, type Names } from "./model/goalpage.ts";
-import { dateLabel, healthWord, slipLabel } from "./model/labels.ts";
+import { activity, ACTIVITY, changeParts, createdFields, ptgChanges, historyNames, joinPages, dateBar, labelRows, eventValue, fieldLabel, groupEvents, groupWorkItems, type ActivityChip, type EventGroup, type Names } from "./model/goalpage.ts";
+import { dateLabel } from "./model/labels.ts";
 import { backPath, goalPath } from "./model/route.ts";
 import { Avatar, HealthDot } from "./parts.tsx";
 import { homeSearch, Link } from "./router.tsx";
@@ -51,7 +52,7 @@ export function GoalPage({ goalKey, viewName }: { goalKey: string; viewName: str
       </main>
     );
   }
-  return <Goal key={`${loaded.data.goal.id}-${loaded.data.goal.version}-${loaded.data.events.length}`} data={loaded.data} back={back} reload={reload} status={status} setStatus={setStatus} />;
+  return <Goal key={`${loaded.data.goal.id}-${loaded.data.goal.version}-${loaded.data.events.length}`} data={loaded.data} reload={reload} status={status} setStatus={setStatus} />;
 }
 
 type Status = { text: string; where: "head" | "subs" | "work" };
@@ -62,7 +63,7 @@ const yearDate = (date: string) => eventValue(date, "due_date");
 const time = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const when = (ts: string) => time.format(new Date(ts));
 
-function Goal({ data, back, reload, status, setStatus }: { data: GoalPageResponse; back: React.ReactNode; reload: () => void; status: Status; setStatus: (s: Status | ((s: Status) => Status)) => void }) {
+function Goal({ data, reload, status, setStatus }: { data: GoalPageResponse; reload: () => void; status: Status; setStatus: (s: Status | ((s: Status) => Status)) => void }) {
   const { goal, actors, today } = data;
   // One panel at a time (G9). A saved panel reloads the page, so every section shows the stored state.
   const [panel, openPanel] = useState<{ name: PanelName | "subgoal" | "workitem"; health?: Exclude<Health, null> } | null>(null);
@@ -82,204 +83,127 @@ function Goal({ data, back, reload, status, setStatus }: { data: GoalPageRespons
       {status.where === where ? status.text : ""}
     </p>
   );
-  const closable = goal.state === "In Progress" || goal.state === "Backlog";
-  const owner = actors[goal.owner] ?? { id: goal.owner, name: goal.owner, kind: "human" as const };
-  const [judged, ...others] = data.dates;
   const open = goal.state === "In Progress";
   // G25: the server says whether the signed-in actor may change this goal (owners-change-goal). Anyone else gets the same page, read-only.
   const may = data.mayChange;
-  const needs = [
-    data.needsYou.lateWorkItems.length > 0 && `${data.needsYou.lateWorkItems.length} work item${data.needsYou.lateWorkItems.length === 1 ? "" : "s"} past its date`,
-    data.needsYou.missingPtg && "a missing Path to Green",
-  ].filter(Boolean);
+  const late = data.needsYou.lateWorkItems.length;
   return (
-    <main className="goalpage">
-      {back}
-      <section className="card ghead">
-        <div className="ghead-top">
-          <div className="ghead-main">
-            <h1 className="gtitle">{goal.summary}</h1>
-            {/* The key shows here; rule 7 keeps keys off Home only (G3). */}
-            <p className="gmeta">
-              <span>{goal.id}</span>
-              <span className="gowner">
-                <Avatar actor={owner} mine={owner.id === data.me.id} /> {owner.name}
-              </span>
-              <span>{goal.state}</span>
-              {data.priority && (
-                <Link to={backPath(homeSearch())}>
-                  Priority {data.priority.rank} {data.priority.title}
-                </Link>
+    <main className="goalpage v2">
+      {/* GP2-1: the breadcrumb replaces "‹ Priorities" and the Parent link; the browser's Back still returns to the view. */}
+      <Crumbs data={data} />
+      <div className="glayout">
+        <header className="ghead2">
+          {/* The key shows here; rule 7 keeps keys off Home only (G3). */}
+          <span className="gkey">{goal.id}</span>
+          <h1 className="gtitle">{goal.summary}</h1>
+          {/* GP2-3: what needs the owner, each a link to it; silence reads as "Nothing needs you now", never as not built. */}
+          {may &&
+            (late || data.needsYou.missingPtg ? (
+              <p className="needs">
+                ! Needs you:{" "}
+                {late > 0 && (
+                  <a href="#g-work" className="needlink">
+                    {late} work item{late === 1 ? "" : "s"} past {late === 1 ? "its" : "their"} date
+                  </a>
+                )}
+                {late > 0 && data.needsYou.missingPtg && " and "}
+                {data.needsYou.missingPtg && goal.health && goal.health !== "GREEN" && (
+                  <button type="button" className="linkbtn needlink" onClick={() => setPanel({ name: "health", health: goal.health as "YELLOW" | "RED" })}>
+                    a missing Path to Green
+                  </button>
+                )}
+              </p>
+            ) : (
+              <p className="needs none">Nothing needs you now</p>
+            ))}
+          {!may && <Changers data={data} />}
+          {may && said("head")}
+          {/* GP2-4: every multi-field action opens its panel here, under the title. */}
+          {panel?.name === "health" && panel.health && <HealthPanel data={data} health={panel.health} onDone={done} />}
+          {panel?.name === "slip" && <SlipPanel data={data} onDone={done} />}
+          {panel?.name === "promote" && <PromotePanel data={data} onDone={done} />}
+          {panel?.name === "close" && <ClosePanel data={data} onDone={done} />}
+          {panel?.name === "pursue" && <PursuePanel data={data} onDone={done} />}
+        </header>
+        <aside className="gprops" aria-label="Properties">
+          <Props data={data} reload={reload} onAct={(a) => setPanel(a)} chosen={panel?.name === "health" ? panel.health : undefined} dateBar={data.dates.length > 0 ? <DateBar data={data} /> : null} />
+        </aside>
+        <div className="gbody">
+          {/* The place for Drafts (G8). It draws nothing in the MLP. */}
+          <div className="draftslot" />
+          {panel?.name === "description" ? (
+            <DescriptionPanel data={data} onDone={done} />
+          ) : (
+            <section className="gsec gdesc">
+              <h2>
+                Description
+                {may && <Pencil label="Edit Description" onClick={() => setPanel({ name: "description" })} />}
+              </h2>
+              {goal.description ? goal.description.split(/\n{2,}/).map((p, k) => <p key={k}>{p}</p>) : <p className="muted">No description yet.</p>}
+              {/* GP2-5: the missing parts, for owners only, plain muted text. */}
+              {may && data.hints.some((h) => h.field === "description") && <p className="hint">{data.hints.filter((h) => h.field === "description").map((h) => h.text).join(" · ")}</p>}
+            </section>
+          )}
+          {goal.path_to_green && (goal.health === "YELLOW" || goal.health === "RED") && (
+            <section className={`gsec gptg ${goal.health}`}>
+              <h2>
+                Path to Green
+                {may && open && <Pencil label="Edit Path to Green" onClick={() => setPanel({ name: "health", health: goal.health as "YELLOW" | "RED" })} />}
+              </h2>
+              <table className="steps">
+                <thead>
+                  <tr>
+                    <th>Steps</th>
+                    <th>Owner</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {goal.path_to_green.steps.map((st, k) => (
+                    <tr key={k}>
+                      <td>{st.text}</td>
+                      <td>{actors[st.owner]?.name ?? st.owner}</td>
+                      <td className="date">{shortDate(st.date, today)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="note">
+                <b>When it is On track again</b> {goal.path_to_green.criteria || <span className="muted">None</span>}
+              </p>
+              {goal.health === "YELLOW" && (
+                <p className="note">
+                  <b>What makes it Off track</b> {goal.path_to_green.trigger || <span className="muted">None</span>}
+                </p>
               )}
-              {data.parent && (
-                <span>
-                  Parent <Link to={goalPath(data.parent.id)}>{data.parent.summary}</Link>
-                </span>
-              )}
-            </p>
-            {may && needs.length > 0 && <p className="needs">! Needs you: {needs.join(" and ")}</p>}
-          </div>
-          {/* A goal that is not In Progress shows no health control; its State word stands alone (G4). */}
-          {open && !may && (
-            <div className="ghealth">
-              <span className="lbl">Health</span>
-              <span className="hread">
-                <HealthDot health={goal.health} word="shown" />
-              </span>
-            </div>
+            </section>
           )}
-          {open && may && (
-            <div className="ghealth" role="group" aria-label="Health">
-              <span className="lbl">Health</span>
-              <span className="hpick">
-                {(["GREEN", "YELLOW", "RED"] as const).map((h) => {
-                  const chosen = panel?.name === "health" && panel.health === h;
-                  return (
-                    <button
-                      key={h}
-                      type="button"
-                      className={`hopt ${h}${goal.health === h && !panel?.health ? " on" : ""}${chosen ? " chosen" : ""}`}
-                      aria-pressed={goal.health === h}
-                      onClick={() => (h === goal.health ? setPanel(null) : setPanel({ name: "health", health: h }))}
-                    >
-                      <HealthDot health={h} word="beside" />
-                      {healthWord(h)}
-                    </button>
-                  );
-                })}
-              </span>
-            </div>
-          )}
-        </div>
-        {/* The date health is judged on leads (G5, DD1). */}
-        {judged && (
-          <div className="gjudged">
-            <span className="lbl">Health is judged on</span>
-            <p className="gdate">
-              {/* The server sends the judged date first, a slip already applied (goal.ts currentDate). */}
-              <span className="date">{yearDate(judged.date)}</span>
-              <span className="gkind">{judged.kind === "Promotion Milestone" ? "Committed · Promotion Milestone" : judged.kind}</span>
-              {judged.slipDays !== undefined && <span className="late"> · {slipLabel(judged.slipDays)}</span>}
-            </p>
-            {data.promotionMilestone && judged.kind === "Promotion Milestone" && (
-              <Link to={goalPath(data.promotionMilestone.id)} className="gpm">
-                {data.promotionMilestone.summary} ›
-              </Link>
-            )}
-            {goal.original_committed_date && <p className="small">Original Committed Date {yearDate(goal.original_committed_date)}</p>}
-            {data.inherited && <p className="small">The parent's date</p>}
-          </div>
-        )}
-        {others.map((d) => (
-          <p key={d.kind} className="gother">
-            <span className="date">{yearDate(d.date)}</span> {d.kind} <span className="muted">· this goal's date</span>
-          </p>
-        ))}
-        {data.dates.length > 0 && <DateBar data={data} />}
-        {!may && <Changers data={data} />}
-        {/* The actions name their object; one that does not apply is not drawn (G7). */}
-        {may && (
-        <div className="gactions">
-          {goal.state === "Backlog" && (
-            <button type="button" className="btn" onClick={() => setPanel({ name: "pursue" })}>
-              Pursue
-            </button>
-          )}
-          {open && goal.date_type === "Committed" && (
-            <button type="button" className="btn" onClick={() => setPanel({ name: "slip" })}>
-              Record a slip
-            </button>
-          )}
-          {closable && (goal.date_type === "Ambition" || goal.date_type === "Fantasy") && (
-            <button type="button" className="btn" onClick={() => setPanel({ name: "promote" })}>
-              Promote date
-            </button>
-          )}
-          {closable && (
-            <button type="button" className="btn" onClick={() => setPanel({ name: "close" })}>
-              Close goal
-            </button>
-          )}
-        </div>
-        )}
-        {may && said("head")}
-        {panel?.name === "health" && panel.health && <HealthPanel data={data} health={panel.health} onDone={done} />}
-        {panel?.name === "slip" && <SlipPanel data={data} onDone={done} />}
-        {panel?.name === "promote" && <PromotePanel data={data} onDone={done} />}
-        {panel?.name === "close" && <ClosePanel data={data} onDone={done} />}
-        {panel?.name === "pursue" && <PursuePanel data={data} onDone={done} />}
-      </section>
-      {/* The place for Drafts (G8). It draws nothing in the MLP. */}
-      <div className="draftslot" />
-      {goal.path_to_green && (
-        <section className={`card gptg ${goal.health ?? ""}`}>
-          <div className="lbl">
-            Path to Green (PTG)
-            {may && open && goal.health && goal.health !== "GREEN" && <Pencil label="Edit Path to Green" onClick={() => setPanel({ name: "health", health: goal.health as "YELLOW" | "RED" })} />}
-          </div>
-          <table className="steps">
-            <thead>
-              <tr>
-                <th>Steps</th>
-                <th>Owner</th>
-                <th>Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {goal.path_to_green.steps.map((s, i) => (
-                <tr key={i}>
-                  <td>{s.text}</td>
-                  <td>{actors[s.owner]?.name ?? s.owner}</td>
-                  <td className="date">{shortDate(s.date, today)}</td>
-                </tr>
+          <section className="gsec gsubs">
+            <h2>
+              Sub-goals <span className="muted">{data.subGoals.length}</span>
+            </h2>
+            {said("subs")}
+            <div className="subrows">
+              {data.subGoals.map((c) => (
+                <SubGoal key={c.id} card={c} data={data} />
               ))}
-            </tbody>
-          </table>
-          <p className="note">
-            <b>When it is On track again</b> {goal.path_to_green.criteria || <span className="muted">None</span>}
-          </p>
-          {goal.health === "YELLOW" && (
-            <p className="note">
-              <b>What makes it Off track</b> {goal.path_to_green.trigger || <span className="muted">None</span>}
-            </p>
-          )}
-        </section>
-      )}
-      <div className="gtwo">
-        {panel?.name === "description" ? (
-          <DescriptionPanel data={data} onDone={done} />
-        ) : (
-          <section className="card gdesc">
-            <div className="lbl">
-              Description
-              {may && <Pencil label="Edit Description" onClick={() => setPanel({ name: "description" })} />}
+              {panel?.name === "subgoal" ? (
+                <AddSubGoal data={data} onDone={done} />
+              ) : (
+                may && (
+                  <button type="button" className="addrow" onClick={() => setPanel({ name: "subgoal" })}>
+                    + Add sub-goal
+                  </button>
+                )
+              )}
             </div>
-            {goal.description ? goal.description.split(/\n{2,}/).map((p, i) => <p key={i}>{p}</p>) : <p className="muted">No description yet.</p>}
-            {/* The missing parts read as one hint line, not as items (G18). */}
-            {may && data.hints.some((h) => h.field === "description") && <p className="hint">{data.hints.filter((h) => h.field === "description").map((h) => h.text).join(" · ")}</p>}
           </section>
-        )}
-        {panel?.name === "fields" ? <FieldsPanel data={data} onDone={done} /> : <Fields data={data} onEdit={may ? () => setPanel({ name: "fields" }) : undefined} />}
-      </div>
-      <section className="gsubs">
-        <h2>
-          Sub-goals
-          {may && (
-            <button type="button" className="btn primary" onClick={() => setPanel({ name: "subgoal" })}>
-              + Sub-goal
-            </button>
+          {data.workItems && (
+            <WorkItems items={data.workItems} data={data} adding={panel?.name === "workitem"} onAdd={() => setPanel({ name: "workitem" })} onDone={done} reload={reload} status={said("work")} />
           )}
-        </h2>
-        {said("subs")}
-        {panel?.name === "subgoal" && <AddSubGoal data={data} onDone={done} />}
-        {data.subGoals.map((c) => (
-          <SubGoal key={c.id} card={c} data={data} />
-        ))}
-      </section>
-      {data.workItems && (
-        <WorkItems items={data.workItems} data={data} adding={panel?.name === "workitem"} onAdd={() => setPanel({ name: "workitem" })} onDone={done} reload={reload} status={said("work")} />
-      )}
-      <Talk data={data} reload={reload} />
+          <Talk data={data} reload={reload} />
+        </div>
+      </div>
     </main>
   );
 }
@@ -351,49 +275,13 @@ function Pencil({ label, onClick }: { label: string; onClick: () => void }) {
   );
 }
 
-function Fields({ data, onEdit }: { data: GoalPageResponse; onEdit?: () => void }) {
-  const { goal, today } = data;
-  const none = <span className="muted">None</span>;
-  const dateOr = (d: string | null) => (d ? <span className="date">{shortDate(d, today)}</span> : none);
-  const rows: [string, React.ReactNode][] = [
-    ["type", goal.type],
-    ["level", goal.level],
-    ["org_unit", data.orgUnit.name],
-    ["severity", goal.severity],
-    ["plan", goal.plan ? /^https?:\/\//.test(goal.plan) ? <a href={goal.plan} target="_blank" rel="noreferrer">{goal.plan}</a> : goal.plan : none],
-    ["plan_maturity", goal.plan_maturity],
-    ["work_product", goal.work_product?.length ? goal.work_product.map((w) => Object.values(w).join(" ")).join(", ") : none],
-    ["parent", data.parent ? <Link to={goalPath(data.parent.id)}>{data.parent.summary}</Link> : none],
-    ["origination", goal.origination],
-    ["visibility", eventValue(goal.visibility, "visibility")],
-    ["original_committed_date", dateOr(goal.original_committed_date)],
-    ["changed_due_date", dateOr(goal.changed_due_date)],
-  ];
-  return (
-    <section className="card gfields">
-      <div className="lbl">
-        Fields
-        {onEdit && <Pencil label="Edit Fields" onClick={onEdit} />}
-      </div>
-      <dl>
-        {rows.map(([field, value]) => (
-          <div key={field}>
-            <dt>{fieldLabel(field)}</dt>
-            <dd>{value}</dd>
-          </div>
-        ))}
-      </dl>
-    </section>
-  );
-}
-
 function SubGoal({ card, data }: { card: SubGoalCard; data: GoalPageResponse }) {
   // The goal's own date, not its Promotion Milestone's: the one a sub-goal with no date of its own takes (D2).
   const ownDate = data.dates.find((d) => d.kind !== "Promotion Milestone");
   const owner = data.actors[card.owner] ?? { id: card.owner, name: card.owner };
   const done = card.workItems && card.workItems.total > 0 ? card.workItems.completed / card.workItems.total : 0;
   return (
-    <div className="card gsub">
+    <div className="gsub2">
       <HealthDot health={card.state === "In Progress" ? card.health : null} word={false} />
       <div className="gsubmain">
         <Link to={goalPath(card.id)} className="title">
@@ -442,48 +330,63 @@ export function Owner({ actor, me }: { actor: ApiActor; me: string }) {
   );
 }
 
+const STATUSES = ["In Progress", "Backlog", "Completed", "Deleted"] as const;
+
+/** GP2-8, GL4: compact rows under a "Status" heading; status chips with counts filter them, and Completed is closed until its chip is pressed. */
 function WorkItems({ items, data, adding, onAdd, onDone, reload, status }: { items: ApiWorkItem[]; data: GoalPageResponse; adding: boolean; onAdd: () => void; onDone: Done; reload: () => void; status: React.ReactNode }) {
-  const [closed, setClosed] = useState<Record<string, boolean>>({ Completed: true });
   const live = items.filter((i) => i.status !== "Deleted");
-  const { ticked, tick, box } = useTick(reload);
+  const counts = groupWorkItems(live).map((g) => ({ status: g.status, n: g.items.length }));
+  const [shown, setShown] = useState<Record<string, boolean>>({ "In Progress": true, Backlog: true, Completed: false });
+  const [picking, setPicking] = useState<string | null>(null);
+  const { move, chosen, box } = useTick(reload);
+  const rows = live.filter((i) => shown[i.status]);
   return (
-    <section className="gwork">
+    <section className="gsec gwork" id="g-work">
       <h2>
         Work items <span className="muted">{live.length}</span>
-        <button type="button" className="btn primary" onClick={onAdd}>
-          + Work item
-        </button>
+        <span className="wchips">
+          {counts.map((c) => (
+            <button key={c.status} type="button" className={`fchip${shown[c.status] ? " on" : ""}`} aria-pressed={Boolean(shown[c.status])} onClick={() => setShown((x) => ({ ...x, [c.status]: !x[c.status] }))}>
+              {c.status} {c.n}
+            </button>
+          ))}
+        </span>
       </h2>
       {status}
-      {live.length === 0 && !adding && <p className="muted note">No work items yet.</p>}
-      {adding && <AddWorkItem data={data} statuses={["Backlog", "In Progress", "Completed", "Deleted"]} onDone={onDone} />}
-      {groupWorkItems(live).map((g) => (
-        <div key={g.status} className="wgroup">
-          <button type="button" className="wghead" aria-expanded={!closed[g.status]} onClick={() => setClosed((c) => ({ ...c, [g.status]: !c[g.status] }))}>
-            {g.status} <span className="muted">{g.items.length}</span>
+      {rows.length > 0 && <div className="wstatushead small">Status</div>}
+      <div className="wrows">
+        {rows.map((i) => {
+          const owner = data.actors[i.owner] ?? { id: i.owner, name: i.owner, kind: "human" as const };
+          const now = chosen(i);
+          return (
+            <div key={i.id} className={`wrow2${i.status === "Completed" ? " done" : ""}`}>
+              {/* The circle is a named control: empty Backlog, half In Progress, checked Completed. */}
+              <button type="button" className={`scircle ${i.status === "Completed" ? "full" : i.status === "In Progress" ? "half" : "empty"}`} aria-label={`Status: ${i.status}. Change`} title="Change status" onClick={() => setPicking(picking === i.id ? null : i.id)} />
+              <span className="wtitle">{i.title}</span>
+              <span className="wwho">
+                <Avatar actor={owner} mine={owner.id === data.me.id} />
+                <span className="wfirst">{owner.name.split(" ")[0]}</span>
+              </span>
+              <span className={`wdue small${i.late ? " late" : ""}`}>{i.due_date ? `${shortDate(i.due_date, data.today)}${i.late ? " late" : i.due_date === data.today ? " today" : ""}` : ""}</span>
+              {picking === i.id && (
+                <select className="wpick" aria-label={`Status of ${i.title}`} value={now} onChange={(e) => move(i, e.target.value as (typeof STATUSES)[number])} autoFocus>
+                  {STATUSES.map((st) => (
+                    <option key={st}>{st}</option>
+                  ))}
+                </select>
+              )}
+              {box(i)}
+            </div>
+          );
+        })}
+        {adding ? (
+          <AddWorkItem data={data} statuses={["Backlog", "In Progress", "Completed", "Deleted"]} onDone={onDone} />
+        ) : (
+          <button type="button" className="addrow" onClick={onAdd}>
+            + Add work item
           </button>
-          {!closed[g.status] &&
-            g.items.map((i) => (
-              <div key={i.id} className={`wrow${i.status === "Completed" ? " done" : ""}`}>
-                {/* The tick's label is its 44 px tap area on touch (rule 29, QA U10). */}
-                <label className="wtick">
-                  <input
-                    type="checkbox"
-                    checked={i.status === "Completed" || ticked?.id === i.id}
-                    disabled={i.status === "Completed"}
-                    onChange={() => tick(i)}
-                    aria-label={`Mark ${i.title} Completed`}
-                  />
-                </label>
-                <span className="wtitle">{i.title}</span>
-                <Owner actor={data.actors[i.owner] ?? { id: i.owner, name: i.owner, kind: "human" }} me={data.me.id} />
-                <span className="wstatus small">{i.status}</span>
-                <span className={`wdue small${i.late ? " late" : ""}`}>{i.due_date ? `${shortDate(i.due_date, data.today)}${i.late ? " late" : ""}` : ""}</span>
-                {box(i)}
-              </div>
-            ))}
-        </div>
-      ))}
+        )}
+      </div>
     </section>
   );
 }
@@ -505,6 +408,9 @@ function EventRow({ group, data }: { group: EventGroup; data: GoalPageResponse }
   const value = (v: unknown, field: string) => eventValue(v, field, names);
   // One write can touch several goals; the row speaks of this goal, and names any other goal before its step.
   const find = (field: string) => group.events.find((x) => x.field === field && x.entity === data.goal.id)?.new;
+  // GL5: a Path to Green change says what changed in it ("Step 1 date Nov 6, 2026 → Nov 13, 2026"), never "1 step → 1 step".
+  const change = (x: ApiEvent) =>
+    x.field === "path_to_green" ? (ptgChanges(x.old as PathToGreen | null, x.new as PathToGreen | null, names).join("; ") || "Path to Green unchanged") : `${fieldLabel(x.field)}: ${value(x.old, x.field)} → ${value(x.new, x.field)}`;
   const other = (x: { entity: string }) => (x.entity !== data.goal.id ? `${x.entity} ` : "");
   return (
     <li className="erow">
@@ -543,7 +449,7 @@ function EventRow({ group, data }: { group: EventGroup; data: GoalPageResponse }
               {[...group.events].reverse().map((x) => (
                 <li key={x.sequence}>
                   {other(x)}
-                  {fieldLabel(x.field)}: {value(x.old, x.field)} → {value(x.new, x.field)}
+                  {change(x)}
                 </li>
               ))}
             </ul>
@@ -553,7 +459,7 @@ function EventRow({ group, data }: { group: EventGroup; data: GoalPageResponse }
             {group.events.map((x) => (
               <p key={x.sequence}>
                 {other(x)}
-                {fieldLabel(x.field)}: {value(x.old, x.field)} → {value(x.new, x.field)}
+                {change(x)}
               </p>
             ))}
             {e.reason && <p className="muted">“{e.reason}”</p>}
@@ -565,18 +471,18 @@ function EventRow({ group, data }: { group: EventGroup; data: GoalPageResponse }
 }
 
 /** Comments and History, each with its count. Comments opens first (design: Comments and History). */
+/** GP2-9, GL5: Activity, last: one stream of comments and changes, newest first, with All, Comments, and Changes, and the comment box at its top. */
 function Talk({ data, reload }: { data: GoalPageResponse; reload: () => void }) {
-  const [tab, setTab] = useState<"Comments" | "History">("Comments");
+  const [chip, setChip] = useState<ActivityChip>("All");
   const [text, setText] = useState("");
   const [error, setError] = useState<string>();
-  const [filter, setFilter] = useState<HistoryFilter>("All");
-  // D1: past 1,000 Events the page holds the newest 100; "Show older" joins the next page, and its comments join the Comments tab.
+  // D1: past 1,000 Events the page holds the newest 100; "Show older" joins the next page.
   const [older, setOlder] = useState<ApiEvent[]>([]);
   const [cursor, setCursor] = useState(data.olderEvents);
   const [loading, setLoading] = useState<string>();
   const events = joinPages(data.events, older);
-  const said = comments(events);
-  const shown = tab === "Comments" ? said : filterEvents(events, filter);
+  const shown = activity(events, chip);
+  const count = { All: data.eventCount, Comments: data.commentCount, Changes: data.eventCount - data.commentCount };
   const more = async () => {
     if (cursor === null) return;
     setLoading("…");
@@ -588,43 +494,35 @@ function Talk({ data, reload }: { data: GoalPageResponse; reload: () => void }) 
     } else setLoading(page.state === "refused" ? page.reason : "");
   };
   return (
-    <section className="gtalk">
-      <span className="tabs" role="tablist">
-        {(["Comments", "History"] as const).map((t) => (
-          <button key={t} type="button" role="tab" aria-selected={tab === t} className={`vtab${tab === t ? " on" : ""}`} onClick={() => setTab(t)}>
-            {t} <span className="muted">{t === "Comments" ? data.commentCount : data.eventCount}</span>
-          </button>
-        ))}
-      </span>
-      {tab === "History" && (
-        <p className="chips">
-          {HISTORY_FILTERS.map((f) => (
-            <button key={f} type="button" className={`fchip${filter === f ? " on" : ""}`} aria-pressed={filter === f} onClick={() => setFilter(f)}>
-              {f}
+    <section className="gsec gtalk">
+      <h2>
+        Activity
+        <span className="wchips">
+          {ACTIVITY.map((c) => (
+            <button key={c} type="button" className={`fchip${chip === c ? " on" : ""}`} aria-pressed={chip === c} onClick={() => setChip(c)}>
+              {c} <span className="muted">{count[c]}</span>
             </button>
           ))}
-        </p>
-      )}
-      {tab === "Comments" && (
-        <form
-          className="commentbox"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            const { body } = await postCommands(commentBatch("goal", data.goal.id, text));
-            if (body.ok) {
-              setText("");
-              reload();
-            } else setError(body.error === "invalid" ? body.violations.map((v) => v.message).join(" ") : body.error === "stale" ? "" : body.message);
-          }}
-        >
-          <textarea rows={3} value={text} placeholder="Comment" onChange={(e) => setText(e.target.value)} aria-label="Comment" />
-          {error && <p className="ferror">{error}</p>}
-          <button type="submit" className="btn primary">
-            Comment
-          </button>
-        </form>
-      )}
-      {tab === "Comments" && said.length === 0 && <p className="muted note">No comments yet.</p>}
+        </span>
+      </h2>
+      <form
+        className="commentbox"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const { body } = await postCommands(commentBatch("goal", data.goal.id, text));
+          if (body.ok) {
+            setText("");
+            reload();
+          } else setError(body.error === "invalid" ? body.violations.map((v) => v.message).join(" ") : body.error === "stale" ? "" : body.message);
+        }}
+      >
+        <textarea rows={2} value={text} placeholder="Comment" onChange={(e) => setText(e.target.value)} aria-label="Comment" />
+        {error && <p className="ferror">{error}</p>}
+        <button type="submit" className="btn primary">
+          Comment
+        </button>
+      </form>
+      {shown.length === 0 && <p className="muted note">{chip === "Comments" ? "No comments yet." : "Nothing yet."}</p>}
       <ul className="events" style={{ "--n": shown.length } as CSSProperties}>
         {groupEvents(shown).map((g) => (
           <EventRow key={g.events[0].sequence} group={g} data={data} />

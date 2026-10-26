@@ -1,9 +1,9 @@
 import { useState, type ReactNode } from "react";
-import type { ApiActor, ApiViolation, CommandsRequest, CommandsResponse, FormOptions, GoalFields, GoalPageResponse, Health, PathToGreen, StoredGoal } from "../../src/api.ts";
+import type { ApiActor, ApiViolation, CommandsRequest, CommandsResponse, FormOptions, GoalPageResponse, Health, PathToGreen, StoredGoal } from "../../src/api.ts";
 import { addDays, shortDate } from "../../src/dates.ts";
 import { postCommands, useJson } from "./data.ts";
 import { closeBatch, fieldsBatch, goalTypes, healthBatch, promoteAndClose, promoteToAmbition, promoteToCommitted, pursueBatch, savedStatus, slipBatch, staleMerge } from "./model/commands.ts";
-import { eventValue, fieldLabel, humans } from "./model/goalpage.ts";
+import { eventValue, humans } from "./model/goalpage.ts";
 import { healthWord } from "./model/labels.ts";
 import { HealthDot } from "./parts.tsx";
 
@@ -376,47 +376,3 @@ export function DescriptionPanel({ data, onDone }: { data: GoalPageResponse; onD
   );
 }
 
-type Editable = Pick<GoalFields, "type" | "level" | "severity" | "plan" | "plan_maturity" | "origination" | "visibility">;
-
-/** G19: the Fields grid made editable in place, with one reason and Save. Choices come from GET /api/options. */
-export function FieldsPanel({ data, onDone }: { data: GoalPageResponse; onDone: Done }) {
-  const [options] = useJson<FormOptions>("/api/options");
-  const g = data.goal;
-  const [values, setValues] = useState<Editable>({ type: g.type, level: g.level, severity: g.severity, plan: g.plan, plan_maturity: g.plan_maturity, origination: g.origination, visibility: g.visibility });
-  const [reason, setReason] = useState("");
-  const saved = useSave(g, () => onDone(true));
-  const choices = options.state === "ok" ? options.data.choices : undefined;
-  const pick = (field: keyof Editable, list?: readonly string[]) => (
-    <label key={field} className="field">
-      <span className="flabel">{fieldLabel(field)}</span>
-      {list ? (
-        <select value={values[field] ?? ""} onChange={(e) => setValues({ ...values, [field]: e.target.value })}>
-          {list.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-      ) : (
-        <input value={values[field] ?? ""} onChange={(e) => setValues({ ...values, [field]: e.target.value || (field === "plan" ? null : "") })} />
-      )}
-      <FieldError saved={saved} field={field} />
-      <Current saved={saved} field={field} data={data} />
-    </label>
-  );
-  const changed = Object.fromEntries(Object.entries(values).filter(([k, v]) => v !== g[k as keyof StoredGoal]));
-  return (
-    <Shell title="Fields" saved={saved} fields={Object.keys(values).concat("reason")} onSave={() => saved.save((goal) => fieldsBatch(goal, values, reason), changed)} onCancel={() => onDone(false)}>
-      <div className="fgrid">
-        {pick("type", choices?.type)}
-        {pick("level", choices?.level)}
-        {pick("severity", choices?.severity)}
-        {pick("plan")}
-        {pick("plan_maturity", choices?.plan_maturity)}
-        {pick("origination", ["New", "Carryover", "Repeating"])}
-        {pick("visibility")}
-      </div>
-      <Reason value={reason} onChange={setReason} saved={saved} />
-    </Shell>
-  );
-}
