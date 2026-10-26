@@ -15,7 +15,8 @@ import { checkConfiguration, configuredDatabase, configuredOrgUnit, configuredSi
 import { prioritiesView } from "./priorities.ts";
 import { BRAND_SLOT, brandHead } from "./brand.ts";
 import { signInPage } from "./signin.ts";
-import { read } from "./read.ts";
+import { goalieOwner, read } from "./read.ts";
+import { mayRankPriorities } from "./rules.ts";
 import { openStore } from "./store.ts";
 import { workQueue } from "./work.ts";
 
@@ -92,7 +93,11 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
   // Resolve the org unit once (review E22). An empty store has none yet, so try again until it does.
   let orgUnit = "";
   const unit = () => (orgUnit ||= configuredOrgUnit(db));
-  app.get("/api/priorities", (c) => c.json<PrioritiesResponse>({ ...prioritiesView(db, unit(), ...todayAndZone(db)), me: c.get("actor") }));
+  app.get("/api/priorities", (c) => {
+    const me = c.get("actor");
+    const mayRank = mayRankPriorities(me.id, goalieOwner(db), read(db, "org_unit", unit()));
+    return c.json<PrioritiesResponse>({ ...prioritiesView(db, unit(), ...todayAndZone(db)), me, mayRank });
+  });
   app.get("/api/goals/:id", (c) => {
     const page = goalPage(db, c.req.param("id"), c.get("actor").id, ...todayAndZone(db));
     return page ? c.json<GoalPageResponse>(page) : refuse(c, 404, "not_found", `no goal ${c.req.param("id")}`);
