@@ -42,7 +42,7 @@ export type TimelineWindow = {
   labels: { at: number; label: string }[];
   /** At days, the month names in the band above the day numbers (rule 21a); empty at every other zoom. */
   months: { at: number; date: string; label: string }[];
-  /** A day's position across the board, held to its edges. */
+  /** A day's position across the board, held to its edges: the start of that day. The today line is at the middle of today (`todayAt`). */
   pos: (date: string) => number;
 };
 
@@ -116,7 +116,8 @@ export function timelineWindow(priorities: { goals: ApiGoal[] }[], today: string
     last: addDays(open, scale.visible * 7 - 1),
     earlier: addDays(open, -scale.step * 7),
     later: addDays(open, scale.step * 7),
-    todayAt: pos(today),
+    // Rule 20: the today line runs through the middle of today's day at every zoom, not on the boundary before it.
+    todayAt: (pos(today) + pos(addDays(today, 1))) / 2,
     labels,
     months: scale.labels === "day" ? monthBand(start, weeks * 7).map((m) => ({ at: pos(m.date), ...m })) : [],
     pos,
@@ -264,19 +265,19 @@ export function laneOf(goal: Omit<ApiGoal, "children">, window: TimelineWindow, 
   const slipped = committed?.slipDays !== undefined;
   const over = slipped && committed !== undefined && goal.started >= committed.date;
   if (goal.state === "In Progress" && goal.health) {
-    if (over && committed) result.health = { from: pos(committed.date), to: pos(today) };
-    else result.health = { from: pos(goal.started), to: pos(committed && committed.date < today ? committed.date : today) };
+    if (over && committed) result.health = { from: pos(committed.date), to: window.todayAt };
+    else result.health = { from: pos(goal.started), to: committed && committed.date < today ? pos(committed.date) : window.todayAt };
   }
   if (committed) {
     const c = committed.date;
-    if (committed.slipDays !== undefined) result.slip = { from: pos(c), to: pos(today), days: committed.slipDays, over: over && result.health !== undefined };
-    else result.ahead = { from: pos(goal.started > today ? goal.started : today), to: pos(c) };
+    if (committed.slipDays !== undefined) result.slip = { from: pos(c), to: window.todayAt, days: committed.slipDays, over: over && result.health !== undefined };
+    else result.ahead = { from: goal.started > today ? pos(goal.started) : window.todayAt, to: pos(c) };
     result.tick = { at: pos(c), date: committed, outside: outside(c) };
   }
   const uncommitted = goal.dates.find((d) => d.kind === "Ambition" || d.kind === "Fantasy");
   if (uncommitted && (uncommitted.kind === "Ambition" || uncommitted.kind === "Fantasy")) {
     result.end = { at: pos(uncommitted.date), date: uncommitted, outside: outside(uncommitted.date) };
-    result.line = { from: committed ? pos(committed.date) : pos(today), to: result.end.at, kind: uncommitted.kind };
+    result.line = { from: committed ? pos(committed.date) : window.todayAt, to: result.end.at, kind: uncommitted.kind };
   }
   return result;
 }

@@ -683,7 +683,7 @@ select.wstatus{height:28px;border:1px solid var(--cut);border-radius:8px;backgro
 .ticklbl,.endlbl,.edge{z-index:4}
 /* Rule 21a: days, a line each day, weekends in --sub-bg. The board starts on a Monday. */
 .z-days .lane{background-image:repeating-linear-gradient(to right,var(--grid) 0 1px,transparent 1px calc(var(--week) / 7)),repeating-linear-gradient(to right,transparent 0 calc(var(--week) * 5 / 7),var(--sub-bg) calc(var(--week) * 5 / 7) var(--week))}
-.z-days .wk{font-size:11px;margin-left:3px}
+.z-days .wk{font-size:11px;margin-left:calc(var(--week) / 14);transform:translateX(-50%)}
 /* Rule 23c: an edge list, one label per line, 2 px apart, from the top of the row. */
 .edge.list{top:4px;bottom:auto;display:flex;flex-direction:column;gap:2px;line-height:14px;font-weight:700}
 .edge.list.after{align-items:flex-end}

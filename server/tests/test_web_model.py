@@ -206,15 +206,25 @@ class TimelineTests(unittest.TestCase):
         r = run('const w = timeline.timelineWindow(api.funded, "2026-10-23", "weeks"); return timeline.visibleRange(w, w.openPx + 11, 13 * 84);')
         self.assertEqual(r["first"], "2026-09-28")  # type: ignore[index]
 
+    def test_the_today_line_runs_through_the_middle_of_today(self) -> None:
+        # Rule 20 (Chelsea, 2026-10-25): at every zoom, through the centre of today's column, not on the boundary before it.
+        got = run('return ["days", "weeks", "months", "quarters"].map((z) => { const w = timeline.timelineWindow(api.funded, "2026-10-23", z); return [w.todayAt, (w.pos("2026-10-23") + w.pos("2026-10-24")) / 2]; });')
+        for at, middle in got:  # type: ignore[union-attr]
+            self.assertAlmostEqual(at, middle, places=9)
+        # A bar that runs to today ends on the line, so they stay joined.
+        lane = run('const w = timeline.timelineWindow(api.funded, "2026-10-23", "weeks"); return [timeline.laneOf({ ...api.funded[0].goals[0], started: "2026-09-01" }, w, "2026-10-23").slip.to, w.todayAt, w.pos("2026-10-23")];')
+        self.assertEqual(lane[0], lane[1])  # type: ignore[index]
+        self.assertNotEqual(lane[1], lane[2])  # type: ignore[index]
+
     def test_a_slip_runs_from_the_committed_date_to_today(self) -> None:
-        lane = run('const w = timeline.timelineWindow(api.funded, "2026-10-23", "weeks"); const l = timeline.laneOf({ ...api.funded[0].goals[0], started: "2026-09-01" }, w, "2026-10-23"); return { l, s: w.pos("2026-09-01"), d: w.pos("2026-10-01"), t: w.pos("2026-10-23") };')
+        lane = run('const w = timeline.timelineWindow(api.funded, "2026-10-23", "weeks"); const l = timeline.laneOf({ ...api.funded[0].goals[0], started: "2026-09-01" }, w, "2026-10-23"); return { l, s: w.pos("2026-09-01"), d: w.pos("2026-10-01"), t: w.todayAt };')
         self.assertEqual(lane["l"]["slip"], {"from": lane["d"], "to": lane["t"], "days": 22, "over": False})  # type: ignore[index]
         self.assertEqual(lane["l"]["health"], {"from": lane["s"], "to": lane["d"]})  # type: ignore[index]
         self.assertEqual(lane["l"]["tick"]["date"]["kind"], "Committed")  # type: ignore[index]
         self.assertNotIn("ahead", lane["l"])  # type: ignore[operator]
 
     def test_a_goal_started_after_its_date_draws_health_under_the_slip(self) -> None:
-        lane = run('const w = timeline.timelineWindow(api.funded, "2026-10-23", "weeks"); return { l: timeline.laneOf(api.funded[0].goals[0], w, "2026-10-23"), d: w.pos("2026-10-01"), t: w.pos("2026-10-23") };')
+        lane = run('const w = timeline.timelineWindow(api.funded, "2026-10-23", "weeks"); return { l: timeline.laneOf(api.funded[0].goals[0], w, "2026-10-23"), d: w.pos("2026-10-01"), t: w.todayAt };')
         self.assertEqual(lane["l"]["health"], {"from": lane["d"], "to": lane["t"]})  # type: ignore[index]
         self.assertTrue(lane["l"]["slip"]["over"])  # type: ignore[index]
 
