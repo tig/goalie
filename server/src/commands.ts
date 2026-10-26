@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import type { ApiEvent, ApiViolation, BatchHint, CommandsResponse, Ref, StoredGoal, StoredPriority } from "./api.ts";
+import type { ApiCommand, ApiEvent, ApiViolation, BatchHint, CommandsResponse, Ref, StoredGoal, StoredPriority } from "./api.ts";
 import { publish, toApiEvent } from "./live.ts";
 import { toApiWorkItem } from "./work.ts";
 import { lookup, read } from "./read.ts";
@@ -13,7 +13,8 @@ import { DEFAULTS, inTransaction, write, type Command, type WriteResult } from "
  */
 
 /** Only goals and work items are written through the API in the MLP (E-10), and a Priority's rank, for drag to reorder on Home. */
-const API_KINDS = ["goal", "work_item", "priority"] as const;
+// The contract names an update for every kind the API writes, so the app can send it (f55879d left priority out).
+const API_KINDS = ["goal", "work_item", "priority"] as const satisfies readonly Extract<ApiCommand, { op: "update" }>["kind"][];
 
 /** The fields that hold a goal key, so a ref may stand there. A ref anywhere else is plain text. */
 const KEY_FIELDS: Record<(typeof API_KINDS)[number], readonly string[]> = { goal: ["promotion_milestone", "parent"], work_item: ["goal"], priority: [] };
