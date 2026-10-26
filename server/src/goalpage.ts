@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import type { ApiEvent, ApiWorkItem, GoalDate, GoalEventsResponse, GoalPageResponse, Health, StoredGoal, SubGoalCard } from "./api.ts";
+import type { ApiEvent, ApiWorkItem, GoalDate, GoalEventsResponse, GoalPageResponse, GoalRef, Health, StoredGoal, SubGoalCard } from "./api.ts";
 import { toApiEvent } from "./live.ts";
 import { toApiWorkItem } from "./work.ts";
 import { above, changers, closesAs, closesAsPromoted, currentDate, mayChangeGoal, goalDates, isOpen, judgedDate, resolvedGoal, uncommittedDate, type State } from "./goal.ts";
@@ -13,6 +13,7 @@ import { goalLints, type Row } from "./rules.ts";
  */
 
 const isLive = (item: Row) => item.status !== "Deleted";
+const goalRef = (goal: Row): GoalRef => ({ id: goal.id as string, summary: goal.summary as string });
 
 /** D1: a history this long or shorter is sent whole. A longer one is sent a page at a time, newest first. */
 const HISTORY_WHOLE = 1_000;
@@ -57,6 +58,9 @@ export function goalPage(db: DatabaseSync, id: string, me: string, today: string
   // G15: the state a close records now. One home: goal.ts closesAs, which rules.ts checks too.
   const closing = stored.state === "In Progress" ? closesAs(goal, today) : null;
 
+  // GP2-12: goals are read in key order, so the first that names this goal as its Promotion Milestone is the lowest key.
+  const backer = [...goals.values()].find((g) => g.promotion_milestone === id);
+
   const pmId = goal.promotion_milestone;
   const pm = typeof pmId === "string" ? goals.get(pmId) : undefined;
   const promotionMilestone = pm && {
@@ -64,6 +68,7 @@ export function goalPage(db: DatabaseSync, id: string, me: string, today: string
     summary: pm.summary as string,
     version: pm.version as number,
     state: pm.state as State,
+    health: (pm.health as Health) ?? null,
     date: currentDate(pm) as string,
     openSubGoals: childrenOf(pm.id as string).filter(isOpen).length,
     openWorkItems: tree(pm.id as string).flatMap(itemsOf).filter((w) => w.status !== "Completed" && isLive(w)).length,
@@ -110,10 +115,12 @@ export function goalPage(db: DatabaseSync, id: string, me: string, today: string
     closesAsPromoted: closesAsPromoted(stored, today),
     mayChange: mayChangeGoal(me, goalieOwner(db), stored, getGoal),
     above: above(stored, getGoal),
+    siblings: typeof stored.parent === "string" ? childrenOf(stored.parent).filter((g) => g.id !== id).map(goalRef) : [],
+    backs: backer ? goalRef(backer) : null,
     changers: who.list,
     moreChangers: who.more,
     promotionMilestone: promotionMilestone ?? null,
-    parent: parent ? { id: parent.id as string, summary: parent.summary as string } : null,
+    parent: parent ? goalRef(parent) : null,
     priority: priority ? { id: priority.id as string, rank: priority.rank as number, title: priority.title as string } : null,
     orgUnit: { id: stored.org_unit as string, name: (unit?.name as string) ?? (stored.org_unit as string), level: (unit?.level as string) ?? "" },
     subGoals,

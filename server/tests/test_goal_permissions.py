@@ -148,7 +148,7 @@ class GoalPermissionTests(unittest.TestCase):
 
     def test_the_goal_page_names_the_owners_above(self) -> None:
         page = self.page("galahad", "XW-0099")
-        self.assertEqual(page["above"], [{"id": "XW-0004", "owner": "chelsea"}, {"id": "XW-0003", "owner": "chelsea"}])
+        self.assertEqual([(a["id"], a["owner"]) for a in page["above"]], [("XW-0004", "chelsea"), ("XW-0003", "chelsea")])
         self.assertIn("chelsea", page["actors"])
         self.assertEqual(self.page("galahad", "XW-0001")["above"], [])
 

@@ -56,9 +56,15 @@
   "above": [
     {
       "id": "XW-0003",
-      "owner": "chelsea"
+      "owner": "chelsea",
+      "summary": "Tig, Chelsea, and agents use GOALIE to drive Excaliwire execution"
     }
   ],
+  "siblings": [],
+  "backs": {
+    "id": "XW-0003",
+    "summary": "Tig, Chelsea, and agents use GOALIE to drive Excaliwire execution"
+  },
   "changers": [
     {
       "actor": "chelsea",
