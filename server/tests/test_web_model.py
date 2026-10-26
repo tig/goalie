@@ -384,11 +384,6 @@ class GoalPageTests(unittest.TestCase):
         groups = run(f'return goalpage.groupWorkItems({json.dumps(items)}).map((g) => [g.status, g.items.map((i) => i.id)]);')
         self.assertEqual(groups, [["In Progress", ["WI-0002", "WI-0004"]], ["Backlog", ["WI-0003"]], ["Completed", ["WI-0001"]]])
 
-    def test_history_filters_by_kind_of_change(self) -> None:
-        fields = ["summary", "due_date", "date_type", "changed_due_date", "health", "path_to_green", "state", "comment", "owner"]
-        counts = run(f'const e = {json.dumps([{"field": f} for f in fields])}; return ["All", "Dates", "Health", "State", "Comments"].map((f) => goalpage.filterEvents(e, f).length);')
-        self.assertEqual(counts, [9, 3, 2, 1, 1])
-
     def test_an_event_value_reads_as_words(self) -> None:
         values = run('return [goalpage.eventValue(null), goalpage.eventValue("GREEN"), goalpage.eventValue(3), goalpage.eventValue({ steps: [1, 2], criteria: "x" }), goalpage.eventValue([{ repo: "github.com/tig/goalie" }])];')
         self.assertEqual(values, ["None", "GREEN", "3", "Path to Green, 2 steps", "github.com/tig/goalie"])
@@ -500,6 +495,21 @@ class GoalPageTests(unittest.TestCase):
         got = run(f"const all = goalpage.joinPages({json.dumps(newer)}, {json.dumps(older)}); return [all.map((e) => e.sequence), goalpage.groupEvents(all).map((g) => g.events.length)];")
         self.assertEqual(got, [[9, 8, 7, 6], [3, 1]])
 
+    def test_a_path_to_green_change_says_what_changed_in_it(self) -> None:
+        # GP2-9, GL5: never "Path to Green, 1 step -> Path to Green, 1 step".
+        old = {"steps": [{"text": "Load the tree", "owner": "tig", "date": "2026-11-06"}], "criteria": "Loaded", "trigger": "Late"}
+        new = {"steps": [{"text": "Load the tree", "owner": "chelsea", "date": "2026-11-13"}, {"text": "Check it", "owner": "tig", "date": "2026-11-20"}], "criteria": "Loaded and checked", "trigger": "Late"}
+        names = {"actors": {"tig": {"name": "Tig"}, "chelsea": {"name": "Chelsea"}}}
+        got = run(f"return goalpage.ptgChanges({json.dumps(old)}, {json.dumps(new)}, {json.dumps(names)});")
+        self.assertEqual(got, ["Step 1 owner Tig → Chelsea", "Step 1 date Nov 6, 2026 → Nov 13, 2026", "Step 2 added: Check it", "When it is On track again: Loaded → Loaded and checked"])
+        self.assertEqual(run(f"return goalpage.ptgChanges(null, {json.dumps(old)}, {json.dumps(names)});"), ["Step 1 added: Load the tree", "When it is On track again: Loaded", "What makes it Off track: Late"])
+        self.assertEqual(run(f"return goalpage.ptgChanges({json.dumps(old)}, null, {json.dumps(names)});"), ["Path to Green cleared"])
+
+    def test_activity_chips_split_comments_from_changes(self) -> None:
+        events = [{"sequence": 3, "field": "comment"}, {"sequence": 2, "field": "health"}, {"sequence": 1, "field": "comment"}]
+        got = run(f"return ['All', 'Comments', 'Changes'].map((c) => goalpage.activity({json.dumps(events)}, c).map((e) => e.sequence));")
+        self.assertEqual(got, [[3, 2, 1], [3, 1], [2]])
+
     def test_a_value_reads_as_names_and_dates(self) -> None:
         ctx = {"actors": {"tig": {"name": "Tig"}}, "names": {"PRI-3": "Priority 3 Run Excaliwire on GOALIE", "excaliwire": "Excaliwire"}}
         v = run(f'const c = {json.dumps(ctx)}; return [goalpage.eventValue("2026-11-30", "due_date", c), goalpage.eventValue("PRI-3", "priority", c), goalpage.eventValue("excaliwire", "org_unit", c), goalpage.eventValue("tig", "owner", c), goalpage.eventValue("organization-wide", "visibility", c)];')
@@ -518,14 +528,6 @@ class GoalPageTests(unittest.TestCase):
         items = [{"id": "1", "owner": "ann", "status": "Completed"}, {"id": "2", "owner": "bob", "status": "In Progress"}, {"id": "3", "owner": "me", "status": "Backlog"}, {"id": "4", "owner": "cat", "status": "In Progress"}]
         actors = {k: {"id": k, "name": k.title(), "kind": "human"} for k in ("ann", "bob", "cat", "me")}
         self.assertEqual(run(f"return goalpage.queues({json.dumps(items)}, {json.dumps(actors)}, 'me').map((q) => q.owner.id);"), ["bob", "cat", "me", "ann"])
-
-    def test_comments_are_the_comment_events(self) -> None:
-        events = [{"field": "comment", "actor": "tig"}, {"field": "health", "actor": "chelsea"}, {"field": "comment", "actor": "chelsea"}]
-        self.assertEqual(run(f'return goalpage.comments({json.dumps(events)}).map((e) => e.actor);'), ["tig", "chelsea"])
-
-
-class CommandTests(unittest.TestCase):
-    """Each goal-page panel saves one CommandsRequest (docs/engineering/goal-page-and-create.md, Edits from the goal page)."""
 
     def test_health_with_a_path_to_green_is_one_update(self) -> None:
         b = run('const g = page("XW-0003").goal; return commands.healthBatch(g, "YELLOW", { steps: [{ text: "Load the tree", owner: "chelsea", date: "2026-10-30" }], criteria: "Tree loaded", trigger: "Not loaded by Nov 2" }, "Seed is late");')

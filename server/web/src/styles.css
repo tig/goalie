@@ -691,3 +691,77 @@ select.wstatus{height:28px;border:1px solid var(--cut);border-radius:8px;backgro
 .edge.list>.endlbl{font-weight:600}
 .edgespace{display:block;width:1px}
 .mband{position:absolute;top:4px;margin-left:3px;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);white-space:nowrap}
+/* Goal page v2 (GP2, GL1 to GL7): main column and properties. */
+.goalpage.v2{max-width:1120px}
+.crumbs{display:flex;align-items:center;min-width:0;margin:0 0 16px;font-size:13px;font-weight:600}
+.crumbs-full{display:flex;align-items:center;min-width:0;white-space:nowrap;overflow:hidden}
+.crumbstep{display:inline-flex;align-items:center;min-width:0}
+.crumb{color:var(--link);text-decoration:none}.crumb:hover{text-decoration:underline}
+.crumb.mid span{display:inline-block;max-width:200px;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
+.crumb.here{color:var(--ink);overflow:hidden;text-overflow:ellipsis}
+.crumbs .sep{margin:0 8px;color:var(--mute)}
+.crumbs-phone{display:none}
+.glayout{display:grid;grid-template-columns:minmax(0,760px) 300px;column-gap:40px;grid-template-areas:"head side" "body side";align-items:start;justify-content:space-between}
+.ghead2{grid-area:head;min-width:0}.gbody{grid-area:body;min-width:0}
+.gprops{grid-area:side;position:sticky;top:calc(var(--topbar) + 16px);max-height:calc(100vh - var(--topbar) - 32px);overflow:auto;background:var(--card);border-radius:16px;padding:6px 16px 12px}
+.gkey{font-size:13px;font-weight:700;color:var(--mute)}
+.ghead2 .gtitle{margin:2px 0 8px}
+.needs.none{color:var(--mute);font-weight:600}
+.needlink{color:var(--red-ink);font-weight:700}
+.gsec{margin:30px 0 0}
+.gsec>h2{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 10px;font-size:15px;font-weight:800}
+.wchips{display:inline-flex;flex-wrap:wrap;gap:6px;margin-left:auto}
+.props .prop{display:grid;grid-template-columns:104px minmax(0,1fr);gap:4px 10px;padding:9px 0;border-bottom:1px solid var(--line);align-items:start}
+.props .prop.phealth{grid-template-columns:1fr}
+.plabel{font-size:12px;font-weight:700;color:var(--mute);padding-top:2px}
+.pvalue{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;min-width:0;font-size:13px;font-weight:600}
+.pvalue>.datebar{flex-basis:100%;margin-top:8px}
+.pvalue .pedit{margin-left:auto;font-size:12px}
+.pbacked,.pother,.pacts{flex-basis:100%;font-size:12px}
+.pacts{display:flex;gap:12px}
+.powner{display:inline-flex;align-items:center;gap:6px}
+.pform{grid-column:1/-1;display:flex;flex-direction:column;gap:6px}
+.pform select,.pform input{font:600 13px var(--font);border:1px solid var(--cut);border-radius:8px;padding:6px 8px}
+.pform .pactions{display:flex;gap:8px;justify-content:flex-end}
+.allprops{display:none;margin:10px 0}
+.family{padding:10px 0;border-bottom:1px solid var(--line)}
+.ftree{list-style:none;margin:6px 0 0;padding:0;font-size:13px}
+.ftree ul{list-style:none;margin:2px 0 0;padding:0 0 0 14px;border-left:1px solid var(--cut)}
+.ftree li{padding:2px 0}.ftree .fchild{padding-left:14px}
+.fthis{display:inline-block;padding:2px 6px}
+.fbacks{display:block;color:var(--mute);padding-left:6px}
+.fsib{display:block}
+.moreprops{padding:8px 0}
+.mphead{display:flex;align-items:center;gap:6px;width:100%;padding:0;background:none;border:0;cursor:pointer;color:var(--ink)}
+.subrows,.wrows{border-top:1px solid var(--line)}
+.gsub2{display:flex;align-items:center;gap:10px;min-height:44px;padding:6px 0;border-bottom:1px solid var(--line)}
+.addrow{display:block;width:100%;min-height:36px;padding:8px 0;border:0;background:none;text-align:left;color:var(--link);font:700 13px var(--font);cursor:pointer}
+.wstatushead{margin:0 0 2px;color:var(--mute);font-weight:700}
+.wrow2{display:grid;grid-template-columns:28px minmax(0,1fr) auto 96px;align-items:center;gap:4px 10px;min-height:36px;border-bottom:1px solid var(--line)}
+.wrow2 .wtitle{font-size:13px}
+.wrow2 .wdue{text-align:right}
+.wrow2>.wpick,.wrow2>.tickreason{grid-column:2/-1}
+.wwho{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600}
+.scircle{position:relative;width:16px;height:16px;padding:0;border:2px solid var(--mute);border-radius:50%;background:none;cursor:pointer}
+.scircle.half{background:linear-gradient(90deg,var(--mute) 50%,transparent 50%)}
+.scircle.full{background:var(--green);border-color:var(--green)}
+.scircle:hover,.scircle:focus-visible{border-color:var(--ink)}
+.gtalk .commentbox{margin:0 0 12px}
+@media (pointer:coarse){.scircle::after,.addrow{min-height:44px}.scircle::after{content:"";position:absolute;left:50%;top:50%;width:44px;height:44px;transform:translate(-50%,-50%)}}
+/* GP2-14: under 1100 px, one column: header, a compact properties block, then the sections. */
+@media (max-width:1099px){
+.glayout{grid-template-columns:minmax(0,1fr);grid-template-areas:"head" "side" "body"}
+.gprops{position:static;max-height:none;overflow:visible;margin-top:12px}
+.allprops{display:block}.propsrest{display:none}.propsrest.shown{display:block}
+.wfirst{display:none}}
+.phone .crumbs-full{display:none}.phone .crumbs-phone{display:inline}
+.phone .props .hpick{display:flex;width:100%;height:44px}.phone .props .hopt{flex:1;justify-content:center}
+.pvalue a,.pvalue{overflow-wrap:anywhere}
+@media (pointer:coarse){
+.props .linkbtn,.props .pvalue>a,.ftree a,.crumbs a{position:relative;display:inline-block}
+.props .linkbtn::after,.props .pvalue>a::after,.ftree a::after,.crumbs a::after{content:"";position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}
+.props .prop{min-height:52px}.pacts{min-height:44px;align-items:center}}
+@media (pointer:coarse){.mphead{min-height:44px}}
+@media (pointer:coarse){.created>summary{min-height:44px;display:flex;align-items:center}}
+@media (pointer:coarse){.wrow2{min-height:44px}}
+@media (pointer:coarse){.props .prop{min-height:56px}}
