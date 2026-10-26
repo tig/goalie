@@ -25,7 +25,7 @@ export type TreeProps = {
   blank: ReactNode;
   /** False in the List, where the health shows once, in its own column (rule 19a). */
   mark?: boolean;
-  /** Rule 26: drag to reorder Priorities, for an actor who may (the server's mayRank) and with no filter on. `save` answers an error to show, or nothing. */
+  /** Rule 35: drag to reorder Priorities, for an actor who may (the server's mayRank) and with no filter on. `save` answers an error to show, or nothing. */
   rank?: { save: (order: string[], reason: string) => Promise<string | undefined> };
 };
 
@@ -131,7 +131,7 @@ export function GoalTree(props: TreeProps) {
     );
   };
 
-  // Rule 26: the order on screen, pending a reason after a move; the drag in progress and the drop line it shows.
+  // Rule 35: the order on screen, pending a reason after a move; the drag in progress and the drop line it shows.
   const base = [...funded, ...backlog].map((p) => p.id);
   const [pending, setPending] = useState<{ order: string[]; moved: string } | null>(null);
   const [reason, setReason] = useState("");

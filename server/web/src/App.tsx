@@ -183,7 +183,7 @@ function Home({ data, reload }: { data: PrioritiesResponse; reload: () => void }
   const view: View = phone && screen.view === "timeline" ? "list" : screen.view;
 
   const search = <Search q={screen.q} health={screen.health} onSearch={(q) => change({ q }, Boolean(screen.q) === Boolean(q.trim()))} onClear={() => change({ health: undefined, q: undefined })} />;
-  // Rule 26: drag to reorder Priorities, only for an actor who may (mayRank) and with no filter on. One batch of the ranks that changed.
+  // Rule 35: drag to reorder Priorities, only for an actor who may (mayRank) and with no filter on. One batch of the ranks that changed.
   const rank =
     data.mayRank && !filtering
       ? {

@@ -47,6 +47,7 @@ The screens are a React app in `server/web/`. It reads `GET /api/priorities` and
 ## Timeline
 
 20. The board draws one grid for every row, as the background of each row, so the pinned column always covers it. The today line is one 2 px `--today` line in front of the grid, the row backgrounds, the highlight, and the bars, from the axis to the bottom of the last row and through the cut line, like a playhead (Chelsea, 2026-10-25). It never takes a press. Label text stays in front of it, on its halo (rule 23), so a label is never struck through. The pinned goal column covers it when today is scrolled under it. At every zoom the line runs through the middle of today's day, not on the boundary before it (Chelsea, 2026-10-25): at days, the centre of today's column, where its day number is centred too. A bar that runs to today (health, slip) ends on the line, so they stay joined.
+20e. A "+" sits beside the Today label on the Timeline; it opens New goal (Chelsea, 2026-10-25). On touch it answers a 44 px tap.
 20a. The timeline scrolls sideways into the past and the future, and is wider than the screen at every zoom (review Q2): 26 weeks back and 39 ahead of the week it opens on at weeks, 52 and 78 at months, 104 and 156 at quarters. The goal names stay pinned on the left while it scrolls, with a soft shadow on their edge.
 20b. The board opens on the week two weeks before today, or earlier to show a Committed date that passed in the last 10 weeks. When that would put today past the left third of the timeline on screen, as on a narrow board, it opens with today at the left third. The app sets the scroll position, so it opens there in every browser. Until the viewer scrolls, it sets it again when fonts or the layout settle late, or when the browser restores an old position (review X2).
 20c. The timeline shows no scrollbar. A soft fade on its left or right edge shows there is more to scroll that way.
@@ -82,6 +83,7 @@ H4. Pointing at a row turns it gray, with no colored bar.
 27. A filter that matches nothing says "No goals match."
 27a. The cut line (SPEC.md §6.3) is named once, on its divider: "✂ Cut line". An empty side says "No Priorities above the cut line." or "No Priorities below the cut line."
 
+35. Priorities reorder by drag, in Timeline and List (Chelsea, 2026-10-25), only for an actor the server says may rank them (mayRank; SPEC.md §6.3: the org unit's owner or the GOALIE owner) and with no filter on. A handle sits on each Priority's first row; dragging shows a drop line between Priorities; on a focused handle, arrow up and down move it one place. After a move the new order shows at once with one short reason field, empty, with Save and Undo, under the moved Priority. Save sends the new ranks as one batch; the cut line stays on its Priority. A refusal shows beside the field in the server's words.
 ## Views
 
 V1. The view tabs follow Priorities in the toolbar: Timeline, List, Calendar on a desktop; List and Calendar on a phone. The view in force is a raised white tab on a `--control` track. All views draw the same goals with the same filter and search.
