@@ -131,12 +131,12 @@ export function closesAsPromoted(goal: Row, today: string): "Completed" | "Compl
 }
 
 /** The goals above this one through parent, nearest first, each with its owner. Stops at a cycle. */
-export function above(goal: Row, getGoal: (id: string) => Row | undefined): { id: string; owner: string }[] {
-  const chain: { id: string; owner: string }[] = [];
+export function above(goal: Row, getGoal: (id: string) => Row | undefined): { id: string; owner: string; summary: string }[] {
+  const chain: { id: string; owner: string; summary: string }[] = [];
   const seen = new Set<unknown>([goal.id]);
   for (let at = typeof goal.parent === "string" ? getGoal(goal.parent) : undefined; at !== undefined && !seen.has(at.id); at = typeof at.parent === "string" ? getGoal(at.parent) : undefined) {
     seen.add(at.id);
-    chain.push({ id: at.id as string, owner: at.owner as string });
+    chain.push({ id: at.id as string, owner: at.owner as string, summary: at.summary as string });
   }
   return chain;
 }
