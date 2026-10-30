@@ -102,7 +102,7 @@ Not in the MLP: the weekly review inside GOALIE, a separate work tracker, mobile
 Tig and Chelsea sign in to goalie.excaliwire.com and see the same goals. These items block it, in order:
 
 - [ ] Tig accepts the amendment to [ADR 0005](adr/0005-auth-and-identity.md): the first deployment has more than one human actor.
-- [x] The Excaliwire Entra ID gate ([ADR 0005](adr/0005-auth-and-identity.md), oauth2-proxy) lets both Tig and Chelsea through. Measured: an unsigned request answers 302 to `/oauth2/start`, and the gate passes its access token to GOALIE ([operations#171](https://github.com/excaliwire/operations/issues/171#issuecomment-6533165956)).
+- [ ] The Excaliwire Entra ID gate ([ADR 0005](adr/0005-auth-and-identity.md), oauth2-proxy) lets both Tig and Chelsea through. Waits on Tig's and Chelsea's first sign-in ([excaliwire/operations#171](https://github.com/excaliwire/operations/issues/171)). Measured so far: an unsigned request answers 302 to `/oauth2/start`, and the gate passes its access token to GOALIE ([operations#171](https://github.com/excaliwire/operations/issues/171#issuecomment-6533165956)).
 - [x] The host's issuer list names the Excaliwire tenant. Measured: the host's `GOALIE_ISSUERS` names the tenant's v2 issuer, and `/` with no token answers 401 from GOALIE ([operations#171](https://github.com/excaliwire/operations/issues/171#issuecomment-6533165956)).
 - [x] The host's store is seeded once from `server/seed/excaliwire.json` ([CONTRIBUTING.md](../CONTRIBUTING.md)). Tig and Chelsea are its human actors. XW-0001, XW-0002, and XW-0003 are its goals.
 - [x] The GOALIE owner sets Tig's and Chelsea's Entra object ids (`oid`) as the subjects of their actors in the host's store. The seed names neither subject.
