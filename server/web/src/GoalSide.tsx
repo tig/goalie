@@ -270,12 +270,16 @@ function Family({ data }: { data: GoalPageResponse }) {
       <ul className="ftree">
         {data.parent && (
           <li>
-            <Link to={goalPath(data.parent.id)}>{data.parent.summary}</Link>
+            <Link to={goalPath(data.parent.id)}>
+              <span className="fname" title={data.parent.summary}>{data.parent.summary}</span>
+            </Link>
           </li>
         )}
         <li className={data.parent ? "fchild" : ""}>
           <span className="fthis" style={{ boxShadow: goal.health ? `inset 3px 0 0 var(--${goal.health.toLowerCase()})` : undefined }}>
-            <HealthDot health={goal.state === "In Progress" ? goal.health : null} word={false} /> <b>{goal.summary}</b> <span className="muted">(this goal)</span>
+            <HealthDot health={goal.state === "In Progress" ? goal.health : null} word={false} />
+            <b className="fname" title={goal.summary}>{goal.summary}</b>
+            <span className="muted">(this goal)</span>
           </span>
           {backs && <span className="fbacks small">◆ backs {backs.id}'s date</span>}
           {data.subGoals.length > 0 && (
@@ -283,7 +287,8 @@ function Family({ data }: { data: GoalPageResponse }) {
               {data.subGoals.slice(0, 5).map((c) => (
                 <li key={c.id}>
                   <Link to={goalPath(c.id)}>
-                    <HealthDot health={c.state === "In Progress" ? c.health : null} word={false} /> {c.summary}
+                    <HealthDot health={c.state === "In Progress" ? c.health : null} word={false} />
+                    <span className="fname" title={c.summary}>{c.summary}</span>
                   </Link>
                 </li>
               ))}
@@ -296,7 +301,9 @@ function Family({ data }: { data: GoalPageResponse }) {
             {more ? (
               siblings.map((s) => (
                 <span key={s.id} className="fsib">
-                  <Link to={goalPath(s.id)}>{s.summary}</Link>
+                  <Link to={goalPath(s.id)}>
+                    <span className="fname" title={s.summary}>{s.summary}</span>
+                  </Link>
                 </span>
               ))
             ) : (

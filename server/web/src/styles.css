@@ -712,7 +712,7 @@ select.wstatus{height:28px;border:1px solid var(--cut);border-radius:8px;backgro
 .gsec>h2{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 10px;font-size:15px;font-weight:800}
 .wchips{display:inline-flex;flex-wrap:wrap;gap:6px;margin-left:auto}
 .props .prop{display:grid;grid-template-columns:104px minmax(0,1fr);gap:4px 10px;padding:9px 0;border-bottom:1px solid var(--line);align-items:start}
-.props .prop.phealth{grid-template-columns:1fr}
+.props .prop.phealth,.props .prop.pjudged{grid-template-columns:1fr}
 .plabel{font-size:12px;font-weight:700;color:var(--mute);padding-top:2px}
 .pvalue{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;min-width:0;font-size:13px;font-weight:600}
 .pvalue>.datebar{flex-basis:100%;margin-top:8px}
@@ -725,10 +725,14 @@ select.wstatus{height:28px;border:1px solid var(--cut);border-radius:8px;backgro
 .pform .pactions{display:flex;gap:8px;justify-content:flex-end}
 .allprops{display:none;margin:10px 0}
 .family{padding:10px 0;border-bottom:1px solid var(--line)}
-.ftree{list-style:none;margin:6px 0 0;padding:0;font-size:13px}
-.ftree ul{list-style:none;margin:2px 0 0;padding:0 0 0 14px;border-left:1px solid var(--cut)}
-.ftree li{padding:2px 0}.ftree .fchild{padding-left:14px}
-.fthis{display:inline-block;padding:2px 6px}
+.ftree{list-style:none;margin:6px 0 0;padding:0;font-size:13px;line-height:20px}
+.ftree ul{list-style:none;margin:2px 0 0;padding:0 0 0 12px;border-left:1px solid var(--cut)}
+.ftree li{padding:1px 0;min-width:0}.ftree .fchild{padding-left:12px}
+/* GL7a: one line per goal in Family; a long name ends in an ellipsis and shows whole on hover. */
+.ftree a,.fthis{display:flex;align-items:center;gap:6px;min-width:0;text-decoration:none}
+.ftree a:hover{text-decoration:underline}
+.ftree a>.fname,.fthis>.fname{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.fthis{padding:2px 6px}
 .fbacks{display:block;color:var(--mute);padding-left:6px}
 .fsib{display:block}
 .moreprops{padding:8px 0}

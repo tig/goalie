@@ -133,6 +133,8 @@ GL4. Work items are compact 36 px rows: a named status circle under a "Status" h
 GL5. Activity is one stream of comments and changes, newest first, with All, Comments, and Changes chips and the comment box at its top. Values read in words: names, not ids; dates as "Dec 15, 2026"; a Path to Green change says what changed in it.
 GL6. The properties column, in order: Health; Health judged on, with its labelled date bar and Record a slip or Promote date; State with Pursue or Close goal; Owner (name written); Priority; Plan with its maturity; Family; More properties (folded, three values shown). A one-field property edits in place in the column with a reason line.
 GL7. Family is a small tree from the parent down: the parent, this goal (bold, with its health bar), its sub-goals, and "N more sub-goals" for its siblings. The Promotion Milestone shows on the Health judged on row ("◆ backed by XW-nnnn"), and a goal that is a milestone says "◆ backs XW-nnnn's date" on its own line, never on a branch. No other relation is drawn; there are no dependency links.
+GL7a. In Family each goal is one line: its health dot, a 6 px gap, then its name. A name too long for the column ends in an ellipsis and shows whole on hover. Names are not underlined until hovered. Why: wrapped names took 2 or 3 lines each and were hard to scan (Chelsea, 2026-10-25).
+GL6a. Health judged on puts its label above the value, so the date and its bar use the full width of the properties column. Why: beside a 104 px label the bar was 154 px and its labels crowded.
 
 ## Work items page
 
