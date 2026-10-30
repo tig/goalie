@@ -7,6 +7,8 @@ import { EDGE_INSET, fitsView, labelWidth, laneOf, openScroll, placeLaneLabels, 
 import { GoalTree, type TreeProps } from "./GoalTree.tsx";
 import { HELP } from "./helpText.tsx";
 import { Legend, look } from "./parts.tsx";
+import { newGoalPath } from "./model/route.ts";
+import { Link } from "./router.tsx";
 
 const pct = (n: number) => `${n.toFixed(3)}%`;
 
@@ -264,6 +266,12 @@ export function TimelineView({ window: w, home, onRange, ...tree }: Props) {
                   <span className="todaylbl" style={{ left: pill }}>
                     Today<span className="td"> · {shortDate(tree.today, tree.today)}</span>
                   </span>
+                )}
+                {/* Rule 20e (Chelsea, 2026-10-25): a "+" beside the Today label opens New goal. */}
+                {pill !== null && (
+                  <Link to={newGoalPath()} className="todayplus" aria-label="New goal" style={{ left: pill + PILL_HALF + 6 }}>
+                    +
+                  </Link>
                 )}
                 {/* An axis label shows only when it fits whole on screen. */}
                 {w.labels.map((l) => (

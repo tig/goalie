@@ -2,6 +2,7 @@ import { useState, type CSSProperties, type ReactNode } from "react";
 import type { ActorRef, Health } from "../../src/api.ts";
 import { isLit, type GoalRow, type PriorityRow } from "./model/filter.ts";
 import { dateLabel, listDates, slipLabel } from "./model/labels.ts";
+import { moveIn, moveTo } from "./model/commands.ts";
 import { goalPath } from "./model/route.ts";
 import { Link, navigate } from "./router.tsx";
 import { Avatar, CHEVRON, HealthDot, look, Rank } from "./parts.tsx";
@@ -24,6 +25,8 @@ export type TreeProps = {
   blank: ReactNode;
   /** False in the List, where the health shows once, in its own column (rule 19a). */
   mark?: boolean;
+  /** Rule 35: drag to reorder Priorities, for an actor who may (the server's mayRank) and with no filter on. `save` answers an error to show, or nothing. */
+  rank?: { save: (order: string[], reason: string) => Promise<string | undefined> };
 };
 
 /** A line of text in the goal column, pinned like a goal name. */
@@ -75,7 +78,7 @@ export function GoalTree(props: TreeProps) {
   const toggle = (id: string) => setFlipped((s) => (s.has(id) ? new Set([...s].filter((x) => x !== id)) : new Set([...s, id])));
   const { funded, backlog, filtering, blank } = props;
 
-  const goal = (g: GoalRow, rank?: number, rails: number[] = [], last = true): ReactNode => {
+  const goal = (g: GoalRow, rank?: number, rails: number[] = [], last = true, lead?: ReactNode): ReactNode => {
     const kids = g.children.length;
     const open = kids > 0 && (g.depth === 0 || filtering) !== flipped.has(g.id);
     const passing: CSSProperties = rails.length
@@ -98,6 +101,7 @@ export function GoalTree(props: TreeProps) {
           onKeyDown={(e) => e.key === "Enter" && e.target === e.currentTarget && navigate(goalPath(g.id))}
         >
           <div className={`left${guide}`} style={passing}>
+            {lead}
             <Rank rank={rank} />
             {props.mark !== false && <HealthDot health={g.health} />}
             {/* The title opens the goal page. The count chip alone opens and closes the tree (rule 19). */}
@@ -127,14 +131,93 @@ export function GoalTree(props: TreeProps) {
     );
   };
 
+  // Rule 35: the order on screen, pending a reason after a move; the drag in progress and the drop line it shows.
+  const base = [...funded, ...backlog].map((p) => p.id);
+  const [pending, setPending] = useState<{ order: string[]; moved: string } | null>(null);
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState<string>();
+  const [drag, setDrag] = useState<{ id: string; at: number } | null>(null);
+  const order = pending?.order ?? base;
+  const byId = new Map([...funded, ...backlog].map((p) => [p.id, p]));
+  const lastFunded = funded[funded.length - 1]?.id;
+  const moved = (next: string[], id: string) => {
+    if (next.join() === base.join()) return setPending(null);
+    setPending({ order: next, moved: id });
+    setError(undefined);
+  };
+  const dropAt = (y: number) => {
+    const rects = [...document.querySelectorAll<HTMLElement>(".group[data-pid]")].map((el) => el.getBoundingClientRect());
+    const i = rects.findIndex((r) => y < r.top + r.height / 2);
+    return i < 0 ? rects.length : i;
+  };
+  const handle = (p: PriorityRow) =>
+    props.rank && (
+      <button
+        type="button"
+        className="draghandle"
+        aria-label={`Move Priority ${order.indexOf(p.id) + 1} ${p.title}. Arrow up or down moves it.`}
+        title="Drag to reorder"
+        onPointerDown={(e) => {
+          e.preventDefault();
+          e.currentTarget.setPointerCapture(e.pointerId);
+          setDrag({ id: p.id, at: order.indexOf(p.id) });
+        }}
+        onPointerMove={(e) => drag && setDrag({ ...drag, at: dropAt(e.clientY) })}
+        onPointerUp={() => {
+          if (drag) moved(moveTo(order, drag.id, drag.at), drag.id);
+          setDrag(null);
+        }}
+        onPointerCancel={() => setDrag(null)}
+        onKeyDown={(e) => {
+          if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+          e.preventDefault();
+          moved(moveIn(order, p.id, e.key === "ArrowUp" ? -1 : 1), p.id);
+        }}
+      >
+        <svg width="10" height="14" viewBox="0 0 10 14" aria-hidden="true">
+          {[2, 7, 12].flatMap((y) => [<circle key={`a${y}`} cx="2.5" cy={y} r="1.5" />, <circle key={`b${y}`} cx="7.5" cy={y} r="1.5" />])}
+        </svg>
+      </button>
+    );
+  const save = async () => {
+    if (!pending || !props.rank) return;
+    const failed = await props.rank.save(pending.order, reason);
+    if (failed) return setError(failed);
+    setPending(null);
+    setReason("");
+  };
+  const ask = (p: PriorityRow) =>
+    pending?.moved === p.id && (
+      <div className="rankreason">
+        <input value={reason} placeholder="Reason" aria-label="Reason for the new order" autoFocus onChange={(e) => setReason(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} />
+        <button type="button" className="btn primary" onClick={save}>
+          Save
+        </button>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => {
+            setPending(null);
+            setReason("");
+            setError(undefined);
+          }}
+        >
+          Undo
+        </button>
+        {error && <span className="ferror">{error}</span>}
+      </div>
+    );
+
   const group = (p: PriorityRow) => (
-    <div className="group" key={p.id}>
+    <div className={`group${drag?.id === p.id ? " dragging" : ""}`} key={p.id} data-pid={props.rank ? p.id : undefined}>
+      {drag && drag.at === order.indexOf(p.id) && <div className="dropline" aria-hidden="true" />}
       {p.goals.length ? (
-        p.goals.map((g, i) => goal(g, i === 0 ? p.rank : undefined))
+        p.goals.map((g, i) => goal(g, i === 0 ? (pending ? order.indexOf(p.id) + 1 : p.rank) : undefined, undefined, undefined, i === 0 ? handle(p) : undefined))
       ) : (
         <div className="row d0" style={{ "--depth": 0 } as CSSProperties}>
           <div className="left">
-            <Rank rank={p.rank} />
+            {handle(p)}
+            <Rank rank={pending ? order.indexOf(p.id) + 1 : p.rank} />
             <HealthDot health={null} word={false} />
             <span className="title muted">{p.title}</span>
             <span className="slot" />
@@ -145,16 +228,31 @@ export function GoalTree(props: TreeProps) {
     </div>
   );
 
+  const rows = (ids: string[]) =>
+    ids.map((id) => {
+      const p = byId.get(id) as PriorityRow;
+      return (
+        <div key={id} className="rankwrap">
+          {group(p)}
+          {ask(p)}
+        </div>
+      );
+    });
+  // While a move waits for its reason, the cut line stays on its Priority (SPEC.md §6.3).
+  const cutAt = lastFunded ? order.indexOf(lastFunded) + 1 : 0;
+  const shownFunded = pending ? order.slice(0, cutAt) : funded.map((p) => p.id);
+  const shownBacklog = pending ? order.slice(cutAt) : backlog.map((p) => p.id);
   return (
     <>
-      {funded.map(group)}
+      {rows(shownFunded)}
       {filtering && !funded.length && !backlog.length && <Note text="No goals match." blank={blank} />}
       {!filtering && !funded.length && <Note text="No Priorities above the cut line." blank={blank} />}
       {/* The cut line (SPEC.md §6.3), named once. */}
       <div className="cut">
         <span>✂ Cut line</span>
       </div>
-      {backlog.length ? backlog.map(group) : !filtering && <Note text="No Priorities below the cut line." blank={blank} />}
+      {shownBacklog.length ? rows(shownBacklog) : !filtering && <Note text="No Priorities below the cut line." blank={blank} />}
+      {drag && drag.at === order.length && <div className="dropline" aria-hidden="true" />}
     </>
   );
 }

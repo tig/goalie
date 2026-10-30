@@ -31,7 +31,7 @@ export function useRoute(): Route {
 }
 
 /** A link inside the app. A plain click opens the page in place; a click with a modifier key opens it the browser's way. */
-export function Link({ to, className, children, ...rest }: { to: string; className?: string; children: ReactNode; "aria-label"?: string; tabIndex?: number }) {
+export function Link({ to, className, children, ...rest }: { to: string; className?: string; children: ReactNode; "aria-label"?: string; tabIndex?: number; style?: React.CSSProperties }) {
   return (
     <a
       href={to}

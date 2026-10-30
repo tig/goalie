@@ -243,6 +243,8 @@ export type ApiCommand =
   | { op: "create"; kind: "work_item"; ref?: Ref; fields: Partial<WorkItemFields>; reason: string }
   | { op: "update"; kind: "goal"; id: string | Ref; base_version: number; fields: Partial<GoalFields>; reason?: string }
   | { op: "update"; kind: "work_item"; id: string | Ref; base_version: number; fields: Partial<WorkItemFields>; reason?: string }
+  /** Drag to reorder on Home: one per moved Priority, in one batch. Its rank only (SPEC.md §6.3). */
+  | { op: "update"; kind: "priority"; id: string; base_version: number; fields: { rank: number }; reason: string }
   | { op: "comment"; kind: "goal" | "work_item"; id: string; text: string };
 
 /**
