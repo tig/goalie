@@ -237,8 +237,23 @@ class CiTenets(unittest.TestCase):
         # Every merged pull request publishes: a push publishes only from develop. main does not publish, so an older main cannot overwrite a newer develop.
         # An operator's dispatch publishes the branch it names. A pull request never publishes.
         self.assertIn(f"    if: {DEPLOY}\n", header)
-        # One publish at a time, in push order: two quick develop pushes must not publish out of order.
+        # Two installs never overlap.
         self.assertIn("\n    concurrency:\n      group: goalie-deploy\n      cancel-in-progress: false\n", header)
+        # The job group does not keep push order: a deploy queues when its tests finish. So a push publishes only while it is the develop tip.
+        steps = deploy.split("\n    steps:", 1)[1]
+        self.assertIn("\n        id: tip\n", steps)
+        tip = steps.index("\n        id: tip\n")
+        publish = steps.index("\n      - name: Publish\n")
+        self.assertLess(steps.index("run: npm ci --omit=dev"), tip)
+        self.assertLess(tip, publish)
+        check = steps[tip:publish]
+        self.assertIn('if [ "$EVENT" = "push" ]; then', check)
+        self.assertIn('tip="$(git ls-remote origin refs/heads/develop | cut -f1)"', check)
+        self.assertIn('if [ "$tip" != "$SHA" ]; then', check)
+        self.assertIn("will publish", check)
+        self.assertIn("EVENT: ${{ github.event_name }}\n", check)
+        self.assertIn("SHA: ${{ github.sha }}\n", check)
+        self.assertIn("\n        if: steps.tip.outputs.publish == 'true'\n", steps[publish:])
         self.assertNotIn("pull_request", header)
         changes = server.split("\n  lint:", 1)[0]
         self.assertLess(changes.index('= "workflow_dispatch"'), changes.index('= "pull_request"'))
