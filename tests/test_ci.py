@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import os
 import re
+import shutil
+import subprocess
+import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -239,7 +244,7 @@ class CiTenets(unittest.TestCase):
         self.assertIn(f"    if: {DEPLOY}\n", header)
         # Two installs never overlap.
         self.assertIn("\n    concurrency:\n      group: goalie-deploy\n      cancel-in-progress: false\n", header)
-        # The job group does not keep push order: a deploy queues when its tests finish. So a push publishes only while it is the develop tip.
+        # The job group does not keep push order: a deploy queues when its tests finish. TipStep pins what the tip step decides.
         steps = deploy.split("\n    steps:", 1)[1]
         self.assertIn("\n        id: tip\n", steps)
         tip = steps.index("\n        id: tip\n")
@@ -248,9 +253,6 @@ class CiTenets(unittest.TestCase):
         self.assertLess(tip, publish)
         check = steps[tip:publish]
         self.assertIn('if [ "$EVENT" = "push" ]; then', check)
-        self.assertIn('tip="$(git ls-remote origin refs/heads/develop | cut -f1)"', check)
-        self.assertIn('if [ "$tip" != "$SHA" ]; then', check)
-        self.assertIn("will publish", check)
         self.assertIn("EVENT: ${{ github.event_name }}\n", check)
         self.assertIn("SHA: ${{ github.sha }}\n", check)
         self.assertIn("\n        if: steps.tip.outputs.publish == 'true'\n", steps[publish:])
@@ -287,6 +289,68 @@ class CiTenets(unittest.TestCase):
             text = (WORKFLOWS / f"{workflow}.yml").read_text(encoding="utf-8")
             for name in names:
                 self.assertIn(f"name: {name}\n", text, workflow)
+
+
+def _tip_script() -> str:
+    """The run block of the deploy job's tip step."""
+    server = (WORKFLOWS / "server.yml").read_text(encoding="utf-8")
+    step = server.split("\n        id: tip\n", 1)[1].split("\n      - name: Publish\n", 1)[0]
+    block = step.split("        run: |\n", 1)[1]
+    return textwrap.dedent(block)
+
+
+@unittest.skipUnless(shutil.which("git") and shutil.which("bash") and shutil.which("python3"), "needs git, bash, and python3")
+class TipStep(unittest.TestCase):
+    """A push that is not the develop tip skips the publish only when the newer commits change server inputs."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        root = Path(self.tmp.name)
+        self.origin = root / "origin"
+        self.work = root / "work"
+        self.git(root, "init", "--quiet", "--initial-branch=develop", str(self.origin))
+        scripts = self.origin / ".github" / "scripts"
+        scripts.mkdir(parents=True)
+        shutil.copy(REPO / ".github" / "scripts" / "ci_affected.py", scripts / "ci_affected.py")
+        self.pushed = self.commit("server/src/server.ts")
+        self.git(root, "clone", "--quiet", "--depth=1", "--branch=develop", self.origin.as_uri(), str(self.work))
+
+    def git(self, cwd: Path, *args: str) -> str:
+        command = ["git", "-c", "user.name=test", "-c", "user.email=test@example.com", *args]
+        return subprocess.run(command, cwd=cwd, capture_output=True, text=True, check=True).stdout.strip()
+
+    def commit(self, path: str) -> str:
+        file = self.origin / path
+        file.parent.mkdir(parents=True, exist_ok=True)
+        file.write_text(f"{path} {file.read_text(encoding='utf-8') if file.exists() else ''}\n", encoding="utf-8")
+        self.git(self.origin, "add", "--all")
+        self.git(self.origin, "commit", "--quiet", "--message", path)
+        return self.git(self.origin, "rev-parse", "HEAD")
+
+    def decide(self, event: str = "push") -> str:
+        output = Path(self.tmp.name) / "output"
+        output.write_text("", encoding="utf-8")
+        env = {**os.environ, "EVENT": event, "SHA": self.pushed, "GITHUB_OUTPUT": str(output)}
+        subprocess.run(["bash", "-c", _tip_script()], cwd=self.work, env=env, capture_output=True, text=True, check=True)
+        return output.read_text(encoding="utf-8").strip()
+
+    def test_the_tip_publishes(self) -> None:
+        self.assertEqual(self.decide(), "publish=true")
+
+    def test_a_newer_tip_that_changes_server_inputs_skips(self) -> None:
+        self.commit("docs/notes.md")
+        self.commit("server/src/rules.ts")
+        self.assertEqual(self.decide(), "publish=false")
+
+    def test_a_newer_tip_that_changes_only_docs_publishes(self) -> None:
+        self.commit("docs/notes.md")
+        self.commit("README.md")
+        self.assertEqual(self.decide(), "publish=true")
+
+    def test_a_dispatch_publishes_whatever_the_tip(self) -> None:
+        self.commit("server/src/rules.ts")
+        self.assertEqual(self.decide("workflow_dispatch"), "publish=true")
 
 
 def _if_before_run(text: str, command: str) -> str:
