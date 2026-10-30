@@ -107,7 +107,7 @@ Tig and Chelsea sign in to goalie.excaliwire.com and see the same goals. These i
 - [ ] The host's store is seeded once from `server/seed/excaliwire.json` ([CONTRIBUTING.md](../CONTRIBUTING.md)). Tig and Chelsea are its human actors. XW-0001, XW-0002, and XW-0003 are its goals.
 - [ ] The GOALIE owner sets Tig's and Chelsea's Entra object ids (`oid`) as the subjects of their actors in the host's store. The seed names neither subject.
 - [ ] [#52 (XW-0003 MLP)](https://github.com/tig/goalie/pull/52) leaves draft. Tig merges `chelsea/mlp` into develop.
-- [ ] A release pull request takes develop into main. Tig merges it. The server publishes only from main, on that push.
+- [ ] A release pull request takes develop into main. Tig merges it. The server publishes on that push to main.
 - [ ] Tig and Chelsea each sign in and open Home. Each sees the same Priorities, goals, and health.
 
 ## Decisions

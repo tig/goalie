@@ -17,7 +17,7 @@ develop is the in-development branch and the primary branch.
 A pull request for in-development work targets develop.
 A release is a pull request from develop into main.
 develop runs the same workflows and does not require them to merge.
-The server publishes only from main.
+The server publishes on a push to main, or when an operator dispatches the server workflow on a branch.
 README.md and docs/ are pure docs, except docs/specs/SPEC.md.
 They run no CI commands and need no test.
 Test-first does not apply to documentation or to configuration.
@@ -69,7 +69,7 @@ Host configuration lives in excaliwire/operations.
 This repo must not name the machine or the public hostname.
 `.github/scripts/deploy_server.sh` publishes the server when the host secrets are set.
 It publishes `package.json`, `package-lock.json`, `src/`, and `web/dist/`. It refuses to publish without `web/dist/index.html`.
-The publish runs on a push to `main` and on `workflow_dispatch`.
+The publish runs on a push to `main`, and on `workflow_dispatch` on the branch the operator names.
 It must not run on a pull request.
 
 Server tests are Python unittest in `server/tests/`.

@@ -63,7 +63,7 @@ RULES = [
     "A pull request for in-development work targets develop.",
     "A release is a pull request from develop into main.",
     "develop runs the same workflows and does not require them to merge.",
-    "The server publishes only from main.",
+    "The server publishes on a push to main, or when an operator dispatches the server workflow on a branch.",
     "Test-first does not apply to documentation or to configuration.",
     "README.md and docs/ are pure docs, except docs/specs/SPEC.md.",
     "They run no CI commands and need no test.",
@@ -76,6 +76,7 @@ AFFECTED = "needs.changes.outputs.affected == 'true'"
 # A skipped required job reports success. Run the check when detection fails.
 DETECTOR = "always() && (needs.changes.result != 'success' || needs.changes.outputs.affected == 'true')"
 REQUIRED_DETECTORS = {"server": 3, "tests": 1, "guidance": 1}
+DEPLOY = "needs.changes.outputs.affected == 'true' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch')"
 
 
 def _paths(text: str) -> dict[str, list[str] | None]:
@@ -233,9 +234,8 @@ class CiTenets(unittest.TestCase):
         header = deploy.split("\n    steps:", 1)[0]
         self.assertIn(AFFECTED, header)
         self.assertNotIn("always()", header)
-        self.assertIn("github.ref == 'refs/heads/main'", header)
-        self.assertIn("github.event_name == 'push'", header)
-        self.assertIn("github.event_name == 'workflow_dispatch'", header)
+        # A push publishes only from main. An operator's dispatch publishes the branch it names. A pull request never publishes.
+        self.assertIn(f"    if: {DEPLOY}\n", header)
         self.assertNotIn("pull_request", header)
         changes = server.split("\n  lint:", 1)[0]
         self.assertLess(changes.index('= "workflow_dispatch"'), changes.index('= "pull_request"'))
