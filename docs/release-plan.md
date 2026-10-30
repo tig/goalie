@@ -97,6 +97,19 @@ The MLP is a prototype built from the [v1 designs](https://claude.ai/artifact/KL
 
 Not in the MLP: the weekly review inside GOALIE, a separate work tracker, mobile, rollups.
 
+### One live GOALIE for Tig and Chelsea
+
+Tig and Chelsea sign in to goalie.excaliwire.com and see the same goals. These items block it, in order:
+
+- [ ] Tig accepts the amendment to [ADR 0005](adr/0005-auth-and-identity.md): the first deployment has more than one human actor.
+- [ ] The Excaliwire Entra ID gate ([ADR 0005](adr/0005-auth-and-identity.md), oauth2-proxy) lets both Tig and Chelsea through.
+- [ ] The host's issuer list names the Excaliwire tenant.
+- [ ] The host's store is seeded once from `server/seed/excaliwire.json` ([CONTRIBUTING.md](../CONTRIBUTING.md)). Tig and Chelsea are its human actors. XW-0001, XW-0002, and XW-0003 are its goals.
+- [ ] The GOALIE owner sets Tig's and Chelsea's Entra object ids (`oid`) as the subjects of their actors in the host's store. The seed names neither subject.
+- [ ] [#52 (XW-0003 MLP)](https://github.com/tig/goalie/pull/52) leaves draft. Tig merges `chelsea/mlp` into develop.
+- [ ] A release pull request takes develop into main. Tig merges it. The server publishes on that push to main.
+- [ ] Tig and Chelsea each sign in and open Home. Each sees the same Priorities, goals, and health.
+
 ## Decisions
 
 1. The default view is the Priorities view, drawn as a timeline, sorted by Priority rank. Health is the color. Decided by Tig on 2026-10-14. [SPEC.md §8.2](specs/SPEC.md#s8-2) sorts by health today. The pull request that builds the view changes §8.2.

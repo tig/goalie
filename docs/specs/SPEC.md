@@ -120,7 +120,7 @@ The User's Manual ([§11 (User's Manual)](#s11)) repeats these definitions, so t
 | **Doc** | A page a human opens and writes: a plan or the User's Manual ([§6.5 (Doc)](#s6-5), [§11 (User's Manual)](#s11)). It is not only a stored body. |
 | **Plan Maturity** | **Watercolor:** broad strokes, soft edges. **Crayon:** main parts clear, lines thick, details flexible. **Pencil:** precise and ready to execute; two readers would picture the same thing. |
 | **Work Product** | Where the output of the work lives (repo, PR, doc folder, deployed URL, metric dashboard). |
-| **Health** | GREEN / YELLOW / RED ([§6.1 (Goal)](#s6-1)). |
+| **Health** | GREEN / YELLOW / RED ([§6.1 (Goal)](#s6-1)). On a screen each value carries its label: GREEN *On track*, YELLOW *At risk*, RED *Off track*. |
 | **Path to Green (PTG)** | The written recovery plan for a YELLOW or RED goal ([§6.1 (Goal)](#s6-1)). |
 | **Actor** | A human or an agent that reads or changes GOALIE data. Every change is attributed to an actor. |
 | **Draft** | An agent's proposed change to an entity. It is visible on that entity as soon as the agent creates it. It must not take effect until a human approves it ([§6.9 (Draft)](#s6-9)). Approving or rejecting a Draft is its own Event, with an actor and a reason. |
@@ -165,7 +165,7 @@ Structured fields are state, date type, health, PTG, rank, and every other field
 
 | Field | Type | Required | Rules / meaning |
 |---|---|---|---|
-| `id` | Stable, human-readable key (e.g. `GOAL-123`) | auto | Never reused. Linkable by people, agents, and other systems. |
+| `id` | Stable, human-readable key (e.g. `GOAL-0123`) | auto | Never reused. Linkable by people, agents, and other systems. The prefix is the owner setting `goal_key_prefix` ([§12 (Configuration points)](#s12)), default `GOAL`. |
 | `version` | Integer | auto | The version of this goal ([§6 (Data model)](#s6)). A committed write advances it. |
 | `summary` | Short text | yes | Pithy and self-describing, with a verb (Increase, Launch, Reduce…). Lint: 5 words or more, or no verb. |
 | `description` | Long text (Markdown) | yes | Should cover: (a) key results; (b) the metrics used to track it and how often they are reviewed; (c) why it matters and what it contributes to (e.g. a theme in the operating plan); (d) who shares responsibility for delivering it (joint owners, not dependencies). Notes are added over time. Lint: any of (a)–(d) missing. Concurrent editing follows [§6.5 (Doc)](#s6-5). |
@@ -173,23 +173,34 @@ Structured fields are state, date type, health, PTG, rank, and every other field
 | `org_unit` | → Org Unit | yes | The unit the goal belongs to. |
 | `level` | Enum **(configurable)** | yes | Default: `Company` · `Program or Function` · `Team` · `Individual`. Agrees with the org unit's level. |
 | `type` | Enum **(configurable)** | yes | Default: `Milestone (Commit)`, a planning goal (reaching a committed state, a signed-off plan, a date for a date; every Promotion Milestone has this type) · `Milestone (Launch)`, a launch or delivery · `Metric (Business)` · `Metric (Customer)` · `Metric (Operational Excellence)`. Types let reviewers check whether a unit has the right mix of goals. |
-| `due_date` | Date | yes | The date the goal will be met. If the exact day is unknown, use the end of the relevant period, e.g. the end of the fiscal quarter **(configurable calendar)**. What the date means depends on `date_type`. |
+| `due_date` | Date | yes | The date the goal will be met. If the exact day is unknown, use the end of the relevant period, e.g. the end of the fiscal quarter **(configurable calendar)**. What the date means depends on `date_type`. A sub-goal may leave `due_date` and `date_type` empty: it then takes its parent's date, Date Type, Promotion Milestone, and plan, until it sets its own. |
 | `date_type` | `Committed` · `Ambition` · `Fantasy` | yes | See [§5 (Date types)](#s5) (invariant). |
 | `promotion_milestone` | → Goal | if `date_type` ≠ Committed | The linked goal has `type = Milestone (Commit)`, `date_type = Committed`, a due date before this goal's, and a human owner (invariant). Empty when Committed. |
 | `plan` | → Doc (hosted Markdown) or external link | when Committed; recommended before | The plan behind the goal, in whatever form it takes: a hosted Markdown plan, a 5Ps doc, a PR/FAQ, a Working Backwards doc, etc. (see *Tig's Toolbox for Product Management* in [§14 (Sources)](#s14)). Hosted plans are versioned, so the plan can be viewed as it stood at commit time. The pinned version is `committed_plan_version`. |
 | `committed_plan_version` | Doc version | auto, when first Committed | Set when `date_type` first becomes Committed (invariant). It is the plan's Doc version at that moment. Later edits to the Doc must not change it. |
-| `plan_maturity` | `Watercolor` · `Crayon` · `Pencil` | yes | Committed needs Pencil (invariant). If a team asks for a committed date on a Crayon plan, push back on the plan, not the date. |
+| `plan_maturity` | `Watercolor` · `Crayon` · `Pencil` | yes | Committed needs Pencil (invariant). A Promotion Milestone (`Milestone (Commit)`) is exempt: it is committed on the plan of the goal it promotes. If a team asks for a committed date on a Crayon plan, push back on the plan, not the date. |
 | `work_product` | List of typed links | optional | Repo / PR / milestone, doc folder, deployed URL, metric dashboard or query. Agents follow these to gather evidence for health. Lint: missing on an in-progress `Milestone (Launch)`. |
 | `original_committed_date` | Date, set by the system | auto | Recorded when `date_type` first becomes Committed. Not editable afterwards (invariant). A deployment can let the GOALIE owner, and no one else, correct a genuine data-entry error, with a logged reason. |
 | `changed_due_date` | Date | optional; only when Committed | The current expected date after a slip. Each change has a reason (invariant) and is logged. No silent re-baselines. |
 | `severity` | Enum **(configurable)** | yes | Default `sev1` critical / urgent / blocking · `sev2` important · `sev3` nice to have. Says how critical the goal is, not where it ranks (see `priority`). |
 | `priority` | → Priority | optional; usually only for Company, Program, or Function goals | The current priority this goal serves. It links to an entry in an org unit's ranked Priority list ([§6.3 (Priority)](#s6-3)), typically the goal's own unit or an ancestor's. Goals under a starved priority, or with no priority, are expected to get less. Reviews and rollups make that visible, so the starvation is deliberate rather than accidental. |
 | `state` | Enum ([§7.2 (State lifecycle)](#s7-2)) | yes | `Backlog` · `In Progress` · `Completed` · `Completed Late` · `Did Not Meet` · `Deleted`. Each change has a reason (invariant). |
-| `health` | `GREEN` · `YELLOW` · `RED` | while In Progress | **GREEN:** on track; risks understood and mitigated; the owner believes the date will be hit. **YELLOW:** real unknowns or blockers, but there's still a credible path to the date. This is the status that demands action while there is time. **RED:** the date isn't credible without intervention, or there's no path to green. Health is judged against the committed date. For an uncommitted goal, that means its Promotion Milestone's date. |
+| `health` | `GREEN` · `YELLOW` · `RED` | while In Progress | **GREEN:** on track; risks understood and mitigated; the owner believes the date will be hit. **YELLOW:** real unknowns or blockers, but there's still a credible path to the date. This is the status that demands action while there is time. **RED:** the date isn't credible without intervention, or there's no path to green. Health is judged against the committed date. For an uncommitted goal, that means its Promotion Milestone's date. **Labels:** a screen shows GREEN as *On track*, YELLOW as *At risk*, and RED as *Off track*. The stored value stays `GREEN`, `YELLOW`, or `RED`. |
 | `path_to_green` | Structured: steps + criteria + trigger | when YELLOW or RED (invariant) | A good PTG has: (1) steps, each with a **named human owner** and (2) a **date** (a date for a date is OK); (3) **criteria for returning to GREEN** that can be tested without debate; (4) for YELLOW, the **trigger that turns it RED**, and what happens then. Lint: any part missing. Archived into history on return to GREEN. |
 | `origination` | `New` · `Carryover` · `Repeating` | yes | New this period; carried over with a revised date; repeated with new targets. |
-| `parent` | → Goal | optional | The goal this one contributes to (e.g. Team → Program → Company). |
+| `parent` | → Goal | optional | The goal this one contributes to (e.g. Team → Program → Company). A sub-goal with no date of its own takes its parent's (see `due_date`). |
 | `visibility` | Enum | default: organization-wide | Restricting it is a logged exception. |
+
+**Who changes a goal** (rule `owners-change-goal`)
+
+Three actors may change a goal's fields: the goal's `owner`, the owner of any goal above it through `parent` (the parent's owner, that goal's parent's owner, and so on to the top), and the GOALIE owner (invariant). Every other actor may read the goal and comment on it ([§6.6 (Events)](#s6-6)). An agent proposes a change as a Draft ([§6.9 (Draft)](#s6-9)). A write by any other actor is rejected, and the rejection names the rule (invariant).
+
+- The rule covers every field a human writes: `health`, `path_to_green`, `state`, `due_date`, `date_type`, `changed_due_date`, `promotion_milestone`, `summary`, `description`, `owner`, `parent`, `priority`, `plan`, `plan_maturity`, `severity`, `type`, `level`, `org_unit`, `origination`, `work_product`, and `visibility`.
+- Health is the owner's belief ([§6.1 (Goal)](#s6-1), `health`). The owner of a goal above it may change it, with a reason, because that owner answers for the goals below it in the review ([§9 (Reviews)](#s9)).
+- A new `owner` is exactly one human, as for every goal. The old owner, an owner above, or the GOALIE owner makes the change.
+- A goal with a `parent` is created by an actor who may change that parent. A goal with no `parent` is created by any human.
+- Approving a Draft is a write to the goal. Only an actor who may change the goal approves or rejects its Draft ([§6.9 (Draft)](#s6-9)).
+- Comments are open to every actor. A comment is not a field change.
 
 ### 6.2 Org Unit
 
@@ -221,6 +232,8 @@ The list's owner is the org unit's owner. Re-ranking is a normal, logged decisio
 
 `id`, `kind` (`human` | `agent`), `display_name`. For agents, also `operator`, the human responsible for that agent. Only humans can own goals or org units.
 
+A deployment has one actor for each human and each agent that uses it. Only the GOALIE owner adds or changes an actor. Adding or changing an actor is an Event, with the GOALIE owner as its actor ([§6.6 (Events)](#s6-6)). A person or an agent with no actor is refused; GOALIE does not add an actor on sign-in.
+
 ### 6.5 Doc
 <a id="s6-5"></a>
 
@@ -238,7 +251,7 @@ Every change to a goal, a Doc, a work item, or a priority, and every comment, is
 ### 6.7 Work Item (optional extension)
 <a id="s6-7"></a>
 
-A lighter record for the work under a goal: `id`, `title`, `owner` (an actor, and it can be an agent), `status`, `due_date`, links. It is linked to a goal. This extension doesn't copy the goal schema. Agents can use the state of linked work items as evidence for a goal's health. When the extension is on, work items are the group's list of work under a goal (invariant for a deployment that enables the extension). A human can file a work item with no agent (invariant for a deployment that enables the extension). The extension stays optional ([§13 (Requirements)](#s13)).
+A lighter record for the work under a goal: `id`, `title`, `owner` (an actor, and it can be an agent), `status`, `due_date`, links. It is linked to a goal. This extension doesn't copy the goal schema. Agents can use the state of linked work items as evidence for a goal's health. When the extension is on, work items are the group's list of work under a goal (invariant for a deployment that enables the extension). A human can file a work item with no agent (invariant for a deployment that enables the extension). The extension stays optional ([§13 (Requirements)](#s13)). The owner setting `work_items` turns it on; the default is off. `status` is one of the State words `Backlog`, `In Progress`, `Completed`, `Deleted`.
 
 ### 6.8 Example record
 
@@ -344,6 +357,7 @@ At the end of the plan period (default: yearly), each open goal is closed out as
 Where the implementation can do these natively it does. Otherwise an agent does them through the API.
 
 - **Validation:** reject a save, or open a Draft for the owner, when it would break an invariant (a missing date type, an uncommitted date with no Promotion Milestone, Committed without a Pencil plan, a date or state change without a reason, YELLOW/RED without a PTG).
+- **Who changes a goal:** a change to a goal by an actor who is not its owner, the owner of a goal above it, or the GOALIE owner is rejected, and the rejection names `owners-change-goal` (invariant, [§6.1 (Goal)](#s6-1)).
 - **Structured fields:** state, date type, health, PTG, rank, and every other field that is not Markdown text change only through validated writes (invariant, [§6 (Data model)](#s6)). Automatic merging must not apply to them (invariant).
 - **Stale writes:** a write names the version it read (invariant, [§6 (Data model)](#s6)). A write against a stale version is rejected, and the rejection returns the current state (invariant).
 - **Commit check:** Invariants are checked on the committed result, on the server, in one transaction (invariant). A failed check must not become visible.
@@ -359,7 +373,7 @@ Where the implementation can do these natively it does. Otherwise an agent does 
 A view is a screen a human opens in the app, and a saved definition of which goals it shows, which columns it shows, and how it sorts (invariant). The saved definition selects goals by level, org unit, owner, type, severity, priority, date type, health, and period. It is not a database view. The app renders that saved definition. A database view alone must not satisfy this requirement. A screen with no saved definition must not satisfy it either.
 
 - **Default columns:** Summary, State, Health, due date (changed if set, otherwise original), **Date Type**, Promotion Milestone and its date (if not Committed), Owner, PTG. Plan and Work Product are one click away.
-- **Default sort:** RED, YELLOW, GREEN.
+- **Default sort:** RED, YELLOW, GREEN. The *Priorities* view sorts by Priority rank instead. It is the default view, drawn as a timeline: one row per Priority in rank order, its goals on that row, health as the color, and each date marked by its Date Type.
 - **Default date presentation:** the Date Type is shown next to the date, so an uncommitted date doesn't read as a promise. Custom views can drop the column.
 - **Standard views:** organization overview; one per org unit; *My goals*; *Promotions due* (Promotion Milestones due soon, default 2 weeks); *Priorities* (an org unit's ranked list, with the goals mapped to each entry and the cut line shown); *Hygiene*; period-end scorecard.
 - **Between reviews:** *My goals* and the view for each org unit are where a human works between reviews, not only during a review (invariant).

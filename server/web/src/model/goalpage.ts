@@ -1,0 +1,203 @@
+import type { ApiActor, ApiEvent, ApiWorkItem, WorkItemStatus } from "../../../src/api.ts";
+import { day, DAY, isDate } from "../../../src/dates.ts";
+import { healthWord } from "./labels.ts";
+import { labelWidth } from "./timeline.ts";
+
+/** The goal page's pure parts: work items by status (G23), the history filters, and how an Event's values read. */
+
+/** Work items group in this order. Deleted items show only in History (G23). */
+const STATUS_ORDER: WorkItemStatus[] = ["In Progress", "Backlog", "Completed"];
+
+export function groupWorkItems<T extends Pick<ApiWorkItem, "status">>(items: T[]): { status: WorkItemStatus; items: T[] }[] {
+  return STATUS_ORDER.map((status) => ({ status, items: items.filter((i) => i.status === status) })).filter((g) => g.items.length > 0);
+}
+
+
+const DATE_YEAR = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+
+/** What a value is named by: actors by id, and other ids (a Priority, an org unit, a goal) by name. */
+export type Names = { actors?: Record<string, { name: string }>; names?: Record<string, string> };
+
+/** An Event's old or new value in words: None for nothing, names for ids, a date with its year (rule 14), a Path to Green by its steps, links by their targets. */
+export function eventValue(value: unknown, field?: string, ctx: Names = {}): string {
+  if (value === null || value === undefined || value === "") return "None";
+  if (typeof value === "string") {
+    if (field === "owner" && ctx.actors?.[value]) return ctx.actors[value].name;
+    if (ctx.names?.[value]) return ctx.names[value];
+    const text: string = value;
+    if (/^\d{4}-/.test(text) && isDate(text)) return DATE_YEAR.format(day(text));
+    if (field === "visibility") return text.charAt(0).toUpperCase() + text.slice(1);
+    if (field === "health") return healthWord(text);
+    return text;
+  }
+  if (Array.isArray(value)) return value.map((v) => (typeof v === "object" && v ? Object.values(v).join(" ") : String(v))).join(", ");
+  if (typeof value === "object") {
+    const steps = (value as { steps?: unknown[] }).steps;
+    if (Array.isArray(steps)) return `Path to Green, ${steps.length} ${steps.length === 1 ? "step" : "steps"}`;
+    return JSON.stringify(value);
+  }
+  return String(value);
+}
+
+/**
+ * The Events of one write: the same actor, time, and reason, on any entity (one save is one row).
+ * `created` when the write gives a summary or title its first value: an In Progress create also moves its state from Backlog (E-5).
+ * `promoted` when the write moves a Date Type up; `milestone` is the Promotion Milestone the same write completed.
+ */
+export type EventGroup = { events: ApiEvent[]; created: boolean; promoted: { milestone: string | null } | null };
+
+const UNCOMMITTED: readonly unknown[] = ["Fantasy", "Ambition"];
+
+type Ptg = { steps: { text: string; owner: string; date: string }[]; criteria?: string; trigger?: string } | null | undefined;
+
+/** GP2-9, GL5: what changed inside a Path to Green, one line per change, in words: "Step 1 date Nov 6, 2026 → Nov 13, 2026". */
+export function ptgChanges(old: Ptg, now: Ptg, ctx: Names = {}): string[] {
+  if (!now) return old ? ["Path to Green cleared"] : [];
+  const out: string[] = [];
+  const steps = Math.max(old?.steps.length ?? 0, now.steps.length);
+  for (let i = 0; i < steps; i++) {
+    const a = old?.steps[i];
+    const b = now.steps[i];
+    const n = `Step ${i + 1}`;
+    if (!a && b) out.push(`${n} added: ${b.text}`);
+    else if (a && !b) out.push(`${n} removed: ${a.text}`);
+    else if (a && b) {
+      if (a.text !== b.text) out.push(`${n}: ${a.text} → ${b.text}`);
+      if (a.owner !== b.owner) out.push(`${n} owner ${eventValue(a.owner, "owner", ctx)} → ${eventValue(b.owner, "owner", ctx)}`);
+      if (a.date !== b.date) out.push(`${n} date ${eventValue(a.date, "date", ctx)} → ${eventValue(b.date, "date", ctx)}`);
+    }
+  }
+  const text = (label: string, x?: string, y?: string) => {
+    if ((x ?? "") === (y ?? "")) return;
+    out.push(x ? (y ? `${label}: ${x} → ${y}` : `${label} cleared`) : `${label}: ${y}`);
+  };
+  text("When it is On track again", old?.criteria, now.criteria);
+  text("What makes it Off track", old?.trigger, now.trigger);
+  return out;
+}
+
+/** GP2-9, GL5: Activity's chips. One stream of comments and changes, newest first. */
+export const ACTIVITY = ["All", "Comments", "Changes"] as const;
+export type ActivityChip = (typeof ACTIVITY)[number];
+export const activity = (events: ApiEvent[], chip: ActivityChip) => (chip === "All" ? events : events.filter((e) => (e.field === "comment") === (chip === "Comments")));
+
+/** D1: an older page of History joins the Events already shown, each Event once, newest first, so a save split across pages groups as one row. */
+export function joinPages(shown: ApiEvent[], older: ApiEvent[]): ApiEvent[] {
+  const seen = new Set(shown.map((e) => e.sequence));
+  return [...shown, ...older.filter((e) => !seen.has(e.sequence))].sort((a, b) => b.sequence - a.sequence);
+}
+
+/** History rows (design check, N6a): one row per write, newest first. A comment is always its own row. */
+export function groupEvents(events: ApiEvent[]): EventGroup[] {
+  const groups: EventGroup[] = [];
+  for (const e of events) {
+    const last = groups[groups.length - 1]?.events[0];
+    const same = last && e.field !== "comment" && last.field !== "comment" && last.actor === e.actor && last.timestamp === e.timestamp && last.reason === e.reason;
+    if (same) groups[groups.length - 1].events.push(e);
+    else groups.push({ events: [e], created: false, promoted: null });
+  }
+  for (const g of groups) {
+    const up = g.events.find((e) => e.field === "date_type" && UNCOMMITTED.includes(e.old) && e.new !== e.old);
+    if (up) {
+      const met = g.events.find((e) => e.entity === up.entity && e.field === "promotion_milestone")?.old;
+      const completed = g.events.some((e) => e.entity === met && e.field === "state" && e.new === "Completed");
+      g.promoted = { milestone: completed && typeof met === "string" ? met : null };
+    }
+    // A Promote from Fantasy also creates the next milestone; the row is the Promote (QA F2).
+    g.created = !g.promoted && g.events.some((e) => (e.field === "summary" || e.field === "title") && (e.old === null || e.old === undefined));
+  }
+  return groups;
+}
+
+/** What a create row lists: each field once, at the value the write left it (newest first), with no empty values. The page's own goal comes first. */
+export function createdFields(events: ApiEvent[], first?: string): ApiEvent[] {
+  const seen = new Set<string>();
+  const ordered = first ? [...events.filter((e) => e.entity === first), ...events.filter((e) => e.entity !== first)] : events;
+  return ordered.filter((e) => {
+    const key = `${e.entity} ${e.field}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return e.new !== null && e.new !== undefined && e.new !== "";
+  });
+}
+
+/** Each goal in the History by its latest summary, so a former Promotion Milestone reads as its name, not its key (GP7). Events are newest first. */
+export function historyNames(events: ApiEvent[]): Record<string, string> {
+  const names: Record<string, string> = {};
+  for (const e of events) if (e.field === "summary" && typeof e.new === "string" && !(e.entity in names)) names[e.entity] = e.new;
+  return names;
+}
+
+/** G25: the people in the read-only line with the words between them, so each can be drawn with its avatar. `more` when the server left some out. */
+export function changeParts<T>(people: T[], more: boolean): (T | string)[] {
+  const parts: (T | string)[] = [];
+  people.forEach((p, i) => {
+    if (i > 0) parts.push(more ? ", " : people.length === 2 ? " and " : i === people.length - 1 ? ", and " : ", ");
+    parts.push(p);
+  });
+  if (more) parts.push(", or an owner of a goal above it");
+  return parts;
+}
+
+/** G25: the read-only line as text. */
+export const changeLine = (names: string[], more: boolean) => `${changeParts(names, more).join("")} can change this goal. You can comment.`;
+
+/** The actors who may own a goal or a Path to Green step: the humans. */
+export const humans = (actors: Record<string, ApiActor> | ApiActor[]) => Object.values(actors).filter((a) => a.kind === "human");
+
+/** SPEC.md §6.1 and §6.7 field names in words, for the History and the Fields card. */
+const LABELS: Record<string, string> = {
+  summary: "Summary", description: "Description", owner: "Owner", org_unit: "Org unit", level: "Level", type: "Type",
+  due_date: "Due Date", date_type: "Date Type", promotion_milestone: "Promotion Milestone", plan: "Plan", plan_maturity: "Plan Maturity",
+  work_product: "Work Product", changed_due_date: "Changed Due Date", severity: "Severity", priority: "Priority", state: "State",
+  health: "Health", path_to_green: "Path to Green", origination: "Origination", parent: "Parent", visibility: "Visibility",
+  original_committed_date: "Original Committed Date", committed_plan_version: "Committed Plan Version",
+  comment: "Comment", title: "Title", status: "Status", goal: "Goal", links: "Links",
+};
+
+export const fieldLabel = (field: string) => LABELS[field] ?? field;
+
+/**
+ * The header's date bar (G6): where the start, today, and each date sit, in percent from the first of them to the last.
+ * It is a picture of the dates above it, not a control.
+ */
+export function dateBar(started: string | null, today: string, dates: { date: string; kind: string }[]): { start: number | null; today: number; marks: { at: number; date: string; kind: string }[] } {
+  const t = day;
+  // A goal that never went In Progress has no start (QA N6): the bar runs from today or its first date.
+  const from = Math.min(...(started ? [t(started)] : []), t(today), ...dates.map((d) => t(d.date)));
+  const to = Math.max(from + DAY, t(today), ...dates.map((d) => t(d.date)));
+  const at = (d: string) => (100 * (t(d) - from)) / (to - from);
+  return { start: started ? at(started) : null, today: at(today), marks: dates.map((d) => ({ at: at(d.date), date: d.date, kind: d.kind })) };
+}
+
+/** Date bar labels (G6): each label's row, 0 or 1. A label that would touch the one before it in its row drops to the other row. `width` is the bar in pixels. */
+export function labelRows(labels: { at: number; text: string; align: "start" | "center" | "end" }[], width: number): number[] {
+  const gap = 8;
+  const ends = [-Infinity, -Infinity];
+  return labels.map((l) => {
+    const w = labelWidth(l.text);
+    const x = (l.at / 100) * width;
+    const left = l.align === "start" ? x : l.align === "end" ? x - w : x - w / 2;
+    const row = left >= ends[0] + gap ? 0 : left >= ends[1] + gap ? 1 : 0;
+    ends[row] = left + w;
+    return row;
+  });
+}
+
+/** QA U5: the owners keep the order they had when the page loaded; anyone new joins at the end. `first` is null before the first load. */
+export function keepOrder(first: string[] | null, now: string[]): string[] {
+  if (!first) return now;
+  return [...first.filter((id) => now.includes(id)), ...now.filter((id) => !first.includes(id))];
+}
+
+/** The team view (plan F6): one queue per owner, people with work In Progress first; each queue by status. Deleted items are left out. */
+export function queues<T extends Pick<ApiWorkItem, "owner" | "status">>(items: T[], actors: Record<string, ApiActor>, me: string) {
+  const owners = [...new Set(items.filter((i) => i.status !== "Deleted").map((i) => i.owner))];
+  const actor = (id: string): ApiActor => actors[id] ?? { id, name: id, kind: "human" };
+  // What is happening now comes first: people with work In Progress, then the signed-in actor, then everyone else; by name within each.
+  const busy = (id: string) => items.some((i) => i.owner === id && i.status === "In Progress");
+  const rank = (q: { owner: ApiActor }) => (busy(q.owner.id) ? 0 : q.owner.id === me ? 1 : 2);
+  return owners
+    .map((id) => ({ owner: actor(id), groups: groupWorkItems(items.filter((i) => i.owner === id)) }))
+    .sort((a, b) => rank(a) - rank(b) || a.owner.name.localeCompare(b.owner.name));
+}

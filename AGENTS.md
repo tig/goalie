@@ -10,7 +10,7 @@ develop is the in-development branch and the primary branch.
 A pull request for in-development work targets develop.
 A release is a pull request from develop into main.
 develop runs the same workflows and does not require them to merge.
-The server publishes only from main.
+The server publishes on a push to main, or when an operator dispatches the server workflow on a branch.
 README.md and docs/ are pure docs, except docs/specs/SPEC.md.
 They run no CI commands and need no test.
 docs/specs/SPEC.md and USERS_MANUAL.md stay inputs of the shared tests.

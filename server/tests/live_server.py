@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import os
 import socket
 import subprocess
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -14,6 +16,10 @@ from pathlib import Path
 from typing import Iterator
 
 SERVER = Path(__file__).resolve().parents[1]
+# Every test runs on this day unless it sets GOALIE_TODAY itself. No test reads the wall clock for a product date.
+TODAY = "2026-10-23"
+ISSUER = "https://issuer.test/tenant/v2.0"
+AUDIENCE = "api://goalie-test"
 
 
 @dataclass(frozen=True)
@@ -40,12 +46,18 @@ def read_stderr(proc: subprocess.Popen[bytes]) -> str:
 
 
 @contextmanager
-def running_server() -> Iterator[tuple[subprocess.Popen[bytes], int]]:
-    """Yield the process and its port. Stop the process on exit."""
+def running_server(
+    database: Path | None = None, extra_env: dict[str, str] | None = None
+) -> Iterator[tuple[subprocess.Popen[bytes], int]]:
+    """Yield the process and its port. Stop the process on exit. The database defaults to a temporary file."""
     port = free_port()
     env = os.environ.copy()
+    env["GOALIE_TODAY"] = TODAY
+    env.update(extra_env or {})
     env["PORT"] = str(port)
     env["HOST"] = "127.0.0.1"
+    scratch = tempfile.TemporaryDirectory()
+    env["GOALIE_DB"] = str(database or Path(scratch.name) / "goalie.db")
     proc = subprocess.Popen(
         ["node", "src/server.ts"],
         cwd=SERVER,
@@ -63,9 +75,10 @@ def running_server() -> Iterator[tuple[subprocess.Popen[bytes], int]]:
             proc.stdout.close()
         if proc.stderr:
             proc.stderr.close()
+        scratch.cleanup()
 
 
-def get(proc: subprocess.Popen[bytes], port: int, path: str) -> Reply:
+def get(proc: subprocess.Popen[bytes], port: int, path: str, headers: dict[str, str] | None = None) -> Reply:
     """GET path. Retry until the server listens. Raise AssertionError on failure."""
     last_error = ""
     for _ in range(50):
@@ -73,7 +86,8 @@ def get(proc: subprocess.Popen[bytes], port: int, path: str) -> Reply:
             err = read_stderr(proc)
             raise AssertionError(f"process exited {proc.returncode}\n{err}")
         try:
-            with urllib.request.urlopen(f"http://127.0.0.1:{port}{path}", timeout=0.2) as response:
+            request = urllib.request.Request(f"http://127.0.0.1:{port}{path}", headers=headers or {})
+            with urllib.request.urlopen(request, timeout=2) as response:
                 return Reply(response.status, response.headers.get("Content-Type", ""), response.read())
         except urllib.error.HTTPError as error:
             return Reply(error.code, error.headers.get("Content-Type", ""), error.read())
@@ -82,3 +96,34 @@ def get(proc: subprocess.Popen[bytes], port: int, path: str) -> Reply:
             time.sleep(0.05)
     stderr = read_stderr(proc)
     raise AssertionError(f"{path} did not answer: {last_error}\n{stderr}")
+
+
+def post(proc: subprocess.Popen[bytes], port: int, path: str, body: object, headers: dict[str, str] | None = None) -> Reply:
+    """POST body as JSON, or as raw bytes when it is bytes. The server must already answer (call get first)."""
+    data = body if isinstance(body, bytes) else json.dumps(body).encode("utf-8")
+    request = urllib.request.Request(f"http://127.0.0.1:{port}{path}", data=data, method="POST", headers={"Content-Type": "application/json", **(headers or {})})
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            return Reply(response.status, response.headers.get("Content-Type", ""), response.read())
+    except urllib.error.HTTPError as error:
+        return Reply(error.code, error.headers.get("Content-Type", ""), error.read())
+
+
+def signed(subject: str) -> tuple[str, dict[str, str]]:
+    """A human token whose oid is subject, and the GOALIE_ISSUERS environment that trusts it."""
+    now = int(time.time())
+    request = {"tokens": [{"claims": {"iss": ISSUER, "aud": AUDIENCE, "oid": subject, "sub": f"pairwise-{subject}", "nbf": now - 5, "exp": now + 600}}]}
+    proc = subprocess.run(["node", "tests/sign_token.mjs"], cwd=SERVER, input=json.dumps(request).encode(), capture_output=True, check=True)
+    out = json.loads(proc.stdout)
+    env = {"GOALIE_ISSUERS": json.dumps([{"issuer": ISSUER, "audience": AUDIENCE, "jwks": out["jwks"]}])}
+    return out["tokens"][0], env
+
+
+def signed_many(*subjects: str) -> tuple[dict[str, str], dict[str, str]]:
+    """One human token per subject, as its oid, all signed by one key, and the GOALIE_ISSUERS environment that trusts them."""
+    now = int(time.time())
+    request = {"tokens": [{"claims": {"iss": ISSUER, "aud": AUDIENCE, "oid": s, "sub": f"pairwise-{s}", "nbf": now - 5, "exp": now + 600}} for s in subjects]}
+    proc = subprocess.run(["node", "tests/sign_token.mjs"], cwd=SERVER, input=json.dumps(request).encode(), capture_output=True, check=True)
+    out = json.loads(proc.stdout)
+    env = {"GOALIE_ISSUERS": json.dumps([{"issuer": ISSUER, "audience": AUDIENCE, "jwks": out["jwks"]}])}
+    return dict(zip(subjects, out["tokens"])), env

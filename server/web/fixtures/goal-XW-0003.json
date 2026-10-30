@@ -1,0 +1,601 @@
+{
+  "me": {
+    "id": "chelsea",
+    "name": "Chelsea",
+    "kind": "human"
+  },
+  "today": "2026-10-23",
+  "goal": {
+    "id": "XW-0003",
+    "version": 1,
+    "summary": "Tig, Chelsea, and agents use GOALIE to drive Excaliwire execution",
+    "description": "",
+    "owner": "chelsea",
+    "org_unit": "excaliwire",
+    "level": "Company",
+    "type": "Milestone (Launch)",
+    "due_date": "2026-11-30",
+    "date_type": "Fantasy",
+    "promotion_milestone": "XW-0004",
+    "plan": "docs/release-plan.md",
+    "committed_plan_version": null,
+    "plan_maturity": "Crayon",
+    "work_product": null,
+    "original_committed_date": null,
+    "changed_due_date": null,
+    "severity": "sev1",
+    "priority": "PRI-3",
+    "state": "In Progress",
+    "health": "GREEN",
+    "path_to_green": null,
+    "origination": "New",
+    "parent": null,
+    "visibility": "organization-wide"
+  },
+  "dates": [
+    {
+      "date": "2026-11-06",
+      "kind": "Promotion Milestone"
+    },
+    {
+      "date": "2026-11-30",
+      "kind": "Fantasy"
+    }
+  ],
+  "inherited": false,
+  "started": "2026-10-23",
+  "closesAs": null,
+  "closesAsPromoted": null,
+  "mayChange": true,
+  "above": [],
+  "siblings": [],
+  "backs": null,
+  "changers": [
+    {
+      "actor": "chelsea",
+      "as": "owner",
+      "goal": "XW-0003"
+    },
+    {
+      "actor": "tig",
+      "as": "goalie-owner",
+      "goal": null
+    }
+  ],
+  "moreChangers": false,
+  "promotionMilestone": {
+    "id": "XW-0004",
+    "summary": "Run the MLP prototype at goalie.excaliwire.com with Excaliwire's real goals loaded",
+    "version": 2,
+    "state": "In Progress",
+    "health": "GREEN",
+    "date": "2026-11-06",
+    "openSubGoals": 7,
+    "openWorkItems": 10
+  },
+  "parent": null,
+  "priority": {
+    "id": "PRI-3",
+    "rank": 3,
+    "title": "Run Excaliwire on GOALIE"
+  },
+  "orgUnit": {
+    "id": "excaliwire",
+    "name": "Excaliwire",
+    "level": "Company"
+  },
+  "subGoals": [
+    {
+      "id": "XW-0004",
+      "summary": "Run the MLP prototype at goalie.excaliwire.com with Excaliwire's real goals loaded",
+      "owner": "chelsea",
+      "state": "In Progress",
+      "health": "GREEN",
+      "dates": [
+        {
+          "date": "2026-11-06",
+          "kind": "Committed"
+        }
+      ],
+      "promotionMilestone": true,
+      "subGoals": 7,
+      "workItems": {
+        "completed": 0,
+        "total": 0
+      }
+    }
+  ],
+  "workItems": [],
+  "events": [
+    {
+      "sequence": 96,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0004",
+      "field": "parent",
+      "old": null,
+      "new": "XW-0003",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 95,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0003",
+      "field": "visibility",
+      "old": null,
+      "new": "organization-wide",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 94,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0003",
+      "field": "origination",
+      "old": null,
+      "new": "New",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 93,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0003",
+      "field": "health",
+      "old": null,
+      "new": "GREEN",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 92,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0003",
+      "field": "state",
+      "old": null,
+      "new": "In Progress",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 91,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0003",
+      "field": "priority",
+      "old": null,
+      "new": "PRI-3",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 90,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0003",
+      "field": "severity",
+      "old": null,
+      "new": "sev1",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 89,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0003",
+      "field": "plan_maturity",
+      "old": null,
+      "new": "Crayon",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 88,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0003",
+      "field": "plan",
+      "old": null,
+      "new": "docs/release-plan.md",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 87,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0003",
+      "field": "promotion_milestone",
+      "old": null,
+      "new": "XW-0004",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 86,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0003",
+      "field": "date_type",
+      "old": null,
+      "new": "Fantasy",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 85,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0003",
+      "field": "due_date",
+      "old": null,
+      "new": "2026-11-30",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 84,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0003",
+      "field": "type",
+      "old": null,
+      "new": "Milestone (Launch)",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 83,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0003",
+      "field": "level",
+      "old": null,
+      "new": "Company",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 82,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0003",
+      "field": "org_unit",
+      "old": null,
+      "new": "excaliwire",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 81,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0003",
+      "field": "owner",
+      "old": null,
+      "new": "chelsea",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 80,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0003",
+      "field": "description",
+      "old": null,
+      "new": "",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 79,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0003",
+      "field": "summary",
+      "old": null,
+      "new": "Tig, Chelsea, and agents use GOALIE to drive Excaliwire execution",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 78,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0004",
+      "field": "visibility",
+      "old": null,
+      "new": "organization-wide",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 77,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0004",
+      "field": "origination",
+      "old": null,
+      "new": "New",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 76,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0004",
+      "field": "health",
+      "old": null,
+      "new": "GREEN",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 75,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0004",
+      "field": "state",
+      "old": null,
+      "new": "In Progress",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 74,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0004",
+      "field": "severity",
+      "old": null,
+      "new": "sev1",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 73,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0004",
+      "field": "original_committed_date",
+      "old": null,
+      "new": "2026-11-06",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 72,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0004",
+      "field": "work_product",
+      "old": null,
+      "new": [
+        {
+          "repo": "github.com/tig/goalie"
+        },
+        {
+          "url": "https://goalie.excaliwire.com"
+        },
+        {
+          "doc": "https://claude.ai/artifact/KL6KBcJMeBMG3Cr7bPWyMk"
+        }
+      ],
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 71,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0004",
+      "field": "plan_maturity",
+      "old": null,
+      "new": "Pencil",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 70,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0004",
+      "field": "plan",
+      "old": null,
+      "new": "docs/release-plan.md",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 69,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0004",
+      "field": "date_type",
+      "old": null,
+      "new": "Committed",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 68,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0004",
+      "field": "due_date",
+      "old": null,
+      "new": "2026-11-06",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 67,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0004",
+      "field": "type",
+      "old": null,
+      "new": "Milestone (Commit)",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 66,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0004",
+      "field": "level",
+      "old": null,
+      "new": "Company",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 65,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0004",
+      "field": "org_unit",
+      "old": null,
+      "new": "excaliwire",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 64,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0004",
+      "field": "owner",
+      "old": null,
+      "new": "chelsea",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 63,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0004",
+      "field": "description",
+      "old": null,
+      "new": "The Promotion Milestone for XW-0003. Held in tig/goalie#47 until GOALIE holds it.",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 62,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0004",
+      "field": "summary",
+      "old": null,
+      "new": "Run the MLP prototype at goalie.excaliwire.com with Excaliwire's real goals loaded",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    }
+  ],
+  "olderEvents": null,
+  "eventCount": 35,
+  "commentCount": 0,
+  "needsYou": {
+    "lateWorkItems": [],
+    "missingPtg": false
+  },
+  "hints": [
+    {
+      "field": "description",
+      "text": "Add the key results"
+    },
+    {
+      "field": "description",
+      "text": "Add the metrics and how often they are reviewed"
+    },
+    {
+      "field": "description",
+      "text": "Add why it matters"
+    },
+    {
+      "field": "description",
+      "text": "Add who shares responsibility"
+    },
+    {
+      "field": "work_product",
+      "text": "Link the work product."
+    }
+  ],
+  "actors": {
+    "backend-engineer": {
+      "id": "backend-engineer",
+      "name": "Backend Engineer",
+      "kind": "agent",
+      "operator": "chelsea"
+    },
+    "chelsea": {
+      "id": "chelsea",
+      "name": "Chelsea",
+      "kind": "human"
+    },
+    "chief-of-staff": {
+      "id": "chief-of-staff",
+      "name": "Chief of Staff",
+      "kind": "agent",
+      "operator": "chelsea"
+    },
+    "codebase-qa": {
+      "id": "codebase-qa",
+      "name": "Codebase QA",
+      "kind": "agent",
+      "operator": "chelsea"
+    },
+    "frontend-engineer": {
+      "id": "frontend-engineer",
+      "name": "Frontend Engineer",
+      "kind": "agent",
+      "operator": "chelsea"
+    },
+    "frontend-qa": {
+      "id": "frontend-qa",
+      "name": "Frontend QA",
+      "kind": "agent",
+      "operator": "chelsea"
+    },
+    "head-of-engineering": {
+      "id": "head-of-engineering",
+      "name": "Head of Engineering",
+      "kind": "agent",
+      "operator": "chelsea"
+    },
+    "product-designer": {
+      "id": "product-designer",
+      "name": "Product Designer",
+      "kind": "agent",
+      "operator": "chelsea"
+    },
+    "product-manager": {
+      "id": "product-manager",
+      "name": "Product Manager",
+      "kind": "agent",
+      "operator": "chelsea"
+    },
+    "tig": {
+      "id": "tig",
+      "name": "Tig",
+      "kind": "human"
+    },
+    "user-researcher": {
+      "id": "user-researcher",
+      "name": "User Researcher",
+      "kind": "agent",
+      "operator": "chelsea"
+    }
+  }
+}

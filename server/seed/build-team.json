@@ -1,0 +1,466 @@
+{
+  "about": [
+    "Our build team in GOALIE: the seats as agent actors operated by Chelsea, and each seat's current tasks as work items under the XW-0003 sub-goal it serves.",
+    "It loads onto the Excaliwire seed: node src/cli.ts seed seed/build-team.json. A deployment that loads only excaliwire.json never gets it.",
+    "Load it again after you edit it. An actor that exists is updated where its fields differ. A work item is matched by owner and title, then updated or created. A second load of the same file writes nothing.",
+    "Only the GOALIE owner writes actors, so the seats are written as tig."
+  ],
+  "onto": "excaliwire.json",
+  "writes": [
+    {
+      "as": "tig",
+      "command": {
+        "op": "create",
+        "kind": "actor",
+        "id": "chief-of-staff",
+        "reason": "The build team's seats (docs/engineering/goal-page-and-create.md, the build team's queues)",
+        "fields": {
+          "kind": "agent",
+          "display_name": "Chief of Staff",
+          "operator": "chelsea",
+          "app_id": "app-chief-of-staff"
+        }
+      }
+    },
+    {
+      "as": "tig",
+      "command": {
+        "op": "create",
+        "kind": "actor",
+        "id": "product-manager",
+        "reason": "The build team's seats (docs/engineering/goal-page-and-create.md, the build team's queues)",
+        "fields": {
+          "kind": "agent",
+          "display_name": "Product Manager",
+          "operator": "chelsea",
+          "app_id": "app-product-manager"
+        }
+      }
+    },
+    {
+      "as": "tig",
+      "command": {
+        "op": "create",
+        "kind": "actor",
+        "id": "product-designer",
+        "reason": "The build team's seats (docs/engineering/goal-page-and-create.md, the build team's queues)",
+        "fields": {
+          "kind": "agent",
+          "display_name": "Product Designer",
+          "operator": "chelsea",
+          "app_id": "app-product-designer"
+        }
+      }
+    },
+    {
+      "as": "tig",
+      "command": {
+        "op": "create",
+        "kind": "actor",
+        "id": "head-of-engineering",
+        "reason": "The build team's seats (docs/engineering/goal-page-and-create.md, the build team's queues)",
+        "fields": {
+          "kind": "agent",
+          "display_name": "Head of Engineering",
+          "operator": "chelsea",
+          "app_id": "app-head-of-engineering"
+        }
+      }
+    },
+    {
+      "as": "tig",
+      "command": {
+        "op": "create",
+        "kind": "actor",
+        "id": "frontend-engineer",
+        "reason": "The build team's seats (docs/engineering/goal-page-and-create.md, the build team's queues)",
+        "fields": {
+          "kind": "agent",
+          "display_name": "Frontend Engineer",
+          "operator": "chelsea",
+          "app_id": "app-frontend-engineer"
+        }
+      }
+    },
+    {
+      "as": "tig",
+      "command": {
+        "op": "create",
+        "kind": "actor",
+        "id": "backend-engineer",
+        "reason": "The build team's seats (docs/engineering/goal-page-and-create.md, the build team's queues)",
+        "fields": {
+          "kind": "agent",
+          "display_name": "Backend Engineer",
+          "operator": "chelsea",
+          "app_id": "app-backend-engineer"
+        }
+      }
+    },
+    {
+      "as": "tig",
+      "command": {
+        "op": "create",
+        "kind": "actor",
+        "id": "codebase-qa",
+        "reason": "The build team's seats (docs/engineering/goal-page-and-create.md, the build team's queues)",
+        "fields": {
+          "kind": "agent",
+          "display_name": "Codebase QA",
+          "operator": "chelsea",
+          "app_id": "app-codebase-qa"
+        }
+      }
+    },
+    {
+      "as": "tig",
+      "command": {
+        "op": "create",
+        "kind": "actor",
+        "id": "frontend-qa",
+        "reason": "The build team's seats (docs/engineering/goal-page-and-create.md, the build team's queues)",
+        "fields": {
+          "kind": "agent",
+          "display_name": "Frontend QA",
+          "operator": "chelsea",
+          "app_id": "app-frontend-qa"
+        }
+      }
+    },
+    {
+      "as": "tig",
+      "command": {
+        "op": "create",
+        "kind": "actor",
+        "id": "user-researcher",
+        "reason": "The build team's seats (docs/engineering/goal-page-and-create.md, the build team's queues)",
+        "fields": {
+          "kind": "agent",
+          "display_name": "User Researcher",
+          "operator": "chelsea",
+          "app_id": "app-user-researcher"
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "work_item",
+        "reason": "Filed",
+        "fields": {
+          "goal": "XW-0007",
+          "title": "Merge B0 to B5 and F0 to F3 into chelsea/mlp",
+          "owner": "chief-of-staff",
+          "status": "Completed",
+          "due_date": "2026-10-24",
+          "links": null
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "work_item",
+        "reason": "Filed",
+        "fields": {
+          "goal": "XW-0007",
+          "title": "Run gate D for the goal page and New goal",
+          "owner": "chief-of-staff",
+          "status": "Backlog",
+          "due_date": "2026-11-03",
+          "links": null
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "work_item",
+        "reason": "Filed",
+        "fields": {
+          "goal": "XW-0007",
+          "title": "Product spec: goal page and goal creation",
+          "owner": "product-manager",
+          "status": "Completed",
+          "due_date": "2026-10-23",
+          "links": null
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "work_item",
+        "reason": "Filed",
+        "fields": {
+          "goal": "XW-0007",
+          "title": "Design: the goal page and New goal",
+          "owner": "product-designer",
+          "status": "Completed",
+          "due_date": "2026-10-23",
+          "links": null
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "work_item",
+        "reason": "Filed",
+        "fields": {
+          "goal": "XW-0008",
+          "title": "Drop the sub-goal date check from the New goal rail (N11)",
+          "owner": "product-designer",
+          "status": "Backlog",
+          "due_date": "2026-10-28",
+          "links": null
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "work_item",
+        "reason": "Filed",
+        "fields": {
+          "goal": "XW-0007",
+          "title": "Engineering plan: goal page and goal creation",
+          "owner": "head-of-engineering",
+          "status": "Completed",
+          "due_date": "2026-10-24",
+          "links": null
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "work_item",
+        "reason": "Filed",
+        "fields": {
+          "goal": "XW-0007",
+          "title": "Structure check of the server at 5087caa",
+          "owner": "head-of-engineering",
+          "status": "Completed",
+          "due_date": "2026-10-24",
+          "links": null
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "work_item",
+        "reason": "Filed",
+        "fields": {
+          "goal": "XW-0007",
+          "title": "F2: the goal page, read only",
+          "owner": "frontend-engineer",
+          "status": "Completed",
+          "due_date": "2026-10-24",
+          "links": null
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "work_item",
+        "reason": "Filed",
+        "fields": {
+          "goal": "XW-0007",
+          "title": "F3: the goal page panels save as batches",
+          "owner": "frontend-engineer",
+          "status": "Completed",
+          "due_date": "2026-10-24",
+          "links": null
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "work_item",
+        "reason": "Filed",
+        "fields": {
+          "goal": "XW-0007",
+          "title": "F4: + Sub-goal and + Work item",
+          "owner": "frontend-engineer",
+          "status": "In Progress",
+          "due_date": "2026-10-27",
+          "links": null
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "work_item",
+        "reason": "Filed",
+        "fields": {
+          "goal": "XW-0008",
+          "title": "F5: New goal and its sub-goals",
+          "owner": "frontend-engineer",
+          "status": "Backlog",
+          "due_date": "2026-10-30",
+          "links": null
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "work_item",
+        "reason": "Filed",
+        "fields": {
+          "goal": "XW-0009",
+          "title": "F6: My work and the team view",
+          "owner": "frontend-engineer",
+          "status": "Backlog",
+          "due_date": "2026-11-02",
+          "links": null
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "work_item",
+        "reason": "Filed",
+        "fields": {
+          "goal": "XW-0007",
+          "title": "B0 to B3: the write route, the rules, and the goal page routes",
+          "owner": "backend-engineer",
+          "status": "Completed",
+          "due_date": "2026-10-24",
+          "links": null
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "work_item",
+        "reason": "Filed",
+        "fields": {
+          "goal": "XW-0009",
+          "title": "B4 and B5: the queues and live updates",
+          "owner": "backend-engineer",
+          "status": "Completed",
+          "due_date": "2026-10-24",
+          "links": null
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "work_item",
+        "reason": "Filed",
+        "fields": {
+          "goal": "XW-0009",
+          "title": "Load the build team into GOALIE",
+          "owner": "backend-engineer",
+          "status": "In Progress",
+          "due_date": "2026-10-25",
+          "links": null
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "work_item",
+        "reason": "Filed",
+        "fields": {
+          "goal": "XW-0007",
+          "title": "Fix the Head of Engineering's open items from the 5087caa check",
+          "owner": "backend-engineer",
+          "status": "Backlog",
+          "due_date": "2026-10-27",
+          "links": null
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "work_item",
+        "reason": "Filed",
+        "fields": {
+          "goal": "XW-0007",
+          "title": "Review the server at c22d40a",
+          "owner": "codebase-qa",
+          "status": "Completed",
+          "due_date": "2026-10-24",
+          "links": null
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "work_item",
+        "reason": "Filed",
+        "fields": {
+          "goal": "XW-0007",
+          "title": "Review the goal page build, server side",
+          "owner": "codebase-qa",
+          "status": "Backlog",
+          "due_date": "2026-10-29",
+          "links": null
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "work_item",
+        "reason": "Filed",
+        "fields": {
+          "goal": "XW-0007",
+          "title": "Check the goal page screens at 1440, 1100, and 390 px",
+          "owner": "frontend-qa",
+          "status": "Backlog",
+          "due_date": "2026-10-29",
+          "links": null
+        }
+      }
+    },
+    {
+      "as": "chelsea",
+      "command": {
+        "op": "create",
+        "kind": "work_item",
+        "reason": "Filed",
+        "fields": {
+          "goal": "XW-0008",
+          "title": "Walk New goal as Galahad",
+          "owner": "user-researcher",
+          "status": "Backlog",
+          "due_date": "2026-11-02",
+          "links": null
+        }
+      }
+    }
+  ]
+}

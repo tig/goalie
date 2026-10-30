@@ -35,7 +35,7 @@ If you only read one section, read **§4 Rules**.
 | **Work Product** | Links to where the output lives: repo, PR, docs, deployed URL, metric dashboard. |
 | **Severity** | `sev1` critical / urgent / blocking · `sev2` important · `sev3` nice to have. How much the goal matters on its own terms. |
 | **Priority** | An entry in an org unit's short, **ranked** list of current priorities. Goals map to one. Lower entries are starved on purpose. |
-| **Health** | **GREEN:** on track. **YELLOW:** at risk, but there's still a credible path to the date. **RED:** the date isn't credible without intervention. |
+| **Health** | **GREEN** (On track): on track. **YELLOW** (At risk): at risk, but there's still a credible path to the date. **RED** (Off track): the date isn't credible without intervention. The screen shows the label in brackets. |
 | **Path to Green (PTG)** | The written recovery plan for a YELLOW or RED goal. |
 | **Draft** | A change an agent proposes. It shows on the goal immediately. It does nothing until a human approves it. |
 | **Presence** | Who is viewing or editing a goal right now. A human or an agent. |
@@ -185,6 +185,11 @@ The GOALIE owner inspects these each quarter and changes the configuration, revi
 4. Comment when you need a note that is not a field change. A comment can sit on any record. In this version it does not reply to another comment.
 5. File a work item when your deployment uses that list. The list is optional.
 6. Open the goal's history to see who changed what, and why. The current fields are not the whole record.
+
+**Add a person or an agent**
+1. The GOALIE owner adds the actor: a human, or an agent with its human operator.
+2. The GOALIE owner maps the human's sign-in to their actor before they first sign in. Until then GOALIE refuses them.
+3. The addition is recorded as an Event under the GOALIE owner's name.
 
 **Approve or reject a Draft**
 1. Open the goal. The Draft is already visible.

@@ -1,0 +1,783 @@
+/*
+ * The app CSS. Every color is a token on :root so an organization can reskin GOALIE (rule 31).
+ * Text tokens meet 4.5:1 on --card and on --ground. No text is below 11 px.
+ */
+:root{--font:"Figtree Variable",system-ui,sans-serif;
+--ground:#f3f8f4;--card:#ffffff;--ink:#2f3a33;--mute:#56625b;--line:#edf2ee;--grid:#eef3ef;--sub-bg:#fafcfb;--control:#f0f5f1;--cut:#c9d3cc;
+--brand:#bfe6cc;--brand-ink:#17482f;--link:#1e6b45;--today:#22744a;--today-ink:#ffffff;--focus:#2c5796;
+--shadow:rgba(47,58,51,.05);
+--red-bg:#fbd9dd;--red-ink:#9c2a3c;--red:#e5677a;--yellow-bg:#fbefc6;--yellow-ink:#755800;--yellow:#e8c766;--green-bg:#d3f0e2;--green-ink:#1e6544;--green:#5cbf85;--none-bg:#eef2ef;--none:#b4beb7;
+--ahead:#e6ece8;--ambition:#8fadd9;--ambition-line:#b7c9e6;--ambition-ink:#2c5796;--fantasy:#a99ce0;--fantasy-line:#cfc6ee;--fantasy-ink:#5e4fa8;--slip-a:#f6b8c0;--slip-b:#fdeef0;
+--av-0-bg:#e3dafb;--av-0-ink:#4a3a91;--av-1-bg:#fadbe7;--av-1-ink:#9a2f5a;--av-2-bg:#d6ecfa;--av-2-ink:#1f5a85;--av-3-bg:#fde3cc;--av-3-ink:#8a4a12;--av-4-bg:#d3f0e2;--av-4-ink:#1e6544;--av-5-bg:#fbefc6;--av-5-ink:#6b5000;
+--hover:#f1f4f2;--tip-bg:#2f3a33;--tip-ink:#ffffff;--tip-shadow:rgba(47,58,51,.22);
+--radius:16px;--topbar:63px;--yellow-tint:#fefaea;--red-tint:#fef4f5;--green-tint:#f1faf5}
+html{scrollbar-gutter:stable}
+body{cursor:default;margin:0;background:var(--ground);color:var(--ink);font:14px/1.4 var(--font);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;-webkit-tap-highlight-color:transparent}
+.top,.cards,.board,.legend,.signin,.tip{user-select:none;-webkit-user-select:none}
+input,textarea{user-select:text;-webkit-user-select:text;cursor:text}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0}
+a,button,.row.parent,[role="button"]{cursor:pointer}
+.gbtn.off,.meter span{cursor:default}
+.meter span[role="button"]{cursor:pointer}
+a,.vtab,.gbtn,.btn,.count,.chev,.row,.chip,.morebtn,.q,.chip-x{transition:background-color .12s ease,box-shadow .12s ease,opacity .12s ease,transform .12s ease,color .12s ease}
+.btn:active,.count:active,.vtab:active,.gbtn:active,.q:active,.morebtn:active,.chip-x:active{transform:scale(.96)}
+.gbtn.off:active{transform:none}
+a{color:var(--link)}
+.top{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:14px;padding:14px 32px;background:var(--card);border-bottom:1px solid var(--line)}
+.logo{width:34px;height:34px;border-radius:11px;background:var(--brand);color:var(--brand-ink);display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:16px}
+.brand{font-weight:800;font-size:18px}.org{color:var(--mute)}
+.tab{height:34px;padding:0 16px;border-radius:999px;background:var(--brand);color:var(--brand-ink);font-weight:700;display:inline-flex;align-items:center;margin-left:16px}
+.me{margin-left:12px}
+.av{width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex:none}
+.av.mine{box-shadow:0 0 0 2px var(--card),0 0 0 3.5px var(--ink)}
+.me .av{width:30px;height:30px;font-size:13px;box-shadow:none}
+main{max-width:1312px;margin:0 auto;padding:28px 32px 48px;box-sizing:border-box;display:flex;flex-direction:column}
+h1{font-size:26px;font-weight:800;margin:0 0 20px}
+.cards{display:grid;grid-template-columns:1.6fr 1fr 1fr;gap:16px;margin-bottom:16px}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:0 1px 2px var(--shadow),0 4px 16px var(--shadow);padding:18px 20px;min-width:0}
+.lbl{display:flex;align-items:center;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin:0 0 8px}
+.num{white-space:nowrap}
+.big{font-size:22px;font-weight:800;margin:0 0 8px;display:flex;align-items:baseline;gap:10px}.big small{font-size:14px;font-weight:700;color:var(--ink);min-width:0}
+.counts{font-size:18px;font-weight:800;margin:0 0 8px}
+.meter{display:flex;gap:3px;margin:0 0 10px}.meter span{flex:1;height:8px;border-radius:999px}
+.note{font-size:13px;margin:0 0 6px}.small{font-size:12px;color:var(--mute)}
+.late{color:var(--red-ink);font-weight:700;white-space:nowrap}
+.date{white-space:nowrap}
+.muted{color:var(--mute)}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* Help: the ? icon and its card. The card is fixed to the screen and placed by the app (rule 9). */
+.help{display:inline-flex;margin-left:6px;vertical-align:middle}
+.q{width:18px;height:18px;border-radius:50%;background:var(--control);color:var(--mute);font-size:11px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;letter-spacing:0}
+.q:hover,.q.on{background:var(--brand);color:var(--brand-ink)}
+.tip{position:fixed;z-index:100;box-sizing:border-box;padding:10px 12px;border-radius:12px;background:var(--tip-bg);color:var(--tip-ink);font-size:12px;font-weight:500;line-height:1.5;box-shadow:0 8px 28px var(--tip-shadow);text-transform:none;letter-spacing:0;white-space:normal}
+.tip b{font-weight:800}
+.tip>div+div{margin-top:6px}
+
+/* The health counts and meter: controls (rule 24). */
+.count{display:inline-flex;align-items:center;gap:6px;margin:0 6px 0 -8px;padding:2px 8px;border-radius:999px;color:var(--ink);font-weight:800;font-size:18px}
+.count:hover,.count:focus-visible{background:var(--control)}.count.on{background:var(--control);box-shadow:inset 0 0 0 1.5px var(--cut)}
+
+/* Highlight and selection (rules H1 to H4). */
+.row.lit,.row.lit>.left{background:var(--hover)}
+.row.lit>.left{box-shadow:inset 3px 0 0 var(--hc),10px 0 10px -10px var(--tip-shadow)}
+/* A parent kept only for context is muted with an ink that keeps 4.5:1, not with opacity (rule 28). */
+.row.ctx .title{color:var(--mute)}.row.ctx .hdot{opacity:.5}
+.chip.lit{box-shadow:inset 3px 0 0 var(--hc, var(--cut));background:var(--hover)}
+.chip[data-health="RED"]{--hc:var(--red)}.chip[data-health="YELLOW"]{--hc:var(--yellow)}.chip[data-health="GREEN"]{--hc:var(--green)}
+
+.search svg{flex:none}
+.search{display:flex;align-items:center;gap:8px;height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--cut);background:var(--card);color:var(--mute);width:240px;flex:none;box-sizing:border-box}
+.search:focus-within{border-color:var(--focus)}
+.search input{border:0;outline:0;background:none;font:600 13px var(--font);color:var(--ink);width:100%;min-width:0}
+/* The health filter in force: a chip at the start of the search box (rule 25a). Its x is Show all. */
+.chip-filter{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 4px 0 8px;border-radius:999px;font-size:11px;font-weight:800;flex:none}
+.chip-filter.RED{background:var(--red-bg);color:var(--red-ink)}.chip-filter.YELLOW{background:var(--yellow-bg);color:var(--yellow-ink)}.chip-filter.GREEN{background:var(--green-bg);color:var(--green-ink)}
+.chip-filter .hdot{width:8px;height:8px}
+.chip-x{width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:13px;line-height:1;color:inherit}
+.chip-x:hover{background:rgba(47,58,51,.1)}
+/* A health is a shape as well as a color (rule 10): GREEN a circle, YELLOW a triangle, RED a square, no health a hollow circle. Each sits in the same 10 px box. A diamond is only a Promotion Milestone. */
+.hdot{width:10px;height:10px;border-radius:50%;flex:none;display:inline-block}
+.hdot.RED{border-radius:2px;transform:scale(.9)}
+.hdot.YELLOW{border-radius:0;clip-path:polygon(50% 4%,100% 92%,0 92%);transform:scale(1.2)}
+.hdot.none{box-shadow:inset 0 0 0 1.5px var(--none)}
+.hword{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.hword.shown{position:static;width:auto;height:auto;overflow:visible;clip:auto;margin-left:6px}
+.hword.GREEN{color:var(--green-ink)}.hword.YELLOW{color:var(--yellow-ink)}.hword.RED{color:var(--red-ink)}.hword.none{color:var(--mute)}
+
+/* The toolbar (rules 25 to 25c, V1, V4): one 44 px row. The left cluster is the view's name, the view tabs, and search. The right cluster is anchored right. Every control is 32 px tall. */
+.board{padding:18px 20px 14px;--left:380px;--gap:12px;--week:84px;--rank:18px;--colgap:10px;--indent:26px;container-type:inline-size}
+.toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;min-height:44px;margin:0 0 12px}
+.toolbar h2{font-size:16px;font-weight:800;margin:0 8px 0 0}
+.tabs{display:inline-flex;align-items:center;gap:2px;height:32px;padding:3px;box-sizing:border-box;border-radius:999px;background:var(--control)}
+.vtab{height:26px;padding:0 12px;border-radius:999px;font-size:13px;font-weight:700;color:var(--mute)}
+.vtab:hover{color:var(--ink)}
+.vtab.on{background:var(--card);color:var(--brand-ink);box-shadow:0 1px 2px rgba(47,58,51,.14)}
+.toolbar .search{margin-left:8px}
+.tright{display:flex;align-items:center;gap:8px;margin-left:auto}
+.range{display:flex;align-items:center;gap:8px}
+.pgroup{display:inline-flex;align-items:center;height:32px;border-radius:999px;border:1px solid var(--cut);background:var(--card);box-sizing:border-box}
+.gbtn{min-width:30px;height:100%;display:inline-flex;align-items:center;justify-content:center;color:var(--ink);font-weight:800;font-size:16px;border-radius:999px}
+.gbtn:hover{background:var(--control)}
+.gbtn.off{color:var(--cut)}.gbtn.off:hover{background:none}
+@container (max-width:1039px){.toolbar .search{width:200px}}
+/* When one row does not fit, the search box takes a second row, full width. */
+.tbreak{display:none}
+@container (max-width:942px){.tbreak{display:block;order:4;flex-basis:100%;height:0}.toolbar .search{order:5;flex:1 1 200px;width:auto;min-width:200px;margin:0}.tright{order:6}}
+.rangelbl{display:inline-grid;min-width:184px;padding:0 4px;box-sizing:border-box;font-weight:700;font-size:13px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.rangelbl>span{grid-area:1/1;text-align:center}
+.rangelbl>.sizer{visibility:hidden}
+.btn{height:32px;box-sizing:border-box;padding:0 12px;border-radius:999px;border:1px solid var(--cut);color:var(--ink);font-weight:700;font-size:13px;display:inline-flex;align-items:center}
+.btn:hover{background:var(--control)}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+/* A row's focus ring is on the goal column only, not across the timeline. */
+.row:focus-visible{outline:none}
+.row:focus-visible>.left{outline:3px solid var(--focus);outline-offset:-3px;border-radius:12px}
+.search input:focus-visible{outline:0}
+
+/* The timeline. No scrollbar shows (rule 20c); an edge fades where there is more to scroll. */
+.tlwrap{position:relative}
+.scroll{overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none}
+.scroll::-webkit-scrollbar{display:none}
+/* The timeline's focus ring goes round the whole timeline, not along its scrolled edge. */
+.scroll:focus-visible{outline:none}
+.tlwrap:has(.scroll:focus-visible){outline:3px solid var(--focus);outline-offset:2px;border-radius:12px}
+.scroll.dragging,.scroll.dragging *{cursor:grabbing}
+.fade{position:absolute;top:0;bottom:0;width:28px;pointer-events:none;opacity:0;z-index:9;transition:opacity .12s ease}
+.fade.before{left:calc(var(--left) + var(--gap));background:linear-gradient(to right,var(--card),transparent)}
+.fade.after{right:0;background:linear-gradient(to left,var(--card),transparent)}
+.more-before>.fade.before,.more-after>.fade.after{opacity:1}
+.tl{position:relative;width:calc(var(--left) + var(--gap) + var(--weeks) * var(--week))}
+.tlbody>.cut{background:var(--card);z-index:2}
+.row.note{min-height:40px}.row.note .lane{background:none}.row.note .title{font-weight:500;font-size:13px}
+.row>.left,.axis>.corner{position:sticky;left:0;z-index:7;background:var(--card);padding-right:var(--gap);box-shadow:10px 0 10px -10px var(--tip-shadow)}
+.axis{display:grid;grid-template-columns:calc(var(--left) + var(--gap)) calc(var(--weeks) * var(--week));height:52px}
+.corner{display:flex;align-items:flex-end;padding-bottom:8px;box-sizing:border-box}
+.colhead{justify-content:space-between;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);padding-bottom:10px}
+.ticks{position:relative}
+.wk{position:absolute;bottom:6px;margin-left:5px;font-size:12px;font-weight:600;color:var(--mute);white-space:nowrap}
+.wk.off{visibility:hidden}
+.td{display:none}.todaylbl:hover .td{display:inline}
+.todaylbl{position:absolute;top:0;transform:translateX(-50%);background:var(--today);color:var(--today-ink);font-size:11px;font-weight:800;padding:1px 8px;border-radius:999px;white-space:nowrap;z-index:6}
+.tlbody{position:relative;border-top:1px solid var(--line)}
+.group{border-bottom:1px solid var(--line)}
+.row{position:relative;display:grid;grid-template-columns:calc(var(--left) + var(--gap)) calc(var(--weeks) * var(--week));align-items:stretch;min-height:52px}
+.row:hover,.row:hover>.left{background:var(--hover)}
+.left{position:relative;display:flex;align-items:center;gap:var(--colgap);min-width:0;box-sizing:border-box;padding:6px var(--gap) 6px 0}
+.d1 .left,.d2 .left{min-height:40px}
+.d1,.d2{min-height:42px}
+.left.tree{background-size:1.5px 100%;background-repeat:no-repeat}
+.left.tree::before{content:"";position:absolute;left:calc((var(--depth) - 1) * var(--indent) + var(--rank) + var(--colgap) + 5px);top:0;height:50%;width:17px;border-left:1.5px solid var(--cut);border-bottom:1.5px solid var(--cut);border-bottom-left-radius:7px}
+.left.tree.more::after{content:"";position:absolute;left:calc((var(--depth) - 1) * var(--indent) + var(--rank) + var(--colgap) + 5px);top:50%;bottom:0;border-left:1.5px solid var(--cut)}
+.kids{position:relative}
+.title{flex:1;min-width:0;font-weight:700;font-size:14px;line-height:1.3;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.d1 .title{font-weight:600;font-size:13.5px}
+.d2 .title{font-weight:500;font-size:13px;color:var(--ink)}
+.rnum{width:var(--rank);flex:none;text-align:right;font-size:13px;font-weight:700;color:var(--mute);font-variant-numeric:tabular-nums}
+.left .hdot{margin-left:calc(var(--depth, 0) * var(--indent))}
+.slot{width:44px;flex:none;display:flex;justify-content:flex-end}
+.chev{display:inline-flex;align-items:center;gap:4px;height:26px;padding:0 9px;border-radius:999px;background:var(--control);color:var(--mute);font-size:12px;font-weight:700;flex:none}
+.chev svg{transition:transform .15s}
+.chev.open svg{transform:rotate(180deg)}
+.row.parent:hover .chev{background:var(--grid);color:var(--ink)}
+.lane{position:relative;height:100%;min-height:40px;
+background-image:repeating-linear-gradient(to right,var(--grid) 0 1px,transparent 1px var(--week))}
+.seg{position:absolute;top:50%;height:20px;margin-top:-10px;z-index:2}
+.d1 .seg,.d2 .seg{height:12px;margin-top:-6px}
+.seg.first{border-radius:999px 0 0 999px}.seg.last{border-radius:0 999px 999px 0}.seg.first.last{border-radius:999px}
+.ahead{background:var(--ahead)}
+.slip{background:repeating-linear-gradient(135deg,var(--slip-a) 0 6px,var(--slip-b) 6px 12px)}
+.slip.over{background:repeating-linear-gradient(135deg,var(--slip-b) 0 6px,transparent 6px 12px)}
+.tick{position:absolute;top:50%;width:3px;height:26px;margin:-13px 0 0 -1.5px;border-radius:2px;background:var(--ink);z-index:3}
+.d1 .tick,.d2 .tick{height:18px;margin-top:-9px}
+/* A Promotion Milestone date is a diamond, a goal's own Committed date a bar, so a parent and a sub-goal on one day tell apart (review X12). */
+.tick.pm,.d1 .tick.pm,.d2 .tick.pm{width:11px;height:11px;margin:-5.5px 0 0 -5.5px;border-radius:2px;transform:rotate(45deg);box-shadow:0 0 0 2px var(--card)}
+.ticklbl{position:absolute;bottom:calc(50% + 11px);font-size:11px;font-weight:800;white-space:nowrap;z-index:3}
+.line{position:absolute;top:50%;height:0;margin-top:-1px;z-index:2;border-top:2px solid var(--ambition-line)}
+.line.Fantasy{border-top:2px dotted var(--fantasy-line)}
+.dot{position:absolute;top:50%;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border-radius:50%;z-index:3;background:var(--ambition);box-shadow:0 0 0 2px var(--card)}
+.dot.Fantasy{background:var(--card);box-shadow:inset 0 0 0 1.5px var(--fantasy),0 0 0 2px var(--card)}
+.endlbl{position:absolute;top:calc(50% + 8px);font-size:11px;font-weight:600;white-space:nowrap;color:var(--mute);z-index:3}
+.endlbl.Ambition{color:var(--ambition-ink)}.endlbl.Fantasy{color:var(--fantasy-ink)}
+/* An edge label sits in the label band above the bars, with no fill, so it covers no bar, tick, or label (rule 23). */
+.edge{position:absolute;bottom:calc(50% + 11px);font-size:11px;font-weight:800;z-index:3;white-space:nowrap}
+.edge.below{bottom:auto;top:calc(50% + 8px);font-weight:600}
+/* A label keeps a halo of the card color, so the today line and the grid never run through its text. */
+.ticklbl,.endlbl,.edge{text-shadow:0 0 2px var(--card),0 0 2px var(--card),0 0 3px var(--card)}
+.d1 .edge.above,.d2 .edge.above{bottom:calc(50% + 8px)}
+.edge>.ticklbl,.edge>.endlbl{position:static;font-size:inherit;font-weight:inherit}
+.edge.after{transform:translateX(-100%)}
+.edge.Ambition{color:var(--ambition-ink)}.edge.Fantasy{color:var(--fantasy-ink)}
+.cut{position:relative;z-index:6;display:flex;align-items:center;gap:10px;margin:0;padding:12px 0 6px;color:var(--mute);font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.cut::before,.cut::after{content:"";flex:1;border-top:1.5px dashed var(--cut)}
+.cut::before{flex:0 0 24px}
+.cut span{position:sticky;left:12px;background:var(--card);padding:0 4px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 20px;justify-content:flex-end;margin-top:12px;font-size:12px;color:var(--mute)}
+.lg{position:relative;display:inline-flex;align-items:center;gap:7px}
+.lg .help{margin-left:0}
+.sw{display:inline-block;width:22px;height:8px;border-radius:999px}
+.sw.health{background:var(--green)}.sw.ahead{background:var(--ahead)}.sw.slip{background:repeating-linear-gradient(135deg,var(--slip-a) 0 4px,var(--slip-b) 4px 8px)}
+.sw.pm{width:8px;height:8px;border-radius:1px;background:var(--ink);transform:rotate(45deg);margin:0 7px}
+.sw.Ambition{height:0;border-top:2px solid var(--ambition-line);border-radius:0}.sw.Fantasy{height:0;border-top:2px dotted var(--fantasy);border-radius:0}
+.z-quarters .lane{background-image:linear-gradient(var(--today),var(--today))}
+.z-months .lane,.z-quarters .lane{--grid:var(--line)}
+.z-months .ticklbl,.z-months .endlbl,.z-quarters .ticklbl,.z-quarters .endlbl{font-size:11px}
+.when{display:none;font-size:12px;color:var(--mute);padding:0 0 6px calc(var(--depth, 0) * var(--indent) + var(--rank) + 2 * var(--colgap))}
+.when.inherited,.inherited{opacity:.8}
+.when .date{color:var(--ink)}.when .light .date{color:var(--mute)}.when.inherited .date{color:var(--mute)}
+
+/* The List (rule V2): one grid, titled once in a 32 px header that stays on screen. Only the title wraps; every other cell is one line. */
+.list{--rank:28px;--colgap:12px}
+.list .lhead,.list .row{display:grid;grid-template-columns:28px minmax(240px,1fr) 48px 96px 192px 156px minmax(160px,.6fr);column-gap:12px;align-items:center}
+.lhead{position:sticky;top:var(--topbar);z-index:8;height:32px;background:var(--card);border-bottom:1px solid var(--line)}
+.col{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lhead .c-priority{grid-column:1/3}
+.lhead .c-owner{text-align:center}
+.list .row{min-height:40px}
+.list .row.d1,.list .row.d2{min-height:36px}
+.list .row>.left{grid-column:1/4;gap:12px;padding:6px 0;min-height:0;box-shadow:none}
+.list .row>.left .av{margin:0 12px}
+.list .title{margin-left:calc(var(--depth, 0) * var(--indent));line-height:18px}
+.list .group{border-bottom:0}
+.list .row.d0{border-top:1px solid var(--line)}
+.list .lbody>.group:first-child .row.d0{border-top:0}
+.cell{font-size:13px;font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell.c-health{display:flex;align-items:center;font-size:12px;font-weight:800;letter-spacing:.02em}
+.cell.c-ptg{font-weight:500}
+.light{color:var(--mute)}
+.pfx{display:none}
+.list .when{padding-left:calc(var(--depth, 0) * var(--indent) + var(--rank) + var(--colgap))}
+/* On a narrow board Promotion Milestone and PTG drop to a second line in the row, each named. */
+@container (max-width:991px){
+.list .lhead,.list .row{grid-template-columns:28px minmax(180px,1fr) 48px 96px 200px}
+.lhead .c-promotion-milestone,.lhead .c-ptg{display:none}
+.list .cell.c-promotion-milestone{grid-column:2/4}
+.list .cell.c-ptg{grid-column:4/6}
+.list .cell.c-promotion-milestone:not(:empty),.list .cell.c-ptg:not(:empty){padding-bottom:6px;font-size:12px}
+.pfx{display:inline;color:var(--mute)}}
+
+/* The Calendar: a month, Monday first. */
+.cal{border-radius:14px;border:1px solid var(--line)}
+.calhead,.calweek{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
+.dow{padding:8px 10px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);background:var(--sub-bg);border-bottom:1px solid var(--line)}
+.calhead .dow:first-child{border-top-left-radius:14px}.calhead .dow:last-child{border-top-right-radius:14px}
+.day{position:relative;min-height:112px;padding:6px 6px 8px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:4px;min-width:0;box-sizing:border-box}
+.calweek .day:last-child{border-right:0}.calweek:last-child .day{border-bottom:0}
+.day.out{background:var(--sub-bg)}.day.out .dnum{color:var(--mute)}
+.dnum{align-self:flex-start;min-width:24px;height:24px;padding:0 6px;box-sizing:border-box;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--mute);font-variant-numeric:tabular-nums}
+.day.today .dnum{background:var(--today);color:var(--today-ink);font-weight:800}
+.dfull{display:none}
+.chip{display:flex;align-items:center;gap:6px;min-height:26px;padding:4px 8px;box-sizing:border-box;border-radius:9px;background:var(--control);font-size:12px;font-weight:600;min-width:0}
+.chip .hdot{width:8px;height:8px}
+.ctitle{flex:1;min-width:0;line-height:1.3;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
+.mk{flex:none;display:inline-block;width:14px;height:6px;border-radius:999px}
+.mk.Committed{background:var(--ink)}
+.mk.Ambition{background:var(--ambition-line)}
+.mk.pm{width:7px;height:7px;border-radius:1px;background:var(--ink);transform:rotate(45deg);margin:0 3.5px}
+.mk.Fantasy{height:0;border-top:2px dotted var(--fantasy);border-radius:0}
+.mk.slip{background:repeating-linear-gradient(135deg,var(--red) 0 3px,var(--slip-b) 3px 6px);box-shadow:inset 0 0 0 1px var(--red)}
+.more{position:relative}
+.morebtn{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:700;color:var(--mute)}
+.morebtn:hover,.morebtn.on{background:var(--control);color:var(--ink)}
+.morelist{position:absolute;z-index:20;left:0;top:calc(100% + 4px);width:max(100%,220px);padding:6px;border-radius:12px;background:var(--card);box-shadow:0 8px 28px var(--tip-shadow);display:flex;flex-direction:column;gap:4px}
+.calweek .day:nth-child(n+5) .morelist{left:auto;right:0}
+
+.signin{max-width:32rem;margin:15vh auto;text-align:center;display:block}
+
+/* Polish (review X18): the summary cards lift a little under the pointer; a skeleton holds the screen's shape while it loads. */
+.cards>.card{min-height:132px;box-sizing:border-box;transition:box-shadow .12s ease,transform .12s ease}
+.cards>.card:hover{transform:translateY(-1px);box-shadow:0 2px 4px var(--shadow),0 10px 24px rgba(47,58,51,.09)}
+.skel{border-radius:10px;background:linear-gradient(90deg,var(--control) 0,var(--line) 40%,var(--control) 80%);background-size:300% 100%;animation:skel 1.2s ease-in-out infinite}
+.skel-title{width:220px;height:30px;margin:0 0 20px}
+.skel-line{height:14px;margin:0 0 12px}.skel-line.short{width:40%}
+.skel-row{height:40px;margin:0 0 10px}
+@keyframes skel{0%{background-position:100% 0}100%{background-position:0 0}}
+@media (prefers-reduced-motion:reduce){.skel{animation:none}}
+
+/* On touch every control answers a 44 px tap, even when it draws smaller (rule 29). No parent clips the tap area. */
+@media (pointer:coarse){
+.vtab,.gbtn,.btn,.count,.q,.morebtn,.chip-x,.av{position:relative}
+.meter span[role="button"]{position:relative}
+.help{position:relative;z-index:2}
+.vtab::after,.gbtn::after,.btn::after,.count::after,.q::after,.morebtn::after,.chip-x::after,.av::after,.meter span[role="button"]::after{content:"";position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}}
+.tip.name{transform:translateX(-50%);white-space:nowrap;padding:6px 10px}
+
+.phonesum{margin:0 0 12px}.phonesum .counts{margin:0;font-size:16px}
+
+/* Phone (rules 32 to 34). The app sets the `phone` class on the root from its one phone width (review E11). */
+.phone .top{padding:12px 16px}
+.phone main{padding:20px 16px 40px}
+.phone .tab{margin-left:4px}
+.phone{--topbar:59px;scrollbar-gutter:auto}
+.phone .board{order:1;padding:14px 12px 12px;--left:100%;--gap:0px}
+.phone .cards{order:2;grid-template-columns:1fr;gap:10px;margin:16px 0 0}
+.phone .card{padding:14px 16px}
+.phone .big{font-size:18px}
+.phone .toolbar h2{flex:1}
+.phone .vtab-timeline{display:none}
+.phone .tbreak{display:none}
+.phone .toolbar .search{order:5;flex:1 1 100%;width:100%;height:40px;margin:4px 0 0}
+.phone .tright{order:6;width:100%;margin:4px 0 0}
+.phone .range{flex:1;justify-content:space-between}
+.phone .range .pgroup,.phone .range .btn{height:40px}
+.phone .corner{position:static;padding:0;box-shadow:none}
+.phone .row{grid-template-columns:minmax(0,1fr)}
+.phone .row>.left{position:relative;box-shadow:none}
+.phone .left{padding-right:4px}
+.phone .when{display:block}
+.phone .list .row{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:10px;padding-bottom:6px;min-height:0}
+.phone .list .row>.left{width:100%}
+.phone .list .cell{display:none}
+.phone .list .cell.c-ptg:not(:empty){display:block;flex-basis:100%;padding:0 0 4px calc(var(--depth, 0) * var(--indent) + var(--rank) + var(--colgap));font-size:12px;color:var(--mute);white-space:normal}
+.phone .list .pfx{display:none}
+.phone .cal{border:0;border-radius:0}
+.phone .calhead{display:none}
+.phone .calweek{display:block}
+.phone .day{display:none;min-height:0;border:0;border-bottom:1px solid var(--line);padding:10px 0}
+.phone .day.has{display:flex}
+.phone .day.out.has{background:none}
+.phone .dnum{display:none}
+.phone .dfull{display:block;font-size:12px;font-weight:800;color:var(--mute)}
+.phone .day.today .dfull{color:var(--today)}
+.phone .rangelbl{padding:0 4px;font-size:12px}
+
+.phone .hword{position:static;width:auto;height:auto;overflow:visible;clip:auto;font-size:11px;font-weight:800;letter-spacing:.02em;margin-left:5px}
+.phone .title{-webkit-line-clamp:3}
+/* On a phone the count chip moves to the date line, so the title takes the width up to the avatar. */
+.phone .left .slot{display:none}
+.when .chev{margin-left:8px;height:22px}
+.chev.inline{display:none}.phone .chev.inline{display:inline-flex}
+.calempty{display:none}.phone .calempty{display:block}
+.phone .legend{display:none}
+.phone .cards>.card{min-height:0}
+.phone .lhead{display:none}
+
+/* A goal title on Home opens its goal page. */
+a.title{color:var(--ink);text-decoration:none}
+a.title:hover{text-decoration:underline;text-underline-offset:3px}
+button.chev{border:0;font:inherit;font-size:12px;font-weight:700}
+button.chev:hover{background:var(--grid);color:var(--ink)}
+
+/* The goal page (docs/design/goal-page-and-create.md, G1 to G24). One column, 1040 px at most. */
+.goalpage{max-width:1104px}
+.back{align-self:flex-start;margin:0 0 14px;font-size:13px;font-weight:700;color:var(--link);text-decoration:none}
+.back:hover{text-decoration:underline}
+.ghead{padding:22px 24px}
+.ghead-top{display:flex;gap:20px;align-items:flex-start}
+.ghead-main{flex:1;min-width:0}
+.gtitle{font-size:26px;font-weight:800;margin:0 0 6px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;user-select:text;-webkit-user-select:text}
+.gmeta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin:0 0 10px;font-size:13px;color:var(--mute)}
+.gowner{display:inline-flex;align-items:center;gap:6px}
+.needs{margin:0 0 10px;font-size:13px;font-weight:700;color:var(--red-ink)}
+.ghealth{display:flex;align-items:center;gap:10px;flex:none}
+.ghealth .lbl{margin:0}
+.hpick{display:inline-flex;height:32px;border-radius:999px;border:1px solid var(--cut);overflow:hidden}
+.hopt{display:inline-flex;align-items:center;gap:6px;padding:0 12px;font-size:12px;font-weight:800;color:var(--mute)}
+.hopt+.hopt{border-left:1px solid var(--cut)}
+.hopt.on.GREEN{background:var(--green-bg);color:var(--green-ink)}.hopt.on.YELLOW{background:var(--yellow-bg);color:var(--yellow-ink)}.hopt.on.RED{background:var(--red-bg);color:var(--red-ink)}
+.gjudged{margin-top:8px}
+.gjudged .lbl{font-size:11px;margin:0 0 2px}
+.gdate{display:flex;align-items:baseline;flex-wrap:wrap;gap:10px;font-size:22px;font-weight:800;margin:0 0 2px}
+.gkind{font-size:14px;font-weight:700;color:var(--ink)}
+.gdate .late{font-size:14px}
+.gpm{display:inline-block;margin:0 0 6px;font-size:13px;font-weight:600;color:var(--link);text-decoration:none}
+.gpm:hover{text-decoration:underline}
+.gother{margin:0 0 2px;font-size:15px;color:var(--mute)}
+.datebar{position:relative;height:34px;margin-top:14px}
+.dbtrack{position:absolute;left:0;right:0;top:8px;height:6px;border-radius:999px;background:var(--control)}
+.dbfill{position:absolute;top:8px;height:6px;border-radius:999px;background:var(--green)}
+.dbtoday{position:absolute;top:2px;width:2px;height:18px;margin-left:-1px;background:var(--today)}
+.dbmark{position:absolute;top:5px;width:3px;height:12px;margin-left:-1.5px;border-radius:2px;background:var(--ink)}
+.dbmark.pm{width:10px;height:10px;margin:1px 0 0 -5px;border-radius:2px;transform:rotate(45deg)}
+.dbmark.Fantasy{width:9px;height:9px;margin:1.5px 0 0 -4.5px;border-radius:50%;background:var(--card);box-shadow:inset 0 0 0 1.5px var(--fantasy)}
+.dbmark.Ambition{width:9px;height:9px;margin:1.5px 0 0 -4.5px;border-radius:50%;background:var(--ambition)}
+.dbstart{position:absolute;left:0;top:20px}
+.draftslot:empty{display:none}
+.gptg{margin-top:12px;padding:16px 20px}
+.gptg.RED{box-shadow:inset 0 0 0 2px var(--red-bg)}.gptg.YELLOW{box-shadow:inset 0 0 0 2px var(--yellow-bg)}
+.steps{width:100%;border-collapse:collapse;font-size:13px;margin:0 0 10px}
+.steps th{text-align:left;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);padding:0 12px 6px 0}
+.steps td{padding:6px 12px 6px 0;border-top:1px solid var(--line);vertical-align:top}
+.gtwo{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-top:16px}
+.gdesc p{margin:0 0 8px;font-size:14px;user-select:text;-webkit-user-select:text}
+.hint{margin:6px 0 0;font-size:12px;color:var(--mute)}
+.gfields dl{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;margin:0}
+.gfields dt{font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--mute)}
+.gfields dd{margin:2px 0 0;font-size:13px;font-weight:600;overflow-wrap:anywhere}
+.gsubs h2,.gwork h2{font-size:16px;font-weight:800;margin:24px 0 10px}
+.gsub{display:flex;align-items:center;gap:12px;padding:12px 16px;margin:0 0 8px}
+.gsubmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.gsubmeta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px}
+.pmtag{color:var(--ink);font-weight:700}
+.progress{display:inline-flex;align-items:center;gap:8px}
+.pbar{display:inline-block;width:80px;height:6px;border-radius:999px;background:var(--control);overflow:hidden}
+.pbar>span{display:block;height:100%;background:var(--green)}
+.chev.static{cursor:default}
+.wgroup{background:var(--card);border-radius:var(--radius);box-shadow:0 1px 2px var(--shadow),0 4px 16px var(--shadow);padding:6px 16px;margin:0 0 8px}
+.wghead{display:flex;gap:6px;width:100%;padding:8px 0;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
+.wrow{display:grid;grid-template-columns:20px minmax(0,1fr) auto 90px 80px;align-items:center;gap:12px;min-height:40px;border-top:1px solid var(--line);font-size:13px}
+.wrow input{width:16px;height:16px;margin:0}
+.wtitle{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wrow.done .wtitle{text-decoration:line-through;color:var(--mute)}
+.wowner{display:inline-flex;align-items:center;gap:6px;font-weight:600}
+.wowner.agent .av{box-shadow:0 0 0 1.5px var(--card),0 0 0 3px var(--mute);outline:1.5px dashed var(--mute);outline-offset:2px}
+.wdue{text-align:right}
+.wdue.late{color:var(--red-ink);font-weight:700}
+.gtalk{margin-top:24px}
+.chips{display:flex;gap:6px;margin:12px 0 0;flex-wrap:wrap}
+.fchip{height:28px;padding:0 12px;border-radius:999px;border:1px solid var(--cut);font-size:12px;font-weight:700;color:var(--mute)}
+.fchip.on{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.events{list-style:none;padding:0;margin:12px 0 0}
+.erow{display:flex;gap:10px;padding:10px 0;border-top:1px solid var(--line);font-size:13px}
+.erow p{margin:0 0 2px;user-select:text;-webkit-user-select:text}
+.phone .ghead-top{flex-direction:column}
+.phone .ghealth,.phone .hpick{width:100%}
+.phone .hpick{height:44px}.phone .hopt{flex:1;justify-content:center}
+.phone .gtwo{grid-template-columns:1fr}
+.phone .gfields dl{grid-template-columns:1fr}
+.phone .wrow{grid-template-columns:20px minmax(0,1fr);row-gap:2px;padding:6px 0}
+.phone .wrow>.wowner,.phone .wrow>.wstatus,.phone .wrow>.wdue{grid-column:2;text-align:left}
+
+/* Goal page panels (G9 to G19): one at a time, in place. */
+.btn.primary{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.btn.primary:hover{filter:brightness(.97)}
+.btn[disabled]{opacity:.6;cursor:default}
+button.hopt{font:inherit;font-size:12px;font-weight:800;color:var(--mute);background:none;border:0;cursor:pointer}
+button.hopt+button.hopt{border-left:1px solid var(--cut)}
+.hopt:hover{background:var(--control)}
+.hopt.chosen.GREEN{box-shadow:inset 0 0 0 2px var(--green)}.hopt.chosen.YELLOW{box-shadow:inset 0 0 0 2px var(--yellow)}.hopt.chosen.RED{box-shadow:inset 0 0 0 2px var(--red)}
+.gactions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.gactions:empty{display:none}
+.panel{margin-top:14px;padding:16px 18px;border-radius:14px;background:var(--sub-bg);box-shadow:inset 0 0 0 1px var(--line)}
+.panel.YELLOW{background:var(--yellow-bg)}.panel.RED{background:var(--red-bg)}.panel.GREEN{background:var(--green-bg)}
+.card>.panel:first-child{margin-top:0}
+.gtwo>.panel{margin-top:0}
+.panel h3{font-size:15px;font-weight:800;margin:0 0 10px}
+.stale{margin:0 0 10px;padding:10px 12px;border-radius:10px;background:var(--card);font-size:13px;font-weight:700;box-shadow:inset 3px 0 0 var(--yellow)}
+.ferror{margin:4px 0 8px;font-size:12px;font-weight:700;color:var(--red-ink)}
+.fcurrent{margin:2px 0 0;font-size:12px;color:var(--mute)}
+.field{display:flex;flex-direction:column;gap:4px;margin:0 0 10px}
+.flabel{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
+.panel input,.panel select,.panel textarea,.commentbox textarea{font:500 13px var(--font);color:var(--ink);background:var(--card);border:1px solid var(--cut);border-radius:10px;padding:7px 10px;box-sizing:border-box;width:100%}
+.panel input:focus,.panel select:focus,.panel textarea:focus,.commentbox textarea:focus{outline:2px solid var(--focus);outline-offset:0}
+.panel textarea.desc{min-height:140px}
+.ptgedit .steps td{border-top:0;padding:3px 8px 3px 0}
+.linkbtn{font:inherit;font-size:13px;font-weight:700;color:var(--link);background:none;border:0;padding:4px 0;cursor:pointer}
+.pactions{display:flex;gap:8px;margin-top:4px}
+.radios{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.radio{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--cut);background:var(--card);font-size:13px;font-weight:700;cursor:pointer}
+.radio input{width:auto;margin:0}
+.radio.on{border-color:var(--ink)}
+.pmbox{padding:12px 14px;margin:0 0 10px;border-radius:12px;background:#efeafc}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+.pencil{margin-left:auto;width:28px;height:28px;border-radius:50%;border:0;background:none;color:var(--mute);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.pencil:hover{background:var(--control);color:var(--ink)}
+.commentbox{display:flex;flex-direction:column;align-items:flex-start;gap:8px;margin:12px 0 0}
+.phone .fgrid{grid-template-columns:1fr}
+.phone .gactions .btn{height:40px}
+.gsubs h2,.gwork h2{display:flex;align-items:center;gap:10px}
+.gsubs h2 .btn,.gwork h2 .btn{margin-left:auto}
+.addrow{margin:0 0 10px}
+.addgrid{display:grid;grid-template-columns:2fr 1fr;gap:0 12px}
+.addgrid.four{grid-template-columns:2fr 1fr 1fr 1fr}
+.tickreason{grid-column:2/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:0 0 8px}
+.tickreason input{flex:1;min-width:160px;font:500 13px var(--font);border:1px solid var(--cut);border-radius:10px;padding:7px 10px}
+.phone .addgrid,.phone .addgrid.four{grid-template-columns:1fr}
+
+/* New goal (N1 to N16): the form on the left, a 320 px rail on the right that stays on screen. */
+.newgoal{max-width:1180px}
+.newgoal h1{margin:0 0 16px}
+.nglayout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:20px;align-items:start}
+.ngform{display:flex;flex-direction:column;gap:14px;min-width:0}
+.ngcard h2{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:800;margin:0 0 14px}
+.ngnum{width:24px;height:24px;border-radius:50%;background:var(--brand);color:var(--brand-ink);font-size:12px;font-weight:800;display:inline-flex;align-items:center;justify-content:center}
+.ngcard input,.ngcard select,.ngcard textarea{font:500 13px var(--font);color:var(--ink);background:var(--card);border:1px solid var(--cut);border-radius:10px;padding:8px 10px;box-sizing:border-box;width:100%}
+.ngcard input:focus,.ngcard select:focus,.ngcard textarea:focus{outline:2px solid var(--focus);outline-offset:0}
+.ngcard .hpick{margin:0 0 6px}
+.hopt.dt.on{background:var(--brand);color:var(--brand-ink)}
+.prows{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:4px 0 10px}
+.prow{display:flex;align-items:center;gap:10px;min-height:40px;padding:0 12px;font-size:13px;font-weight:600;cursor:pointer}
+.prow+.prow{border-top:1px solid var(--line)}
+.prow input{width:auto;margin:0}
+.prow.on{background:var(--green-bg)}
+.planbox{padding:12px 14px;margin:0 0 12px;border-radius:12px;background:var(--sub-bg);box-shadow:inset 0 0 0 1px var(--line)}
+.morechips{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.morechip{display:flex;flex-direction:column;gap:4px}
+.ngsub{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.ngsub .title{font-size:13px;font-weight:700}
+.ngsub .ferror{grid-column:1/-1}
+.ngsubbtns{display:flex;gap:4px}
+.ngsubbtns .gbtn{border:1px solid var(--cut);height:28px;min-width:28px;font-size:13px}
+.ngcard>.btn{margin-top:4px}
+.ngrail{position:sticky;top:calc(var(--topbar) + 16px);display:flex;flex-direction:column;gap:12px}
+.previewrow{display:flex;align-items:center;gap:10px;min-height:40px}
+.previewrow .title{flex:1;min-width:0;font-size:14px}
+.ngmake ul{list-style:none;padding:0;margin:0 0 8px;font-size:13px;font-weight:600}
+.ngmake li{padding:3px 0}
+.ngmake .checks li{font-weight:600}
+.bad{color:var(--red-ink)}.good{margin:0;color:var(--green-ink);font-size:13px;font-weight:700}
+.btn.create{height:44px;justify-content:center;font-size:14px}
+.cancel{align-self:center;font-size:13px;font-weight:700;color:var(--link)}
+.newgoal-btn,.btn.newgoal{text-decoration:none}
+.phone .morechips{grid-template-columns:1fr 1fr}
+.ngcard input[type=radio]{width:auto;padding:0}
+.ngcard>.flabel,.ngcard .planbox>.flabel{display:block;margin:4px 0 4px}
+.phone .ngsub{grid-template-columns:1fr auto}
+.phone .ngsub>.small{grid-column:1/-1;grid-row:2}
+.phone .ptgedit .steps thead{display:none}
+.phone .ptgedit .steps tr{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:6px 0;border-top:1px solid var(--line)}
+.phone .ptgedit .steps td:first-child{grid-column:1/-1}
+.newgoal.mob{display:none}
+.phone .newgoal.mob{display:inline-flex;height:40px;order:2}
+.phone .newgoal.desk{display:none}
+.phone .toolbar .tabs{order:1}
+.phone .tright:empty{display:none}
+
+/* Goal page, design check at 5087caa. */
+.panel.YELLOW{background:var(--yellow-tint);box-shadow:inset 0 0 0 1.5px var(--yellow-bg)}
+.panel.RED{background:var(--red-tint);box-shadow:inset 0 0 0 1.5px var(--red-bg)}
+.panel.GREEN{background:var(--green-tint);box-shadow:inset 0 0 0 1.5px var(--green-bg)}
+.ptgedit .linkbtn{margin-bottom:12px}
+.pactions{justify-content:flex-end;align-items:center;flex-wrap:wrap}
+.pactions>.small{margin-right:auto}
+.pmbox h4{margin:0 0 4px;font-size:13px;font-weight:800}
+.willdo{margin:0 0 10px;padding:10px 12px;border-radius:10px;background:var(--card);box-shadow:inset 0 0 0 1px var(--line);font-size:13px}
+.willdo ul{margin:6px 0 0;padding-left:18px}
+.gmeta>*+*::before{content:"·";margin-right:14px;color:var(--mute)}
+.gmeta>a{color:var(--mute);text-decoration:none}.gmeta>a:hover{text-decoration:underline}
+.gmeta{gap:6px 8px}
+.datebar{height:44px}
+.dblabels{position:absolute;left:0;right:0;top:22px;height:16px}
+.dblabels>span{position:absolute;white-space:nowrap;transform:translateX(-50%)}
+.dblabels>span.start{transform:none}
+.dblabels>span.end{transform:translateX(-100%)}
+.dblabels>span.low{top:16px}
+.datebar.two{margin-bottom:24px}
+.dbstart{display:none}
+.created>summary{cursor:pointer;list-style:none}
+.created>summary::-webkit-details-marker{display:none}
+.created>summary::before{content:"▸ ";color:var(--mute)}
+.created[open]>summary::before{content:"▾ "}
+.created ul{margin:4px 0 0;padding-left:18px;color:var(--mute)}
+@media (max-width:900px){.gtwo{grid-template-columns:1fr}}
+@media (pointer:coarse){
+.back,.pencil,.gpm{position:relative}
+.back::after,.pencil::after,.gpm::after{content:"";position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}}
+.phone .gactions{display:grid;grid-template-columns:1fr 1fr}
+.phone .gactions .btn{justify-content:center}
+.gtwo{align-items:start}
+
+/* The top bar's pages, and the work page (plan F6). */
+.toptabs{display:flex;gap:6px;margin-left:16px}
+.toptabs .tab{margin-left:0;text-decoration:none}
+.tab.off{background:none;color:var(--mute)}
+.tab.off:hover{background:var(--control);color:var(--ink)}
+.workpage{max-width:1104px}
+.workhead{display:flex;align-items:center;flex-wrap:wrap;gap:16px;margin:0 0 16px}
+.workhead h1{margin:0}
+.workhead .vtab{text-decoration:none;display:inline-flex;align-items:center}
+.queue{margin:0 0 20px}
+.queue h2{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:800;margin:0 0 10px}
+.qowner{color:inherit;text-decoration:none}
+.qowner:hover{text-decoration:underline}
+.qrow{grid-template-columns:20px minmax(0,1fr) minmax(0,.8fr) 80px 120px}
+.wgoal{color:var(--link);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wgoal:hover{text-decoration:underline}
+.phone .toptabs{margin-left:4px}
+.phone .qrow{grid-template-columns:20px minmax(0,1fr) auto}
+.phone .qrow>.wtitle,.phone .qrow>.wgoal{grid-column:2/-1}
+.phone .qrow>.wdue{grid-column:2;text-align:left}
+.phone .qrow>.wgoal{text-align:left}
+.phone .qrow>.wstatus{grid-column:3}
+.phone .top .org{display:none}
+.phone .toptabs .tab{height:32px;padding:0 12px;white-space:nowrap}
+.phone .top{gap:10px}
+.workhead .wowner{display:inline-flex;align-items:center;gap:8px}
+.phone .workhead{gap:8px}
+.phone .wtitle{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.qdone{margin:0 0 8px}
+.qdone>.linkbtn{padding:4px 0}
+.wdue.today{color:var(--ink);font-weight:700}
+@media (pointer:coarse){.wrow input[type=checkbox]{position:relative}.wrow{min-height:44px}}
+
+/* New goal, design check (N8, N15, rule 29). */
+.mchips{display:flex;flex-wrap:wrap;gap:8px}
+.mchip{display:inline-flex;align-items:center;gap:2px;padding:0 4px 0 12px;min-height:34px;border-radius:999px;background:var(--control);flex-wrap:wrap}
+.mchip>label{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.mlabel{font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--mute)}
+.ngcard .mchip select,.ngcard .mchip input{width:auto;border:0;background:transparent;padding:6px 4px;font-weight:700}
+.ngcard .mchip input{width:120px}
+.mchip .ferror{flex-basis:100%;margin:0 0 6px}
+.ngcount{text-align:center}
+.ngtopcount{display:none}
+@media (pointer:coarse){
+.ngcard input:not([type=radio]),.ngcard select,.ngcard textarea{min-height:44px}
+.prow{min-height:44px}}
+.qdone>.linkbtn{color:var(--mute)}
+.qdone>.linkbtn:hover{color:var(--ink)}
+.phone .radio{height:auto;min-height:36px;padding:6px 12px;border-radius:14px}
+/* N15, N15a: under 960 px of page New goal takes the phone layout: the form full width, the checks as a count at the top, Create as a fixed 48 px bar. */
+@media (max-width:960px){
+.nglayout{grid-template-columns:minmax(0,1fr)}
+.ngrail{position:static}
+.ngtopcount{display:block;margin:0 0 10px;color:var(--ink)}.ngtopcount.miss{color:var(--red-ink)}
+.ngtopcount.good{color:var(--green-ink)}
+main.newgoal{padding-bottom:84px}
+.btn.create{position:fixed;left:16px;right:16px;bottom:12px;height:48px;z-index:40;box-shadow:0 6px 20px var(--tip-shadow)}}
+/* G25: read-only health is its shape and word (rule 10); the line names who may change the goal. */
+.hread{display:inline-flex;align-items:center;gap:6px;font-weight:700}
+.gwho{color:var(--mute);margin:10px 0 0;display:flex;flex-wrap:wrap;align-items:center;gap:0 2px}
+.gwhoname{display:inline-flex;align-items:center;gap:4px;color:var(--ink)}
+/* Rule 29 on touch (QA U10): a sub-goal card taps its title; a text link that wraps answers a 44 px band. */
+@media (pointer:coarse){
+.gsub{position:relative}.gsub .title::after{content:"";position:absolute;inset:0}
+.gmeta a,.gfields a,.gpm{position:relative;display:inline-block}
+.gmeta a::after,.gfields a::after,.gpm::after{content:"";position:absolute;left:0;right:0;top:50%;height:max(100%,44px);transform:translateY(-50%)}
+/* A link that clips its text (ellipsis, line clamp) cannot draw outside itself, so it grows a clear border or padding and gives the space back. A line clamp would show a third line in padding, so the title clamps an inner span. */
+.wgoal{padding:13px 0;margin:-13px 0;position:relative;z-index:1}
+.goal a.title{display:block;overflow:visible;padding:13px 0;margin:-13px 0}
+.goal a.title>.clamp{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.phone .goal a.title>.clamp{-webkit-line-clamp:3}
+/* Rows of small controls keep their 44 px areas apart. */
+.chips{row-gap:16px}.gtalk .chips{margin-top:18px}
+.counts{margin:22px 0 28px;display:flex;flex-wrap:wrap;align-items:center;column-gap:10px;row-gap:18px}
+.fchip,.chev,.qowner,.qdone .linkbtn,.wtick,.cancel{position:relative}
+.fchip::after,.chev::after,.qowner::after,.qdone .linkbtn::after,.wtick::after,.cancel::after{content:"";position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}
+.wtick{display:inline-flex;align-items:center;justify-content:center}
+.chev{z-index:8}
+.zoom .gbtn{min-width:44px}
+.search input{min-height:44px}}
+.gstatus{margin:8px 0 0;font-size:13px;font-weight:600;color:var(--green-ink)}.gstatus:empty{margin:0}
+select.wstatus{height:28px;border:1px solid var(--cut);border-radius:8px;background:var(--card);padding:0 6px}
+@media (pointer:coarse){select.wstatus{min-height:44px;position:relative;z-index:2}}
+.qwho{display:inline-flex;align-items:baseline;flex-wrap:wrap}.qop{color:var(--mute);font-weight:500;font-size:14px}
+.phone .qwho{flex-direction:column;align-items:flex-start}.phone .qcomma{display:none}.phone .qop{font-size:13px}
+/* New goal v2 (NF1 to NF18). */
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:4px 0 6px}
+.tile{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-height:44px;padding:10px 12px;border:1px solid var(--cut);border-radius:12px;background:var(--card);text-align:left;font-size:12px;color:var(--ink);cursor:pointer}
+.tile b{font-size:14px}.tile .tcost{color:var(--mute)}
+.tile:hover{border-color:var(--ink)}
+.tile.on{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}.tile.on .tcost{color:var(--brand-ink)}
+.ngunder{margin:-6px 0 12px;font-weight:700;color:var(--mute)}
+.ownerpick{display:flex;align-items:center;gap:8px}.ownerpick select{flex:1}
+.pmbox h3{margin:0 0 4px;font-size:14px}
+.ngbacklog{margin:12px 0 0}
+.dhead{display:flex;align-items:center;justify-content:space-between;width:100%;padding:0;background:none;border:0;text-align:left;cursor:pointer;color:var(--ink)}
+.dhead h2{margin:0}
+.ngdetails .small.muted{margin:10px 0 0}
+.drows{display:flex;flex-direction:column;margin-top:10px}
+.drow{display:grid;grid-template-columns:minmax(140px,.9fr) minmax(0,1.2fr) 64px;align-items:center;gap:4px 12px;padding:8px 0;border-top:1px solid var(--line)}
+.dlabel{display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:700}
+.dvalue{font-size:13px;color:var(--mute)}.drow>.linkbtn{justify-self:end}
+.dline{white-space:pre-wrap}
+.dedit,.drow>.ferror{grid-column:1/-1}
+.tosave{list-style:none;padding:0;margin:6px 0 0}
+.tosave li .linkbtn{color:var(--ink);font-weight:600;padding:3px 0;text-decoration:none}
+.tosave li.ok .linkbtn{color:var(--green-ink)}
+.tosave li.miss .linkbtn{color:var(--red-ink)}
+.btn.create.muted{background:var(--control);color:var(--mute)}
+.phone .tiles{grid-template-columns:1fr}
+.phone .drow{grid-template-columns:minmax(0,1fr) auto}.phone .dvalue{grid-column:1;grid-row:2}
+@media (pointer:coarse){.tosave li .linkbtn,.ngtopcount{min-height:44px;min-width:44px;display:flex;align-items:center}}
+/* Rule 29 on touch (QA N2): the top bar's pages, the Completed fold, and the Details rows' links and help keep 44 px areas apart. */
+@media (pointer:coarse){
+.tab,.drow>.linkbtn{position:relative}
+.tab::after,.drow>.linkbtn::after{content:"";position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}
+.wghead{min-height:44px;align-items:center}
+.drow{min-height:52px;padding:4px 0}}
+.olderrow{display:flex;align-items:center;gap:10px;margin:10px 0 0}
+/* Rule 24b: each count is its shape, number, meaning, then the word, smaller and muted. */
+.count .cnum{font-size:18px;font-weight:800}
+.count .cmean{font-size:14px;font-weight:700}
+.phonesum .counts{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+/* NG1: "+ New goal" in the top bar, before the avatar. */
+.btn.topnew{margin-left:auto;height:32px;display:inline-flex;align-items:center;gap:6px;text-decoration:none}
+.phone .btn.topnew{width:44px;height:44px;padding:0;justify-content:center;border-radius:999px}
+.phone .topnewword{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (pointer:coarse){.dhead{min-height:44px}.btn.create{min-height:48px}}
+@media (pointer:coarse){.phonesum .counts{gap:0}.phonesum .count{min-height:44px}}
+.goal>.row{cursor:pointer}.goal>.row:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+/* Rule 20: one today line from the axis to the bottom of the last row, through the cut line, in front of the grid, rows, highlight, and bars;
+   label text (z 4, on its halo) and the pinned goal column (z 7) stay in front of it. */
+.nowline{position:absolute;top:52px;bottom:0;width:2px;left:calc(var(--left) + var(--gap) + var(--weeks) * var(--week) * var(--now) / 100 - 1px);background:var(--today);z-index:3;pointer-events:none}
+.ticklbl,.endlbl,.edge{z-index:4}
+/* Rule 21a: days, a line each day, weekends in --sub-bg. The board starts on a Monday. */
+.z-days .lane{background-image:repeating-linear-gradient(to right,var(--grid) 0 1px,transparent 1px calc(var(--week) / 7)),repeating-linear-gradient(to right,transparent 0 calc(var(--week) * 5 / 7),var(--sub-bg) calc(var(--week) * 5 / 7) var(--week))}
+.z-days .wk{font-size:11px;margin-left:calc(var(--week) / 14);transform:translateX(-50%)}
+/* Rule 23c: an edge list, one label per line, 2 px apart, from the top of the row. */
+.edge.list{top:4px;bottom:auto;display:flex;flex-direction:column;gap:2px;line-height:14px;font-weight:700}
+.edge.list.after{align-items:flex-end}
+.edge.list>.eline{position:static;font-size:inherit}
+.edge.list>.endlbl{font-weight:600}
+.edgespace{display:block;width:1px}
+.mband{position:absolute;top:4px;margin-left:3px;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);white-space:nowrap}
+/* Goal page v2 (GP2, GL1 to GL7): main column and properties. */
+.goalpage.v2{max-width:1120px}
+.crumbs{display:flex;align-items:center;min-width:0;margin:0 0 16px;font-size:13px;font-weight:600}
+.crumbs-full{display:flex;align-items:center;min-width:0;white-space:nowrap;overflow:hidden}
+.crumbstep{display:inline-flex;align-items:center;min-width:0}
+.crumb{color:var(--link);text-decoration:none}.crumb:hover{text-decoration:underline}
+.crumb.mid span{display:inline-block;max-width:200px;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
+.crumb.here{color:var(--ink);overflow:hidden;text-overflow:ellipsis}
+.crumbs .sep{margin:0 8px;color:var(--mute)}
+.crumbs-phone{display:none}
+.glayout{display:grid;grid-template-columns:minmax(0,760px) 300px;column-gap:40px;grid-template-areas:"head side" "body side";align-items:start;justify-content:space-between}
+.ghead2{grid-area:head;min-width:0}.gbody{grid-area:body;min-width:0}
+.gprops{grid-area:side;position:sticky;top:calc(var(--topbar) + 16px);max-height:calc(100vh - var(--topbar) - 32px);overflow:auto;background:var(--card);border-radius:16px;padding:6px 16px 12px}
+.gkey{font-size:13px;font-weight:700;color:var(--mute)}
+.ghead2 .gtitle{margin:2px 0 8px}
+.needs.none{color:var(--mute);font-weight:600}
+.needlink{color:var(--red-ink);font-weight:700}
+.gsec{margin:30px 0 0}
+.gsec>h2{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 10px;font-size:15px;font-weight:800}
+.wchips{display:inline-flex;flex-wrap:wrap;gap:6px;margin-left:auto}
+.props .prop{display:grid;grid-template-columns:104px minmax(0,1fr);gap:4px 10px;padding:9px 0;border-bottom:1px solid var(--line);align-items:start}
+.props .prop.phealth,.props .prop.pjudged{grid-template-columns:1fr}
+.plabel{font-size:12px;font-weight:700;color:var(--mute);padding-top:2px}
+.pvalue{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;min-width:0;font-size:13px;font-weight:600}
+.pvalue>.datebar{flex-basis:100%;margin-top:8px}
+.pvalue .pedit{margin-left:auto;font-size:12px}
+.pbacked,.pother,.pacts{flex-basis:100%;font-size:12px}
+.pacts{display:flex;gap:12px}
+.powner{display:inline-flex;align-items:center;gap:6px}
+.pform{grid-column:1/-1;display:flex;flex-direction:column;gap:6px}
+.pform select,.pform input{font:600 13px var(--font);border:1px solid var(--cut);border-radius:8px;padding:6px 8px}
+.pform .pactions{display:flex;gap:8px;justify-content:flex-end}
+.allprops{display:none;margin:10px 0}
+.family{padding:10px 0;border-bottom:1px solid var(--line)}
+.ftree{list-style:none;margin:6px 0 0;padding:0;font-size:13px;line-height:20px}
+.ftree ul{list-style:none;margin:2px 0 0;padding:0 0 0 12px;border-left:1px solid var(--cut)}
+.ftree li{padding:1px 0;min-width:0}.ftree .fchild{padding-left:12px}
+/* GL7a: one line per goal in Family; a long name ends in an ellipsis and shows whole on hover. */
+.ftree a,.fthis{display:flex;align-items:center;gap:6px;min-width:0;text-decoration:none}
+.ftree a:hover{text-decoration:underline}
+.ftree a>.fname,.fthis>.fname{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.fthis{padding:2px 6px}
+.fbacks{display:block;color:var(--mute);padding-left:6px}
+.fsib{display:block}
+.moreprops{padding:8px 0}
+.mphead{display:flex;align-items:center;gap:6px;width:100%;padding:0;background:none;border:0;cursor:pointer;color:var(--ink)}
+.subrows,.wrows{border-top:1px solid var(--line)}
+.gsub2{display:flex;align-items:center;gap:10px;min-height:44px;padding:6px 0;border-bottom:1px solid var(--line)}
+.addrow{display:block;width:100%;min-height:36px;padding:8px 0;border:0;background:none;text-align:left;color:var(--link);font:700 13px var(--font);cursor:pointer}
+.wstatushead{margin:0 0 2px;color:var(--mute);font-weight:700}
+.wrow2{display:grid;grid-template-columns:28px minmax(0,1fr) auto 96px;align-items:center;gap:4px 10px;min-height:36px;border-bottom:1px solid var(--line)}
+.wrow2 .wtitle{font-size:13px}
+.wrow2 .wdue{text-align:right}
+.wrow2>.wpick,.wrow2>.tickreason{grid-column:2/-1}
+.wwho{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600}
+.scircle{position:relative;width:16px;height:16px;padding:0;border:2px solid var(--mute);border-radius:50%;background:none;cursor:pointer}
+.scircle.half{background:linear-gradient(90deg,var(--mute) 50%,transparent 50%)}
+.scircle.full{background:var(--green);border-color:var(--green)}
+.scircle:hover,.scircle:focus-visible{border-color:var(--ink)}
+.gtalk .commentbox{margin:0 0 12px}
+@media (pointer:coarse){.scircle::after,.addrow{min-height:44px}.scircle::after{content:"";position:absolute;left:50%;top:50%;width:44px;height:44px;transform:translate(-50%,-50%)}}
+/* GP2-14: under 1100 px, one column: header, a compact properties block, then the sections. */
+@media (max-width:1099px){
+.glayout{grid-template-columns:minmax(0,1fr);grid-template-areas:"head" "side" "body"}
+.gprops{position:static;max-height:none;overflow:visible;margin-top:12px}
+.allprops{display:block}.propsrest{display:none}.propsrest.shown{display:block}
+.wfirst{display:none}}
+.phone .crumbs-full{display:none}.phone .crumbs-phone{display:inline}
+.phone .props .hpick{display:flex;width:100%;height:44px}.phone .props .hopt{flex:1;justify-content:center}
+.pvalue a,.pvalue{overflow-wrap:anywhere}
+@media (pointer:coarse){
+.props .linkbtn,.props .pvalue>a,.ftree a,.crumbs a{position:relative;display:inline-block}
+.props .linkbtn::after,.props .pvalue>a::after,.ftree a::after,.crumbs a::after{content:"";position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}
+.props .prop{min-height:52px}.pacts{min-height:44px;align-items:center}}
+@media (pointer:coarse){.mphead{min-height:44px}}
+@media (pointer:coarse){.created>summary{min-height:44px;display:flex;align-items:center}}
+@media (pointer:coarse){.wrow2{min-height:44px}}
+@media (pointer:coarse){.props .prop{min-height:56px}}
+.todayplus{position:absolute;top:0;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:var(--today);color:var(--today-ink);font-size:13px;font-weight:800;line-height:1;text-decoration:none;z-index:6}
+.todayplus:hover{filter:brightness(1.1)}
+@media (pointer:coarse){.todayplus::after{content:"";position:absolute;left:50%;top:50%;width:44px;height:44px;transform:translate(-50%,-50%)}}
+/* Rule 35: drag to reorder Priorities. */
+.draghandle{display:inline-flex;align-items:center;justify-content:center;width:16px;height:24px;margin-right:2px;padding:0;border:0;background:none;color:var(--mute);cursor:grab;touch-action:none;position:relative}
+.draghandle svg{fill:currentColor}
+.draghandle:hover,.draghandle:focus-visible{color:var(--ink)}
+.group.dragging{opacity:.55}
+.dropline{height:0;border-top:2px solid var(--link);margin:-1px 0;position:relative;z-index:8}
+.rankreason{position:sticky;left:0;z-index:7;display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:min(620px,100%);box-sizing:border-box;padding:8px 12px 10px 28px;background:var(--hover);border-radius:0 0 10px 0}
+.rankreason input{flex:1;min-width:160px;max-width:360px;font:600 13px var(--font);border:1px solid var(--cut);border-radius:8px;padding:6px 8px}
+@media (pointer:coarse){.draghandle::after{content:"";position:absolute;left:50%;top:50%;width:44px;height:44px;transform:translate(-50%,-50%)}}

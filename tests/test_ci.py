@@ -42,6 +42,7 @@ RUNS = {
         "npm ci --prefix server",
         "npm run lint --prefix server",
         "npm run typecheck --prefix server",
+        "npm run build --prefix server",
         "python -m unittest discover -s server/tests -v",
     ],
     "tests": [
@@ -62,7 +63,7 @@ RULES = [
     "A pull request for in-development work targets develop.",
     "A release is a pull request from develop into main.",
     "develop runs the same workflows and does not require them to merge.",
-    "The server publishes only from main.",
+    "The server publishes on a push to main, or when an operator dispatches the server workflow on a branch.",
     "Test-first does not apply to documentation or to configuration.",
     "README.md and docs/ are pure docs, except docs/specs/SPEC.md.",
     "They run no CI commands and need no test.",
@@ -75,6 +76,7 @@ AFFECTED = "needs.changes.outputs.affected == 'true'"
 # A skipped required job reports success. Run the check when detection fails.
 DETECTOR = "always() && (needs.changes.result != 'success' || needs.changes.outputs.affected == 'true')"
 REQUIRED_DETECTORS = {"server": 3, "tests": 1, "guidance": 1}
+DEPLOY = "needs.changes.outputs.affected == 'true' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch')"
 
 
 def _paths(text: str) -> dict[str, list[str] | None]:
@@ -232,9 +234,8 @@ class CiTenets(unittest.TestCase):
         header = deploy.split("\n    steps:", 1)[0]
         self.assertIn(AFFECTED, header)
         self.assertNotIn("always()", header)
-        self.assertIn("github.ref == 'refs/heads/main'", header)
-        self.assertIn("github.event_name == 'push'", header)
-        self.assertIn("github.event_name == 'workflow_dispatch'", header)
+        # A push publishes only from main. An operator's dispatch publishes the branch it names. A pull request never publishes.
+        self.assertIn(f"    if: {DEPLOY}\n", header)
         self.assertNotIn("pull_request", header)
         changes = server.split("\n  lint:", 1)[0]
         self.assertLess(changes.index('= "workflow_dispatch"'), changes.index('= "pull_request"'))
@@ -242,6 +243,20 @@ class CiTenets(unittest.TestCase):
         self.assertIn("Host configuration lives in excaliwire/operations.", contributing)
         self.assertNotIn("goalie.excaliwire.com", contributing)
         self.assertNotIn("129.212.164.158", contributing)
+        # Review E8: a deployment's identity tenant lives with its host configuration.
+        self.assertNotIn("login.microsoftonline.com/", contributing)
+
+    def test_the_publish_carries_the_built_web_app(self) -> None:
+        # ADR 0010: the same Node process serves the built React app, so a publish without server/web/dist is refused.
+        server = (WORKFLOWS / "server.yml").read_text(encoding="utf-8")
+        test = server.split("\n  test:", 1)[1].split("\n  deploy:", 1)[0]
+        self.assertLess(test.index("run: npm run build --prefix server\n"), test.index("run: python -m unittest discover -s server/tests -v\n"))
+        deploy = server.split("\n  deploy:", 1)[1]
+        self.assertLess(deploy.index("run: npm run build --prefix server\n"), deploy.index("run: npm ci --omit=dev"))
+        self.assertLess(deploy.index("run: npm ci --omit=dev"), deploy.index("deploy_server.sh"))
+        script = (REPO / ".github" / "scripts" / "deploy_server.sh").read_text(encoding="utf-8")
+        self.assertIn("web/dist/index.html", script)
+        self.assertIn('cp -a "$server/web/dist/." "$stage/web/dist/"', script)
 
     def test_required_checks_have_unique_names(self) -> None:
         # The ruleset on main requires these contexts. The job name is the check name.

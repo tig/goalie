@@ -1,0 +1,385 @@
+{
+  "me": {
+    "id": "chelsea",
+    "name": "Chelsea",
+    "kind": "human"
+  },
+  "today": "2026-10-23",
+  "goal": {
+    "id": "XW-0001",
+    "version": 1,
+    "summary": "Regenerate the E28 canon by Oct 1",
+    "description": "",
+    "owner": "tig",
+    "org_unit": "excaliwire",
+    "level": "Company",
+    "type": "Milestone (Launch)",
+    "due_date": "2026-10-01",
+    "date_type": "Committed",
+    "promotion_milestone": null,
+    "plan": "Placeholder: Tig links the plan",
+    "committed_plan_version": null,
+    "plan_maturity": "Pencil",
+    "work_product": null,
+    "original_committed_date": "2026-10-01",
+    "changed_due_date": null,
+    "severity": "sev1",
+    "priority": "PRI-1",
+    "state": "In Progress",
+    "health": "RED",
+    "path_to_green": {
+      "steps": [
+        {
+          "owner": "tig",
+          "date": "2026-10-29",
+          "text": "Placeholder: Tig writes the Path to Green"
+        }
+      ],
+      "criteria": "Placeholder: Tig writes the criteria for returning to GREEN"
+    },
+    "origination": "New",
+    "parent": null,
+    "visibility": "organization-wide"
+  },
+  "dates": [
+    {
+      "date": "2026-10-01",
+      "kind": "Committed",
+      "slipDays": 22
+    }
+  ],
+  "inherited": false,
+  "started": "2026-10-23",
+  "closesAs": "Completed Late",
+  "closesAsPromoted": null,
+  "mayChange": false,
+  "above": [],
+  "siblings": [],
+  "backs": null,
+  "changers": [
+    {
+      "actor": "tig",
+      "as": "owner",
+      "goal": "XW-0001"
+    }
+  ],
+  "moreChangers": false,
+  "promotionMilestone": null,
+  "parent": null,
+  "priority": {
+    "id": "PRI-1",
+    "rank": 1,
+    "title": "Regenerate the E28 canon"
+  },
+  "orgUnit": {
+    "id": "excaliwire",
+    "name": "Excaliwire",
+    "level": "Company"
+  },
+  "subGoals": [],
+  "workItems": [],
+  "events": [
+    {
+      "sequence": 43,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0001",
+      "field": "visibility",
+      "old": null,
+      "new": "organization-wide",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 42,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0001",
+      "field": "origination",
+      "old": null,
+      "new": "New",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 41,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0001",
+      "field": "path_to_green",
+      "old": null,
+      "new": {
+        "steps": [
+          {
+            "owner": "tig",
+            "date": "2026-10-29",
+            "text": "Placeholder: Tig writes the Path to Green"
+          }
+        ],
+        "criteria": "Placeholder: Tig writes the criteria for returning to GREEN"
+      },
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 40,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0001",
+      "field": "health",
+      "old": null,
+      "new": "RED",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 39,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0001",
+      "field": "state",
+      "old": null,
+      "new": "In Progress",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 38,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0001",
+      "field": "priority",
+      "old": null,
+      "new": "PRI-1",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 37,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0001",
+      "field": "severity",
+      "old": null,
+      "new": "sev1",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 36,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0001",
+      "field": "original_committed_date",
+      "old": null,
+      "new": "2026-10-01",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 35,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0001",
+      "field": "plan_maturity",
+      "old": null,
+      "new": "Pencil",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 34,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0001",
+      "field": "plan",
+      "old": null,
+      "new": "Placeholder: Tig links the plan",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 33,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0001",
+      "field": "date_type",
+      "old": null,
+      "new": "Committed",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 32,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0001",
+      "field": "due_date",
+      "old": null,
+      "new": "2026-10-01",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 31,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0001",
+      "field": "type",
+      "old": null,
+      "new": "Milestone (Launch)",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 30,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0001",
+      "field": "level",
+      "old": null,
+      "new": "Company",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 29,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0001",
+      "field": "org_unit",
+      "old": null,
+      "new": "excaliwire",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 28,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0001",
+      "field": "owner",
+      "old": null,
+      "new": "tig",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 27,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0001",
+      "field": "description",
+      "old": null,
+      "new": "",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    },
+    {
+      "sequence": 26,
+      "timestamp": "2026-10-23T12:00:00.000Z",
+      "actor": "chelsea",
+      "entity_kind": "goal",
+      "entity": "XW-0001",
+      "field": "summary",
+      "old": null,
+      "new": "Regenerate the E28 canon by Oct 1",
+      "reason": "Seeded from tig/goalie#47 (XW-0003 MLP)"
+    }
+  ],
+  "olderEvents": null,
+  "eventCount": 18,
+  "commentCount": 0,
+  "needsYou": {
+    "lateWorkItems": [],
+    "missingPtg": false
+  },
+  "hints": [
+    {
+      "field": "description",
+      "text": "Add the key results"
+    },
+    {
+      "field": "description",
+      "text": "Add the metrics and how often they are reviewed"
+    },
+    {
+      "field": "description",
+      "text": "Add why it matters"
+    },
+    {
+      "field": "description",
+      "text": "Add who shares responsibility"
+    },
+    {
+      "field": "work_product",
+      "text": "Link the work product."
+    }
+  ],
+  "actors": {
+    "backend-engineer": {
+      "id": "backend-engineer",
+      "name": "Backend Engineer",
+      "kind": "agent",
+      "operator": "chelsea"
+    },
+    "chelsea": {
+      "id": "chelsea",
+      "name": "Chelsea",
+      "kind": "human"
+    },
+    "chief-of-staff": {
+      "id": "chief-of-staff",
+      "name": "Chief of Staff",
+      "kind": "agent",
+      "operator": "chelsea"
+    },
+    "codebase-qa": {
+      "id": "codebase-qa",
+      "name": "Codebase QA",
+      "kind": "agent",
+      "operator": "chelsea"
+    },
+    "frontend-engineer": {
+      "id": "frontend-engineer",
+      "name": "Frontend Engineer",
+      "kind": "agent",
+      "operator": "chelsea"
+    },
+    "frontend-qa": {
+      "id": "frontend-qa",
+      "name": "Frontend QA",
+      "kind": "agent",
+      "operator": "chelsea"
+    },
+    "head-of-engineering": {
+      "id": "head-of-engineering",
+      "name": "Head of Engineering",
+      "kind": "agent",
+      "operator": "chelsea"
+    },
+    "product-designer": {
+      "id": "product-designer",
+      "name": "Product Designer",
+      "kind": "agent",
+      "operator": "chelsea"
+    },
+    "product-manager": {
+      "id": "product-manager",
+      "name": "Product Manager",
+      "kind": "agent",
+      "operator": "chelsea"
+    },
+    "tig": {
+      "id": "tig",
+      "name": "Tig",
+      "kind": "human"
+    },
+    "user-researcher": {
+      "id": "user-researcher",
+      "name": "User Researcher",
+      "kind": "agent",
+      "operator": "chelsea"
+    }
+  }
+}
