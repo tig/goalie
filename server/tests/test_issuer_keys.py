@@ -57,7 +57,7 @@ class FakeIssuer:
 def sign(issuer: str, kids: list[str]) -> tuple[dict[str, Any], list[str]]:
     """Sign one token per kid with one fresh key. Return that key as a JWK and the tokens."""
     now = int(time.time())
-    claims = {"iss": issuer, "aud": AUDIENCE, "sub": "sub-tig", "iat": now, "nbf": now - 5, "exp": now + 600}
+    claims = {"iss": issuer, "aud": AUDIENCE, "oid": "oid-tig", "sub": "pairwise-tig", "iat": now, "nbf": now - 5, "exp": now + 600}
     request = {"tokens": [{"claims": claims, "header": {"kid": kid}} for kid in kids]}
     proc = subprocess.run(["node", "tests/sign_token.mjs"], cwd=SERVER, input=json.dumps(request).encode(), capture_output=True, check=True)
     signed = json.loads(proc.stdout)
@@ -70,7 +70,7 @@ class IssuerKeyTests(unittest.TestCase):
         self.addCleanup(self.issuer.close)
         self.store = Store()
         self.addCleanup(self.store.close)
-        tig = create("actor", "tig", {"kind": "human", "display_name": "Tig", "subject": "sub-tig"})
+        tig = create("actor", "tig", {"kind": "human", "display_name": "Tig", "subject": "oid-tig"})
         self.assertTrue(self.store.write("tig", tig)["ok"])
         self.env = {"GOALIE_ISSUERS": json.dumps([{"issuer": self.issuer.issuer, "audience": AUDIENCE}])}
         self.jwk, self.tokens = sign(self.issuer.issuer, ["k1", "k2", "k3"])

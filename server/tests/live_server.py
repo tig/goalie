@@ -110,9 +110,9 @@ def post(proc: subprocess.Popen[bytes], port: int, path: str, body: object, head
 
 
 def signed(subject: str) -> tuple[str, dict[str, str]]:
-    """A token for subject, and the GOALIE_ISSUERS environment that trusts it."""
+    """A human token whose oid is subject, and the GOALIE_ISSUERS environment that trusts it."""
     now = int(time.time())
-    request = {"tokens": [{"claims": {"iss": ISSUER, "aud": AUDIENCE, "sub": subject, "nbf": now - 5, "exp": now + 600}}]}
+    request = {"tokens": [{"claims": {"iss": ISSUER, "aud": AUDIENCE, "oid": subject, "sub": f"pairwise-{subject}", "nbf": now - 5, "exp": now + 600}}]}
     proc = subprocess.run(["node", "tests/sign_token.mjs"], cwd=SERVER, input=json.dumps(request).encode(), capture_output=True, check=True)
     out = json.loads(proc.stdout)
     env = {"GOALIE_ISSUERS": json.dumps([{"issuer": ISSUER, "audience": AUDIENCE, "jwks": out["jwks"]}])}
@@ -120,9 +120,9 @@ def signed(subject: str) -> tuple[str, dict[str, str]]:
 
 
 def signed_many(*subjects: str) -> tuple[dict[str, str], dict[str, str]]:
-    """One token per human subject, all signed by one key, and the GOALIE_ISSUERS environment that trusts them."""
+    """One human token per subject, as its oid, all signed by one key, and the GOALIE_ISSUERS environment that trusts them."""
     now = int(time.time())
-    request = {"tokens": [{"claims": {"iss": ISSUER, "aud": AUDIENCE, "sub": s, "nbf": now - 5, "exp": now + 600}} for s in subjects]}
+    request = {"tokens": [{"claims": {"iss": ISSUER, "aud": AUDIENCE, "oid": s, "sub": f"pairwise-{s}", "nbf": now - 5, "exp": now + 600}} for s in subjects]}
     proc = subprocess.run(["node", "tests/sign_token.mjs"], cwd=SERVER, input=json.dumps(request).encode(), capture_output=True, check=True)
     out = json.loads(proc.stdout)
     env = {"GOALIE_ISSUERS": json.dumps([{"issuer": ISSUER, "audience": AUDIENCE, "jwks": out["jwks"]}])}

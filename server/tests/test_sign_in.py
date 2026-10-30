@@ -22,16 +22,18 @@ def claims(**extra: Any) -> dict[str, Any]:
 
 
 TOKENS: list[dict[str, Any]] = [
-    {"claims": claims(sub="sub-tig", email="tig@example.com")},
+    {"claims": claims(oid="oid-tig", sub="pairwise-tig", email="tig@example.com")},
     {"claims": claims(idtyp="app", azp="app-bot", sub="sp-bot")},
-    {"claims": claims(sub="sub-tig"), "foreign_key": True},
-    {"claims": claims(sub="sub-tig", iss="https://other.test/v2.0")},
-    {"claims": claims(sub="sub-tig", aud="api://someone-else")},
-    {"claims": claims(sub="sub-tig", exp=int(time.time()) - 600)},
-    {"claims": claims(sub="sub-tig"), "header": {"alg": "none"}},
-    {"claims": claims(sub="app-bot")},
-    {"claims": claims(idtyp="app", azp="sub-tig")},
-    {"claims": claims(sub="sub-tig", nbf=int(time.time()) + 600)},
+    {"claims": claims(oid="oid-tig", sub="pairwise-tig"), "foreign_key": True},
+    {"claims": claims(oid="oid-tig", sub="pairwise-tig", iss="https://other.test/v2.0")},
+    {"claims": claims(oid="oid-tig", sub="pairwise-tig", aud="api://someone-else")},
+    {"claims": claims(oid="oid-tig", sub="pairwise-tig", exp=int(time.time()) - 600)},
+    {"claims": claims(oid="oid-tig", sub="pairwise-tig"), "header": {"alg": "none"}},
+    {"claims": claims(oid="app-bot", sub="app-bot")},
+    {"claims": claims(idtyp="app", azp="oid-tig")},
+    {"claims": claims(oid="oid-tig", sub="pairwise-tig", nbf=int(time.time()) + 600)},
+    {"claims": claims(sub="oid-tig")},
+    {"claims": claims(oid="oid-chelsea", sub="oid-tig")},
 ]
 
 
@@ -53,7 +55,7 @@ class SignInTests(unittest.TestCase):
         self.store = Store()
         self.addCleanup(self.store.close)
         for command in [
-            create("actor", "tig", {"kind": "human", "display_name": "Tig", "email": "tig@example.com", "subject": "sub-tig"}),
+            create("actor", "tig", {"kind": "human", "display_name": "Tig", "email": "tig@example.com", "subject": "oid-tig"}),
             create("actor", "bot", {"kind": "agent", "display_name": "Bot", "operator": "tig", "app_id": "app-bot"}),
         ]:
             self.assertTrue(self.store.write("tig", command)["ok"])
@@ -74,8 +76,15 @@ class SignInTests(unittest.TestCase):
         self.assertFalse(result["ok"], result)
         self.assertTrue(result["reason"])
 
-    def test_human_token_maps_to_the_human_by_subject(self) -> None:
+    def test_human_token_maps_to_the_human_by_oid(self) -> None:
+        # Entra ID: sub is pairwise per application, so no one can read it from the tenant. oid is the user's object id.
         self.assertActor(self.bearer(0), "tig")
+
+    def test_human_token_with_no_oid_is_refused(self) -> None:
+        self.assertRefused(self.bearer(10))
+
+    def test_human_token_does_not_map_by_sub(self) -> None:
+        self.assertRefused(self.bearer(11))
 
     def test_agent_token_maps_to_the_agent_with_its_operator(self) -> None:
         result = self.whoami(self.bearer(1))

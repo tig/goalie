@@ -122,7 +122,10 @@ async function verifyToken(
   return { ok: true, claims };
 }
 
-/** Resolve request headers to one actor. A human token maps by subject, an agent token by application id. */
+/**
+ * Resolve request headers to one actor. A human token maps by its `oid`, an agent token by application id.
+ * Entra ID makes `sub` pairwise, unique per user per application, so no one can read it from the tenant. `oid` is the user's object id.
+ */
 export async function resolveActor(db: DatabaseSync, headers: Record<string, string>, issuers: Issuer[]): Promise<Resolution> {
   const bearer = header(headers, "authorization")?.match(/^Bearer\s+(\S+)$/i)?.[1];
   const token = bearer ?? header(headers, "x-auth-request-access-token");
@@ -140,8 +143,8 @@ export async function resolveActor(db: DatabaseSync, headers: Record<string, str
   }
 
   const agent = claims.idtyp === "app";
-  const id = agent ? (claims.azp ?? claims.appid) : claims.sub;
-  if (typeof id !== "string") return { ok: false, reason: "the token names no subject" };
+  const id = agent ? (claims.azp ?? claims.appid) : claims.oid;
+  if (typeof id !== "string") return { ok: false, reason: agent ? "the token names no application id" : "the token has no oid" };
   const actor = readActorByToken(db, agent ? "agent" : "human", id);
   if (!actor) return { ok: false, reason: `no ${agent ? "agent" : "human"} actor for this token` };
   return { ok: true, actor };

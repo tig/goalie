@@ -125,7 +125,7 @@ export function milestonesOf(db: DatabaseSync, goal: Row): string[] {
   return [...milestones];
 }
 
-/** Read the actor a verified token names. A human maps by subject, an agent by application id (ADR 0005). */
+/** Read the actor a verified token names. A human maps by subject, the token's `oid`, and an agent by application id (ADR 0005). */
 export function readActorByToken(db: DatabaseSync, kind: "human" | "agent", id: string): Row | undefined {
   const column = kind === "agent" ? "app_id" : "subject";
   return decode("actor", db.prepare(`SELECT * FROM actor WHERE ${column} = ? AND kind = ?`).get(id, kind) as Row | undefined);

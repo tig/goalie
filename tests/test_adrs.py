@@ -58,6 +58,8 @@ class AdrTests(unittest.TestCase):
         self.assertIn("8136e28b-aee3-4d34-ab49-c0da1a468e3a", decision)
         self.assertNotIn("Argon2id", decision)
         self.assertNotIn("must not add an external identity provider", decision)
+        # Entra ID makes sub pairwise per application, so no one can read it from the tenant. A human maps by oid.
+        self.assertIn("A human token with no `oid` is refused.", decision)
 
     def test_markdown_crdt_is_yjs_on_the_server(self) -> None:
         decision = _decision("0008-concurrent-markdown.md")
