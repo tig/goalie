@@ -237,6 +237,8 @@ class CiTenets(unittest.TestCase):
         # Every merged pull request publishes: a push publishes only from develop. main does not publish, so an older main cannot overwrite a newer develop.
         # An operator's dispatch publishes the branch it names. A pull request never publishes.
         self.assertIn(f"    if: {DEPLOY}\n", header)
+        # One publish at a time, in push order: two quick develop pushes must not publish out of order.
+        self.assertIn("\n    concurrency:\n      group: goalie-deploy\n      cancel-in-progress: false\n", header)
         self.assertNotIn("pull_request", header)
         changes = server.split("\n  lint:", 1)[0]
         self.assertLess(changes.index('= "workflow_dispatch"'), changes.index('= "pull_request"'))

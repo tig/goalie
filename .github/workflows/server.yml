@@ -104,6 +104,10 @@ jobs:
   deploy:
     needs: [changes, lint, typecheck, test]
     if: needs.changes.outputs.affected == 'true' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || github.event_name == 'workflow_dispatch')
+    # One publish at a time. A newer run waits, and a pending run is replaced by a newer one, so publishes stay in push order.
+    concurrency:
+      group: goalie-deploy
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

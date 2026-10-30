@@ -104,10 +104,11 @@ Tig and Chelsea sign in to goalie.excaliwire.com and see the same goals. These i
 - [ ] Tig accepts the amendment to [ADR 0005](adr/0005-auth-and-identity.md): the first deployment has more than one human actor.
 - [ ] The Excaliwire Entra ID gate ([ADR 0005](adr/0005-auth-and-identity.md), oauth2-proxy) lets both Tig and Chelsea through.
 - [ ] The host's issuer list names the Excaliwire tenant.
-- [ ] The host's store is seeded once from `server/seed/excaliwire.json` ([CONTRIBUTING.md](../CONTRIBUTING.md)). Tig and Chelsea are its human actors. XW-0001, XW-0002, and XW-0003 are its goals.
-- [ ] The GOALIE owner sets Tig's and Chelsea's Entra object ids (`oid`) as the subjects of their actors in the host's store. The seed names neither subject.
-- [ ] [#52 (XW-0003 MLP)](https://github.com/tig/goalie/pull/52) leaves draft. Tig merges `chelsea/mlp` into develop.
-- [ ] The server publishes on the push to develop that merged #52. A push to main does not publish.
+- [x] The host's store is seeded once from `server/seed/excaliwire.json` ([CONTRIBUTING.md](../CONTRIBUTING.md)). Tig and Chelsea are its human actors. XW-0001, XW-0002, and XW-0003 are its goals.
+- [x] The GOALIE owner sets Tig's and Chelsea's Entra object ids (`oid`) as the subjects of their actors in the host's store. The seed names neither subject.
+- [x] [#52 (XW-0003 MLP)](https://github.com/tig/goalie/pull/52) leaves draft. Tig merges `chelsea/mlp` into develop, at a3845a5.
+- [x] #52's code is live. An operator dispatched the server workflow on `chelsea/mlp` at cfe7318 ([run 41116472005](https://github.com/tig/goalie/actions/runs/41116472005)). The push to develop that merged #52 skipped the publish under the old rule ([run 41123574578](https://github.com/tig/goalie/actions/runs/41123574578)).
+- [ ] The push to develop that merges [#55](https://github.com/tig/goalie/pull/55) publishes develop. develop at a3845a5 has the same tree as cfe7318, so that publish changes no code. A push to main does not publish.
 - [ ] Tig and Chelsea each sign in and open Home. Each sees the same Priorities, goals, and health.
 
 ## Decisions
