@@ -1,8 +1,8 @@
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import type { ActorRef, Health } from "../../src/api.ts";
 import { isLit, type GoalRow, type PriorityRow } from "./model/filter.ts";
 import { dateLabel, listDates, slipLabel } from "./model/labels.ts";
-import { moveIn, moveTo } from "./model/commands.ts";
+import { focusAfterMove, moveIn, moveTo } from "./model/commands.ts";
 import { goalPath } from "./model/route.ts";
 import { Link, navigate } from "./router.tsx";
 import { Avatar, CHEVRON, HealthDot, look, Rank } from "./parts.tsx";
@@ -133,18 +133,22 @@ export function GoalTree(props: TreeProps) {
 
   // Rule 35: the order on screen, pending a reason after a move; the drag in progress and the drop line it shows.
   const base = [...funded, ...backlog].map((p) => p.id);
-  const [pending, setPending] = useState<{ order: string[]; moved: string } | null>(null);
+  const [pending, setPending] = useState<{ order: string[]; moved: string; via: "key" | "pointer" } | null>(null);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string>();
   const [drag, setDrag] = useState<{ id: string; at: number } | null>(null);
   const order = pending?.order ?? base;
   const byId = new Map([...funded, ...backlog].map((p) => [p.id, p]));
   const lastFunded = funded[funded.length - 1]?.id;
-  const moved = (next: string[], id: string) => {
+  const moved = (next: string[], id: string, via: "key" | "pointer") => {
     if (next.join() === base.join()) return setPending(null);
-    setPending({ order: next, moved: id });
+    setPending({ order: next, moved: id, via });
     setError(undefined);
   };
+  // A keyboard move can carry the Priority across the cut line, which draws its row again; give the handle its focus back.
+  useEffect(() => {
+    if (pending && focusAfterMove(pending.via) === "handle") document.querySelector<HTMLElement>(`.group[data-pid="${pending.moved}"] .draghandle`)?.focus();
+  }, [pending]);
   const dropAt = (y: number) => {
     const rects = [...document.querySelectorAll<HTMLElement>(".group[data-pid]")].map((el) => el.getBoundingClientRect());
     const i = rects.findIndex((r) => y < r.top + r.height / 2);
@@ -164,14 +168,14 @@ export function GoalTree(props: TreeProps) {
         }}
         onPointerMove={(e) => drag && setDrag({ ...drag, at: dropAt(e.clientY) })}
         onPointerUp={() => {
-          if (drag) moved(moveTo(order, drag.id, drag.at), drag.id);
+          if (drag) moved(moveTo(order, drag.id, drag.at), drag.id, "pointer");
           setDrag(null);
         }}
         onPointerCancel={() => setDrag(null)}
         onKeyDown={(e) => {
           if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
           e.preventDefault();
-          moved(moveIn(order, p.id, e.key === "ArrowUp" ? -1 : 1), p.id);
+          moved(moveIn(order, p.id, e.key === "ArrowUp" ? -1 : 1), p.id, "key");
         }}
       >
         <svg width="10" height="14" viewBox="0 0 10 14" aria-hidden="true">
@@ -189,7 +193,7 @@ export function GoalTree(props: TreeProps) {
   const ask = (p: PriorityRow) =>
     pending?.moved === p.id && (
       <div className="rankreason">
-        <input value={reason} placeholder="Reason" aria-label="Reason for the new order" autoFocus onChange={(e) => setReason(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} />
+        <input value={reason} placeholder="Reason" aria-label="Reason for the new order" autoFocus={focusAfterMove(pending.via) === "reason"} onChange={(e) => setReason(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} />
         <button type="button" className="btn primary" onClick={save}>
           Save
         </button>

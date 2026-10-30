@@ -318,3 +318,8 @@ export function moveTo(order: string[], id: string, index: number): string[] {
   const at = index > from ? index - 1 : index;
   return [...rest.slice(0, at), id, ...rest.slice(at)];
 }
+
+/** Rule 35: after a drop the Reason line takes focus. After a keyboard move focus stays on the handle, so the next arrow moves the Priority again. */
+export function focusAfterMove(via: "key" | "pointer"): "handle" | "reason" {
+  return via === "key" ? "handle" : "reason";
+}

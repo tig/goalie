@@ -679,6 +679,11 @@ process.stdout.write(JSON.stringify([a.body.message, b.body.message]));"""
         got = run("return [commands.moveIn(['a', 'b', 'c'], 'c', -1), commands.moveIn(['a', 'b', 'c'], 'a', -1), commands.moveIn(['a', 'b', 'c'], 'a', 1)];")
         self.assertEqual(got, [["a", "c", "b"], ["a", "b", "c"], ["b", "a", "c"]])
 
+    def test_a_keyboard_move_keeps_focus_on_the_handle(self) -> None:
+        # Rule 35: the next arrow must move the Priority again, so a keyboard move does not send focus to the Reason line. A drop does.
+        got = run("return [commands.focusAfterMove('key'), commands.focusAfterMove('pointer')];")
+        self.assertEqual(got, ["handle", "reason"])
+
     def test_a_new_goal_is_sent_in_the_create_order(self) -> None:
         b = run(f"return commands.createBatch({json.dumps(self.FORM)});")
         steps = [(c["op"], c["kind"], c.get("ref") or c.get("id")) for c in b["commands"]]  # type: ignore[index]
