@@ -103,7 +103,11 @@ jobs:
 
   deploy:
     needs: [changes, lint, typecheck, test]
-    if: needs.changes.outputs.affected == 'true' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch')
+    if: needs.changes.outputs.affected == 'true' && ((github.event_name == 'push' && github.ref == 'refs/heads/develop') || github.event_name == 'workflow_dispatch')
+    # Two installs never overlap. The group does not keep push order, so the tip step below skips a push when a newer develop commit changes server inputs.
+    concurrency:
+      group: goalie-deploy
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -115,7 +119,28 @@ jobs:
       - run: npm ci --prefix server
       - run: npm run build --prefix server
       - run: npm ci --omit=dev --ignore-scripts --prefix server
+      - name: Skip a push when a newer develop commit changes server inputs
+        id: tip
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = "push" ]; then
+            git fetch --quiet --depth=1 origin refs/heads/develop
+            tip="$(git rev-parse FETCH_HEAD)"
+            changed="$(git diff --name-only --no-renames "$SHA" "$tip")"
+            newer="$(printf '%s\n' "$changed" | GITHUB_OUTPUT= python3 .github/scripts/ci_affected.py server)"
+            if [ "$newer" = "true" ]; then
+              echo "Skipping ${SHA}: a newer develop commit changes server inputs and will publish."
+              echo "publish=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+          echo "publish=true" >> "$GITHUB_OUTPUT"
       - name: Publish
+        if: steps.tip.outputs.publish == 'true'
         env:
           GOALIE_DEPLOY_HOST: ${{ secrets.GOALIE_DEPLOY_HOST }}
           GOALIE_DEPLOY_USER: ${{ secrets.GOALIE_DEPLOY_USER }}

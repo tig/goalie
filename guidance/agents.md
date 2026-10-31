@@ -62,7 +62,7 @@ Tig holds dozens of workstreams and cannot cache your context.
 - A pull request for in-development work targets develop.
 - A release is a pull request from develop into main.
 - develop runs the same workflows and does not require them to merge.
-- The server publishes on a push to main, or when an operator dispatches the server workflow on a branch.
+- The server publishes on a push to develop, or when an operator dispatches the server workflow on a branch.
 - **Learnings go on the issue**, not only in the pull request body. A merged pull request buries them.
 - **Merge, never rebase, on a shared branch.** Another session may have branched from it.
 
