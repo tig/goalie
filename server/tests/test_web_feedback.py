@@ -57,11 +57,11 @@ class FeedbackAnswerTests(unittest.TestCase):
         self.assertEqual(answer(400, json.dumps({"error": "note is empty"})), {"sent": False, "message": "Write a note, then send it."})
 
     def test_401_is_a_refused_caller_key_so_feedback_is_not_available(self) -> None:
-        # xw-feedback answers 401 only when it refuses the caller key that the host adds (excaliwire/factory#3192). Signing in again cannot fix that. With the host sign-in in front (#56, item 2), a signed-out person gets a redirect.
+        # xw-feedback answers 401 only when it refuses the caller key that the host adds (excaliwire/factory#3192).
         self.assertEqual(answer(401, json.dumps({"error": "caller key refused"})), {"sent": False, "message": NOT_AVAILABLE})
 
     def test_a_redirect_says_to_sign_in_again(self) -> None:
-        # The app posts with redirect "manual". A sign-in redirect is an opaque redirect with status 0, not a network failure.
+        # The app posts with redirect "manual", and reads an opaque redirect as "sign in again", not as a network failure.
         self.assertEqual(answer(0, kind="opaqueredirect"), {"sent": False, "message": "Sign in again, then send your note."})
 
     def test_403_says_the_feedback_service_refused_the_page(self) -> None:

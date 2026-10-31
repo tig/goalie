@@ -52,7 +52,7 @@ export async function postCommands(batch: CommandsRequest): Promise<{ status: nu
 }
 
 /**
- * POST /api/feedback: one note and this page's URL. A redirect is not followed, so a sign-in redirect reads as "sign in again".
+ * POST /api/feedback: one note and this page's URL. A redirect is not followed, and the answer for one is "sign in again".
  * The URL has no query and no hash: tig/goalie is public, and the query can hold search text.
  */
 export async function postFeedback(note: string): Promise<FeedbackAnswer> {

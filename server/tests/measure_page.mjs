@@ -9,7 +9,7 @@ import { join } from "node:path";
 
 const [chrome, url, width, height, expression] = process.argv.slice(2);
 const profile = mkdtempSync(join(tmpdir(), "goalie-chrome-"));
-// --no-sandbox: the only page is the test's own server on 127.0.0.1. Chrome then does not need the user namespaces its sandbox uses on Linux.
+// --no-sandbox: the only page is the test's own server on 127.0.0.1.
 const browser = spawn(chrome, ["--headless=new", "--no-sandbox", "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--remote-debugging-port=0", `--user-data-dir=${profile}`, "about:blank"], { stdio: "ignore" });
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 

@@ -30,7 +30,7 @@ const SIGN_IN = "Sign in again, then send your note.";
 
 const REFUSED: Record<number, string> = {
   400: "Write a note, then send it.",
-  // xw-feedback answers 401 only when it refuses the caller key the host adds (excaliwire/factory#3192). With the host sign-in in front, a signed-out person gets a redirect instead.
+  // xw-feedback answers 401 only when it refuses the caller key the host adds (excaliwire/factory#3192).
   401: NOT_AVAILABLE,
   403: "The feedback service refused this page. Your note was not sent.",
   404: NOT_AVAILABLE,
@@ -41,8 +41,8 @@ const REFUSED: Record<number, string> = {
 /**
  * Sent only on a 2xx JSON answer with ok true.
  * A 401 or 404 is a host fault: xw-feedback refused the key the host adds, or the host does not send the path to xw-feedback, so GOALIE answers it.
- * A 502 from xw-feedback means it took the key and could not file the note: its token is not xw-admin, or GitHub failed. A 502 from the host means xw-feedback did not answer.
- * In each case the note was not sent and the person cannot fix it, so each says that feedback is not available.
+ * A 502 from xw-feedback means it took the key and could not file the note: its token is not xw-admin, or GitHub failed. A 502 from the host means the sign-in gate or xw-feedback did not answer: the host checks sign-in before it sends the path on (operations#179).
+ * In each case the note was not sent, so each says that feedback is not available.
  */
 export function feedbackAnswer(reply: FeedbackReply): FeedbackAnswer {
   if (reply.type === "opaqueredirect") return { sent: false, message: SIGN_IN };

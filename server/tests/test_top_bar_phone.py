@@ -101,7 +101,7 @@ class TopBarPhoneTests(unittest.TestCase):
                 self.assertGreaterEqual(bar[name]["height"], 44, (width, name, bar))
 
     def test_the_bar_is_as_tall_as_topbar_on_a_phone_and_a_desktop(self) -> None:
-        # Sticky heads (.lhead, .ngrail, .gprops) sit at top: var(--topbar). A bar taller than --topbar would cover them; a shorter one would leave a gap.
+        # .lhead sits at top: var(--topbar), flush under the bar. .ngrail and .gprops sit 16 px below that.
         self.assertFalse(self.desktop["phone"])
         for name, bar in (("375 px", self.bar), ("1280 px", self.desktop)):
             self.assertEqual(bar["height"], bar["topbar"], (name, bar))

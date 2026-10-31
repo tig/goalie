@@ -102,7 +102,7 @@ class AppServingTests(unittest.TestCase):
         self.assertEqual(set(json.loads(self.unknown_api.body)), {"error", "reason"})
 
     def test_goalie_has_no_feedback_route(self) -> None:
-        # Host configuration sends /api/feedback to xw-feedback before GOALIE sees it (#56). GOALIE answers it as any unknown API path, never with the app.
+        # Host configuration is to send /api/feedback to xw-feedback before GOALIE sees it (#56). GOALIE answers it as any unknown API path, never with the app.
         self.assertEqual(self.feedback.status, 404)
         self.assertEqual(json.loads(self.feedback.body)["reason"], "no API route POST /api/feedback")
 
