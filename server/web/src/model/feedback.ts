@@ -44,6 +44,19 @@ export function isFeedbackChrome(target: EventTarget | null): boolean {
   return Boolean(target.closest(FEEDBACK_CHROME));
 }
 
+/** Inputs that take no typed text. Ported from presentation-core src/viewport/viewChrome.ts NO_TEXT_INPUT (lines 5 to 14) at 7d1a70cf5. */
+const NO_TEXT_INPUT = new Set(["checkbox", "radio", "button", "submit", "reset", "color", "file", "image"]);
+
+/**
+ * True for a text field: an input that takes text, a select, a textarea, or contenteditable. Ported from viewChrome.ts isTyping (lines 100 to 109) at 7d1a70cf5.
+ * A right-click there keeps the browser's menu, so paste and spelling work. In the Canon Viewer the menu opens only on a picked element, and its text fields are not ones.
+ */
+export function isTyping(target: EventTarget | null): boolean {
+  if (typeof HTMLElement === "undefined") return false;
+  if (target instanceof HTMLInputElement) return !NO_TEXT_INPUT.has(target.type);
+  return target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement || (target instanceof HTMLElement && target.isContentEditable);
+}
+
 /** data-focus is JSON of the item. Do not invent a second encoding. */
 export function encodeFocus(item: FocusItem): string {
   return JSON.stringify(item);

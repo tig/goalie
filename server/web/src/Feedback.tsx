@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { postFeedback } from "./data.ts";
-import { createFeedbackMark, decodeFocus, feedbackFocus, isFeedbackChrome, menuPoint, NOTE_MAX, type FeedbackAnswer, type FeedbackFocus, type FocusItem } from "./model/feedback.ts";
+import { createFeedbackMark, decodeFocus, feedbackFocus, isFeedbackChrome, isTyping, menuPoint, NOTE_MAX, type FeedbackAnswer, type FeedbackFocus, type FocusItem } from "./model/feedback.ts";
 import { parseRoute, type Route } from "./model/route.ts";
 import { useDismiss } from "./useScreen.ts";
 
@@ -26,6 +26,7 @@ type Menu = { x: number; y: number; focus?: FeedbackFocus; back: Element | null 
 /**
  * Feedback (tig/goalie#56). The top-bar button opens the dialog with no picked element. A right-click anywhere else in GOALIE opens GOALIE's menu in place of the browser's,
  * and its "Feedback..." opens the dialog about the element that was right-clicked. The ContextMenu key and Shift+F10 open the menu on the focused element.
+ * A text field keeps the browser's menu, as in the Canon Viewer.
  * The dialog shows what was picked, says that the note was sent or why not, and keeps a note that was not sent. The Canon Viewer's pattern, ported in model/feedback.ts.
  */
 export function Feedback() {
@@ -41,15 +42,31 @@ export function Feedback() {
   const [answer, setAnswer] = useState<FeedbackAnswer | undefined>();
 
   useEffect(() => {
-    const onMenu = (e: MouseEvent) => {
-      if (e.defaultPrevented || isFeedbackChrome(e.target) || !(e.target instanceof Element)) return;
-      e.preventDefault();
-      const { items, picked } = pickedChain(e.target);
+    const open = (target: Element, point: { clientX: number; clientY: number }) => {
+      const { items, picked } = pickedChain(target);
       mark.set(picked);
-      setMenu({ ...menuPoint(e, (picked ?? e.target).getBoundingClientRect()), focus: feedbackFocus(PAGE_NAME[parseRoute(location.pathname).page], items), back: document.activeElement });
+      setMenu({ ...menuPoint(point, (picked ?? target).getBoundingClientRect()), focus: feedbackFocus(PAGE_NAME[parseRoute(location.pathname).page], items), back: document.activeElement });
+    };
+    const mine = (target: EventTarget | null): target is Element => target instanceof Element && !isFeedbackChrome(target) && !isTyping(target);
+    const onMenu = (e: MouseEvent) => {
+      if (e.defaultPrevented || !mine(e.target)) return;
+      e.preventDefault();
+      open(e.target, e);
+    };
+    // Shift+F10 opens the menu on the focused element. Chrome sends no contextmenu for it in headless Chrome (measured), so GOALIE reads the key itself.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "F10" || !e.shiftKey || e.ctrlKey || e.altKey || e.metaKey || e.defaultPrevented) return;
+      const target = document.activeElement && document.activeElement !== document.body ? document.activeElement : document.querySelector("main");
+      if (!mine(target)) return;
+      e.preventDefault();
+      open(target, { clientX: 0, clientY: 0 });
     };
     document.addEventListener("contextmenu", onMenu, true);
-    return () => document.removeEventListener("contextmenu", onMenu, true);
+    document.addEventListener("keydown", onKey, true);
+    return () => {
+      document.removeEventListener("contextmenu", onMenu, true);
+      document.removeEventListener("keydown", onKey, true);
+    };
   }, [mark]);
 
   // The menu opens at the point and stays 8 px inside the screen. Its one item takes keyboard focus.
