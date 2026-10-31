@@ -76,6 +76,14 @@ class FocusTests(unittest.TestCase):
     def test_a_bad_data_focus_is_no_item(self) -> None:
         self.assertEqual(run('return ["", null, "{", "[]", JSON.stringify({ kind: "goal", id: "XW-1" }), JSON.stringify({ kind: 1, id: "a", label: "b" })].map((raw) => f.decodeFocus(raw));'), [None] * 6)
 
+    def test_inside_an_edit_form_the_form_is_the_focus(self) -> None:
+        # An unsaved form is a draft, not an item: nothing inside it is picked, so no value in it is sent (Dubric on #57).
+        chain = [{"kind": "goal", "id": "XW-0003", "label": "Cut time-to-value"}, {"kind": "form", "id": "Change Owner", "label": "Change Owner"}, {"kind": "actor", "id": "tig", "label": "Tig"}]
+        self.assertEqual(run(f"return f.focusChain({json.dumps(chain)});"), chain[:2])
+        nested = [{"kind": "form", "id": "New goal", "label": "New goal"}, {"kind": "form", "id": "Sub-goal", "label": "Sub-goal"}, {"kind": "actor", "id": "tig", "label": "Tig"}]
+        self.assertEqual(run(f"return f.focusChain({json.dumps(nested)});"), nested[:1])
+        self.assertEqual(run(f"return f.focusChain({json.dumps(chain[:1])});"), chain[:1])
+
     def test_a_non_element_is_not_feedback_chrome(self) -> None:
         # hit.test.ts: isFeedbackChrome is false for a non-element.
         self.assertEqual(run("return f.isFeedbackChrome(null);"), False)

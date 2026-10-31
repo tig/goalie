@@ -12,7 +12,7 @@ SECRET = "typed-words-must-not-leave-7731"
 
 # Every scenario starts the same way: wait for Home, catch POST /api/feedback, record each contextmenu, and give helpers to the steps.
 SETUP = """
-  if (!document.querySelector(".goal") || !document.querySelector(".topfeedback")) return null;
+  if (!document.querySelector(".topfeedback") || !document.querySelector(READY)) return null;
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const input = (command) => new Promise((resolve, reject) => {
     window.__goalieInputDone ??= {};
@@ -50,8 +50,8 @@ SETUP = """
 """
 
 
-def scenario(steps: str) -> str:
-    return f"(async () => {{ {SETUP} {steps} }})()"
+def scenario(steps: str, ready: str = ".goal") -> str:
+    return f"(async () => {{ const READY = {json.dumps(ready)}; {SETUP} {steps} }})()"
 
 
 RIGHT_CLICK_A_GOAL = scenario("""
@@ -72,7 +72,7 @@ def keyboard(name: str, shift: bool) -> str:
   await key({json.dumps(name)}, {json.dumps(shift)});
   const box = row.getBoundingClientRect();
   const m = menu()?.getBoundingClientRect();
-  return {{ open: Boolean(menu()), focused: document.activeElement?.getAttribute("role") ?? null, nearRow: Boolean(m) && m.top >= box.top && m.top <= box.bottom + 8 }};
+  return {{ open: Boolean(menu()), focused: document.activeElement?.getAttribute("role") ?? null, nearRow: Boolean(m) && m.top >= box.top && m.top <= box.bottom + 8, browser: menus.some((x) => x.browser) }};
 """)
 
 
@@ -113,15 +113,120 @@ TEXT_FIELD = scenario(f"""
 """)
 
 
+# Shift+F10 opens GOALIE's menu. A contextmenu that then arrives on its own item (here the real ContextMenu key) must not open the browser's menu over it.
+BOTH_MENUS = scenario("""
+  document.querySelector(".goal [role=link]").focus();
+  await key("F10", true);
+  const opened = Boolean(menu());
+  await key("ContextMenu");
+  return { opened, menus, open: Boolean(menu()), target: document.activeElement?.getAttribute("role") ?? null };
+""")
+
+# Keyboard focus comes back to the row: after the menu closes, and after the dialog closes by Escape, by Close, or after Send.
+FOCUS_BACK = scenario("""
+  const row = document.querySelector(".goal [role=link]");
+  const onRow = () => document.activeElement === row;
+  const out = {};
+  row.focus(); await key("F10", true); await key("Escape"); out.menuEscape = onRow();
+  row.focus(); await key("F10", true); await key("Tab"); out.menuTab = { closed: !menu() };
+  row.focus(); await key("F10", true); await key("Enter"); out.dialogOpen = dialog()?.open ?? false; await key("Escape"); out.dialogEscape = onRow();
+  row.focus(); await key("F10", true); await key("Enter");
+  await click([...dialog().querySelectorAll("button")].find((b) => b.textContent === "Close")); out.dialogClose = onRow();
+  row.focus(); await key("F10", true); await key("Enter"); await send("Focus test."); out.sent = sent.length; await key("Escape"); out.afterSend = onRow();
+  return out;
+""")
+
+OUTSIDE_CLICK = scenario("""
+  await rightClick(document.querySelector(".goal .title"));
+  const opened = Boolean(menu());
+  await click(document.querySelector("main h1"));
+  return { opened, after: Boolean(menu()) };
+""")
+
+# The picked element keeps a mark while the menu and the dialog are open, and loses it when the dialog closes.
+MARK = scenario("""
+  const goal = document.querySelector(".goal");
+  await rightClick(goal.querySelector(".title"));
+  const inMenu = [...document.querySelectorAll("[data-feedback-focused]")].map((e) => e === goal);
+  await pickFeedback();
+  const inDialog = [...document.querySelectorAll("[data-feedback-focused]")].map((e) => e === goal);
+  await key("Escape");
+  return { inMenu, inDialog, after: document.querySelectorAll("[data-feedback-focused]").length };
+""")
+
+# The feedback control and its dialog keep the browser's menu.
+CHROME = scenario("""
+  await rightClick(document.querySelector(".topfeedback"));
+  const button = { menus: [...menus], goalie: Boolean(menu()) };
+  await click(document.querySelector(".topfeedback"));
+  menus.length = 0;
+  await rightClick(dialog().querySelector("h2"));
+  return { button, dialog: { menus: [...menus], goalie: Boolean(menu()) } };
+""")
+
+AVATAR = scenario("""
+  await rightClick(document.querySelector(".goal .av"));
+  await pickFeedback();
+  const shown = about();
+  await send("Owner looks wrong.");
+  return { shown, sent };
+""")
+
+WORK_ROW = scenario("""
+  const row = document.querySelector(".wrow");
+  const title = row.querySelector(".wtitle").textContent;
+  await rightClick(row.querySelector(".wtitle"));
+  await pickFeedback();
+  const shown = about();
+  await send("This item is done.");
+  return { title, shown, sent };
+""", ready=".wrow")
+
+GOAL_PAGE = scenario("""
+  await rightClick(document.querySelector(".gtitle"));
+  await pickFeedback();
+  const title = about();
+  await send("Title note.");
+  await key("Escape");
+  const state = [...document.querySelectorAll(".prop .plabel")].find((e) => e.textContent === "State");
+  await rightClick(state);
+  await pickFeedback();
+  const field = about();
+  await send("State note.");
+  return { title, field, sent };
+""", ready=".gtitle")
+
+# Dubric's case on #57: pick Tig in the New goal form's Owner select, then right-click the owner avatar beside it.
+NEW_GOAL_FORM = scenario("""
+  const select = document.querySelector(".ownerpick select");
+  Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(select, "tig");
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+  await sleep(100);
+  const avatar = document.querySelector(".ownerpick .av");
+  const showing = avatar.getAttribute("aria-label");
+  await rightClick(avatar);
+  await pickFeedback();
+  const shown = about();
+  await send("The owner list is long.");
+  return { showing, shown, sent };
+""", ready=".ownerpick select")
+
+
 class FeedbackMenuTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        with signed_app() as (open_page, api):
+        # The build-team seed adds work items, so the Work items page has rows.
+        with signed_app("seed/build-team.json") as (open_page, api):
             first = api("/api/priorities")["funded"][0]
             goal = first["goals"][0]
             cls.goal = {"label": goal["summary"], "id": goal["id"], "kind": "goal", "breadcrumb": ["Home", first["title"]]}
-            pages = (RIGHT_CLICK_A_GOAL, keyboard("F10", True), keyboard("ContextMenu", False), ESCAPE, TOP_BAR_BUTTON, TEXT_FIELD)
-            cls.picked, cls.shift_f10, cls.menu_key, cls.escape, cls.top_bar, cls.field = (open_page(1280, s) for s in pages)
+            cls.owner = goal["owner"]
+            pages = (RIGHT_CLICK_A_GOAL, keyboard("F10", True), keyboard("ContextMenu", False), ESCAPE, TOP_BAR_BUTTON, TEXT_FIELD, BOTH_MENUS, FOCUS_BACK, OUTSIDE_CLICK, MARK, CHROME, AVATAR)
+            cls.picked, cls.shift_f10, cls.menu_key, cls.escape, cls.top_bar, cls.field, cls.both, cls.back, cls.outside, cls.mark, cls.chrome, cls.avatar = (open_page(1280, s) for s in pages)
+            cls.work_ids = {i["id"] for i in api("/api/work")["items"]}
+            cls.work = open_page(1280, WORK_ROW, "/work")
+            cls.goal_page = open_page(1280, GOAL_PAGE, f"/goals/{goal['id']}")
+            cls.form = open_page(1280, NEW_GOAL_FORM, "/goals/new")
 
     def test_right_click_on_a_goal_opens_the_goalie_menu_with_feedback(self) -> None:
         self.assertEqual(self.picked["menus"], [{"browser": False}], "the browser's own menu must not open")
@@ -140,10 +245,50 @@ class FeedbackMenuTests(unittest.TestCase):
         self.assertEqual(self.picked["focused"], "menuitem")
 
     def test_shift_f10_opens_the_menu_on_the_focused_element(self) -> None:
-        self.assertEqual(self.shift_f10, {"open": True, "focused": "menuitem", "nearRow": True})
+        self.assertEqual(self.shift_f10, {"open": True, "focused": "menuitem", "nearRow": True, "browser": False})
 
     def test_the_context_menu_key_opens_the_menu_on_the_focused_element(self) -> None:
-        self.assertEqual(self.menu_key, {"open": True, "focused": "menuitem", "nearRow": True})
+        self.assertEqual(self.menu_key, {"open": True, "focused": "menuitem", "nearRow": True, "browser": False})
+
+    def test_a_contextmenu_on_goalies_open_menu_is_prevented(self) -> None:
+        self.assertTrue(self.both["opened"], self.both)
+        self.assertEqual(self.both["menus"], [{"browser": False}], self.both)
+        self.assertTrue(self.both["open"], self.both)
+
+    def test_keyboard_focus_comes_back_to_the_row(self) -> None:
+        self.assertEqual(self.back, {"menuEscape": True, "menuTab": {"closed": True}, "dialogOpen": True, "dialogEscape": True, "dialogClose": True, "sent": 1, "afterSend": True})
+
+    def test_a_click_outside_closes_the_menu(self) -> None:
+        self.assertEqual(self.outside, {"opened": True, "after": False})
+
+    def test_the_picked_element_is_marked_until_the_dialog_closes(self) -> None:
+        self.assertEqual(self.mark, {"inMenu": [True], "inDialog": [True], "after": 0})
+
+    def test_the_feedback_control_and_dialog_keep_the_browsers_menu(self) -> None:
+        self.assertEqual(self.chrome, {"button": {"menus": [{"browser": True}], "goalie": False}, "dialog": {"menus": [{"browser": True}], "goalie": False}})
+
+    def test_an_avatar_is_its_actor(self) -> None:
+        name = self.owner["name"]
+        self.assertEqual(self.avatar["shown"], f"About: {name} (actor)")
+        self.assertEqual(self.avatar["sent"][0]["focus"], {"label": name, "id": self.owner["id"], "kind": "actor", "breadcrumb": self.goal["breadcrumb"] + [self.goal["label"]]})
+
+    def test_a_work_row_is_its_work_item(self) -> None:
+        self.assertEqual(self.work["shown"], f"About: {self.work['title']} (work item)")
+        focus = self.work["sent"][0]["focus"]
+        self.assertEqual((focus["kind"], focus["label"], focus["breadcrumb"]), ("work item", self.work["title"], ["Work items"]))
+        self.assertIn(focus["id"], self.work_ids)
+
+    def test_the_goal_page_is_its_goal_and_a_field_is_its_name_only(self) -> None:
+        self.assertEqual(self.goal_page["title"], f"About: {self.goal['label']} (goal)")
+        self.assertEqual(self.goal_page["sent"][0]["focus"], {"label": self.goal["label"], "id": self.goal["id"], "kind": "goal", "breadcrumb": ["Goal page"]})
+        self.assertEqual(self.goal_page["field"], "About: State (field)")
+        self.assertEqual(self.goal_page["sent"][1]["focus"], {"label": "State", "id": "State", "kind": "field", "breadcrumb": ["Goal page", self.goal["label"]]})
+
+    def test_in_the_new_goal_form_the_form_is_the_focus_not_the_owner_picked(self) -> None:
+        self.assertEqual(self.form["showing"], "Tig", self.form)
+        self.assertEqual(self.form["shown"], "About: New goal (form)")
+        self.assertEqual(self.form["sent"][0]["focus"], {"label": "New goal", "id": "New goal", "kind": "form", "breadcrumb": ["New goal"]})
+        self.assertNotIn("Tig", json.dumps(self.form["sent"]))
 
     def test_escape_closes_the_menu(self) -> None:
         self.assertEqual(self.escape, {"opened": True, "after": False, "dialog": False})

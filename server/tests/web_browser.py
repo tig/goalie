@@ -18,7 +18,7 @@ MEASURE = Path(__file__).resolve().parent / "measure_page.mjs"
 BUILD = SERVER / "web" / "dist" / "index.html"
 MAC_CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
-Open = Callable[[int, str], Any]
+Open = Callable[..., Any]
 
 
 def chrome() -> str | None:
@@ -27,8 +27,9 @@ def chrome() -> str | None:
 
 
 @contextmanager
-def signed_app() -> Iterator[tuple[Open, Callable[[str], Any]]]:
-    """Yield open(width, expression), which loads Home in a fresh Chrome and returns what the expression gives, and api(path), which reads the API as Chelsea.
+def signed_app(*seeds: str) -> Iterator[tuple[Open, Callable[[str], Any]]]:
+    """Yield open(width, expression, path="/"), which loads the page in a fresh Chrome and returns what the expression gives, and api(path), which reads the API as Chelsea.
+    Each of seeds (a path under server/) loads after the Excaliwire seed.
     CI builds the app and has Chrome, so there a missing one fails. A local run without them skips."""
     browser = chrome()
     missing = "no Chrome (set CHROME)" if not browser else "no build (run npm run build --prefix server)" if not BUILD.is_file() else ""
@@ -38,16 +39,17 @@ def signed_app() -> Iterator[tuple[Open, Callable[[str], Any]]]:
         raise unittest.SkipTest(missing)
     store = Store()
     try:
-        code, result = store.run("seed")
-        assert code == 0, result
+        for seed in ("", *seeds):
+            code, result = store.run("seed", *([seed] if seed else []))
+            assert code == 0, result
         chelsea = store.read("actor", "chelsea")
         assert store.write("tig", update("actor", "chelsea", chelsea["version"], {"subject": "sub-chelsea"}))["ok"]
         token, env = signed("sub-chelsea")
         with running_server(store.path, env) as (proc, port):
             assert get(proc, port, "/health").status == 200
 
-            def open_page(width: int, expression: str) -> Any:
-                done = subprocess.run(["node", str(MEASURE), str(browser), f"http://127.0.0.1:{port}/", str(width), "812", expression], capture_output=True, text=True, timeout=90, env={**os.environ, "GOALIE_TOKEN": token})
+            def open_page(width: int, expression: str, path: str = "/") -> Any:
+                done = subprocess.run(["node", str(MEASURE), str(browser), f"http://127.0.0.1:{port}{path}", str(width), "812", expression], capture_output=True, text=True, timeout=90, env={**os.environ, "GOALIE_TOKEN": token})
                 if done.returncode != 0:
                     raise AssertionError(done.stderr)
                 return json.loads(done.stdout)
