@@ -11,7 +11,7 @@ import { dateLabel } from "./model/labels.ts";
 import { backPath, goalPath } from "./model/route.ts";
 import { Avatar, HealthDot } from "./parts.tsx";
 import { homeSearch, Link } from "./router.tsx";
-import { encodeFocus } from "./model/feedback.ts";
+import { encodeFocus, formFocus } from "./model/feedback.ts";
 
 /**
  * The goal page (docs/design/goal-page-and-create.md, G1 to G24). It reads GET /api/goals/:id.
@@ -508,6 +508,7 @@ function Talk({ data, reload }: { data: GoalPageResponse; reload: () => void }) 
       </h2>
       <form
         className="commentbox"
+        data-focus={formFocus("Comment")}
         onSubmit={async (e) => {
           e.preventDefault();
           const { body } = await postCommands(commentBatch("goal", data.goal.id, text));

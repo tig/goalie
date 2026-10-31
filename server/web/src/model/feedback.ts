@@ -30,8 +30,8 @@ export function feedbackBody(note: string, url: string, focus?: FeedbackFocus): 
 
 /*
  * Picking an element. Ported from excaliwire/factory presentation-core src/feedback/hit.ts and describe.ts at 7d1a70cf596ec1ec7ada03668df302b9520bcb50,
- * with their tests in server/tests/test_web_feedback.py. The Canon Viewer resolves data-focus against circuit.yaml. GOALIE writes the item itself into data-focus,
- * so the focus is only what the element shows: never typed text or a field's value.
+ * with their tests in server/tests/test_web_feedback.py. The Canon Viewer resolves data-focus against circuit.yaml. GOALIE writes the item itself into data-focus:
+ * a stored item's name, id, and kind, a field's name, or an edit form's own title. Inside an edit form the form is the pick (focusChain), so no value in it is sent.
  */
 
 /** The feedback control and its dialog. A right-click there keeps the browser's menu. */
@@ -72,6 +72,18 @@ export function decodeFocus(raw: string | null | undefined): FocusItem | null {
   }
   return null;
 }
+
+/**
+ * An edit form is a draft, not an item: nothing inside it is picked, so no value in it is sent. The outermost form in the chain is the pick.
+ * `chain` is outermost first. Items may carry more, such as their element.
+ */
+export function focusChain<T extends FocusItem>(chain: T[]): T[] {
+  const form = chain.findIndex((item) => item.kind === "form");
+  return form < 0 ? chain : chain.slice(0, form + 1);
+}
+
+/** The data-focus of an edit form. Its name is the form's own title, never a value in it. */
+export const formFocus = (label: string) => encodeFocus({ kind: "form", id: label, label });
 
 /** The focus of a pick: the innermost item, and the page's name and the items around it as the breadcrumb. No item is no focus. */
 export function feedbackFocus(page: string, chain: FocusItem[]): FeedbackFocus | undefined {

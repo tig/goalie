@@ -6,6 +6,7 @@ import { closeBatch, fieldsBatch, goalTypes, healthBatch, promoteAndClose, promo
 import { eventValue, humans } from "./model/goalpage.ts";
 import { healthWord } from "./model/labels.ts";
 import { HealthDot } from "./parts.tsx";
+import { formFocus } from "./model/feedback.ts";
 
 /**
  * The goal page's panels (G9 to G19). One panel at a time, in place. Each Save posts one batch; the server checks every rule.
@@ -57,7 +58,7 @@ function Current({ saved, field, data }: { saved: Saved; field: string; data: Go
 function Shell({ title, tone, saved, fields, onSave, onCancel, saveLabel = "Save", note, children }: { title: string; tone?: string; saved: Saved; fields: string[]; onSave: () => void; onCancel: () => void; saveLabel?: string; note?: string; children: ReactNode }) {
   const loose = saved.violations.filter((v) => !v.field || !fields.includes(v.field));
   return (
-    <section className={`panel${tone ? ` ${tone}` : ""}`} aria-label={title}>
+    <section className={`panel${tone ? ` ${tone}` : ""}`} aria-label={title} data-focus={formFocus(title)}>
       <h3>{title}</h3>
       {saved.stale && <p className="stale">Someone saved this goal after you opened it.</p>}
       {saved.message && <p className="ferror">{saved.message}</p>}

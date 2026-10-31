@@ -6,7 +6,7 @@ import { focusAfterMove, moveIn, moveTo } from "./model/commands.ts";
 import { goalPath } from "./model/route.ts";
 import { Link, navigate } from "./router.tsx";
 import { Avatar, CHEVRON, HealthDot, look, Rank } from "./parts.tsx";
-import { encodeFocus } from "./model/feedback.ts";
+import { encodeFocus, formFocus } from "./model/feedback.ts";
 
 /** The x of the health dot's center at a level: the rank column, the gap, the indent, half the dot. The sizes are CSS variables on .board. */
 const railX = (level: number) => `calc(var(--rank) + var(--colgap) + ${level} * var(--indent) + 5px)`;
@@ -193,7 +193,7 @@ export function GoalTree(props: TreeProps) {
   };
   const ask = (p: PriorityRow) =>
     pending?.moved === p.id && (
-      <div className="rankreason">
+      <div className="rankreason" data-focus={formFocus("Reason for the new order")}>
         <input value={reason} placeholder="Reason" aria-label="Reason for the new order" autoFocus={focusAfterMove(pending.via) === "reason"} onChange={(e) => setReason(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} />
         <button type="button" className="btn primary" onClick={save}>
           Save

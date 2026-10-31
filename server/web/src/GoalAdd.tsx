@@ -6,6 +6,7 @@ import type { Done } from "./GoalPanels.tsx";
 import { goalTypes, savedStatus, subGoalBatch, workItemBatch, workItemStatusBatch, type SubGoalRow } from "./model/commands.ts";
 import { humans } from "./model/goalpage.ts";
 import { dateLabel } from "./model/labels.ts";
+import { formFocus } from "./model/feedback.ts";
 
 /** + Sub-goal, + Work item, and the work item tick (G20, G22, G24). Each posts one batch; the server checks every rule. */
 
@@ -56,7 +57,7 @@ export function AddSubGoal({ data, onDone }: { data: GoalPageResponse; onDone: D
   const uncommitted = own && date.date_type !== "Committed";
   const row: SubGoalRow = { summary, owner, ...(own ? { date } : {}), ...(uncommitted ? { milestone: { ...ms, summary: ms.summary || `Commit a date for ${summary}` } } : {}) };
   return (
-    <section className="panel addrow" aria-label="Sub-goal">
+    <section className="panel addrow" aria-label="Sub-goal" data-focus={formFocus("Sub-goal")}>
       <div className="addgrid">
         <label className="field">
           <span className="flabel">Summary</span>
@@ -135,7 +136,7 @@ export function AddWorkItem({ data, statuses, onDone }: { data: GoalPageResponse
   const [due, setDue] = useState("");
   const [result, post] = usePost((b) => onDone(true, savedStatus("workitem", b)));
   return (
-    <section className="panel addrow" aria-label="Work item">
+    <section className="panel addrow" aria-label="Work item" data-focus={formFocus("Work item")}>
       <div className="addgrid four">
         <label className="field">
           <span className="flabel">Title</span>

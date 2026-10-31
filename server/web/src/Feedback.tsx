@@ -1,24 +1,22 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { postFeedback } from "./data.ts";
-import { createFeedbackMark, decodeFocus, feedbackFocus, isFeedbackChrome, isTyping, menuPoint, NOTE_MAX, type FeedbackAnswer, type FeedbackFocus, type FocusItem } from "./model/feedback.ts";
+import { createFeedbackMark, decodeFocus, feedbackFocus, focusChain, isFeedbackChrome, isTyping, menuPoint, NOTE_MAX, type FeedbackAnswer, type FeedbackFocus, type FocusItem } from "./model/feedback.ts";
 import { parseRoute, type Route } from "./model/route.ts";
 import { useDismiss } from "./useScreen.ts";
 
 /** The first name in a focus breadcrumb: the page the element is on. */
 const PAGE_NAME: Record<Route["page"], string> = { home: "Home", work: "Work items", new: "New goal", goal: "Goal page" };
 
-/** The element under a right-click, and every element around it, that names an item in data-focus. Outermost first. */
+/** The element under a right-click, and every element around it, that names an item in data-focus, outermost first. Inside an edit form, the form is the pick. */
 function pickedChain(target: Element): { items: FocusItem[]; picked: Element | null } {
-  const items: FocusItem[] = [];
-  let picked: Element | null = null;
+  const found: (FocusItem & { el: Element })[] = [];
   for (let el = target.closest("[data-focus]"); el; el = el.parentElement?.closest("[data-focus]") ?? null) {
     const item = decodeFocus(el.getAttribute("data-focus"));
-    if (!item) continue;
-    items.unshift(item);
-    picked ??= el;
+    if (item) found.unshift({ ...item, el });
   }
-  return { items, picked };
+  const chain = focusChain(found);
+  return { items: chain.map(({ kind, id, label }) => ({ kind, id, label })), picked: chain.at(-1)?.el ?? null };
 }
 
 type Menu = { x: number; y: number; focus?: FeedbackFocus; back: Element | null };
@@ -37,6 +35,8 @@ export function Feedback() {
   const [menu, setMenu] = useState<Menu | null>(null);
   const [place, setPlace] = useState<CSSProperties>({});
   const [focus, setFocus] = useState<FeedbackFocus | undefined>();
+  // Where keyboard focus goes when the dialog closes: the element the menu opened on. The menu item that had focus is gone by then.
+  const returnTo = useRef<HTMLElement | null>(null);
   const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
   const [answer, setAnswer] = useState<FeedbackAnswer | undefined>();
@@ -49,6 +49,11 @@ export function Feedback() {
     };
     const mine = (target: EventTarget | null): target is Element => target instanceof Element && !isFeedbackChrome(target) && !isTyping(target);
     const onMenu = (e: MouseEvent) => {
+      // A contextmenu while GOALIE's menu is open, such as the ContextMenu key on its item, must not open the browser's menu over it.
+      if (document.querySelector(".ctxmenu") || (e.target instanceof Element && e.target.closest(".ctxmenu"))) {
+        e.preventDefault();
+        return;
+      }
       if (e.defaultPrevented || !mine(e.target)) return;
       e.preventDefault();
       open(e.target, e);
@@ -84,7 +89,8 @@ export function Feedback() {
   }, [menu, mark]);
   useDismiss(Boolean(menu), [menuBox], closeMenu);
 
-  const openDialog = (about?: FeedbackFocus) => {
+  const openDialog = (about?: FeedbackFocus, back?: Element | null) => {
+    returnTo.current = back instanceof HTMLElement && back !== document.body ? back : null;
     setMenu(null);
     setFocus(about);
     setAnswer(undefined);
@@ -131,7 +137,7 @@ export function Feedback() {
               }
             }}
           >
-            <button ref={item} type="button" role="menuitem" onClick={() => openDialog(menu.focus)}>
+            <button ref={item} type="button" role="menuitem" onClick={() => openDialog(menu.focus, menu.back)}>
               Feedback...
             </button>
           </div>,
@@ -145,6 +151,8 @@ export function Feedback() {
         onClose={() => {
           mark.set(null);
           setFocus(undefined);
+          if (returnTo.current?.isConnected) returnTo.current.focus();
+          returnTo.current = null;
         }}
       >
         <form

@@ -10,6 +10,7 @@ import { countLine, detailsLine, makes, placeOf, ruleAnswer, toSave, type SaveLi
 import { backPath, goalPath } from "./model/route.ts";
 import { Avatar, HealthDot, Help } from "./parts.tsx";
 import { homeSearch, Link, navigate } from "./router.tsx";
+import { formFocus } from "./model/feedback.ts";
 
 /**
  * New goal v2, foundation first (docs/design/goal-page-and-create.md, NF1 to NF18; interaction rules NG2 to NG7).
@@ -217,7 +218,7 @@ function Form({ options, parent, under, back }: { options: FormOptions; parent?:
   const stopped = latest && couldNot && !latest.ok && latest.error !== "invalid" ? (latest.error === "stale" ? "Someone saved a goal this form uses. Reload the page and try again." : latest.message) : null;
 
   return (
-    <main className="newgoal">
+    <main className="newgoal" data-focus={formFocus("New goal")}>
       {back}
       <h1>New goal</h1>
       {/* NF18: on a phone and under 960 px, the count is a line at the top that opens the checklist. */}

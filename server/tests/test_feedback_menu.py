@@ -25,6 +25,7 @@ SETUP = """
   window.fetch = async (url, init) => {
     if (String(url).endsWith("/api/feedback")) {
       sent.push(JSON.parse(init.body));
+      if (window.__refuse) return new Response(JSON.stringify({ error: "not_found", reason: "no API route POST /api/feedback" }), { status: 404, headers: { "content-type": "application/json" } });
       return new Response(JSON.stringify({ ok: true, issueUrl: "https://github.com/tig/goalie/issues/7", number: 7 }), { status: 201, headers: { "content-type": "application/json" } });
     }
     return real(url, init);
@@ -193,8 +194,57 @@ GOAL_PAGE = scenario("""
   await pickFeedback();
   const field = about();
   await send("State note.");
-  return { title, field, sent };
+  await key("Escape");
+  const owner = [...document.querySelectorAll(".prop .plabel")].find((e) => e.textContent === "Owner");
+  await rightClick(owner);
+  await pickFeedback();
+  const ownerField = about();
+  await send("Owner note.");
+  return { title, field, ownerField, sent };
 """, ready=".gtitle")
+
+# Every edit form on a goal page is the pick for anything inside it: the field form, a panel, the two add rows, and the comment box.
+EDIT_FORMS = scenario("""
+  const byText = (text) => [...document.querySelectorAll("main button")].find((b) => b.textContent.trim() === text || b.getAttribute("aria-label") === text);
+  const aboutIn = async (root) => {
+    await rightClick([...root.querySelectorAll("button")].at(-1));
+    await pickFeedback();
+    const shown = about();
+    await key("Escape");
+    // Close the form, so the next one can open.
+    const cancel = [...root.querySelectorAll("button")].find((b) => b.textContent.trim() === "Cancel");
+    if (cancel) await click(cancel);
+    return shown;
+  };
+  const out = {};
+  await click(byText("Change Owner")); out.change = await aboutIn(document.querySelector(".pform"));
+  await click(byText("At risk")); const panel = document.querySelector("section.panel:not(.addrow)"); out.panel = [await aboutIn(panel), panel.getAttribute("aria-label")];
+  await click(byText("+ Add sub-goal")); out.subGoal = await aboutIn(document.querySelector("section.addrow[aria-label='Sub-goal']"));
+  await click(byText("+ Add work item")); out.workItem = await aboutIn(document.querySelector("section.addrow[aria-label='Work item']"));
+  out.comment = await aboutIn(document.querySelector("form.commentbox"));
+  return out;
+""", ready=".gtitle")
+
+# A note that was not sent stays in the box. A note that was sent leaves it.
+KEPT = scenario("""
+  window.__refuse = true;
+  await click(document.querySelector(".topfeedback"));
+  await send("Keep this note.");
+  const refused = { value: dialog().querySelector("textarea").value, status: dialog().querySelector("[role=status]").textContent };
+  window.__refuse = false;
+  await click(dialog().querySelector("button[type=submit]"));
+  await sleep(300);
+  return { refused, sent: { value: dialog().querySelector("textarea").value, status: dialog().querySelector("[role=status]").textContent } };
+""")
+
+# A right-click at the screen's right edge opens the menu 8 px inside it.
+EDGE = scenario("""
+  const row = document.querySelector(".goal [role=link]").getBoundingClientRect();
+  await input({ mouse: "right", x: innerWidth - 3, y: row.top + row.height / 2 });
+  await sleep(80);
+  const m = menu()?.getBoundingClientRect();
+  return { width: innerWidth, right: m ? m.right : null };
+""")
 
 # Dubric's case on #57: pick Tig in the New goal form's Owner select, then right-click the owner avatar beside it.
 NEW_GOAL_FORM = scenario("""
@@ -227,6 +277,10 @@ class FeedbackMenuTests(unittest.TestCase):
             cls.work = open_page(1280, WORK_ROW, "/work")
             cls.goal_page = open_page(1280, GOAL_PAGE, f"/goals/{goal['id']}")
             cls.form = open_page(1280, NEW_GOAL_FORM, "/goals/new")
+            cls.kept, cls.edge = open_page(1280, KEPT), open_page(1280, EDGE)
+            # A goal Chelsea owns, so she may change it and its edit forms open.
+            mine = next(g["id"] for p in api("/api/priorities")["funded"] for g in p["goals"] if g["owner"]["id"] == "chelsea")
+            cls.forms = open_page(1280, EDIT_FORMS, f"/goals/{mine}")
 
     def test_right_click_on_a_goal_opens_the_goalie_menu_with_feedback(self) -> None:
         self.assertEqual(self.picked["menus"], [{"browser": False}], "the browser's own menu must not open")
@@ -283,6 +337,21 @@ class FeedbackMenuTests(unittest.TestCase):
         self.assertEqual(self.goal_page["sent"][0]["focus"], {"label": self.goal["label"], "id": self.goal["id"], "kind": "goal", "breadcrumb": ["Goal page"]})
         self.assertEqual(self.goal_page["field"], "About: State (field)")
         self.assertEqual(self.goal_page["sent"][1]["focus"], {"label": "State", "id": "State", "kind": "field", "breadcrumb": ["Goal page", self.goal["label"]]})
+        # A field with a value to change is its name and its field id, never its value.
+        self.assertEqual(self.goal_page["ownerField"], "About: Owner (field)")
+        self.assertEqual(self.goal_page["sent"][2]["focus"], {"label": "Owner", "id": "owner", "kind": "field", "breadcrumb": ["Goal page", self.goal["label"]]})
+
+    def test_a_note_not_sent_stays_and_a_sent_note_leaves(self) -> None:
+        self.assertEqual(self.kept, {"refused": {"value": "Keep this note.", "status": "Feedback is not available. Your issue was not sent."}, "sent": {"value": "", "status": "Filed as issue #7"}})
+
+    def test_the_menu_stays_8_px_inside_the_screen(self) -> None:
+        self.assertIsNotNone(self.edge["right"], self.edge)
+        self.assertLessEqual(self.edge["right"], self.edge["width"] - 8, self.edge)
+        self.assertGreater(self.edge["right"], self.edge["width"] - 40, self.edge)
+
+    def test_every_edit_form_on_a_goal_page_is_the_pick_inside_it(self) -> None:
+        panel, title = self.forms["panel"]
+        self.assertEqual({**self.forms, "panel": panel}, {"change": "About: Change Owner (form)", "panel": f"About: {title} (form)", "subGoal": "About: Sub-goal (form)", "workItem": "About: Work item (form)", "comment": "About: Comment (form)"})
 
     def test_in_the_new_goal_form_the_form_is_the_focus_not_the_owner_picked(self) -> None:
         self.assertEqual(self.form["showing"], "Tig", self.form)
