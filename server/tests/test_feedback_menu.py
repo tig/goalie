@@ -246,6 +246,14 @@ EDGE = scenario("""
   return { width: innerWidth, right: m ? m.right : null };
 """)
 
+CALENDAR_CHIP = scenario("""
+  const chip = document.querySelector(".chip");
+  const title = chip.querySelector(".ctitle").textContent;
+  await rightClick(chip);
+  await pickFeedback();
+  return { title, shown: about() };
+""", ready=".chip")
+
 # Dubric's case on #57: pick Tig in the New goal form's Owner select, then right-click the owner avatar beside it.
 NEW_GOAL_FORM = scenario("""
   const select = document.querySelector(".ownerpick select");
@@ -278,6 +286,7 @@ class FeedbackMenuTests(unittest.TestCase):
             cls.goal_page = open_page(1280, GOAL_PAGE, f"/goals/{goal['id']}")
             cls.form = open_page(1280, NEW_GOAL_FORM, "/goals/new")
             cls.kept, cls.edge = open_page(1280, KEPT), open_page(1280, EDGE)
+            cls.chip = open_page(1280, CALENDAR_CHIP, "/?view=calendar")
             # A goal Chelsea owns, so she may change it and its edit forms open.
             mine = next(g["id"] for p in api("/api/priorities")["funded"] for g in p["goals"] if g["owner"]["id"] == "chelsea")
             cls.forms = open_page(1280, EDIT_FORMS, f"/goals/{mine}")
@@ -340,6 +349,9 @@ class FeedbackMenuTests(unittest.TestCase):
         # A field with a value to change is its name and its field id, never its value.
         self.assertEqual(self.goal_page["ownerField"], "About: Owner (field)")
         self.assertEqual(self.goal_page["sent"][2]["focus"], {"label": "Owner", "id": "owner", "kind": "field", "breadcrumb": ["Goal page", self.goal["label"]]})
+
+    def test_a_calendar_chip_is_its_goal(self) -> None:
+        self.assertEqual(self.chip["shown"], f"About: {self.chip['title']} (goal)")
 
     def test_a_note_not_sent_stays_and_a_sent_note_leaves(self) -> None:
         self.assertEqual(self.kept, {"refused": {"value": "Keep this note.", "status": "Feedback is not available. Your issue was not sent."}, "sent": {"value": "", "status": "Filed as issue #7"}})
