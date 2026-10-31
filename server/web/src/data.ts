@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ApiError, CommandsRequest, CommandsResponse } from "../../src/api.ts";
 import { commandsAnswer } from "./model/commands.ts";
-import { FEEDBACK_PATH, feedbackAnswer, feedbackBody, type FeedbackAnswer } from "./model/feedback.ts";
+import { FEEDBACK_PATH, feedbackAnswer, feedbackBody, type FeedbackAnswer, type FeedbackFocus } from "./model/feedback.ts";
 
 /** Reading the API. Every read is one GET with the actor's session; the server holds the rules. */
 
@@ -52,12 +52,12 @@ export async function postCommands(batch: CommandsRequest): Promise<{ status: nu
 }
 
 /**
- * POST /api/feedback: one note and this page's URL. A redirect is not followed, and the answer for one is "sign in again".
+ * POST /api/feedback: one note, this page's URL, and the picked element's focus when there is one. A redirect is not followed, and the answer for one is "sign in again".
  * The URL has no query and no hash: tig/goalie is public, and the query can hold search text.
  */
-export async function postFeedback(note: string): Promise<FeedbackAnswer> {
+export async function postFeedback(note: string, focus?: FeedbackFocus): Promise<FeedbackAnswer> {
   try {
-    const reply = await fetch(FEEDBACK_PATH, { method: "POST", redirect: "manual", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify(feedbackBody(note, location.origin + location.pathname)) });
+    const reply = await fetch(FEEDBACK_PATH, { method: "POST", redirect: "manual", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify(feedbackBody(note, location.origin + location.pathname, focus)) });
     return feedbackAnswer({ status: reply.status, type: reply.type, contentType: reply.headers.get("content-type") ?? "", text: await reply.text().catch(() => "") });
   } catch {
     return feedbackAnswer({ status: 0, type: "error", contentType: "", text: "" });

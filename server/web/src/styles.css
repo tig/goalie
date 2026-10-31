@@ -693,6 +693,15 @@ select.wstatus{height:28px;border:1px solid var(--cut);border-radius:8px;backgro
 .feedback .refused{color:var(--red-ink)}
 .feedbackrow{display:flex;gap:8px}
 @media (pointer:coarse){.feedback textarea{min-height:88px}.feedbackrow .btn{min-height:44px}}
+/* #56: GOALIE's right-click menu, the element it picked, and what the dialog says was picked. */
+.ctxmenu{position:fixed;z-index:200;min-width:160px;padding:4px;background:var(--card);border:1px solid var(--cut);border-radius:12px;box-shadow:0 6px 20px var(--tip-shadow)}
+.ctxmenu [role=menuitem]{display:flex;align-items:center;width:100%;padding:8px 12px;border-radius:8px;font-weight:700;font-size:13px;text-align:left;cursor:pointer}
+.ctxmenu [role=menuitem]:hover,.ctxmenu [role=menuitem]:focus-visible{background:var(--control);outline:none}
+@media (pointer:coarse){.ctxmenu [role=menuitem]{min-height:44px}}
+[data-feedback-focused]{outline:2px solid var(--focus);outline-offset:2px}
+.feedbackfocus{margin:0 0 10px}
+.feedbackfocus p{margin:0}
+.feedbackabout{font-weight:700}
 @media (pointer:coarse){.dhead{min-height:44px}.btn.create{min-height:48px}}
 @media (pointer:coarse){.phonesum .counts{gap:0}.phonesum .count{min-height:44px}}
 .goal>.row{cursor:pointer}.goal>.row:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}

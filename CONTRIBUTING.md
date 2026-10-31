@@ -61,7 +61,7 @@ The default host is `127.0.0.1`.
 `POST /api/commands` writes: a list of commands, in order, in one transaction (`CommandsRequest`). With `check: true` it runs the batch, rolls it back, and answers the same.
 `GET /api/events` streams each committed goal and work item Event as Server-Sent Events ([ADR 0007](docs/adr/0007-live-update.md)). `id` is the sequence. `Last-Event-ID` resumes from the log. A rolled-back or `check` batch sends nothing. A write from `node src/cli.ts` runs in another process and is not streamed.
 Every other `/api/` path answers 404. An `/api/` request with no verified token answers 401 with `{"error", "reason"}`.
-GOALIE has no `/api/feedback` route. The app's Feedback control posts a note and the page URL there. The URL has no query and no hash. Host configuration is to send that path to xw-feedback before GOALIE sees it. Until the host does, GOALIE answers 404, and the app says that feedback is not available.
+GOALIE has no `/api/feedback` route. The app's Feedback button, and Feedback... on the menu a right-click opens, post a note, the page URL, and the right-clicked element there. The URL has no query and no hash. Host configuration is to send that path to xw-feedback before GOALIE sees it. Until the host does, GOALIE answers 404, and the app says that feedback is not available.
 `GET /assets/*` answers a file of the build. Any other path that names a file, such as `/main.js`, answers 404. Every other path answers the build's `index.html`, so the app routes in the browser.
 A page or asset request with no verified token answers 401 with the sign-in page. The sign-in page loads the shared Excaliwire chrome from `/_xw/`. Host configuration serves `/_xw/`.
 With no build in `GOALIE_WEB_DIST`, a page request answers 503 with a plain message.
@@ -75,7 +75,7 @@ A pull request merged into `develop` publishes. A push to `main` does not publis
 It must not run on a pull request.
 
 Server tests are Python unittest in `server/tests/`.
-The serving test points `GOALIE_WEB_DIST` at a temporary folder with a stub `index.html`. `test_top_bar_phone.py` opens the built app at 375, 360, and 1280 px in headless Chrome, through `server/tests/measure_page.mjs`. It skips with no build or no Chrome, and fails instead when `CI` is set. `CHROME` names the browser. The other server tests read only `/health`, `/api/`, and the sign-in page, and need no build.
+The serving test points `GOALIE_WEB_DIST` at a temporary folder with a stub `index.html`. `test_top_bar_phone.py` and `test_feedback_menu.py` open the built app in headless Chrome, through `server/tests/web_browser.py` and `measure_page.mjs`. They skip with no build or no Chrome, and fail instead when `CI` is set. `CHROME` names the browser. The other server tests read only `/health`, `/api/`, and the sign-in page, and need no build.
 
 Local preview of the built app:
 
