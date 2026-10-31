@@ -1,4 +1,5 @@
-"""Right-click anywhere in GOALIE opens its own menu with "Feedback...". The element picked is the note's focus (#56). Measured in headless Chrome on the built app, with the feedback post caught in the page."""
+"""Right-click anywhere in GOALIE, except in a text field, opens its own menu with "Feedback...". The element picked is the note's focus (#56).
+Measured in headless Chrome on the built app. The mouse and the keys are real input through Chrome (measure_page.mjs), not dispatched events. The feedback post is caught in the page."""
 
 from __future__ import annotations
 
@@ -9,10 +10,16 @@ from web_browser import signed_app
 
 SECRET = "typed-words-must-not-leave-7731"
 
-# Every scenario starts the same way: wait for Home, catch POST /api/feedback, and give helpers to the steps.
+# Every scenario starts the same way: wait for Home, catch POST /api/feedback, record each contextmenu, and give helpers to the steps.
 SETUP = """
   if (!document.querySelector(".goal") || !document.querySelector(".topfeedback")) return null;
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const input = (command) => new Promise((resolve, reject) => {
+    window.__goalieInputDone ??= {};
+    const id = Math.floor(Math.random() * 1e9);
+    window.__goalieInputDone[id] = (error) => (error ? reject(new Error(error)) : resolve());
+    window.goalieInput(JSON.stringify({ id, ...command }));
+  });
   const sent = [];
   const real = window.fetch;
   window.fetch = async (url, init) => {
@@ -22,25 +29,24 @@ SETUP = """
     }
     return real(url, init);
   };
-  const rightClick = (el, keyboard = false) => {
-    const r = el.getBoundingClientRect();
-    const at = keyboard ? {} : { clientX: r.left + 5, clientY: r.top + 5, button: 2 };
-    return el.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, ...at }));
-  };
+  // A contextmenu that GOALIE does not prevent is the browser's own menu.
+  const menus = [];
+  window.addEventListener("contextmenu", (e) => menus.push({ browser: !e.defaultPrevented }));
+  const at = (el) => { const r = el.getBoundingClientRect(); return { x: r.left + Math.min(10, r.width / 2), y: r.top + r.height / 2 }; };
+  const rightClick = async (el) => { await input({ mouse: "right", ...at(el) }); await sleep(80); };
+  const click = async (el) => { await input({ mouse: "left", ...at(el) }); await sleep(80); };
+  const key = async (name, shift = false) => { await input({ key: name, shift }); await sleep(80); };
   const menu = () => document.querySelector("[role=menu]");
   const dialog = () => document.querySelector("dialog.feedback");
-  const type = (el, text) => {
-    const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-    Object.getOwnPropertyDescriptor(proto, "value").set.call(el, text);
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-  };
+  const about = () => dialog()?.querySelector(".feedbackabout")?.textContent ?? null;
+  const pickFeedback = async () => { const item = menu()?.querySelector("[role=menuitem]"); if (item) await click(item); };
   const send = async (note) => {
-    type(dialog().querySelector("textarea"), note);
+    await click(dialog().querySelector("textarea"));
+    await input({ text: note });
     await sleep(50);
-    dialog().querySelector("button[type=submit]").click();
+    await click(dialog().querySelector("button[type=submit]"));
     await sleep(300);
   };
-  const about = () => dialog()?.querySelector(".feedbackabout")?.textContent ?? null;
 """
 
 
@@ -49,66 +55,61 @@ def scenario(steps: str) -> str:
 
 
 RIGHT_CLICK_A_GOAL = scenario("""
-  const goal = document.querySelector(".goal .title");
-  const browserMenu = rightClick(goal);
-  await sleep(50);
+  await rightClick(document.querySelector(".goal .title"));
   const items = menu() ? [...menu().querySelectorAll("[role=menuitem]")].map((e) => e.textContent) : null;
   const focused = document.activeElement?.getAttribute("role") ?? null;
-  menu()?.querySelector("[role=menuitem]")?.click();
-  await sleep(50);
+  await pickFeedback();
   const shown = { open: dialog()?.open ?? false, about: about() };
   if (shown.open) await send("The date looks wrong.");
-  return { browserMenu, items, focused, shown, sent, status: dialog()?.querySelector("[role=status]")?.textContent ?? null };
+  return { menus, items, focused, shown, sent, status: dialog()?.querySelector("[role=status]")?.textContent ?? null };
 """)
 
-KEYBOARD_ON_A_GOAL = scenario("""
+
+def keyboard(name: str, shift: bool) -> str:
+    return scenario(f"""
   const row = document.querySelector(".goal [role=link]");
   row.focus();
-  rightClick(row, true);
-  await sleep(50);
+  await key({json.dumps(name)}, {json.dumps(shift)});
   const box = row.getBoundingClientRect();
   const m = menu()?.getBoundingClientRect();
-  return { open: Boolean(menu()), focused: document.activeElement?.getAttribute("role") ?? null, nearRow: Boolean(m) && m.top >= box.top && m.top <= box.bottom + 8 };
+  return {{ open: Boolean(menu()), focused: document.activeElement?.getAttribute("role") ?? null, nearRow: Boolean(m) && m.top >= box.top && m.top <= box.bottom + 8 }};
 """)
 
+
 ESCAPE = scenario("""
-  rightClick(document.querySelector(".goal .title"));
-  await sleep(50);
+  await rightClick(document.querySelector(".goal .title"));
   const opened = Boolean(menu());
-  document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-  await sleep(50);
+  await key("Escape");
   return { opened, after: Boolean(menu()), dialog: dialog()?.open ?? false };
 """)
 
 TOP_BAR_BUTTON = scenario("""
-  rightClick(document.querySelector(".goal .title"));
-  await sleep(50);
-  menu()?.querySelector("[role=menuitem]")?.click();
-  await sleep(50);
+  await rightClick(document.querySelector(".goal .title"));
+  await pickFeedback();
   const picked = about();
-  [...(dialog()?.querySelectorAll("button") ?? [])].find((b) => b.textContent === "Close")?.click();
-  await sleep(50);
-  document.querySelector(".topfeedback").click();
-  await sleep(50);
+  const close = [...(dialog()?.querySelectorAll("button") ?? [])].find((b) => b.textContent === "Close");
+  if (close) await click(close);
+  await click(document.querySelector(".topfeedback"));
   const shown = { open: dialog()?.open ?? false, about: about() };
   await send("The page is slow.");
   return { picked, shown, sent };
 """)
 
-TYPED_TEXT = scenario(f"""
+TEXT_FIELD = scenario(f"""
   const box = document.querySelector("input[type=search]");
-  box.focus();
-  type(box, {json.dumps(SECRET)});
+  await click(box);
+  await input({{ text: {json.dumps(SECRET)} }});
   await sleep(300);
-  rightClick(box);
-  await sleep(50);
+  await rightClick(box);
+  const inField = {{ menus: [...menus], goalie: Boolean(menu()) }};
+  if (menu()) await key("Escape");
+  await rightClick(document.querySelector(".board h2"));
   const opened = Boolean(menu());
-  menu()?.querySelector("[role=menuitem]")?.click();
-  await sleep(50);
+  await pickFeedback();
   const open = dialog()?.open ?? false;
   const shown = dialog()?.textContent ?? "";
   await send("Search did not find it.");
-  return {{ opened, open, shown, sent }};
+  return {{ inField, opened, open, shown, sent }};
 """)
 
 
@@ -119,10 +120,11 @@ class FeedbackMenuTests(unittest.TestCase):
             first = api("/api/priorities")["funded"][0]
             goal = first["goals"][0]
             cls.goal = {"label": goal["summary"], "id": goal["id"], "kind": "goal", "breadcrumb": ["Home", first["title"]]}
-            cls.picked, cls.keyboard, cls.escape, cls.top_bar, cls.typed = (open_page(1280, s) for s in (RIGHT_CLICK_A_GOAL, KEYBOARD_ON_A_GOAL, ESCAPE, TOP_BAR_BUTTON, TYPED_TEXT))
+            pages = (RIGHT_CLICK_A_GOAL, keyboard("F10", True), keyboard("ContextMenu", False), ESCAPE, TOP_BAR_BUTTON, TEXT_FIELD)
+            cls.picked, cls.shift_f10, cls.menu_key, cls.escape, cls.top_bar, cls.field = (open_page(1280, s) for s in pages)
 
     def test_right_click_on_a_goal_opens_the_goalie_menu_with_feedback(self) -> None:
-        self.assertFalse(self.picked["browserMenu"], "the browser's own menu must not open")
+        self.assertEqual(self.picked["menus"], [{"browser": False}], "the browser's own menu must not open")
         self.assertEqual(self.picked["items"], ["Feedback..."])
 
     def test_choosing_feedback_opens_the_dialog_showing_that_goal(self) -> None:
@@ -134,10 +136,14 @@ class FeedbackMenuTests(unittest.TestCase):
         self.assertEqual(self.picked["sent"][0]["note"], "The date looks wrong.")
         self.assertEqual(self.picked["status"], "Filed as issue #7")
 
-    def test_the_menu_is_reachable_by_keyboard(self) -> None:
-        # The ContextMenu key and Shift+F10 send contextmenu to the focused element with no pointer position.
+    def test_the_menu_takes_keyboard_focus(self) -> None:
         self.assertEqual(self.picked["focused"], "menuitem")
-        self.assertEqual(self.keyboard, {"open": True, "focused": "menuitem", "nearRow": True})
+
+    def test_shift_f10_opens_the_menu_on_the_focused_element(self) -> None:
+        self.assertEqual(self.shift_f10, {"open": True, "focused": "menuitem", "nearRow": True})
+
+    def test_the_context_menu_key_opens_the_menu_on_the_focused_element(self) -> None:
+        self.assertEqual(self.menu_key, {"open": True, "focused": "menuitem", "nearRow": True})
 
     def test_escape_closes_the_menu(self) -> None:
         self.assertEqual(self.escape, {"opened": True, "after": False, "dialog": False})
@@ -149,12 +155,15 @@ class FeedbackMenuTests(unittest.TestCase):
         self.assertEqual(len(self.top_bar["sent"]), 1, self.top_bar)
         self.assertNotIn("focus", self.top_bar["sent"][0])
 
+    def test_a_text_field_keeps_the_browsers_menu(self) -> None:
+        # As in the Canon Viewer: its menu opens only on a picked element, and its text fields keep the browser's menu, so paste and spelling work.
+        self.assertEqual(self.field["inField"], {"menus": [{"browser": True}], "goalie": False})
+
     def test_nothing_typed_in_a_field_is_posted(self) -> None:
-        # Right-click on the search box, with words typed in it, still opens the menu and the dialog.
-        self.assertEqual((self.typed["opened"], self.typed["open"]), (True, True), self.typed)
-        self.assertEqual(len(self.typed["sent"]), 1, self.typed)
-        self.assertNotIn(SECRET, json.dumps(self.typed["sent"]))
-        self.assertNotIn(SECRET, self.typed["shown"])
+        self.assertEqual((self.field["opened"], self.field["open"]), (True, True), self.field)
+        self.assertEqual(len(self.field["sent"]), 1, self.field)
+        self.assertNotIn(SECRET, json.dumps(self.field["sent"]))
+        self.assertNotIn(SECRET, self.field["shown"])
 
 
 if __name__ == "__main__":

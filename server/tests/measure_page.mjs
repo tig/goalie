@@ -2,6 +2,9 @@
 // Usage: node measure_page.mjs <chrome> <url> <width> <height> <expression>
 // The expression returns null until the page is ready. GOALIE_TOKEN, when set, is sent as the bearer token.
 // It uses the Chrome DevTools Protocol over Node's own WebSocket, so the repo needs no browser package.
+// Real input: the page calls goalieInput(JSON of a command) and waits for window.__goalieInputDone[id]. The command goes through Chrome's own input
+// (Input.dispatchMouseEvent, Input.dispatchKeyEvent, Input.insertText), as a person's mouse and keys do, not through dispatchEvent.
+// Commands: {mouse: "left" | "right", x, y}, {key: "Escape" | "Enter" | "Tab" | "ContextMenu" | "F10", shift?: true}, {text}.
 import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -12,6 +15,13 @@ const profile = mkdtempSync(join(tmpdir(), "goalie-chrome-"));
 // --no-sandbox: the only page is the test's own server on 127.0.0.1.
 const browser = spawn(chrome, ["--headless=new", "--no-sandbox", "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--remote-debugging-port=0", `--user-data-dir=${profile}`, "about:blank"], { stdio: "ignore" });
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const KEYS = {
+  Escape: { key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 },
+  Enter: { key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, text: "\r" },
+  Tab: { key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 },
+  ContextMenu: { key: "ContextMenu", code: "ContextMenu", windowsVirtualKeyCode: 93 },
+  F10: { key: "F10", code: "F10", windowsVirtualKeyCode: 121 },
+};
 
 async function until(what, read, seconds = 20) {
   for (let i = 0; i < seconds * 10; i++) {
@@ -36,8 +46,32 @@ try {
   });
   let next = 0;
   const pending = new Map();
+  const realInput = async (command) => {
+    if (command.mouse) {
+      const at = { x: command.x, y: command.y };
+      const button = { button: command.mouse, buttons: command.mouse === "right" ? 2 : 1, clickCount: 1 };
+      await send("Input.dispatchMouseEvent", { type: "mouseMoved", ...at });
+      await send("Input.dispatchMouseEvent", { type: "mousePressed", ...at, ...button });
+      await send("Input.dispatchMouseEvent", { type: "mouseReleased", ...at, ...button, buttons: 0 });
+    } else if (command.key) {
+      const { text, ...key } = KEYS[command.key];
+      const modifiers = command.shift ? 8 : 0;
+      await send("Input.dispatchKeyEvent", { type: text ? "keyDown" : "rawKeyDown", modifiers, ...key, ...(text ? { text } : {}) });
+      await send("Input.dispatchKeyEvent", { type: "keyUp", modifiers, ...key });
+    } else if (typeof command.text === "string") {
+      await send("Input.insertText", { text: command.text });
+    } else {
+      throw new Error(`unknown input ${JSON.stringify(command)}`);
+    }
+  };
+  const done = (id, error) => send("Runtime.evaluate", { expression: `window.__goalieInputDone?.[${id}]?.(${error ? JSON.stringify(error) : ""})` });
   ws.onmessage = (message) => {
     const reply = JSON.parse(message.data);
+    if (reply.method === "Runtime.bindingCalled" && reply.params.name === "goalieInput") {
+      const command = JSON.parse(reply.params.payload);
+      realInput(command).then(() => done(command.id), (error) => done(command.id, String(error)));
+      return;
+    }
     const call = pending.get(reply.id);
     if (!call) return;
     pending.delete(reply.id);
@@ -52,6 +86,8 @@ try {
     });
   await send("Emulation.setDeviceMetricsOverride", { width: Number(width), height: Number(height), deviceScaleFactor: 1, mobile: true });
   await send("Network.enable");
+  await send("Runtime.enable");
+  await send("Runtime.addBinding", { name: "goalieInput" });
   if (process.env.GOALIE_TOKEN) await send("Network.setExtraHTTPHeaders", { headers: { Authorization: `Bearer ${process.env.GOALIE_TOKEN}` } });
   await send("Page.navigate", { url });
   const value = await until("the page to be ready", async () => {
