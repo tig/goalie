@@ -10,6 +10,7 @@ from pathlib import Path
 
 WEB = Path(__file__).resolve().parents[1] / "web" / "src"
 FEEDBACK = (WEB / "model" / "feedback.ts").as_uri()
+DATA = (WEB / "data.ts").as_uri()
 
 URL = "https://goalie.example/goals/XW-0003?view=list"
 NOT_AVAILABLE = "Feedback is not available. Your note was not sent."
@@ -55,10 +56,11 @@ class FeedbackAnswerTests(unittest.TestCase):
     def test_an_empty_note_says_to_write_one(self) -> None:
         self.assertEqual(answer(400, json.dumps({"error": "note is empty"})), {"sent": False, "message": "Write a note, then send it."})
 
-    def test_401_says_to_sign_in_again(self) -> None:
-        self.assertEqual(answer(401, json.dumps({"error": "caller key refused"})), {"sent": False, "message": "Sign in again, then send your note."})
+    def test_401_is_a_refused_caller_key_so_feedback_is_not_available(self) -> None:
+        # xw-feedback answers 401 only when it refuses the caller key that the host adds. Signing in again cannot fix that. A signed-out person gets the sign-in redirect.
+        self.assertEqual(answer(401, json.dumps({"error": "caller key refused"})), {"sent": False, "message": NOT_AVAILABLE})
 
-    def test_a_redirect_to_sign_in_reads_as_401(self) -> None:
+    def test_a_redirect_says_to_sign_in_again(self) -> None:
         # The app posts with redirect "manual". A sign-in redirect is an opaque redirect with status 0, not a network failure.
         self.assertEqual(answer(0, kind="opaqueredirect"), {"sent": False, "message": "Sign in again, then send your note."})
 
@@ -84,6 +86,45 @@ class FeedbackAnswerTests(unittest.TestCase):
 
     def test_another_status_is_named(self) -> None:
         self.assertEqual(answer(500, "boom", "text/plain"), {"sent": False, "message": "Your note was not sent (status 500)."})
+
+
+def post(reply: str) -> dict:
+    """Call data.ts postFeedback on a page with search text and a hash. `reply` is JS for what fetch gives back. Return the request and the answer."""
+    script = f"""globalThis.location = {{ origin: "https://goalie.example", pathname: "/goals/XW-0003", search: "?q=private%20words", hash: "#history", href: "https://goalie.example/goals/XW-0003?q=private%20words#history" }};
+let sent;
+globalThis.fetch = async (url, init) => {{ sent = {{ url, init }}; {reply} }};
+const data = await import("{DATA}");
+const answer = await data.postFeedback("  A note  ");
+process.stdout.write(JSON.stringify({{ url: sent.url, method: sent.init.method, redirect: sent.init.redirect, headers: sent.init.headers, body: JSON.parse(sent.init.body), answer }}));"""
+    proc = subprocess.run(["node", "--no-warnings", "--input-type=module", "-e", script], capture_output=True, text=True, timeout=30)
+    if proc.returncode != 0:
+        raise AssertionError(proc.stderr)
+    return json.loads(proc.stdout)
+
+
+class PostFeedbackTests(unittest.TestCase):
+    """data.ts postFeedback: the request it sends, and how it reads what comes back."""
+
+    def test_it_posts_json_to_the_same_origin_feedback_path(self) -> None:
+        got = post('return new Response(JSON.stringify({ ok: true, issueNumber: 7 }), { status: 201, headers: { "content-type": "application/json" } });')
+        self.assertEqual(got["url"], "/api/feedback")
+        self.assertEqual(got["method"], "POST")
+        self.assertEqual(got["headers"]["content-type"], "application/json")
+        self.assertEqual(got["answer"], {"sent": True, "message": "Sent. Thank you."})
+
+    def test_the_page_url_has_no_query_and_no_hash(self) -> None:
+        # tig/goalie is public. Search text and the hash must not go into an issue.
+        got = post('return new Response("", { status: 404 });')
+        self.assertEqual(got["body"], {"note": "A note", "page": {"url": "https://goalie.example/goals/XW-0003", "app": "goalie"}})
+
+    def test_it_does_not_follow_a_redirect_and_reads_one_as_sign_in(self) -> None:
+        got = post('return { status: 0, type: "opaqueredirect", headers: new Headers(), text: async () => "" };')
+        self.assertEqual(got.get("redirect"), "manual")
+        self.assertEqual(got["answer"], {"sent": False, "message": "Sign in again, then send your note."})
+
+    def test_a_failed_fetch_says_the_server_was_not_reached(self) -> None:
+        got = post('throw new TypeError("fetch failed");')
+        self.assertEqual(got["answer"], {"sent": False, "message": "GOALIE could not reach the server. Your note was not sent."})
 
 
 class FeedbackControlTests(unittest.TestCase):

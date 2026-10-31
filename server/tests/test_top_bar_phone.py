@@ -1,4 +1,4 @@
-"""At 375 px the top bar fits the screen, and Feedback and New goal are each at least 44 by 44 px (#56). At 375 px and at 1280 px the bar is as tall as --topbar, which sticky heads sit under. Measured in headless Chrome on the built app."""
+"""At 375 px and at 360 px the top bar fits the screen, and Feedback and New goal are each at least 44 by 44 px (#56). At 375 px and at 1280 px the bar is as tall as --topbar, which sticky heads sit under. Measured in headless Chrome on the built app."""
 
 from __future__ import annotations
 
@@ -36,6 +36,8 @@ TOP_BAR = """(async () => {
     feedback: box(feedback),
     newGoal: box(newGoal),
     clippedTabs: [...bar.querySelectorAll(".tab")].filter((t) => t.scrollWidth > t.clientWidth).map((t) => t.textContent),
+    tabsEnd: Math.max(...[...bar.querySelectorAll(".tab")].map((t) => t.getBoundingClientRect().right)),
+    feedbackStart: feedback.getBoundingClientRect().left,
   };
 })()"""
 
@@ -71,24 +73,32 @@ class TopBarPhoneTests(unittest.TestCase):
             token, env = signed("sub-chelsea")
             with running_server(store.path, env) as (proc, port):
                 assert get(proc, port, "/health").status == 200
-                cls.bar, cls.desktop = (measure(str(browser), f"http://127.0.0.1:{port}/", width, token) for width in (375, 1280))
+                # 360 px is the narrowest width where the bar fits. There, a logo or a button that may shrink is squeezed under 44 px.
+                cls.bar, cls.narrow, cls.desktop = (measure(str(browser), f"http://127.0.0.1:{port}/", width, token) for width in (375, 360, 1280))
         finally:
             store.close()
 
+    def phones(self) -> tuple[tuple[int, dict], ...]:
+        return ((375, self.bar), (360, self.narrow))
+
     def test_the_page_draws_the_phone_layout(self) -> None:
-        self.assertTrue(self.bar["phone"])
-        self.assertEqual(self.bar["viewport"], 375)
+        for width, bar in self.phones():
+            self.assertTrue(bar["phone"], width)
+            self.assertEqual(bar["viewport"], width)
 
     def test_the_top_bar_is_no_wider_than_the_screen(self) -> None:
-        self.assertLessEqual(self.bar["page"], 375, self.bar)
-        self.assertLessEqual(self.bar["bar"], 375, self.bar)
-        self.assertLessEqual(self.bar["right"], 375, self.bar)
-        self.assertEqual(self.bar["clippedTabs"], [], self.bar)
+        for width, bar in self.phones():
+            self.assertLessEqual(bar["page"], width, bar)
+            self.assertLessEqual(bar["bar"], width, bar)
+            self.assertLessEqual(bar["right"], width, bar)
+            self.assertEqual(bar["clippedTabs"], [], bar)
+            self.assertLessEqual(bar["tabsEnd"], bar["feedbackStart"], bar)
 
     def test_feedback_and_new_goal_are_44_px_touch_targets(self) -> None:
-        for name in ("feedback", "newGoal"):
-            self.assertGreaterEqual(self.bar[name]["width"], 44, (name, self.bar))
-            self.assertGreaterEqual(self.bar[name]["height"], 44, (name, self.bar))
+        for width, bar in self.phones():
+            for name in ("feedback", "newGoal"):
+                self.assertGreaterEqual(bar[name]["width"], 44, (width, name, bar))
+                self.assertGreaterEqual(bar[name]["height"], 44, (width, name, bar))
 
     def test_the_bar_is_as_tall_as_topbar_on_a_phone_and_a_desktop(self) -> None:
         # Sticky heads sit at top: var(--topbar). A bar taller than --topbar covers them; a shorter one leaves a gap.
