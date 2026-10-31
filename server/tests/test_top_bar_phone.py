@@ -2,19 +2,9 @@
 
 from __future__ import annotations
 
-import json
-import os
-import shutil
-import subprocess
 import unittest
-from pathlib import Path
 
-from goalie_cli import SERVER, Store, update
-from live_server import get, running_server, signed
-
-MEASURE = Path(__file__).resolve().parent / "measure_page.mjs"
-BUILD = SERVER / "web" / "dist" / "index.html"
-MAC_CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+from web_browser import signed_app
 
 # Null until the app has drawn the signed-in top bar and its font has loaded.
 TOP_BAR = """(async () => {
@@ -42,41 +32,12 @@ TOP_BAR = """(async () => {
 })()"""
 
 
-def chrome() -> str | None:
-    found = os.environ.get("CHROME") or next((p for p in map(shutil.which, ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser")) if p), None)
-    return found or (MAC_CHROME if Path(MAC_CHROME).is_file() else None)
-
-
-def measure(browser: str, url: str, width: int, token: str) -> dict:
-    measured = subprocess.run(["node", str(MEASURE), browser, url, str(width), "812", TOP_BAR], capture_output=True, text=True, timeout=90, env={**os.environ, "GOALIE_TOKEN": token})
-    if measured.returncode != 0:
-        raise AssertionError(measured.stderr)
-    return json.loads(measured.stdout)
-
-
 class TopBarPhoneTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        # CI builds the app and has Chrome, so there a missing one fails. A local run without them skips.
-        browser = chrome()
-        missing = "no Chrome (set CHROME)" if not browser else "no build (run npm run build --prefix server)" if not BUILD.is_file() else ""
-        if missing:
-            if os.environ.get("CI"):
-                raise AssertionError(missing)
-            raise unittest.SkipTest(missing)
-        store = Store()
-        try:
-            code, result = store.run("seed")
-            assert code == 0, result
-            chelsea = store.read("actor", "chelsea")
-            assert store.write("tig", update("actor", "chelsea", chelsea["version"], {"subject": "sub-chelsea"}))["ok"]
-            token, env = signed("sub-chelsea")
-            with running_server(store.path, env) as (proc, port):
-                assert get(proc, port, "/health").status == 200
-                # 360 px is a common phone width. Below 366 px the items need more than the bar less its 16 px side padding, so an item that may shrink is squeezed: without flex:none, Feedback is 41.9 px at 360 px. Measured: the items stay inside the screen down to 350 px.
-                cls.bar, cls.narrow, cls.desktop = (measure(str(browser), f"http://127.0.0.1:{port}/", width, token) for width in (375, 360, 1280))
-        finally:
-            store.close()
+        with signed_app() as (open_page, _):
+            # 360 px is a common phone width. Below 366 px the items need more than the bar less its 16 px side padding, so an item that may shrink is squeezed: without flex:none, Feedback is 41.9 px at 360 px. Measured: the items stay inside the screen down to 350 px.
+            cls.bar, cls.narrow, cls.desktop = (open_page(width, TOP_BAR) for width in (375, 360, 1280))
 
     def phones(self) -> tuple[tuple[int, dict], ...]:
         return ((375, self.bar), (360, self.narrow))
