@@ -33,14 +33,15 @@ class FeedbackBodyTests(unittest.TestCase):
     def test_the_note_goes_to_the_same_origin_feedback_path(self) -> None:
         self.assertEqual(run("return f.FEEDBACK_PATH;"), "/api/feedback")
 
-    def test_the_body_is_the_canon_viewer_shape_with_the_page_url(self) -> None:
+    def test_the_body_is_the_note_and_the_page_url(self) -> None:
+        # xw-feedback titles a goalie note from the note and leaves out the Focus section when there is no focus (excaliwire/factory#3192). So the body has no focus.
         body = run(f'return f.feedbackBody("  The cut line is hard to find.  ", {json.dumps(URL)});')
-        self.assertEqual(body, {"note": "The cut line is hard to find.", "page": {"url": URL, "app": "goalie"}, "focus": {"id": "chrome", "label": "Goalie", "kind": "chrome", "breadcrumb": []}})
+        self.assertEqual(body, {"note": "The cut line is hard to find.", "page": {"url": URL, "app": "goalie"}})
 
     def test_the_body_names_no_repo_labels_or_email(self) -> None:
         # xw-feedback picks the repo and the labels. Caddy adds the email from the sign-in.
         body = run(f'return f.feedbackBody("A note", {json.dumps(URL)});')
-        self.assertEqual(set(body), {"note", "page", "focus"})  # type: ignore[arg-type]
+        self.assertEqual(set(body), {"note", "page"})  # type: ignore[arg-type]
         self.assertNotIn("email", json.dumps(body))
 
     def test_a_long_note_is_clipped_to_the_limit(self) -> None:
