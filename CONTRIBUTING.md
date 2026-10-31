@@ -75,7 +75,7 @@ A pull request merged into `develop` publishes. A push to `main` does not publis
 It must not run on a pull request.
 
 Server tests are Python unittest in `server/tests/`.
-The serving test points `GOALIE_WEB_DIST` at a temporary folder with a stub `index.html`. The other server tests read only `/health`, `/api/`, and the sign-in page. So the suite needs no build.
+The serving test points `GOALIE_WEB_DIST` at a temporary folder with a stub `index.html`. `test_top_bar_phone.py` opens the built app at 375 px in headless Chrome, through `server/tests/measure_page.mjs`. It skips with no build or no Chrome, and fails instead when `CI` is set. `CHROME` names the browser. The other server tests read only `/health`, `/api/`, and the sign-in page, and need no build.
 
 Local preview of the built app:
 

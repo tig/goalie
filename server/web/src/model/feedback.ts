@@ -1,9 +1,8 @@
-import { BRAND } from "../../../src/brand.ts";
-
 /**
  * In-app feedback (tig/goalie#56). The note and the page URL go to same-origin POST /api/feedback.
  * GOALIE has no such route: host configuration sends the path to xw-feedback, which files the note as an issue.
- * The body is the Canon Viewer's shape. xw-feedback picks the repo and the labels, and the host adds the reporter's email, so the body names none of them.
+ * The body is the note and the page, in the Canon Viewer's shape. It has no focus: xw-feedback titles a GOALIE note from the note (excaliwire/factory#3192).
+ * xw-feedback picks the repo and the labels, and the host adds the reporter's email, so the body names none of them.
  */
 
 export const FEEDBACK_PATH = "/api/feedback";
@@ -14,12 +13,11 @@ export const NOTE_MAX = 4000;
 export type FeedbackBody = {
   note: string;
   page: { url: string; app: "goalie" };
-  focus: { id: "chrome"; label: string; kind: "chrome"; breadcrumb: string[] };
 };
 
 /** The body for one note from the page at url. */
 export function feedbackBody(note: string, url: string): FeedbackBody {
-  return { note: note.trim().slice(0, NOTE_MAX), page: { url, app: "goalie" }, focus: { id: "chrome", label: BRAND.app, kind: "chrome", breadcrumb: [] } };
+  return { note: note.trim().slice(0, NOTE_MAX), page: { url, app: "goalie" } };
 }
 
 /** What came back. `type` is the Fetch response type: "opaqueredirect" for a redirect the app did not follow, "error" for no answer. */
