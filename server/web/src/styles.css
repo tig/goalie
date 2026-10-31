@@ -288,7 +288,8 @@ background-image:repeating-linear-gradient(to right,var(--grid) 0 1px,transparen
 .phone .top{padding:12px 16px}
 .phone main{padding:20px 16px 40px}
 .phone .tab{margin-left:4px}
-.phone{--topbar:59px;scrollbar-gutter:auto}
+/* The phone bar is 12 px padding, a 44 px button, 12 px padding, and a 1 px border. test_top_bar_phone.py measures it. */
+.phone{--topbar:69px;scrollbar-gutter:auto}
 .phone .board{order:1;padding:14px 12px 12px;--left:100%;--gap:0px}
 .phone .cards{order:2;grid-template-columns:1fr;gap:10px;margin:16px 0 0}
 .phone .card{padding:14px 16px}
