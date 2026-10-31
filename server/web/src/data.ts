@@ -51,10 +51,13 @@ export async function postCommands(batch: CommandsRequest): Promise<{ status: nu
   }
 }
 
-/** POST /api/feedback: one note and this page's URL. A redirect is not followed, so a sign-in redirect reads as "sign in again". */
+/**
+ * POST /api/feedback: one note and this page's URL. A redirect is not followed, so a sign-in redirect reads as "sign in again".
+ * The URL has no query and no hash: tig/goalie is public, and the query can hold search text.
+ */
 export async function postFeedback(note: string): Promise<FeedbackAnswer> {
   try {
-    const reply = await fetch(FEEDBACK_PATH, { method: "POST", redirect: "manual", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify(feedbackBody(note, location.href)) });
+    const reply = await fetch(FEEDBACK_PATH, { method: "POST", redirect: "manual", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify(feedbackBody(note, location.origin + location.pathname)) });
     return feedbackAnswer({ status: reply.status, type: reply.type, contentType: reply.headers.get("content-type") ?? "", text: await reply.text().catch(() => "") });
   } catch {
     return feedbackAnswer({ status: 0, type: "error", contentType: "", text: "" });

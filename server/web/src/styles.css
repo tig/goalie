@@ -680,7 +680,7 @@ select.wstatus{height:28px;border:1px solid var(--cut);border-radius:8px;backgro
 .topfeedback~.topnew{margin-left:0}
 .phone .btn.topfeedback{width:44px;height:44px;padding:0;justify-content:center}
 .phone .topfeedbackword{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-/* On a phone the bar is one row at 375 px: the logo stands for the brand word, and the gaps are tighter. Feedback and New goal keep 44 px (#57). */
+/* On a phone the bar is one row down to 360 px: the logo stands for the brand word, and the gaps are tighter. No shrink keeps Feedback and New goal at 44 px (#57). */
 .phone .top .brand{display:none}
 .phone .top .me{margin-left:0}
 .phone .top .logo,.phone .btn.topfeedback,.phone .btn.topnew,.phone .top .me{flex:none}

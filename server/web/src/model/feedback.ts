@@ -30,14 +30,15 @@ const SIGN_IN = "Sign in again, then send your note.";
 
 const REFUSED: Record<number, string> = {
   400: "Write a note, then send it.",
-  401: SIGN_IN,
+  // xw-feedback answers 401 only when it refuses the caller key the host adds. A signed-out person gets the sign-in redirect instead.
+  401: NOT_AVAILABLE,
   403: "The feedback service refused this page. Your note was not sent.",
   404: NOT_AVAILABLE,
   429: "Too many notes in one minute. Wait a minute, then send it again.",
   502: NOT_AVAILABLE,
 };
 
-/** Sent only on a 2xx JSON answer with ok true. A 404 or 502 means the host does not send /api/feedback to xw-feedback yet. */
+/** Sent only on a 2xx JSON answer with ok true. A 401, 404, or 502 is a host fault: the host does not send /api/feedback to xw-feedback with a key it takes. */
 export function feedbackAnswer(reply: FeedbackReply): FeedbackAnswer {
   if (reply.type === "opaqueredirect") return { sent: false, message: SIGN_IN };
   if (reply.status === 0) return { sent: false, message: "GOALIE could not reach the server. Your note was not sent." };
