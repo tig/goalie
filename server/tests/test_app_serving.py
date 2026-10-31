@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 from goalie_cli import SERVER, Store, create
-from live_server import get, running_server, signed
+from live_server import get, post, running_server, signed
 
 INDEX = b"<!doctype html><head><!--goalie:brand--></head><div id=root></div><!-- stub build -->"
 SCRIPT = b"console.log('stub');"
@@ -35,6 +35,7 @@ class AppServingTests(unittest.TestCase):
             cls.missing_file = [get(proc, port, path, auth) for path in ("/main.js", "/favicon.ico", "/goals/app.css")]
             cls.escape = get(proc, port, "/assets/..%2f..%2fsecret.txt", auth)
             cls.unknown_api = get(proc, port, "/api/nope", auth)
+            cls.feedback = post(proc, port, "/api/feedback", {"note": "A note", "page": {"url": "/"}}, auth)
             cls.anonymous_home = get(proc, port, "/")
             cls.anonymous_script = get(proc, port, "/assets/app.js")
             cls.health = get(proc, port, "/health")
@@ -99,6 +100,11 @@ class AppServingTests(unittest.TestCase):
     def test_an_unknown_api_path_is_404_json(self) -> None:
         self.assertEqual(self.unknown_api.status, 404)
         self.assertEqual(set(json.loads(self.unknown_api.body)), {"error", "reason"})
+
+    def test_goalie_has_no_feedback_route(self) -> None:
+        # Host configuration sends /api/feedback to xw-feedback before GOALIE sees it (#56). GOALIE answers it as any unknown API path, never with the app.
+        self.assertEqual(self.feedback.status, 404)
+        self.assertEqual(json.loads(self.feedback.body)["reason"], "no API route POST /api/feedback")
 
     def test_without_a_verified_actor_the_page_is_the_sign_in_page(self) -> None:
         self.assertEqual(self.anonymous_home.status, 401)
