@@ -679,7 +679,7 @@ select.wstatus{height:28px;border:1px solid var(--cut);border-radius:8px;backgro
 .topfeedback~.topnew{margin-left:0}
 .phone .btn.topfeedback{width:44px;height:44px;padding:0;justify-content:center}
 .phone .topfeedbackword{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-/* On a phone the logo stands for the brand word, so the 44 px Feedback fits beside the tabs. */
+/* On a phone the logo stands for the brand word, to give the top bar buttons room. At 375 px they are still narrower than 44 px (#57). */
 .phone .top .brand{display:none}
 .feedback{width:min(440px,calc(100vw - 32px));box-sizing:border-box;border:none;color:var(--ink)}
 .feedback::backdrop{background:var(--tip-shadow)}
