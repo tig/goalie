@@ -28,7 +28,7 @@ A guidance-only change must not run this suite.
 Server tests sit with the server, in `server/tests/`.
 Their command is `python -m unittest discover -s server/tests -v`.
 The server suite starts the process and reads `GET /health`, `GET /api/priorities`, `GET /assets/*`, and `GET /`.
-The serving test points `GOALIE_WEB_DIST` at a temporary folder with a stub `index.html`. The other server tests read only `/health`, `/api/`, and the sign-in page. So the suite needs no build.
+The serving test points `GOALIE_WEB_DIST` at a temporary folder with a stub `index.html`. `test_top_bar_phone.py` and `test_feedback_menu.py` open the built app in headless Chrome, through `server/tests/web_browser.py` and `measure_page.mjs`. They skip with no build or no Chrome, and fail instead when `CI` is set. `CHROME` names the browser. The other server tests read only `/health`, `/api/`, and the sign-in page, and need no build.
 The workflow still runs `npm run build --prefix server` before the suite, so a broken build fails the check.
 `server/tests/test_priorities_api.py` checks the data of the Priorities view. Drawing tests belong to the web app in `server/web/`.
 Their workflow is [`.github/workflows/server.yml`](../.github/workflows/server.yml).

@@ -7,6 +7,7 @@ import { healthWord, slipLabel } from "./model/labels.ts";
 import { backPath, goalPath } from "./model/route.ts";
 import { Avatar, HealthDot } from "./parts.tsx";
 import { homeSearch, Link } from "./router.tsx";
+import { encodeFocus } from "./model/feedback.ts";
 
 /**
  * Goal page v2 (design GP2-1, GP2-10 to GP2-13; rules GL2, GL6, GL7): the breadcrumb and the properties column.
@@ -56,7 +57,7 @@ type Edit = { field: keyof GoalFields; initial: unknown; input: (value: unknown,
 function Prop({ label, children, edit, data, reload, className }: { label: string; children: ReactNode; edit?: Edit; data: GoalPageResponse; reload: () => void; className?: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className={`prop${className ? ` ${className}` : ""}`}>
+    <div className={`prop${className ? ` ${className}` : ""}`} data-focus={encodeFocus({ kind: "field", id: edit?.field ?? label, label })}>
       <span className="plabel">{label}</span>
       <span className="pvalue">
         {children}

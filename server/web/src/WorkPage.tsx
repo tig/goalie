@@ -7,6 +7,7 @@ import { Owner } from "./GoalPage.tsx";
 import { keepOrder, queues } from "./model/goalpage.ts";
 import { goalPath, workPath } from "./model/route.ts";
 import { Link } from "./router.tsx";
+import { encodeFocus } from "./model/feedback.ts";
 
 /**
  * The work page (plan F6): one owner's queue, or every queue (the team view), each by status.
@@ -103,7 +104,7 @@ function Queues({ work, reload, single }: { work: WorkResponse; reload: () => vo
             const done = g.status === "Completed";
             const shut = closed[key] ?? done;
             const rows = g.items.map((i) => (
-              <div key={i.id} className={`wrow qrow${i.status === "Completed" ? " done" : ""}`}>
+              <div key={i.id} className={`wrow qrow${i.status === "Completed" ? " done" : ""}`} data-focus={encodeFocus({ kind: "work item", id: i.id, label: i.title })}>
                 {/* The tick's label is its 44 px tap area on touch (rule 29). */}
                 <label className="wtick">
                   <input type="checkbox" checked={i.status === "Completed" || ticked?.id === i.id} disabled={i.status === "Completed"} onChange={() => tick(i)} aria-label={`Mark ${i.title} Completed`} />

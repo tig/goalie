@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import type { ActorRef, Health } from "../../src/api.ts";
 import { placePopover, popoverWidth } from "./model/popover.ts";
 import { useDismiss } from "./useScreen.ts";
+import { encodeFocus } from "./model/feedback.ts";
 
 /** The shared parts every view is built from. */
 
@@ -44,6 +45,7 @@ export function Avatar({ actor, mine = false }: { actor: ActorRef; mine?: boolea
     <span
       ref={box}
       className={`av${mine ? " mine" : ""}`}
+      data-focus={encodeFocus({ kind: "actor", id: actor.id, label: actor.name })}
       style={{ background: `var(--av-${n}-bg)`, color: `var(--av-${n}-ink)` }}
       title={actor.name}
       role="img"

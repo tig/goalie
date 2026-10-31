@@ -11,6 +11,7 @@ import { dateLabel } from "./model/labels.ts";
 import { backPath, goalPath } from "./model/route.ts";
 import { Avatar, HealthDot } from "./parts.tsx";
 import { homeSearch, Link } from "./router.tsx";
+import { encodeFocus } from "./model/feedback.ts";
 
 /**
  * The goal page (docs/design/goal-page-and-create.md, G1 to G24). It reads GET /api/goals/:id.
@@ -88,7 +89,7 @@ function Goal({ data, reload, status, setStatus }: { data: GoalPageResponse; rel
   const may = data.mayChange;
   const late = data.needsYou.lateWorkItems.length;
   return (
-    <main className="goalpage v2">
+    <main className="goalpage v2" data-focus={encodeFocus({ kind: "goal", id: goal.id, label: goal.summary })}>
       {/* GP2-1: the breadcrumb replaces "‹ Priorities" and the Parent link; the browser's Back still returns to the view. */}
       <Crumbs data={data} />
       <div className="glayout">
