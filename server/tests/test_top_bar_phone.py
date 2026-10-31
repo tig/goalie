@@ -1,4 +1,4 @@
-"""At 375 px the top bar fits the screen, and Feedback and New goal are each at least 44 by 44 px (#56). Measured in headless Chrome on the built app."""
+"""At 375 px the top bar fits the screen, and Feedback and New goal are each at least 44 by 44 px (#56). At 375 px and at 1280 px the bar is as tall as --topbar, which sticky heads sit under. Measured in headless Chrome on the built app."""
 
 from __future__ import annotations
 
@@ -31,6 +31,8 @@ TOP_BAR = """(async () => {
     page: document.documentElement.scrollWidth,
     bar: bar.scrollWidth,
     right: Math.max(...shown.map((e) => e.getBoundingClientRect().right)),
+    height: bar.getBoundingClientRect().height,
+    topbar: parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--topbar")),
     feedback: box(feedback),
     newGoal: box(newGoal),
     clippedTabs: [...bar.querySelectorAll(".tab")].filter((t) => t.scrollWidth > t.clientWidth).map((t) => t.textContent),
@@ -41,6 +43,13 @@ TOP_BAR = """(async () => {
 def chrome() -> str | None:
     found = os.environ.get("CHROME") or next((p for p in map(shutil.which, ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser")) if p), None)
     return found or (MAC_CHROME if Path(MAC_CHROME).is_file() else None)
+
+
+def measure(browser: str, url: str, width: int, token: str) -> dict:
+    measured = subprocess.run(["node", str(MEASURE), browser, url, str(width), "812", TOP_BAR], capture_output=True, text=True, timeout=90, env={**os.environ, "GOALIE_TOKEN": token})
+    if measured.returncode != 0:
+        raise AssertionError(measured.stderr)
+    return json.loads(measured.stdout)
 
 
 class TopBarPhoneTests(unittest.TestCase):
@@ -62,12 +71,9 @@ class TopBarPhoneTests(unittest.TestCase):
             token, env = signed("sub-chelsea")
             with running_server(store.path, env) as (proc, port):
                 assert get(proc, port, "/health").status == 200
-                measured = subprocess.run(["node", str(MEASURE), str(browser), f"http://127.0.0.1:{port}/", "375", "812", TOP_BAR], capture_output=True, text=True, timeout=90, env={**os.environ, "GOALIE_TOKEN": token})
+                cls.bar, cls.desktop = (measure(str(browser), f"http://127.0.0.1:{port}/", width, token) for width in (375, 1280))
         finally:
             store.close()
-        if measured.returncode != 0:
-            raise AssertionError(measured.stderr)
-        cls.bar = json.loads(measured.stdout)
 
     def test_the_page_draws_the_phone_layout(self) -> None:
         self.assertTrue(self.bar["phone"])
@@ -83,6 +89,12 @@ class TopBarPhoneTests(unittest.TestCase):
         for name in ("feedback", "newGoal"):
             self.assertGreaterEqual(self.bar[name]["width"], 44, (name, self.bar))
             self.assertGreaterEqual(self.bar[name]["height"], 44, (name, self.bar))
+
+    def test_the_bar_is_as_tall_as_topbar_on_a_phone_and_a_desktop(self) -> None:
+        # Sticky heads sit at top: var(--topbar). A bar taller than --topbar covers them; a shorter one leaves a gap.
+        self.assertFalse(self.desktop["phone"])
+        for name, bar in (("375 px", self.bar), ("1280 px", self.desktop)):
+            self.assertEqual(bar["height"], bar["topbar"], (name, bar))
 
 
 if __name__ == "__main__":
