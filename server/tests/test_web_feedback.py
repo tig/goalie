@@ -40,7 +40,7 @@ class FeedbackBodyTests(unittest.TestCase):
         self.assertEqual(body, {"note": "The cut line is hard to find.", "page": {"url": URL, "app": "goalie"}})
 
     def test_the_body_names_no_repo_labels_or_email(self) -> None:
-        # xw-feedback picks the repo and the labels. Caddy adds the email from the sign-in.
+        # xw-feedback picks the repo and the labels. The host is to add the email from the sign-in (#56, item 2).
         body = run(f'return f.feedbackBody("A note", {json.dumps(URL)});')
         self.assertEqual(set(body), {"note", "page"})  # type: ignore[arg-type]
         self.assertNotIn("email", json.dumps(body))
@@ -57,7 +57,7 @@ class FeedbackAnswerTests(unittest.TestCase):
         self.assertEqual(answer(400, json.dumps({"error": "note is empty"})), {"sent": False, "message": "Write a note, then send it."})
 
     def test_401_is_a_refused_caller_key_so_feedback_is_not_available(self) -> None:
-        # xw-feedback answers 401 only when it refuses the caller key that the host adds. Signing in again cannot fix that. A signed-out person gets the sign-in redirect.
+        # xw-feedback answers 401 only when it refuses the caller key that the host adds (excaliwire/factory#3192). Signing in again cannot fix that. With the host sign-in in front (#56, item 2), a signed-out person gets a redirect.
         self.assertEqual(answer(401, json.dumps({"error": "caller key refused"})), {"sent": False, "message": NOT_AVAILABLE})
 
     def test_a_redirect_says_to_sign_in_again(self) -> None:

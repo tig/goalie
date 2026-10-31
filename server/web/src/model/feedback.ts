@@ -1,8 +1,8 @@
 /**
  * In-app feedback (tig/goalie#56). The note and the page URL go to same-origin POST /api/feedback.
  * GOALIE has no such route: host configuration sends the path to xw-feedback, which files the note as an issue.
- * The body is the note and the page, in the Canon Viewer's shape. It has no focus: xw-feedback titles a GOALIE note from the note (excaliwire/factory#3192).
- * xw-feedback picks the repo and the labels, and the host adds the reporter's email, so the body names none of them.
+ * The body is the note and the page, a subset of the Canon Viewer's body. It has no focus: xw-feedback titles a GOALIE note from the note (excaliwire/factory#3192).
+ * xw-feedback picks the repo and the labels, and the host is to add the reporter's email (#56, item 2), so the body names none of them.
  */
 
 export const FEEDBACK_PATH = "/api/feedback";
@@ -30,7 +30,7 @@ const SIGN_IN = "Sign in again, then send your note.";
 
 const REFUSED: Record<number, string> = {
   400: "Write a note, then send it.",
-  // xw-feedback answers 401 only when it refuses the caller key the host adds. A signed-out person gets the sign-in redirect instead.
+  // xw-feedback answers 401 only when it refuses the caller key the host adds (excaliwire/factory#3192). With the host sign-in in front, a signed-out person gets a redirect instead.
   401: NOT_AVAILABLE,
   403: "The feedback service refused this page. Your note was not sent.",
   404: NOT_AVAILABLE,
@@ -38,7 +38,12 @@ const REFUSED: Record<number, string> = {
   502: NOT_AVAILABLE,
 };
 
-/** Sent only on a 2xx JSON answer with ok true. A 401, 404, or 502 is a host fault: the host does not send /api/feedback to xw-feedback with a key it takes. */
+/**
+ * Sent only on a 2xx JSON answer with ok true.
+ * A 401 or 404 is a host fault: xw-feedback refused the key the host adds, or the host does not send the path to xw-feedback, so GOALIE answers it.
+ * A 502 from xw-feedback means it took the key and could not file the note: its token is not xw-admin, or GitHub failed. A 502 from the host means xw-feedback did not answer.
+ * In each case the note was not sent and the person cannot fix it, so each says that feedback is not available.
+ */
 export function feedbackAnswer(reply: FeedbackReply): FeedbackAnswer {
   if (reply.type === "opaqueredirect") return { sent: false, message: SIGN_IN };
   if (reply.status === 0) return { sent: false, message: "GOALIE could not reach the server. Your note was not sent." };

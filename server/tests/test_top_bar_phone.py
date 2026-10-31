@@ -73,7 +73,7 @@ class TopBarPhoneTests(unittest.TestCase):
             token, env = signed("sub-chelsea")
             with running_server(store.path, env) as (proc, port):
                 assert get(proc, port, "/health").status == 200
-                # 360 px is the narrowest width where the bar fits. There, a logo or a button that may shrink is squeezed under 44 px.
+                # 360 px is a common phone width. Below 366 px the items need more than the bar less its 16 px side padding, so an item that may shrink is squeezed: without flex:none, Feedback is 41.9 px at 360 px. Measured: the items stay inside the screen down to 350 px.
                 cls.bar, cls.narrow, cls.desktop = (measure(str(browser), f"http://127.0.0.1:{port}/", width, token) for width in (375, 360, 1280))
         finally:
             store.close()
@@ -101,7 +101,7 @@ class TopBarPhoneTests(unittest.TestCase):
                 self.assertGreaterEqual(bar[name]["height"], 44, (width, name, bar))
 
     def test_the_bar_is_as_tall_as_topbar_on_a_phone_and_a_desktop(self) -> None:
-        # Sticky heads sit at top: var(--topbar). A bar taller than --topbar covers them; a shorter one leaves a gap.
+        # Sticky heads (.lhead, .ngrail, .gprops) sit at top: var(--topbar). A bar taller than --topbar would cover them; a shorter one would leave a gap.
         self.assertFalse(self.desktop["phone"])
         for name, bar in (("375 px", self.bar), ("1280 px", self.desktop)):
             self.assertEqual(bar["height"], bar["topbar"], (name, bar))

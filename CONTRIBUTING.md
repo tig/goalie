@@ -61,7 +61,7 @@ The default host is `127.0.0.1`.
 `POST /api/commands` writes: a list of commands, in order, in one transaction (`CommandsRequest`). With `check: true` it runs the batch, rolls it back, and answers the same.
 `GET /api/events` streams each committed goal and work item Event as Server-Sent Events ([ADR 0007](docs/adr/0007-live-update.md)). `id` is the sequence. `Last-Event-ID` resumes from the log. A rolled-back or `check` batch sends nothing. A write from `node src/cli.ts` runs in another process and is not streamed.
 Every other `/api/` path answers 404. An `/api/` request with no verified token answers 401 with `{"error", "reason"}`.
-GOALIE has no `/api/feedback` route. The app's Feedback control posts a note and the page URL, with no query and no hash, there, and host configuration sends that path to xw-feedback before GOALIE sees it. Until the host does, GOALIE answers 404, and the app says that feedback is not available.
+GOALIE has no `/api/feedback` route. The app's Feedback control posts a note and the page URL there. The URL has no query and no hash. Host configuration is to send that path to xw-feedback before GOALIE sees it. Until the host does, GOALIE answers 404, and the app says that feedback is not available.
 `GET /assets/*` answers a file of the build. Any other path that names a file, such as `/main.js`, answers 404. Every other path answers the build's `index.html`, so the app routes in the browser.
 A page or asset request with no verified token answers 401 with the sign-in page. The sign-in page loads the shared Excaliwire chrome from `/_xw/`. Host configuration serves `/_xw/`.
 With no build in `GOALIE_WEB_DIST`, a page request answers 503 with a plain message.
