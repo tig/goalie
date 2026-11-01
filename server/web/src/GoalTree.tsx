@@ -6,6 +6,7 @@ import { focusAfterMove, moveIn, moveTo } from "./model/commands.ts";
 import { goalPath } from "./model/route.ts";
 import { Link, navigate } from "./router.tsx";
 import { Avatar, CHEVRON, HealthDot, look, Rank } from "./parts.tsx";
+import { encodeFocus } from "./model/feedback.ts";
 
 /** The x of the health dot's center at a level: the rank column, the gap, the indent, half the dot. The sizes are CSS variables on .board. */
 const railX = (level: number) => `calc(var(--rank) + var(--colgap) + ${level} * var(--indent) + 5px)`;
@@ -88,7 +89,7 @@ export function GoalTree(props: TreeProps) {
     const lit = isLit(g, props);
     const childRails = g.depth > 0 && !last ? [...rails, g.depth - 1] : rails;
     return (
-      <div key={g.id} className="goal">
+      <div key={g.id} className="goal" data-focus={encodeFocus({ kind: "goal", id: g.id, label: g.summary })}>
         <div
           className={`row d${Math.min(g.depth, 2)}${g.match ? "" : " ctx"}${lit ? " lit" : ""}${kids ? " parent" : ""}`}
           data-health={g.health ?? ""}
@@ -213,7 +214,7 @@ export function GoalTree(props: TreeProps) {
     );
 
   const group = (p: PriorityRow) => (
-    <div className={`group${drag?.id === p.id ? " dragging" : ""}`} key={p.id} data-pid={props.rank ? p.id : undefined}>
+    <div className={`group${drag?.id === p.id ? " dragging" : ""}`} key={p.id} data-pid={props.rank ? p.id : undefined} data-focus={encodeFocus({ kind: "priority", id: p.id, label: p.title })}>
       {drag && drag.at === order.indexOf(p.id) && <div className="dropline" aria-hidden="true" />}
       {p.goals.length ? (
         p.goals.map((g, i) => goal(g, i === 0 ? (pending ? order.indexOf(p.id) + 1 : p.rank) : undefined, undefined, undefined, i === 0 ? handle(p) : undefined))

@@ -61,36 +61,36 @@ class ConformanceTests(unittest.TestCase):
         76: ("test_org_unit_has_a_named_human_owner",),
         88: ("test_original_committed_date_is_not_rewritten",),
         90: ("test_state_or_date_change_carries_a_written_reason",),
-        134: ("test_goal_date_carries_a_date_type",),
-        143: ("test_uncommitted_date_has_a_promotion_milestone",),
-        151: ("test_committed_date_cannot_be_demoted",),
-        159: (
+        135: ("test_goal_date_carries_a_date_type",),
+        144: ("test_uncommitted_date_has_a_promotion_milestone",),
+        152: ("test_committed_date_cannot_be_demoted",),
+        160: (
             "test_version_is_stored_on_each_writable_entity",
             "test_write_names_the_version_it_read",
             "test_write_names_the_version_it_read",
         ),
-        161: (
+        162: (
             "test_structured_fields_are_not_merged",
             "test_structured_fields_are_not_merged",
         ),
-        172: ("test_goal_has_exactly_one_human_owner",),
-        177: ("test_goal_date_carries_a_date_type",),
-        178: ("test_uncommitted_date_has_a_promotion_milestone",),
-        180: ("test_promotion_pins_committed_plan_version",),
-        181: ("test_committed_goal_needs_a_pencil_plan",),
-        183: ("test_original_committed_date_is_not_rewritten",),
-        184: ("test_state_or_date_change_carries_a_written_reason",),
-        187: ("test_state_or_date_change_carries_a_written_reason",),
-        189: ("test_yellow_or_red_goal_has_a_path_to_green",),
-        207: ("test_org_unit_has_a_named_human_owner",),
-        219: ("test_priority_ranks_are_unique",),
-        240: ("test_doc_is_a_page", "test_doc_is_a_page"),
-        242: (
+        173: ("test_goal_has_exactly_one_human_owner",),
+        178: ("test_goal_date_carries_a_date_type",),
+        179: ("test_uncommitted_date_has_a_promotion_milestone",),
+        181: ("test_promotion_pins_committed_plan_version",),
+        182: ("test_committed_goal_needs_a_pencil_plan",),
+        184: ("test_original_committed_date_is_not_rewritten",),
+        185: ("test_state_or_date_change_carries_a_written_reason",),
+        188: ("test_state_or_date_change_carries_a_written_reason",),
+        190: ("test_yellow_or_red_goal_has_a_path_to_green",),
+        208: ("test_org_unit_has_a_named_human_owner",),
+        220: ("test_priority_ranks_are_unique",),
+        241: ("test_doc_is_a_page", "test_doc_is_a_page"),
+        243: (
             "test_markdown_edit_is_not_lost",
             "test_markdown_edit_is_not_lost",
             "test_saved_doc_version_comes_from_the_merged_text",
         ),
-        247: (
+        248: (
             "test_event_sequence_only_increases",
             "test_views_and_agents_share_one_stream",
             "test_client_resumes_from_the_last_sequence",
@@ -99,7 +99,7 @@ class ConformanceTests(unittest.TestCase):
             "test_comment_is_an_event_on_the_entity",
             "test_draft_appears_live_and_does_not_take_effect_until_approval",
         ),
-        249: (
+        250: (
             "test_every_change_is_an_event",
             "test_history_is_readable_on_the_record",
             "test_history_is_readable_on_the_record",
@@ -107,37 +107,37 @@ class ConformanceTests(unittest.TestCase):
             "test_history_is_readable_on_the_record",
             "test_history_is_readable_on_the_record",
         ),
-        254: (
+        255: (
             "test_work_items_are_the_list_under_the_goal",
             "test_human_can_file_a_work_item_with_no_agent",
         ),
-        285: (
+        286: (
             "test_draft_appears_live_and_does_not_take_effect_until_approval",
             "test_draft_appears_live_and_does_not_take_effect_until_approval",
             "test_stale_draft_approval_is_rejected",
         ),
-        361: (
-            "test_structured_fields_are_not_merged",
-            "test_structured_fields_are_not_merged",
-        ),
         362: (
+            "test_structured_fields_are_not_merged",
+            "test_structured_fields_are_not_merged",
+        ),
+        363: (
             "test_write_names_the_version_it_read",
             "test_write_names_the_version_it_read",
         ),
-        363: ("test_commit_check_is_one_server_transaction",),
-        367: ("test_deleted_goal_stays_findable",),
-        373: ("test_view_is_a_screen_plus_a_saved_definition",),
-        379: ("test_between_reviews_work_starts_at_my_goals",),
-        380: ("test_committed_change_appears_within_the_live_update_time",),
-        381: (
+        364: ("test_commit_check_is_one_server_transaction",),
+        368: ("test_deleted_goal_stays_findable",),
+        374: ("test_view_is_a_screen_plus_a_saved_definition",),
+        380: ("test_between_reviews_work_starts_at_my_goals",),
+        381: ("test_committed_change_appears_within_the_live_update_time",),
+        382: (
             "test_client_resumes_from_the_last_sequence",
             "test_client_resumes_from_the_last_sequence",
         ),
-        382: ("test_view_shows_presence",),
-        474: ("test_only_the_goalie_owner_changes_owner_settings",),
-        492: ("test_a_user_changes_only_their_own_settings",),
-        196: ("test_only_owners_change_a_goal", "test_only_owners_change_a_goal"),
-        360: ("test_only_owners_change_a_goal",),
+        383: ("test_view_shows_presence",),
+        475: ("test_only_the_goalie_owner_changes_owner_settings",),
+        493: ("test_a_user_changes_only_their_own_settings",),
+        197: ("test_only_owners_change_a_goal", "test_only_owners_change_a_goal"),
+        361: ("test_only_owners_change_a_goal",),
     }
 
     SKIP_WHY = {
@@ -197,97 +197,97 @@ class ConformanceTests(unittest.TestCase):
 
     @unittest.skip("Filled by #4.")
     def test_goal_has_exactly_one_human_owner(self) -> None:
-        """§3 principle 1 and the §6.1 owner field are the same test. SPEC.md lines 73 and 172."""
+        """§3 principle 1 and the §6.1 owner field are the same test. SPEC.md lines 73 and 173."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #4.")
     def test_goal_date_carries_a_date_type(self) -> None:
-        """§3 principle 2, §5, and the §6.1 date_type field are the same test. SPEC.md lines 74, 134, and 177."""
+        """§3 principle 2, §5, and the §6.1 date_type field are the same test. SPEC.md lines 74, 135, and 178."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #4.")
     def test_org_unit_has_a_named_human_owner(self) -> None:
-        """§3 principle 4 and §6.2 are the same test. SPEC.md lines 76 and 196."""
+        """§3 principle 4 and §6.2 are the same test. SPEC.md lines 76 and 197."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #4.")
     def test_original_committed_date_is_not_rewritten(self) -> None:
-        """§3 principle 8 and the §6.1 original_committed_date field are the same test. SPEC.md lines 88 and 183. Only the GOALIE owner may correct a data-entry error, with a logged reason."""
+        """§3 principle 8 and the §6.1 original_committed_date field are the same test. SPEC.md lines 88 and 184. Only the GOALIE owner may correct a data-entry error, with a logged reason."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #4.")
     def test_state_or_date_change_carries_a_written_reason(self) -> None:
-        """§3 principle 9, the §6.1 state field, and the §6.1 changed_due_date field are the same test. SPEC.md lines 90, 184, and 187."""
+        """§3 principle 9, the §6.1 state field, and the §6.1 changed_due_date field are the same test. SPEC.md lines 90, 185, and 188."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #4.")
     def test_uncommitted_date_has_a_promotion_milestone(self) -> None:
-        """§5 and the §6.1 promotion_milestone shape are the same test. SPEC.md lines 143 and 178. The linked goal must be Milestone (Commit), Committed, due before the goal, and owned by a human. It is empty when Committed."""
+        """§5 and the §6.1 promotion_milestone shape are the same test. SPEC.md lines 144 and 179. The linked goal must be Milestone (Commit), Committed, due before the goal, and owned by a human. It is empty when Committed."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #4.")
     def test_committed_date_cannot_be_demoted(self) -> None:
-        """§5 is this test. SPEC.md line 151."""
+        """§5 is this test. SPEC.md line 152."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #4.")
     def test_committed_goal_needs_a_pencil_plan(self) -> None:
-        """The §6.1 plan_maturity field is this test. SPEC.md line 181."""
+        """The §6.1 plan_maturity field is this test. SPEC.md line 182."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #4.")
     def test_yellow_or_red_goal_has_a_path_to_green(self) -> None:
-        """The §6.1 path_to_green field is this test. SPEC.md line 189."""
+        """The §6.1 path_to_green field is this test. SPEC.md line 190."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #4.")
     def test_priority_ranks_are_unique(self) -> None:
-        """§6.3 is this test. SPEC.md line 208."""
+        """§6.3 is this test. SPEC.md line 209."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #4.")
     def test_write_names_the_version_it_read(self) -> None:
-        """§6, §8.1 stale writes, and §13 item 14 are the same test. This is the rule, not column storage. SPEC.md line 348 is this test. On line 159, the write sentence and the stale-write sentence are this test, and the version sentence is test_version_is_stored_on_each_writable_entity. The scaffold map lists those three marks in that order. Line 57 is the two-actors mark. It is split across this test, test_markdown_edit_is_not_lost, test_committed_change_appears_within_the_live_update_time, and test_every_change_is_an_event. There is no umbrella test. The scaffold map assigns line 57 to this test."""
+        """§6, §8.1 stale writes, and §13 item 14 are the same test. This is the rule, not column storage. SPEC.md line 349 is this test. On line 160, the write sentence and the stale-write sentence are this test, and the version sentence is test_version_is_stored_on_each_writable_entity. The scaffold map lists those three marks in that order. Line 57 is the two-actors mark. It is split across this test, test_markdown_edit_is_not_lost, test_committed_change_appears_within_the_live_update_time, and test_every_change_is_an_event. There is no umbrella test. The scaffold map assigns line 57 to this test."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #4.")
     def test_structured_fields_are_not_merged(self) -> None:
-        """§6, §8.1, and §13 item 13 are the same test. SPEC.md lines 161 and 347. Both marks on each line are this test. Structured fields change only through validated writes. Automatic merging must not apply. The ordinary-session mark on line 49 includes editing those fields. That mark is split across test_between_reviews_work_starts_at_my_goals, this test, test_doc_is_a_page, test_comment_is_an_event_on_the_entity, and test_human_can_file_a_work_item_with_no_agent. The scaffold map assigns line 49 to test_between_reviews_work_starts_at_my_goals."""
+        """§6, §8.1, and §13 item 13 are the same test. SPEC.md lines 162 and 348. Both marks on each line are this test. Structured fields change only through validated writes. Automatic merging must not apply. The ordinary-session mark on line 49 includes editing those fields. That mark is split across test_between_reviews_work_starts_at_my_goals, this test, test_doc_is_a_page, test_comment_is_an_event_on_the_entity, and test_human_can_file_a_work_item_with_no_agent. The scaffold map assigns line 49 to test_between_reviews_work_starts_at_my_goals."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #4.")
     def test_commit_check_is_one_server_transaction(self) -> None:
-        """§8.1 and §13 item 15 are the same test. SPEC.md line 349. A failed check must not become visible."""
+        """§8.1 and §13 item 15 are the same test. SPEC.md line 350. A failed check must not become visible."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #4.")
     def test_deleted_goal_stays_findable(self) -> None:
-        """§8.1 and the deleted-goal sentence of §13 item 24 are the same test. SPEC.md line 353. The rest of §13 item 24 is test_history_is_readable_on_the_record."""
+        """§8.1 and the deleted-goal sentence of §13 item 24 are the same test. SPEC.md line 354. The rest of §13 item 24 is test_history_is_readable_on_the_record."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #4.")
     def test_comment_is_an_event_on_the_entity(self) -> None:
-        """§6.6, §13 item 27, and the §4 Comment row are the same test. On SPEC.md line 234, the sentences that any entity can have comments and that a comment must not reply to another comment are this test. The scaffold map lists this test for both comment marks on line 234. A comment is an Event, not its own entity. The ordinary-session comment under line 49 is this test. A work-item comment is test_work_item_comment_is_an_event."""
+        """§6.6, §13 item 27, and the §4 Comment row are the same test. On SPEC.md line 235, the sentences that any entity can have comments and that a comment must not reply to another comment are this test. The scaffold map lists this test for both comment marks on line 235. A comment is an Event, not its own entity. The ordinary-session comment under line 49 is this test. A work-item comment is test_work_item_comment_is_an_event."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #4.")
     def test_stale_draft_approval_is_rejected(self) -> None:
-        """§6.9 is this test. On SPEC.md line 272, approval is a write against base_version, and a stale approval must be rejected and must return current state. The scaffold map lists this test for the base_version mark on line 272."""
+        """§6.9 is this test. On SPEC.md line 273, approval is a write against base_version, and a stale approval must be rejected and must return current state. The scaffold map lists this test for the base_version mark on line 273."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #3.")
     def test_version_is_stored_on_each_writable_entity(self) -> None:
-        """§6 says every writable entity has a version, and storing that version is this test. SPEC.md line 159's first sentence is this test. The write sentence and the stale-write sentence on that line are test_write_names_the_version_it_read. This test must not replace that rule test."""
+        """§6 says every writable entity has a version, and storing that version is this test. SPEC.md line 160's first sentence is this test. The write sentence and the stale-write sentence on that line are test_write_names_the_version_it_read. This test must not replace that rule test."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #3.")
     def test_sequence_is_stored_on_the_event_log(self) -> None:
-        """§6.6 names the sequence column, and storing it is this test. Monotonic behavior is test_event_sequence_only_increases. SPEC.md line 234's first mark is that test. The scaffold map lists that test for the first mark. This test must not replace the stream tests."""
+        """§6.6 names the sequence column, and storing it is this test. Monotonic behavior is test_event_sequence_only_increases. SPEC.md line 235's first mark is that test. The scaffold map lists that test for the first mark. This test must not replace the stream tests."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #3.")
     def test_drafts_are_stored(self) -> None:
-        """§6.9 fields are stored by this test. The live-approval marks on SPEC.md line 272 are test_draft_appears_live_and_does_not_take_effect_until_approval and test_stale_draft_approval_is_rejected. This test must not replace those rule tests."""
+        """§6.9 fields are stored by this test. The live-approval marks on SPEC.md line 273 are test_draft_appears_live_and_does_not_take_effect_until_approval and test_stale_draft_approval_is_rejected. This test must not replace those rule tests."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #3.")
@@ -297,107 +297,107 @@ class ConformanceTests(unittest.TestCase):
 
     @unittest.skip("Filled by #3.")
     def test_every_change_is_an_event(self) -> None:
-        """§6.6 and the opening of §13 item 24 are this test. §1.2 says work a person did must not disappear without an Event. SPEC.md line 236's first sentence is this test. The later sentences on that line are test_history_is_readable_on_the_record. The Event clause of line 57 is this test. The scaffold map assigns line 57 to test_write_names_the_version_it_read. It lists this test for the first mark on line 236."""
+        """§6.6 and the opening of §13 item 24 are this test. §1.2 says work a person did must not disappear without an Event. SPEC.md line 237's first sentence is this test. The later sentences on that line are test_history_is_readable_on_the_record. The Event clause of line 57 is this test. The scaffold map assigns line 57 to test_write_names_the_version_it_read. It lists this test for the first mark on line 237."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #3.")
     def test_committed_plan_version_column_is_stored(self) -> None:
-        """The §6.1 committed_plan_version column is stored by this test. Pinning it is test_promotion_pins_committed_plan_version. SPEC.md line 180 is that pin test. This test must not replace the pin test."""
+        """The §6.1 committed_plan_version column is stored by this test. Pinning it is test_promotion_pins_committed_plan_version. SPEC.md line 181 is that pin test. This test must not replace the pin test."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #5.")
     def test_event_sequence_only_increases(self) -> None:
-        """§6.6 and §13 item 16 are the same test for the monotonic sequence. SPEC.md line 234's first mark is this test. The scaffold map lists this test for that mark. The same line also states the shared stream, resume, comments, and the Draft decision Event. Those statements are test_views_and_agents_share_one_stream, test_client_resumes_from_the_last_sequence, test_comment_is_an_event_on_the_entity, and test_draft_appears_live_and_does_not_take_effect_until_approval."""
+        """§6.6 and §13 item 16 are the same test for the monotonic sequence. SPEC.md line 235's first mark is this test. The scaffold map lists this test for that mark. The same line also states the shared stream, resume, comments, and the Draft decision Event. Those statements are test_views_and_agents_share_one_stream, test_client_resumes_from_the_last_sequence, test_comment_is_an_event_on_the_entity, and test_draft_appears_live_and_does_not_take_effect_until_approval."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #5.")
     def test_client_resumes_from_the_last_sequence(self) -> None:
-        """§6.6, §8.2 Resume, and §13 item 18 are the same test. SPEC.md line 367 is this test, including the sentence that the client receives every Event with a greater sequence. The same two sentences on line 234 are this test. The scaffold map lists this test for both resume marks on line 234."""
+        """§6.6, §8.2 Resume, and §13 item 18 are the same test. SPEC.md line 368 is this test, including the sentence that the client receives every Event with a greater sequence. The same two sentences on line 235 are this test. The scaffold map lists this test for both resume marks on line 235."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #5.")
     def test_views_and_agents_share_one_stream(self) -> None:
-        """§6.6 and §13 items 16 and 21 are the same test. One stream. Views and agents both use it. On SPEC.md line 234, the sentence that the Event log is the change stream views and agents subscribe to is this test. The scaffold map lists this test for the stream mark on line 234. The MCP subscribe path is test_mcp_can_subscribe_to_the_same_stream, not a second copy of this test."""
+        """§6.6 and §13 items 16 and 21 are the same test. One stream. Views and agents both use it. On SPEC.md line 235, the sentence that the Event log is the change stream views and agents subscribe to is this test. The scaffold map lists this test for the stream mark on line 235. The MCP subscribe path is test_mcp_can_subscribe_to_the_same_stream, not a second copy of this test."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #5.")
     def test_only_the_goalie_owner_changes_owner_settings(self) -> None:
-        """§12 and §13 item 29 are this test for owner settings. SPEC.md line 460. A user must not change owner settings. The same ban is restated on line 478, which the scaffold map assigns to test_a_user_changes_only_their_own_settings."""
+        """§12 and §13 item 29 are this test for owner settings. SPEC.md line 461. A user must not change owner settings. The same ban is restated on line 479, which the scaffold map assigns to test_a_user_changes_only_their_own_settings."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #5.")
     def test_a_user_changes_only_their_own_settings(self) -> None:
-        """§12 and §13 item 29 are this test for one user's own settings. SPEC.md line 478. A user must not change another user's settings. The sentence also restates that a user must not change owner settings, which is test_only_the_goalie_owner_changes_owner_settings."""
+        """§12 and §13 item 29 are this test for one user's own settings. SPEC.md line 479. A user must not change another user's settings. The sentence also restates that a user must not change owner settings, which is test_only_the_goalie_owner_changes_owner_settings."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #7.")
     def test_doc_is_a_page(self) -> None:
-        """§6.5, the first sentence of §13 item 26, and the §1.2 linked-plan bullet are the same test. SPEC.md line 227 is this test. Both marks are this test. A Doc is a page a human opens and writes, with no agent required. It is not only a stored body. The ordinary-session mark on line 49 includes writing that page. The scaffold map assigns line 49 to test_between_reviews_work_starts_at_my_goals."""
+        """§6.5, the first sentence of §13 item 26, and the §1.2 linked-plan bullet are the same test. SPEC.md line 228 is this test. Both marks are this test. A Doc is a page a human opens and writes, with no agent required. It is not only a stored body. The ordinary-session mark on line 49 includes writing that page. The scaffold map assigns line 49 to test_between_reviews_work_starts_at_my_goals."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #7.")
     def test_markdown_edit_is_not_lost(self) -> None:
-        """§6.5, §1.2, and §13 items 19 and 25 are this test for the edit. An edit must not be lost. More than one actor may edit a Doc body or a goal description at the same time. On SPEC.md line 229, those two sentences are this test, and the saved-version sentence is test_saved_doc_version_comes_from_the_merged_text. The scaffold map lists this test for the first two marks on line 229. The Markdown clause of line 57 is this test."""
+        """§6.5, §1.2, and §13 items 19 and 25 are this test for the edit. An edit must not be lost. More than one actor may edit a Doc body or a goal description at the same time. On SPEC.md line 230, those two sentences are this test, and the saved-version sentence is test_saved_doc_version_comes_from_the_merged_text. The scaffold map lists this test for the first two marks on line 230. The Markdown clause of line 57 is this test."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #7.")
     def test_saved_doc_version_comes_from_the_merged_text(self) -> None:
-        """§6.5 and §13 item 19 are the same test. On SPEC.md line 229, the sentence that a saved Doc version is taken from that text is this test. The scaffold map lists this test for the saved-version mark on line 229."""
+        """§6.5 and §13 item 19 are the same test. On SPEC.md line 230, the sentence that a saved Doc version is taken from that text is this test. The scaffold map lists this test for the saved-version mark on line 230."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #7.")
     def test_promotion_pins_committed_plan_version(self) -> None:
-        """§5 promotion to Committed, §6.1, and §13 item 19 are the same test. SPEC.md line 180. Later edits to the Doc must not change the pinned version. Storing the column is test_committed_plan_version_column_is_stored."""
+        """§5 promotion to Committed, §6.1, and §13 item 19 are the same test. SPEC.md line 181. Later edits to the Doc must not change the pinned version. Storing the column is test_committed_plan_version_column_is_stored."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #8.")
     def test_view_is_a_screen_plus_a_saved_definition(self) -> None:
-        """§8.2 and §13 item 28 are the same test. SPEC.md line 359. Not a database view. A database view alone must not satisfy it. A screen with no saved definition must not satisfy it."""
+        """§8.2 and §13 item 28 are the same test. SPEC.md line 360. Not a database view. A database view alone must not satisfy it. A screen with no saved definition must not satisfy it."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #8.")
     def test_between_reviews_work_starts_at_my_goals(self) -> None:
-        """§8.2 and §1.2 are the same test for between-reviews work. SPEC.md line 365. My goals and the org-unit view are where a human works between reviews. Line 49 is the ordinary-session mark. It is split across this test, test_structured_fields_are_not_merged, test_doc_is_a_page, test_comment_is_an_event_on_the_entity, and test_human_can_file_a_work_item_with_no_agent. There is no umbrella test. The scaffold map assigns line 49 to this test."""
+        """§8.2 and §1.2 are the same test for between-reviews work. SPEC.md line 366. My goals and the org-unit view are where a human works between reviews. Line 49 is the ordinary-session mark. It is split across this test, test_structured_fields_are_not_merged, test_doc_is_a_page, test_comment_is_an_event_on_the_entity, and test_human_can_file_a_work_item_with_no_agent. There is no umbrella test. The scaffold map assigns line 49 to this test."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #8.")
     def test_committed_change_appears_within_the_live_update_time(self) -> None:
-        """§8.2, §13 item 17, and §13 item 25 are the same test. SPEC.md line 366. The default is 1 second. The time is configurable. The live-update clause of line 57 is this test. The scaffold map assigns line 57 to test_write_names_the_version_it_read."""
+        """§8.2, §13 item 17, and §13 item 25 are the same test. SPEC.md line 367. The default is 1 second. The time is configurable. The live-update clause of line 57 is this test. The scaffold map assigns line 57 to test_write_names_the_version_it_read."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #8.")
     def test_view_shows_presence(self) -> None:
-        """§8.2, §13 item 20, and §1.2 are the same test. SPEC.md line 368. Human or agent."""
+        """§8.2, §13 item 20, and §1.2 are the same test. SPEC.md line 369. Human or agent."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #8.")
     def test_history_is_readable_on_the_record(self) -> None:
-        """The §6.6 read path and §13 item 24, except the deleted-goal sentence, are the same test. That deleted-goal sentence is test_deleted_goal_stays_findable. On SPEC.md line 236, the sentences after the first are this test. A human reads Events on the record, follows one goal across a plan period, and reads a comment on its entity. Export is not the only way. Current fields are not a substitute for the trail. The scaffold map lists this test for the five marks after the first on line 236."""
+        """The §6.6 read path and §13 item 24, except the deleted-goal sentence, are the same test. That deleted-goal sentence is test_deleted_goal_stays_findable. On SPEC.md line 237, the sentences after the first are this test. A human reads Events on the record, follows one goal across a plan period, and reads a comment on its entity. Export is not the only way. Current fields are not a substitute for the trail. The scaffold map lists this test for the five marks after the first on line 237."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #8.")
     def test_user_settings_include_favorite_views_and_appearance(self) -> None:
-        """§12 user settings and §13 item 29 are this test for favorite views and appearance. Favorites default to none beyond the standard views. Appearance defaults to light, and a user may choose dark. Who may write the row is test_only_the_goalie_owner_changes_owner_settings and test_a_user_changes_only_their_own_settings. Those permission marks are SPEC.md lines 460 and 478. This content has no separate invariant mark."""
+        """§12 user settings and §13 item 29 are this test for favorite views and appearance. Favorites default to none beyond the standard views. Appearance defaults to light, and a user may choose dark. Who may write the row is test_only_the_goalie_owner_changes_owner_settings and test_a_user_changes_only_their_own_settings. Those permission marks are SPEC.md lines 461 and 479. This content has no separate invariant mark."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #9.")
     def test_draft_appears_live_and_does_not_take_effect_until_approval(self) -> None:
-        """§6.9, the §4 Draft row, §10, and §13 item 22 are the same test. SPEC.md line 272's first two marks are this test. The Draft appears live. It must not take effect until a human approves it. Approving or rejecting it is its own Event, with an actor and a reason. The same Event sentence on line 234 is this test. The scaffold map lists this test for the Draft decision mark on line 234 and for the first two marks on line 272. Stale approval stays test_stale_draft_approval_is_rejected."""
+        """§6.9, the §4 Draft row, §10, and §13 item 22 are the same test. SPEC.md line 273's first two marks are this test. The Draft appears live. It must not take effect until a human approves it. Approving or rejecting it is its own Event, with an actor and a reason. The same Event sentence on line 235 is this test. The scaffold map lists this test for the Draft decision mark on line 235 and for the first two marks on line 273. Stale approval stays test_stale_draft_approval_is_rejected."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #12.")
     def test_work_items_are_the_list_under_the_goal(self) -> None:
-        """§6.7 and §13 item 26 are this test when the extension is on. SPEC.md line 241's first mark is this test. The scaffold map lists this test for that mark. The second mark on that line is test_human_can_file_a_work_item_with_no_agent."""
+        """§6.7 and §13 item 26 are this test when the extension is on. SPEC.md line 242's first mark is this test. The scaffold map lists this test for that mark. The second mark on that line is test_human_can_file_a_work_item_with_no_agent."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #12.")
     def test_human_can_file_a_work_item_with_no_agent(self) -> None:
-        """§6.7, §1.2, and §13 item 23 are the same test. On SPEC.md line 241, the sentence that a human can file a work item with no agent is this test. The scaffold map lists test_work_items_are_the_list_under_the_goal for the first mark on line 241, and this test for the second. The ordinary-session mark on line 49 includes this bullet. That line maps to test_between_reviews_work_starts_at_my_goals."""
+        """§6.7, §1.2, and §13 item 23 are the same test. On SPEC.md line 242, the sentence that a human can file a work item with no agent is this test. The scaffold map lists test_work_items_are_the_list_under_the_goal for the first mark on line 242, and this test for the second. The ordinary-session mark on line 49 includes this bullet. That line maps to test_between_reviews_work_starts_at_my_goals."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #12.")
     def test_work_item_extension_stays_optional(self) -> None:
-        """§6.7 and §13 item 26 are this test. SPEC.md line 241 says the extension stays optional. That sentence has no invariant mark. The marked sentences on that line are test_work_items_are_the_list_under_the_goal and test_human_can_file_a_work_item_with_no_agent."""
+        """§6.7 and §13 item 26 are this test. SPEC.md line 242 says the extension stays optional. That sentence has no invariant mark. The marked sentences on that line are test_work_items_are_the_list_under_the_goal and test_human_can_file_a_work_item_with_no_agent."""
         self.fail("not filled")
 
     @unittest.skip("Filled by #12.")

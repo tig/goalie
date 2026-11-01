@@ -18,6 +18,7 @@ import { usePhone, useScreen } from "./useScreen.ts";
 import { GoalPage } from "./GoalPage.tsx";
 import { NewGoal } from "./NewGoal.tsx";
 import { WorkPage } from "./WorkPage.tsx";
+import { Feedback } from "./Feedback.tsx";
 import { backPath, newGoalPath, workPath } from "./model/route.ts";
 import { homeSearch, Link, rememberHome, useRoute } from "./router.tsx";
 
@@ -57,6 +58,8 @@ function TopBar({ data }: { data?: PrioritiesResponse }) {
       <span className="brand">{BRAND.app}</span>
       {data && <span className="org">/ {data.org.name}</span>}
       {data && <TopTabs />}
+      {/* Feedback is in the top bar on every page, before New goal (#56). */}
+      <Feedback />
       {/* NG1: New goal is in the top bar on every page, before the avatar; on a phone a 44 px + named "New goal". */}
       {data && (
         <Link to={newGoalPath()} className="btn primary topnew" aria-label="New goal">

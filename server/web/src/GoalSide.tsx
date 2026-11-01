@@ -7,6 +7,7 @@ import { healthWord, slipLabel } from "./model/labels.ts";
 import { backPath, goalPath } from "./model/route.ts";
 import { Avatar, HealthDot } from "./parts.tsx";
 import { homeSearch, Link } from "./router.tsx";
+import { encodeFocus, formFocus } from "./model/feedback.ts";
 
 /**
  * Goal page v2 (design GP2-1, GP2-10 to GP2-13; rules GL2, GL6, GL7): the breadcrumb and the properties column.
@@ -56,7 +57,7 @@ type Edit = { field: keyof GoalFields; initial: unknown; input: (value: unknown,
 function Prop({ label, children, edit, data, reload, className }: { label: string; children: ReactNode; edit?: Edit; data: GoalPageResponse; reload: () => void; className?: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className={`prop${className ? ` ${className}` : ""}`}>
+    <div className={`prop${className ? ` ${className}` : ""}`} data-focus={encodeFocus({ kind: "field", id: edit?.field ?? label, label })}>
       <span className="plabel">{label}</span>
       <span className="pvalue">
         {children}
@@ -68,6 +69,7 @@ function Prop({ label, children, edit, data, reload, className }: { label: strin
       </span>
       {open && edit && (
         <PropForm
+          label={label}
           edit={edit}
           data={data}
           onDone={(saved) => {
@@ -81,7 +83,7 @@ function Prop({ label, children, edit, data, reload, className }: { label: strin
 }
 
 /** The in-place form: the field, one reason line, Save. The server checks every rule; a refusal shows here in its words. */
-function PropForm({ edit, data, onDone }: { edit: Edit; data: GoalPageResponse; onDone: (saved: boolean) => void }) {
+function PropForm({ label, edit, data, onDone }: { label: string; edit: Edit; data: GoalPageResponse; onDone: (saved: boolean) => void }) {
   const [value, setValue] = useState<unknown>(edit.initial);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string>();
@@ -95,7 +97,7 @@ function PropForm({ edit, data, onDone }: { edit: Edit; data: GoalPageResponse; 
     else setError(body.error === "invalid" ? body.violations.map((v) => v.message).join(" ") : body.error === "stale" ? "Someone saved this goal after you opened it. Reload the page." : body.message);
   };
   return (
-    <div className="pform">
+    <div className="pform" data-focus={formFocus(`Change ${label}`)}>
       {edit.input(value, setValue, options.state === "ok" ? options.data : null)}
       <input value={reason} placeholder="Reason" aria-label="Reason" onChange={(e) => setReason(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} />
       {error && <p className="ferror">{error}</p>}

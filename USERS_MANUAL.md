@@ -41,6 +41,7 @@ If you only read one section, read **§4 Rules**.
 | **Presence** | Who is viewing or editing a goal right now. A human or an agent. |
 | **Comment** | Prose you attach to any record. In this version a comment does not reply to another comment. |
 | **Version** | The version of a record a save was based on. The save names it. Docs keep older versions. |
+| **Feedback** | A note about GOALIE itself, filed as a public issue on the GOALIE repo with the page's address. Send it from the top bar's Feedback button, or right-click the thing it is about and choose Feedback... so the note names it. It never carries what you typed in a field. |
 | ‹local terms› | ‹any renames or additions› |
 
 ## 3. Who does what
