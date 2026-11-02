@@ -123,7 +123,7 @@ const pick = (list: readonly string[], field: string) => (value: unknown, set: (
   </select>
 );
 
-type Act = { name: "health" | "pursue" | "slip" | "promote" | "close"; health?: Exclude<Health, null> };
+type Act = { name: "health" | "pursue" | "slip" | "pullin" | "promote" | "close"; health?: Exclude<Health, null> };
 
 /** GP2-10 to GP2-13: the properties column. Actions that need more than one field open their panel in the main column (`onAct`). */
 export function Props({ data, reload, onAct, chosen, dateBar }: { data: GoalPageResponse; reload: () => void; onAct: (a: Act | null) => void; chosen?: Health; dateBar: ReactNode }) {
@@ -164,11 +164,16 @@ export function Props({ data, reload, onAct, chosen, dateBar }: { data: GoalPage
         )}
       </Prop>
       {judged && (
-        <Prop label="Health judged on" data={data} reload={reload} className="pjudged">
+        // tig/goalie#60: the label names the date. Health is judged on it, so the line under the value says so.
+        <Prop label="Committed Date" data={data} reload={reload} className="pjudged">
           <span>
-            <b className="date">{yearDate(judged.date)}</b> {judged.kind === "Promotion Milestone" ? "Committed · Promotion Milestone" : judged.kind}
+            <b className="date">{yearDate(judged.date)}</b> {judged.kind === "Promotion Milestone" ? "Promotion Milestone" : judged.kind}
             {judged.slipDays !== undefined && <span className="late"> · {slipLabel(judged.slipDays)}</span>}
           </span>
+          <span className="muted pother">Health is judged on this date.</span>
+          {judged.kind === "Committed" && goal.changed_due_date && goal.original_committed_date && (
+            <span className="muted pother">Original Committed Date {yearDate(goal.original_committed_date)}</span>
+          )}
           {dateBar}
           {pm && judged.kind === "Promotion Milestone" && (
             <Link to={goalPath(pm.id)} className="pbacked">
@@ -186,6 +191,12 @@ export function Props({ data, reload, onAct, chosen, dateBar }: { data: GoalPage
               {open && goal.date_type === "Committed" && (
                 <button type="button" className="linkbtn" onClick={() => onAct({ name: "slip" })}>
                   Record a slip
+                </button>
+              )}
+              {/* A pull-in moves the date earlier, not before today, so a date on or before today has none. */}
+              {open && goal.date_type === "Committed" && !data.inherited && judged.date > data.today && (
+                <button type="button" className="linkbtn" onClick={() => onAct({ name: "pullin" })}>
+                  Record a pull-in
                 </button>
               )}
               {closable && (goal.date_type === "Ambition" || goal.date_type === "Fantasy") && (

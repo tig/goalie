@@ -170,17 +170,21 @@ export function dateBar(started: string | null, today: string, dates: { date: st
   return { start: started ? at(started) : null, today: at(today), marks: dates.map((d) => ({ at: at(d.date), date: d.date, kind: d.kind })) };
 }
 
-/** Date bar labels (G6): each label's row, 0 or 1. A label that would touch the one before it in its row drops to the other row. `width` is the bar in pixels. */
-export function labelRows(labels: { at: number; text: string; align: "start" | "center" | "end" }[], width: number): number[] {
+/**
+ * Date bar labels (G6): each label's row, 0 or 1, and its left edge in pixels. A label that would touch the one before it in its row drops to the other row.
+ * Each label stays inside the bar, so none runs past the card (tig/goalie#62). `width` is the bar in pixels.
+ */
+export function labelPlaces(labels: { at: number; text: string; align: "start" | "center" | "end" }[], width: number): { row: number; left: number }[] {
   const gap = 8;
   const ends = [-Infinity, -Infinity];
   return labels.map((l) => {
     const w = labelWidth(l.text);
     const x = (l.at / 100) * width;
-    const left = l.align === "start" ? x : l.align === "end" ? x - w : x - w / 2;
+    const wanted = l.align === "start" ? x : l.align === "end" ? x - w : x - w / 2;
+    const left = Math.max(0, Math.min(width - w, wanted));
     const row = left >= ends[0] + gap ? 0 : left >= ends[1] + gap ? 1 : 0;
     ends[row] = left + w;
-    return row;
+    return { row, left };
   });
 }
 

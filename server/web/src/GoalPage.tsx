@@ -4,9 +4,9 @@ import { shortDate } from "../../src/dates.ts";
 import { getJson, postCommands, useJson } from "./data.ts";
 import { AddSubGoal, AddWorkItem, useTick } from "./GoalAdd.tsx";
 import { Crumbs, Props } from "./GoalSide.tsx";
-import { ClosePanel, DescriptionPanel, HealthPanel, PromotePanel, PursuePanel, SlipPanel, type Done, type PanelName } from "./GoalPanels.tsx";
+import { ClosePanel, DescriptionPanel, HealthPanel, PromotePanel, PullInPanel, PursuePanel, SlipPanel, type Done, type PanelName } from "./GoalPanels.tsx";
 import { commentBatch } from "./model/commands.ts";
-import { activity, ACTIVITY, changeParts, createdFields, ptgChanges, historyNames, joinPages, dateBar, labelRows, eventValue, fieldLabel, groupEvents, groupWorkItems, type ActivityChip, type EventGroup, type Names } from "./model/goalpage.ts";
+import { activity, ACTIVITY, changeParts, createdFields, ptgChanges, historyNames, joinPages, dateBar, labelPlaces, eventValue, fieldLabel, groupEvents, groupWorkItems, type ActivityChip, type EventGroup, type Names } from "./model/goalpage.ts";
 import { dateLabel } from "./model/labels.ts";
 import { backPath, goalPath } from "./model/route.ts";
 import { Avatar, HealthDot } from "./parts.tsx";
@@ -122,6 +122,7 @@ function Goal({ data, reload, status, setStatus }: { data: GoalPageResponse; rel
           {/* GP2-4: every multi-field action opens its panel here, under the title. */}
           {panel?.name === "health" && panel.health && <HealthPanel data={data} health={panel.health} onDone={done} />}
           {panel?.name === "slip" && <SlipPanel data={data} onDone={done} />}
+          {panel?.name === "pullin" && <PullInPanel data={data} onDone={done} />}
           {panel?.name === "promote" && <PromotePanel data={data} onDone={done} />}
           {panel?.name === "close" && <ClosePanel data={data} onDone={done} />}
           {panel?.name === "pursue" && <PursuePanel data={data} onDone={done} />}
@@ -231,7 +232,7 @@ function Changers({ data }: { data: GoalPageResponse }) {
 function DateBar({ data }: { data: GoalPageResponse }) {
   const bar = dateBar(data.started, data.today, data.dates);
   const [width, setWidth] = useState(0);
-  // The bar's width decides which labels would touch; a label that would drops to a second row (labelRows).
+  // The bar's width decides which labels would touch; a label that would drops to a second row. Each stays inside the bar (labelPlaces).
   const measured = useCallback((el: HTMLDivElement | null) => {
     if (!el) return;
     setWidth(el.clientWidth);
@@ -245,9 +246,9 @@ function DateBar({ data }: { data: GoalPageResponse }) {
     ...(bar.start === null || Math.abs(bar.today - bar.start) > 12 ? [{ key: "today", at: bar.today, text: "Today", align: bar.start === null && bar.today < 5 ? ("start" as const) : ("center" as const) }] : []),
     ...bar.marks.map((m) => ({ key: m.kind, at: m.at, text: shortDate(m.date, data.today), align: m.at > 85 ? ("end" as const) : ("center" as const) })),
   ];
-  const rows = labelRows(labels, width || 1000);
+  const places = labelPlaces(labels, width || 1000);
   return (
-    <div className={`datebar${rows.includes(1) ? " two" : ""}`} aria-hidden="true" ref={measured}>
+    <div className={`datebar${places.some((p) => p.row) ? " two" : ""}`} aria-hidden="true" ref={measured}>
       <span className="dbtrack" />
       {bar.start !== null && <span className="dbfill" style={{ left: `${bar.start}%`, width: `${Math.max(0, bar.today - bar.start)}%` }} />}
       <span className="dbtoday" style={{ left: `${bar.today}%` }} />
@@ -256,7 +257,7 @@ function DateBar({ data }: { data: GoalPageResponse }) {
       ))}
       <span className="dblabels small">
         {labels.map((l, i) => (
-          <span key={l.key} className={`${l.align}${rows[i] ? " low" : ""}`} style={{ left: `${l.at}%` }}>
+          <span key={l.key} className={places[i].row ? "low" : undefined} style={{ left: places[i].left }}>
             {l.text}
           </span>
         ))}

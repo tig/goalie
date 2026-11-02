@@ -27,12 +27,15 @@ function usePost(onSaved: (answer: CommandsResponse) => void): [Result, (batch: 
   return [result, post];
 }
 
+/** tig/goalie#65: these forms add something new, and its key is not shown until it saves, so a message drops the key it starts with. */
+const unkeyed = (message: string) => message.replace(/^[A-Z]+-\d+: (.)/, (_, c: string) => c.toUpperCase());
+
 const Errors = ({ result }: { result: Result }) => (
   <>
     {result.message && <p className="ferror">{result.message}</p>}
     {result.violations.map((v, i) => (
       <p key={i} className="ferror">
-        {v.message}
+        {unkeyed(v.message)}
       </p>
     ))}
   </>
@@ -52,10 +55,12 @@ export function AddSubGoal({ data, onDone }: { data: GoalPageResponse; onDone: D
   const [own, setOwn] = useState(false);
   const [date, setDate] = useState({ due_date: goal.due_date ?? today, date_type: (goal.date_type ?? "Committed") as "Committed" | "Ambition" | "Fantasy" });
   const [ms, setMs] = useState({ summary: "", due_date: addDays(today, 14), owner: goal.owner });
+  const [plan, setPlan] = useState({ plan: "", plan_maturity: goal.plan_maturity });
   const [result, post] = usePost((b) => onDone(true, savedStatus("subgoal", b)));
   const parentDate = data.dates.find((d) => d.kind !== "Promotion Milestone") ?? data.dates[0];
   const uncommitted = own && date.date_type !== "Committed";
-  const row: SubGoalRow = { summary, owner, ...(own ? { date } : {}), ...(uncommitted ? { milestone: { ...ms, summary: ms.summary || `Commit a date for ${summary}` } } : {}) };
+  const committed = own && date.date_type === "Committed";
+  const row: SubGoalRow = { summary, owner, ...(own ? { date } : {}), ...(uncommitted ? { milestone: { ...ms, summary: ms.summary || `Commit a date for ${summary}` } } : {}), ...(committed ? { plan } : {}) };
   return (
     <section className="panel addrow" aria-label="Sub-goal" data-focus={formFocus("Sub-goal")}>
       <div className="addgrid">
@@ -98,6 +103,26 @@ export function AddSubGoal({ data, onDone }: { data: GoalPageResponse; onDone: D
               ))}
             </select>
           </label>
+        </div>
+      )}
+      {/* tig/goalie#65: a Committed date needs a Plan at Pencil, so its own Committed date asks for the plan here, not after Add. */}
+      {committed && (
+        <div className="pmbox">
+          <p className="small">A Committed date needs a Plan at Pencil. Link the plan, or pick Ambition.</p>
+          <div className="addgrid">
+            <label className="field">
+              <span className="flabel">Plan</span>
+              <input value={plan.plan} placeholder="A link or a path" onChange={(e) => setPlan({ ...plan, plan: e.target.value })} />
+            </label>
+            <label className="field">
+              <span className="flabel">Plan Maturity</span>
+              <select value={plan.plan_maturity} onChange={(e) => setPlan({ ...plan, plan_maturity: e.target.value as typeof plan.plan_maturity })}>
+                {(["Watercolor", "Crayon", "Pencil"] as const).map((m) => (
+                  <option key={m}>{m}</option>
+                ))}
+              </select>
+            </label>
+          </div>
         </div>
       )}
       {uncommitted && (

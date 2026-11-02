@@ -116,6 +116,8 @@ The User's Manual ([§11 (User's Manual)](#s11)) repeats these definitions, so t
 | **Starvation** | The deliberate lack of attention and resources for items lower on the priority list. It is the intended effect of prioritizing, not a failure. |
 | **Date Type** | How firm a goal's date is: Committed, Ambition, or Fantasy ([§5 (Date types)](#s5)). |
 | **Promotion Milestone** | A goal with a committed date, by which another goal's uncommitted date moves up one Date Type ([§5 (Date types)](#s5)). |
+| **Slip** | A move of a Committed date to a later date, with a reason. The Original Committed Date stays on record ([§7.1 (Date lifecycle)](#s7-1)). |
+| **Pull-in** | A move of a Committed date to an earlier date, not before today, with a reason. The Original Committed Date stays on record ([§7.1 (Date lifecycle)](#s7-1)). |
 | **Plan** | The document describing how a goal will be achieved. Its maturity is Watercolor, Crayon, or Pencil. |
 | **Doc** | A page a human opens and writes: a plan or the User's Manual ([§6.5 (Doc)](#s6-5), [§11 (User's Manual)](#s11)). It is not only a stored body. |
 | **Plan Maturity** | **Watercolor:** broad strokes, soft edges. **Crayon:** main parts clear, lines thick, details flexible. **Pencil:** precise and ready to execute; two readers would picture the same thing. |
@@ -149,7 +151,7 @@ Not every date is the same kind of date, and treating them as the same is a majo
 - **Promoting Fantasy → Ambition** comes with a new Promotion Milestone for Ambition → Committed.
 - **Promoting Ambition → Committed** needs a Plan at Pencil maturity, records the **Original Committed Date** ([§6 (Data model)](#s6)), pins the plan's Doc version (`committed_plan_version`, [§6.1 (Goal)](#s6-1)), and removes the Promotion Milestone link. The completed milestone stays in the history.
 - The promoted date can differ from the old ambition or fantasy date. Negotiating the date is part of promotion. The difference is recorded and reported ([§8.2 (Views)](#s8-2)).
-- **A Committed date can't be demoted** (invariant). If it can't be hit, that is a slip ([§6 (Data model)](#s6)).
+- **A Committed date can't be demoted** (invariant). If it can't be hit, that is a slip ([§6 (Data model)](#s6)). If it will be hit early, that is a pull-in.
 - **Ambition → Fantasy** is allowed, with a reason, and is counted as a regression.
 
 ## 6. Data model
@@ -182,7 +184,7 @@ Structured fields are state, date type, health, PTG, rank, and every other field
 | `plan_maturity` | `Watercolor` · `Crayon` · `Pencil` | yes | Committed needs Pencil (invariant). A Promotion Milestone (`Milestone (Commit)`) is exempt: it is committed on the plan of the goal it promotes. If a team asks for a committed date on a Crayon plan, push back on the plan, not the date. |
 | `work_product` | List of typed links | optional | Repo / PR / milestone, doc folder, deployed URL, metric dashboard or query. Agents follow these to gather evidence for health. Lint: missing on an in-progress `Milestone (Launch)`. |
 | `original_committed_date` | Date, set by the system | auto | Recorded when `date_type` first becomes Committed. Not editable afterwards (invariant). A deployment can let the GOALIE owner, and no one else, correct a genuine data-entry error, with a logged reason. |
-| `changed_due_date` | Date | optional; only when Committed | The current expected date after a slip. Each change has a reason (invariant) and is logged. No silent re-baselines. |
+| `changed_due_date` | Date | optional; only when Committed | The current expected date after a slip or a pull-in. A slip moves it later. A pull-in moves it earlier, not before today. Each change has a reason (invariant) and is logged. It can't be cleared. No silent re-baselines. |
 | `severity` | Enum **(configurable)** | yes | Default `sev1` critical / urgent / blocking · `sev2` important · `sev3` nice to have. Says how critical the goal is, not where it ranks (see `priority`). |
 | `priority` | → Priority | optional; usually only for Company, Program, or Function goals | The current priority this goal serves. It links to an entry in an org unit's ranked Priority list ([§6.3 (Priority)](#s6-3)), typically the goal's own unit or an ancestor's. Goals under a starved priority, or with no priority, are expected to get less. Reviews and rollups make that visible, so the starvation is deliberate rather than accidental. |
 | `state` | Enum ([§7.2 (State lifecycle)](#s7-2)) | yes | `Backlog` · `In Progress` · `Completed` · `Completed Late` · `Did Not Meet` · `Deleted`. Each change has a reason (invariant). |
@@ -294,6 +296,7 @@ A goal has two lifecycles that run in parallel:
 Committing to *pursue* a goal is a separate decision from committing to its *date*.
 
 ### 7.1 Date lifecycle
+<a id="s7-1"></a>
 
 ```mermaid
 stateDiagram-v2
@@ -306,6 +309,7 @@ stateDiagram-v2
     Ambition --> Committed: promote by Promotion Milestone date<br/>(Plan at Pencil, records Original Committed Date)
     Ambition --> Fantasy: demote (reason, counted as regression)
     Committed --> Committed: slip (changed_due_date + reason)<br/>not demotable
+    Committed --> Committed: pull-in (earlier changed_due_date + reason)
 
     Fantasy --> Missed: milestone date passes unmet
     Ambition --> Missed: milestone date passes unmet

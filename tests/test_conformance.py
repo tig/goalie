@@ -61,36 +61,36 @@ class ConformanceTests(unittest.TestCase):
         76: ("test_org_unit_has_a_named_human_owner",),
         88: ("test_original_committed_date_is_not_rewritten",),
         90: ("test_state_or_date_change_carries_a_written_reason",),
-        135: ("test_goal_date_carries_a_date_type",),
-        144: ("test_uncommitted_date_has_a_promotion_milestone",),
-        152: ("test_committed_date_cannot_be_demoted",),
-        160: (
+        137: ("test_goal_date_carries_a_date_type",),
+        146: ("test_uncommitted_date_has_a_promotion_milestone",),
+        154: ("test_committed_date_cannot_be_demoted",),
+        162: (
             "test_version_is_stored_on_each_writable_entity",
             "test_write_names_the_version_it_read",
             "test_write_names_the_version_it_read",
         ),
-        162: (
+        164: (
             "test_structured_fields_are_not_merged",
             "test_structured_fields_are_not_merged",
         ),
-        173: ("test_goal_has_exactly_one_human_owner",),
-        178: ("test_goal_date_carries_a_date_type",),
-        179: ("test_uncommitted_date_has_a_promotion_milestone",),
-        181: ("test_promotion_pins_committed_plan_version",),
-        182: ("test_committed_goal_needs_a_pencil_plan",),
-        184: ("test_original_committed_date_is_not_rewritten",),
-        185: ("test_state_or_date_change_carries_a_written_reason",),
-        188: ("test_state_or_date_change_carries_a_written_reason",),
-        190: ("test_yellow_or_red_goal_has_a_path_to_green",),
-        208: ("test_org_unit_has_a_named_human_owner",),
-        220: ("test_priority_ranks_are_unique",),
-        241: ("test_doc_is_a_page", "test_doc_is_a_page"),
-        243: (
+        175: ("test_goal_has_exactly_one_human_owner",),
+        180: ("test_goal_date_carries_a_date_type",),
+        181: ("test_uncommitted_date_has_a_promotion_milestone",),
+        183: ("test_promotion_pins_committed_plan_version",),
+        184: ("test_committed_goal_needs_a_pencil_plan",),
+        186: ("test_original_committed_date_is_not_rewritten",),
+        187: ("test_state_or_date_change_carries_a_written_reason",),
+        190: ("test_state_or_date_change_carries_a_written_reason",),
+        192: ("test_yellow_or_red_goal_has_a_path_to_green",),
+        210: ("test_org_unit_has_a_named_human_owner",),
+        222: ("test_priority_ranks_are_unique",),
+        243: ("test_doc_is_a_page", "test_doc_is_a_page"),
+        245: (
             "test_markdown_edit_is_not_lost",
             "test_markdown_edit_is_not_lost",
             "test_saved_doc_version_comes_from_the_merged_text",
         ),
-        248: (
+        250: (
             "test_event_sequence_only_increases",
             "test_views_and_agents_share_one_stream",
             "test_client_resumes_from_the_last_sequence",
@@ -99,7 +99,7 @@ class ConformanceTests(unittest.TestCase):
             "test_comment_is_an_event_on_the_entity",
             "test_draft_appears_live_and_does_not_take_effect_until_approval",
         ),
-        250: (
+        252: (
             "test_every_change_is_an_event",
             "test_history_is_readable_on_the_record",
             "test_history_is_readable_on_the_record",
@@ -107,37 +107,37 @@ class ConformanceTests(unittest.TestCase):
             "test_history_is_readable_on_the_record",
             "test_history_is_readable_on_the_record",
         ),
-        255: (
+        257: (
             "test_work_items_are_the_list_under_the_goal",
             "test_human_can_file_a_work_item_with_no_agent",
         ),
-        286: (
+        288: (
             "test_draft_appears_live_and_does_not_take_effect_until_approval",
             "test_draft_appears_live_and_does_not_take_effect_until_approval",
             "test_stale_draft_approval_is_rejected",
         ),
-        362: (
+        366: (
             "test_structured_fields_are_not_merged",
             "test_structured_fields_are_not_merged",
         ),
-        363: (
+        367: (
             "test_write_names_the_version_it_read",
             "test_write_names_the_version_it_read",
         ),
-        364: ("test_commit_check_is_one_server_transaction",),
-        368: ("test_deleted_goal_stays_findable",),
-        374: ("test_view_is_a_screen_plus_a_saved_definition",),
-        380: ("test_between_reviews_work_starts_at_my_goals",),
-        381: ("test_committed_change_appears_within_the_live_update_time",),
-        382: (
+        368: ("test_commit_check_is_one_server_transaction",),
+        372: ("test_deleted_goal_stays_findable",),
+        378: ("test_view_is_a_screen_plus_a_saved_definition",),
+        384: ("test_between_reviews_work_starts_at_my_goals",),
+        385: ("test_committed_change_appears_within_the_live_update_time",),
+        386: (
             "test_client_resumes_from_the_last_sequence",
             "test_client_resumes_from_the_last_sequence",
         ),
-        383: ("test_view_shows_presence",),
-        475: ("test_only_the_goalie_owner_changes_owner_settings",),
-        493: ("test_a_user_changes_only_their_own_settings",),
-        197: ("test_only_owners_change_a_goal", "test_only_owners_change_a_goal"),
-        361: ("test_only_owners_change_a_goal",),
+        387: ("test_view_shows_presence",),
+        479: ("test_only_the_goalie_owner_changes_owner_settings",),
+        497: ("test_a_user_changes_only_their_own_settings",),
+        199: ("test_only_owners_change_a_goal", "test_only_owners_change_a_goal"),
+        365: ("test_only_owners_change_a_goal",),
     }
 
     SKIP_WHY = {

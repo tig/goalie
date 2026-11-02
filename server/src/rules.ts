@@ -222,15 +222,18 @@ export function checkTransition(kind: string, before: Row | undefined, after: Ro
     // SPEC.md §7.2: Completed is met on or before the Original Committed Date, Completed Late after it.
     found.push({ rule: "completed-on-time", message: `${after.id}: met ${expected === "Completed" ? "on time" : "late"}, so it is ${expected}.`, field: "state" });
   }
-  // A slip moves the date later (SPEC.md §7.1: a missed Committed date is a slip, never a re-baseline).
-  // Codebase QA Q12: clearing a slip would let the next slip move the date earlier.
+  // A slip moves the date later, a pull-in earlier but not before today (SPEC.md §4, §7.1). Neither is a re-baseline.
+  // Codebase QA Q12: a changed date is kept, so no one clears it to step around it.
   if (before.changed_due_date != null && after.changed_due_date == null && after.date_type === "Committed") {
-    found.push({ rule: "slip-moves-later", message: `${after.id}: a slip is kept. The next slip moves the date later than ${String(before.changed_due_date)}.`, field: "changed_due_date" });
+    found.push({ rule: "changed-date-kept", message: `${after.id}: a changed date is kept. Record a slip or a pull-in from ${String(before.changed_due_date)}.`, field: "changed_due_date" });
   }
   if (after.changed_due_date != null && after.changed_due_date !== before.changed_due_date) {
     const current = (before.changed_due_date ?? before.due_date) as string;
-    if (typeof current === "string" && (after.changed_due_date as string) <= current) {
-      found.push({ rule: "slip-moves-later", message: `${after.id}: a slip moves the date later than ${current}.`, field: "changed_due_date" });
+    const date = after.changed_due_date as string;
+    if (typeof current === "string" && date === current) {
+      found.push({ rule: "date-moves", message: `${after.id}: the date is already ${current}. A slip moves it later, a pull-in earlier.`, field: "changed_due_date" });
+    } else if (typeof current === "string" && date < current && date < today) {
+      found.push({ rule: "pull-in-not-before-today", message: `${after.id}: a pull-in moves the date no earlier than today, ${today}.`, field: "changed_due_date" });
     }
   }
   const moves = STATE_MOVES[before.state as State];

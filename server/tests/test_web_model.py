@@ -412,8 +412,17 @@ class GoalPageTests(unittest.TestCase):
 
     def test_date_bar_labels_that_would_touch_drop_to_a_second_row(self) -> None:
         labels = '[{ at: 0, text: "In Progress since Oct 24", align: "start" }, { at: 37, text: "Nov 6", align: "center" }, { at: 100, text: "Nov 30", align: "end" }]'
-        self.assertEqual(run(f"return goalpage.labelRows({labels}, 310);"), [0, 1, 0])  # a phone
-        self.assertEqual(run(f"return goalpage.labelRows({labels}, 990);"), [0, 0, 0])  # 1440
+        self.assertEqual(run(f"return goalpage.labelPlaces({labels}, 310).map((p) => p.row);"), [0, 1, 0])  # a phone
+        self.assertEqual(run(f"return goalpage.labelPlaces({labels}, 990).map((p) => p.row);"), [0, 0, 0])  # 1440
+
+    def test_date_bar_labels_stay_inside_the_bar(self) -> None:
+        # tig/goalie#62: on XW-0001 the start label ran past the card's right edge and the first date past its left.
+        labels = '[{ at: 0, text: "Oct 1", align: "center" }, { at: 72, text: "In Progress since Today", align: "start" }, { at: 100, text: "Today", align: "center" }]'
+        places = run(f"return goalpage.labelPlaces({labels}, 268);")
+        widths = [5 * 7, 23 * 7, 5 * 7]
+        for p, w in zip(places, widths):  # type: ignore[arg-type]
+            self.assertGreaterEqual(p["left"], 0)
+            self.assertLessEqual(p["left"] + w, 268)
 
     def test_a_goal_never_in_progress_has_no_start_on_the_bar(self) -> None:
         bar = run('return goalpage.dateBar(null, "2026-10-25", [{ date: "2026-12-11", kind: "Committed" }]);')
@@ -552,6 +561,12 @@ class GoalPageTests(unittest.TestCase):
         self.assertEqual(sorted(b["commands"][0]["fields"]), ["changed_due_date", "health", "path_to_green"])  # type: ignore[index]
         self.assertEqual(b["commands"][0]["fields"]["changed_due_date"], "2026-11-20")  # type: ignore[index]
 
+    def test_a_pull_in_sets_only_an_earlier_changed_due_date(self) -> None:
+        # tig/goalie#64: health and the Path to Green stay as they are.
+        b = run('const g = page("XW-0001").goal; return commands.pullInBatch(g, "2026-11-05", "Done ahead");')
+        self.assertEqual(b["commands"][0]["fields"], {"changed_due_date": "2026-11-05"})  # type: ignore[index]
+        self.assertEqual(b["commands"][0]["reason"], "Done ahead")  # type: ignore[index]
+
     def test_promoting_fantasy_makes_a_new_milestone_first(self) -> None:
         b = run('const g = page("XW-0003").goal; return commands.promoteToAmbition(g, { summary: "Commit a date for the launch", due_date: "2026-12-01", owner: "chelsea" }, "2026-12-15", "Plan is clearer", "Milestone (Commit)");')
         c = b["commands"]  # type: ignore[index]
@@ -592,6 +607,12 @@ class GoalPageTests(unittest.TestCase):
     def test_a_sub_goal_on_its_parents_date_sends_no_date(self) -> None:
         b = run('return commands.subGoalBatch(page("XW-0003").goal, { summary: "Load the tree", owner: "chelsea" }, TYPES);')
         self.assertEqual(b, {"commands": [{"op": "create", "kind": "goal", "ref": "$s1", "fields": {"summary": "Load the tree", "owner": "chelsea", "parent": "XW-0003", "type": "Milestone (Launch)", "org_unit": "excaliwire", "level": "Company", "severity": "sev1", "origination": "New", "visibility": "organization-wide", "plan_maturity": "Crayon", "state": "Backlog"}, "reason": "Sub-goal of XW-0003"}]})
+
+    def test_a_committed_sub_goal_sends_its_own_plan(self) -> None:
+        # tig/goalie#65: a sub-goal with its own Committed date needs a Plan at Pencil, so the form sends the plan with the date.
+        b = run('return commands.subGoalBatch(page("XW-0004").goal, { summary: "Open a goal", owner: "chelsea", date: { due_date: "2026-12-01", date_type: "Committed" }, plan: { plan: "docs/plans/open.md", plan_maturity: "Pencil" } }, TYPES);')
+        f = b["commands"][0]["fields"]  # type: ignore[index]
+        self.assertEqual((f["date_type"], f["plan"], f["plan_maturity"]), ("Committed", "docs/plans/open.md", "Pencil"))
 
     def test_an_uncommitted_sub_goal_brings_its_own_milestone_in_the_create_order(self) -> None:
         b = run('return commands.subGoalBatch(page("XW-0004").goal, { summary: "Open a goal", owner: "chelsea", date: { due_date: "2026-12-01", date_type: "Ambition" }, milestone: { summary: "Commit a date for Open a goal", due_date: "2026-11-20", owner: "chelsea" } }, TYPES);')
@@ -652,6 +673,7 @@ process.stdout.write(JSON.stringify([a.body.message, b.body.message]));"""
             ("close", {"ok": True, "ids": {}, "events": []}, {"state": "Completed Late"}),
             ("promote-close", {"ok": True, "ids": {}, "events": []}, {"state": "Completed"}),
             ("slip", {"ok": True, "ids": {}, "events": []}, {"date": "Dec 4, 2026"}),
+            ("pull-in", {"ok": True, "ids": {}, "events": []}, {"date": "Nov 5, 2026"}),
         ]
         self.assertEqual(run(f"return {json.dumps(cases)}.map(([k, a, x]) => commands.savedStatus(k, a, x));"), [
             "Added XW-0020 under this goal.",
@@ -661,6 +683,7 @@ process.stdout.write(JSON.stringify([a.body.message, b.body.message]));"""
             "Closed as Completed Late.",
             "Promoted to Committed and closed as Completed.",
             "Recorded a slip to Dec 4, 2026.",
+            "Recorded a pull-in to Nov 5, 2026.",
         ])
 
     def test_reordering_priorities_sends_one_batch_of_the_ranks_that_changed(self) -> None:
