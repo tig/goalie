@@ -136,7 +136,7 @@ function Goal({ data, reload, status, setStatus }: { data: GoalPageResponse; rel
           {panel?.name === "description" ? (
             <DescriptionPanel data={data} onDone={done} />
           ) : (
-            <section className="gsec gdesc">
+            <section className="gsec gdesc" data-focus={encodeFocus({ kind: "section", id: "Description", label: "Description" })}>
               <h2>
                 Description
                 {may && <Pencil label="Edit Description" onClick={() => setPanel({ name: "description" })} />}
@@ -147,7 +147,7 @@ function Goal({ data, reload, status, setStatus }: { data: GoalPageResponse; rel
             </section>
           )}
           {goal.path_to_green && (goal.health === "YELLOW" || goal.health === "RED") && (
-            <section className={`gsec gptg ${goal.health}`}>
+            <section className={`gsec gptg ${goal.health}`} data-focus={encodeFocus({ kind: "section", id: "Path to Green", label: "Path to Green" })}>
               <h2>
                 Path to Green
                 {may && open && <Pencil label="Edit Path to Green" onClick={() => setPanel({ name: "health", health: goal.health as "YELLOW" | "RED" })} />}
@@ -180,7 +180,7 @@ function Goal({ data, reload, status, setStatus }: { data: GoalPageResponse; rel
               )}
             </section>
           )}
-          <section className="gsec gsubs">
+          <section className="gsec gsubs" data-focus={encodeFocus({ kind: "section", id: "Sub-goals", label: "Sub-goals" })}>
             <h2>
               Sub-goals <span className="muted">{data.subGoals.length}</span>
             </h2>
@@ -283,7 +283,7 @@ function SubGoal({ card, data }: { card: SubGoalCard; data: GoalPageResponse }) 
   const owner = data.actors[card.owner] ?? { id: card.owner, name: card.owner };
   const done = card.workItems && card.workItems.total > 0 ? card.workItems.completed / card.workItems.total : 0;
   return (
-    <div className="gsub2">
+    <div className="gsub2" data-focus={encodeFocus({ kind: "goal", id: card.id, label: card.summary })}>
       <HealthDot health={card.state === "In Progress" ? card.health : null} word={false} />
       <div className="gsubmain">
         <Link to={goalPath(card.id)} className="title">
@@ -344,7 +344,7 @@ function WorkItems({ items, data, adding, onAdd, onDone, reload, status }: { ite
   const { move, chosen, box } = useTick(reload);
   const rows = live.filter((i) => shown[i.status]);
   return (
-    <section className="gsec gwork" id="g-work">
+    <section className="gsec gwork" id="g-work" data-focus={encodeFocus({ kind: "section", id: "Work items", label: "Work items" })}>
       <h2>
         Work items <span className="muted">{live.length}</span>
         <span className="wchips">
@@ -362,7 +362,7 @@ function WorkItems({ items, data, adding, onAdd, onDone, reload, status }: { ite
           const owner = data.actors[i.owner] ?? { id: i.owner, name: i.owner, kind: "human" as const };
           const now = chosen(i);
           return (
-            <div key={i.id} className={`wrow2${i.status === "Completed" ? " done" : ""}`}>
+            <div key={i.id} className={`wrow2${i.status === "Completed" ? " done" : ""}`} data-focus={encodeFocus({ kind: "work item", id: i.id, label: i.title })}>
               {/* The circle is a named control: empty Backlog, half In Progress, checked Completed. */}
               <button type="button" className={`scircle ${i.status === "Completed" ? "full" : i.status === "In Progress" ? "half" : "empty"}`} aria-label={`Status: ${i.status}. Change`} title="Change status" onClick={() => setPicking(picking === i.id ? null : i.id)} />
               <span className="wtitle">
@@ -429,7 +429,8 @@ function EventRow({ group, data }: { group: EventGroup; data: GoalPageResponse }
     x.field === "path_to_green" ? (ptgChanges(x.old as PathToGreen | null, x.new as PathToGreen | null, names).join("; ") || "Path to Green unchanged") : `${fieldLabel(x.field)}: ${value(x.old, x.field)} → ${value(x.new, x.field)}`;
   const other = (x: { entity: string }) => (x.entity !== data.goal.id ? `${x.entity} ` : "");
   return (
-    <li className="erow">
+    // tig/goalie#68: an Activity entry names who and when, never the text of a comment.
+    <li className="erow" data-focus={encodeFocus({ kind: e.field === "comment" ? "comment" : "change", id: `#${e.sequence}`, label: `${actor.name}, ${when(e.timestamp)}` })}>
       <Avatar actor={actor} mine={actor.id === data.me.id} />
       <div>
         <p className="small">
@@ -510,7 +511,7 @@ function Talk({ data, reload }: { data: GoalPageResponse; reload: () => void }) 
     } else setLoading(page.state === "refused" ? page.reason : "");
   };
   return (
-    <section className="gsec gtalk">
+    <section className="gsec gtalk" data-focus={encodeFocus({ kind: "section", id: "Activity", label: "Activity" })}>
       <h2>
         Activity
         <span className="wchips">
