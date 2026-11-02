@@ -201,7 +201,7 @@ Three actors may change a goal's fields: the goal's `owner`, the owner of any go
 - A new `owner` is exactly one human, as for every goal. The old owner, an owner above, or the GOALIE owner makes the change.
 - A goal with a `parent` is created by an actor who may change that parent. A goal with no `parent` is created by any human.
 - Approving a Draft is a write to the goal. Only an actor who may change the goal approves or rejects its Draft ([§6.9 (Draft)](#s6-9)).
-- Comments are open to every actor. A comment is not a field change.
+- Comments are open to every actor. A comment is not a field change. A comment is Markdown text, like `description`.
 
 ### 6.2 Org Unit
 
