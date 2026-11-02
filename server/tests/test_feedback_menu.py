@@ -203,6 +203,23 @@ GOAL_PAGE = scenario("""
   return { title, field, ownerField, sent };
 """, ready=".gtitle")
 
+# Chelsea, tig/goalie#68: a pick names the smallest part under the pointer. A section, an Activity entry, and a button each name themselves, not the whole goal.
+GRANULAR = scenario("""
+  const pick = async (el, note) => {
+    el.scrollIntoView({ block: "center" });
+    await rightClick(el);
+    await pickFeedback();
+    const shown = about();
+    await send(note);
+    await key("Escape");
+    return shown;
+  };
+  const section = await pick(document.querySelector(".gdesc h2"), "Section note.");
+  const chip = await pick(document.querySelector(".gtalk .fchip"), "Chip note.");
+  const entry = await pick(document.querySelector(".gtalk .erow p"), "Entry note.");
+  return { section, chip, entry, sent };
+""", ready=".gtalk .erow")
+
 # Every edit form on a goal page is the pick for anything inside it: the field form, a panel, the two add rows, and the comment box.
 EDIT_FORMS = scenario("""
   const byText = (text) => [...document.querySelectorAll("main button")].find((b) => b.textContent.trim() === text || b.getAttribute("aria-label") === text);
@@ -284,6 +301,7 @@ class FeedbackMenuTests(unittest.TestCase):
             cls.work_ids = {i["id"] for i in api("/api/work")["items"]}
             cls.work = open_page(1280, WORK_ROW, "/work")
             cls.goal_page = open_page(1280, GOAL_PAGE, f"/goals/{goal['id']}")
+            cls.granular = open_page(1280, GRANULAR, f"/goals/{goal['id']}")
             cls.form = open_page(1280, NEW_GOAL_FORM, "/goals/new")
             cls.kept, cls.edge = open_page(1280, KEPT), open_page(1280, EDGE)
             cls.chip = open_page(1280, CALENDAR_CHIP, "/?view=calendar")
@@ -349,6 +367,16 @@ class FeedbackMenuTests(unittest.TestCase):
         # A field with a value to change is its name and its field id, never its value.
         self.assertEqual(self.goal_page["ownerField"], "About: Owner (field)")
         self.assertEqual(self.goal_page["sent"][2]["focus"], {"label": "Owner", "id": "owner", "kind": "field", "breadcrumb": ["Goal page", self.goal["label"]]})
+
+    def test_a_section_an_activity_entry_and_a_button_each_name_themselves(self) -> None:
+        # tig/goalie#68: the note said "the whole goal" for a right-click on part of it.
+        at = ["Goal page", self.goal["label"]]
+        self.assertEqual(len(self.granular["sent"]), 3, self.granular)
+        section, chip, entry = (x["focus"] for x in self.granular["sent"])
+        self.assertEqual(section, {"label": "Description", "id": "Description", "kind": "section", "breadcrumb": at})
+        self.assertEqual((chip["kind"], chip["label"].split()[0], chip["breadcrumb"]), ("control", "All", at + ["Activity"]))
+        self.assertIn(entry["kind"], ("comment", "change"))
+        self.assertEqual(entry["breadcrumb"], at + ["Activity"])
 
     def test_a_calendar_chip_is_its_goal(self) -> None:
         self.assertEqual(self.chip["shown"], f"About: {self.chip['title']} (goal)")

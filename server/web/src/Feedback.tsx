@@ -8,6 +8,12 @@ import { useDismiss } from "./useScreen.ts";
 /** The first name in a focus breadcrumb: the page the element is on. */
 const PAGE_NAME: Record<Route["page"], string> = { home: "Home", work: "Work items", new: "New goal", goal: "Goal page" };
 
+/** What a control pick is: a button, a link, or a tab. A goal row's [role=link] names its goal in data-focus instead. */
+const CONTROL = "button, a[href], [role=button], [role=tab]";
+
+/** A control's name: its aria-label, else its text, in one line. */
+const controlLabel = (el: Element) => (el.getAttribute("aria-label") ?? el.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
+
 /** The element under a right-click, and every element around it, that names an item in data-focus, outermost first. Inside an edit form, the form is the pick. */
 function pickedChain(target: Element): { items: FocusItem[]; picked: Element | null } {
   const found: (FocusItem & { el: Element })[] = [];
@@ -15,6 +21,10 @@ function pickedChain(target: Element): { items: FocusItem[]; picked: Element | n
     const item = decodeFocus(el.getAttribute("data-focus"));
     if (item) found.unshift({ ...item, el });
   }
+  // tig/goalie#68: a button, link, or tab under the pointer is the smallest pick, inside the item around it. One that names an item is that item.
+  const control = target.closest(CONTROL);
+  const label = control && controlLabel(control);
+  if (control && label && !control.hasAttribute("data-focus") && label !== found.at(-1)?.label && (!found.length || found.at(-1)!.el.contains(control))) found.push({ kind: "control", id: label, label, el: control });
   const chain = focusChain(found);
   return { items: chain.map(({ kind, id, label }) => ({ kind, id, label })), picked: chain.at(-1)?.el ?? null };
 }
