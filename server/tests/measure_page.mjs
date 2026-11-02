@@ -4,7 +4,8 @@
 // It uses the Chrome DevTools Protocol over Node's own WebSocket, so the repo needs no browser package.
 // Real input: the page calls goalieInput(JSON of a command) and waits for window.__goalieInputDone[id]. The command goes through Chrome's own input
 // (Input.dispatchMouseEvent, Input.dispatchKeyEvent, Input.insertText), as a person's mouse and keys do, not through dispatchEvent.
-// Commands: {mouse: "left" | "right", x, y}, {key: "Escape" | "Enter" | "Tab" | "ContextMenu" | "F10", shift?: true}, {text}.
+// Commands: {mouse: "left" | "right", x, y}, {key: "Escape" | "Enter" | "Tab" | "ContextMenu" | "F10", shift?: true}, {text},
+// {touch: "on"}, then {touch: "long" | "tap", x, y, ms?, dx?, dy?} (one finger through Input.dispatchTouchEvent; dx and dy move it while it is down).
 import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -45,6 +46,7 @@ try {
     ws.onerror = reject;
   });
   let next = 0;
+  let touching = false;
   const pending = new Map();
   const realInput = async (command) => {
     if (command.mouse) {
@@ -60,6 +62,23 @@ try {
       await send("Input.dispatchKeyEvent", { type: "keyUp", modifiers, ...key });
     } else if (typeof command.text === "string") {
       await send("Input.insertText", { text: command.text });
+    } else if (command.touch) {
+      // One finger, as a phone sends it: down, held for `ms`, moved by dx and dy on the way when given, then up.
+      // {touch: "on"} makes the page a touch screen first. Its layout changes (pointer: coarse), so a step measures where to press after it.
+      if (!touching) {
+        await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
+        touching = true;
+      }
+      if (command.touch === "on") return;
+      const ms = command.ms ?? (command.touch === "long" ? 700 : 60);
+      await send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: command.x, y: command.y }] });
+      const steps = command.dx || command.dy ? 5 : 0;
+      for (let i = 1; i <= steps; i++) {
+        await wait(20);
+        await send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: command.x + ((command.dx ?? 0) * i) / steps, y: command.y + ((command.dy ?? 0) * i) / steps }] });
+      }
+      await wait(Math.max(0, ms - steps * 20));
+      await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
     } else {
       throw new Error(`unknown input ${JSON.stringify(command)}`);
     }
