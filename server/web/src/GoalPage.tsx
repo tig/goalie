@@ -9,7 +9,7 @@ import { commentBatch } from "./model/commands.ts";
 import { activity, ACTIVITY, changeParts, createdFields, ptgChanges, historyNames, joinPages, dateBar, labelPlaces, eventValue, fieldLabel, groupEvents, groupWorkItems, mayEditWorkItem, type ActivityChip, type EventGroup, type Names } from "./model/goalpage.ts";
 import { dateLabel } from "./model/labels.ts";
 import { backPath, goalPath } from "./model/route.ts";
-import { Avatar, HealthDot } from "./parts.tsx";
+import { Avatar, HealthDot, Markdown } from "./parts.tsx";
 import { homeSearch, Link } from "./router.tsx";
 import { encodeFocus, formFocus } from "./model/feedback.ts";
 
@@ -141,7 +141,7 @@ function Goal({ data, reload, status, setStatus }: { data: GoalPageResponse; rel
                 Description
                 {may && <Pencil label="Edit Description" onClick={() => setPanel({ name: "description" })} />}
               </h2>
-              {goal.description ? goal.description.split(/\n{2,}/).map((p, k) => <p key={k}>{p}</p>) : <p className="muted">No description yet.</p>}
+              {goal.description ? <Markdown text={goal.description} /> : <p className="muted">No description yet.</p>}
               {/* GP2-5: the missing parts, for owners only, plain muted text. */}
               {may && data.hints.some((h) => h.field === "description") && <p className="hint">{data.hints.filter((h) => h.field === "description").map((h) => h.text).join(" · ")}</p>}
             </section>
@@ -171,11 +171,11 @@ function Goal({ data, reload, status, setStatus }: { data: GoalPageResponse; rel
                 </tbody>
               </table>
               <p className="note">
-                <b>When it is On track again</b> {goal.path_to_green.criteria || <span className="muted">None</span>}
+                <b>When it is On track again</b> {goal.path_to_green.criteria ? <Markdown text={goal.path_to_green.criteria} inline /> : <span className="muted">None</span>}
               </p>
               {goal.health === "YELLOW" && (
                 <p className="note">
-                  <b>What makes it Off track</b> {goal.path_to_green.trigger || <span className="muted">None</span>}
+                  <b>What makes it Off track</b> {goal.path_to_green.trigger ? <Markdown text={goal.path_to_green.trigger} inline /> : <span className="muted">None</span>}
                 </p>
               )}
             </section>
@@ -437,7 +437,7 @@ function EventRow({ group, data }: { group: EventGroup; data: GoalPageResponse }
           {group.events.every((x) => x.entity !== data.goal.id) && <span className="muted"> · {e.entity}</span>}
         </p>
         {e.field === "comment" ? (
-          <p>{String(e.new)}</p>
+          <Markdown text={String(e.new)} />
         ) : group.created ? (
           <details className="created">
             <summary>

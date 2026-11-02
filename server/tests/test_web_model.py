@@ -13,7 +13,7 @@ FIXTURE = Path(__file__).resolve().parents[1] / "web" / "fixtures" / "priorities
 
 def run(body: str) -> object:
     """Run an ES module that imports the model as `m` and the seed fixture as `api`, and return what it prints as JSON."""
-    imports = "".join(f'import * as {name} from "{(MODEL / f"{name}.ts").as_uri()}";\n' for name in ("query", "filter", "timeline", "calendar", "popover", "labels", "scroll", "route", "goalpage", "commands", "newgoal"))
+    imports = "".join(f'import * as {name} from "{(MODEL / f"{name}.ts").as_uri()}";\n' for name in ("query", "filter", "timeline", "calendar", "popover", "labels", "scroll", "route", "goalpage", "commands", "newgoal", "markdown"))
     script = f"""{imports}
 import {{ readFileSync }} from "node:fs";
 const api = JSON.parse(readFileSync({json.dumps(str(FIXTURE))}, "utf-8"));
@@ -852,3 +852,44 @@ class NewGoalV2Tests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MarkdownTests(unittest.TestCase):
+    """Issue #61: multi-line text is Markdown, and a GitHub issue or pull request reference is a link (GL8)."""
+
+    def test_tig_s_example_links_to_the_factory_issue(self) -> None:
+        got = run('return markdown.markdown("See factory/issues/172 now");')
+        self.assertEqual(got, [{"t": "p", "c": [{"t": "text", "v": "See "}, {"t": "link", "href": "https://github.com/excaliwire/factory/issues/172", "c": [{"t": "text", "v": "factory#172"}]}, {"t": "text", "v": " now"}]}])
+
+    def test_every_reference_form_links_with_a_short_name(self) -> None:
+        src = "factory#3 web/pull/9 excaliwire/operations#179 tig/goalie#56 goalie#57 someone/thing/issues/4 https://github.com/excaliwire/factory/pull/3192"
+        got = run(f"return markdown.markdown({json.dumps(src)})[0].c.filter((x) => x.t === 'link').map((x) => [x.href, x.c[0].v]);")
+        self.assertEqual(got, [
+            ["https://github.com/excaliwire/factory/issues/3", "factory#3"],
+            ["https://github.com/excaliwire/web/pull/9", "web#9"],
+            ["https://github.com/excaliwire/operations/issues/179", "operations#179"],
+            ["https://github.com/tig/goalie/issues/56", "goalie#56"],
+            ["https://github.com/tig/goalie/issues/57", "goalie#57"],
+            ["https://github.com/someone/thing/issues/4", "someone/thing#4"],
+            ["https://github.com/excaliwire/factory/pull/3192", "factory#3192"],
+        ])
+
+    def test_a_number_alone_is_not_a_reference(self) -> None:
+        got = run('return markdown.markdown("Priority #1 and C# and a/b").flatMap((b) => b.c).map((x) => x.t);')
+        self.assertEqual(got, ["text"])
+
+    def test_raw_html_stays_text_and_only_web_links_open(self) -> None:
+        got = run('return markdown.markdown("<script>alert(1)</script> [x](javascript:void) [y](https://e.com/a)")[0].c;')
+        self.assertEqual(got, [{"t": "text", "v": "<script>alert(1)</script> "}, {"t": "text", "v": "[x](javascript:void)"}, {"t": "text", "v": " "}, {"t": "link", "href": "https://e.com/a", "c": [{"t": "text", "v": "y"}]}])
+
+    def test_blocks_and_emphasis(self) -> None:
+        src = "# Key results\n\n- **one**\n- *two* and `code`\n\n1. first\n2. second\n\n> quoted\n\nline one\nline two\n\n```\nraw **not bold**\n```"
+        got = run(f"return markdown.markdown({json.dumps(src)});")
+        self.assertEqual([b["t"] for b in got], ["h", "ul", "ol", "quote", "p", "code"])  # type: ignore[index]
+        self.assertEqual(got[1]["items"], [[{"t": "strong", "c": [{"t": "text", "v": "one"}]}], [{"t": "em", "c": [{"t": "text", "v": "two"}]}, {"t": "text", "v": " and "}, {"t": "code", "v": "code"}]])  # type: ignore[index]
+        self.assertEqual(got[4]["c"], [{"t": "text", "v": "line one"}, {"t": "br"}, {"t": "text", "v": "line two"}])  # type: ignore[index]
+        self.assertEqual(got[5], {"t": "code", "v": "raw **not bold**"})  # type: ignore[index]
+
+    def test_a_bare_address_links_without_its_trailing_stop(self) -> None:
+        got = run('return markdown.markdown("Read https://e.com/x.")[0].c;')
+        self.assertEqual(got, [{"t": "text", "v": "Read "}, {"t": "link", "href": "https://e.com/x", "c": [{"t": "text", "v": "https://e.com/x"}]}, {"t": "text", "v": "."}])

@@ -5,6 +5,7 @@ import type { ActorRef, Health } from "../../src/api.ts";
 import { placePopover, popoverWidth } from "./model/popover.ts";
 import { useDismiss } from "./useScreen.ts";
 import { encodeFocus } from "./model/feedback.ts";
+import { markdown, type Inline } from "./model/markdown.ts";
 
 /** The shared parts every view is built from. */
 
@@ -199,4 +200,89 @@ export function Legend({ kind, help }: { kind: keyof typeof LEGEND; help?: Parti
       ))}
     </div>
   );
+}
+
+/** Markdown text, drawn from the model's tree (GL8). Nothing here reads HTML. A link opens in a new tab. */
+export function Markdown({ text, inline }: { text: string; inline?: boolean }) {
+  const blocks = markdown(text);
+  // Text inside a sentence (a Path to Green criterion) stays in the sentence when it is one paragraph.
+  if (inline && blocks.length === 1 && blocks[0].t === "p") return <Spans of={blocks[0].c} />;
+  return (
+    <div className="md">
+      {blocks.map((b, k) => {
+        switch (b.t) {
+          case "p":
+            return (
+              <p key={k}>
+                <Spans of={b.c} />
+              </p>
+            );
+          case "quote":
+            return (
+              <blockquote key={k}>
+                <Spans of={b.c} />
+              </blockquote>
+            );
+          case "h": {
+            const H = b.level === 1 ? "h3" : "h4";
+            return (
+              <H key={k}>
+                <Spans of={b.c} />
+              </H>
+            );
+          }
+          case "ul":
+          case "ol": {
+            const List = b.t;
+            return (
+              <List key={k}>
+                {b.items.map((item, j) => (
+                  <li key={j}>
+                    <Spans of={item} />
+                  </li>
+                ))}
+              </List>
+            );
+          }
+          case "code":
+            return (
+              <pre key={k}>
+                <code>{b.v}</code>
+              </pre>
+            );
+        }
+      })}
+    </div>
+  );
+}
+
+function Spans({ of }: { of: Inline[] }) {
+  return of.map((x, k) => {
+    switch (x.t) {
+      case "text":
+        return x.v;
+      case "br":
+        return <br key={k} />;
+      case "code":
+        return <code key={k}>{x.v}</code>;
+      case "strong":
+        return (
+          <strong key={k}>
+            <Spans of={x.c} />
+          </strong>
+        );
+      case "em":
+        return (
+          <em key={k}>
+            <Spans of={x.c} />
+          </em>
+        );
+      case "link":
+        return (
+          <a key={k} href={x.href} target="_blank" rel="noopener noreferrer">
+            <Spans of={x.c} />
+          </a>
+        );
+    }
+  });
 }
