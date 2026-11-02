@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import type { ApiEvent, PrioritiesResponse, WorkItemStatus, WorkResponse } from "../../src/api.ts";
 import { shortDate } from "../../src/dates.ts";
 import { useJson } from "./data.ts";
-import { useTick } from "./GoalAdd.tsx";
-import { Owner } from "./GoalPage.tsx";
-import { keepOrder, queues } from "./model/goalpage.ts";
+import { EditWorkItem, useTick } from "./GoalAdd.tsx";
+import { Owner, Pencil } from "./GoalPage.tsx";
+import { keepOrder, mayEditWorkItem, queues } from "./model/goalpage.ts";
 import { goalPath, workPath } from "./model/route.ts";
 import { Link } from "./router.tsx";
 import { encodeFocus } from "./model/feedback.ts";
@@ -80,6 +80,7 @@ const STATUSES: WorkItemStatus[] = ["Backlog", "In Progress", "Completed", "Dele
 
 function Queues({ work, reload, single }: { work: WorkResponse; reload: () => void; single: boolean }) {
   const [closed, setClosed] = useState<Record<string, boolean>>({});
+  const [editing, setEditing] = useState<string | null>(null);
   const { ticked, tick, move, chosen, box } = useTick(reload);
   // QA U5: a save does not move a person's queue; the order from page load holds until the next visit.
   const sorted = queues(work.items, work.actors, work.me.id);
@@ -109,7 +110,10 @@ function Queues({ work, reload, single }: { work: WorkResponse; reload: () => vo
                 <label className="wtick">
                   <input type="checkbox" checked={i.status === "Completed" || ticked?.id === i.id} disabled={i.status === "Completed"} onChange={() => tick(i)} aria-label={`Mark ${i.title} Completed`} />
                 </label>
-                <span className="wtitle">{i.title}</span>
+                <span className="wtitle">
+                  {i.title}
+                  {mayEditWorkItem(work.me, i) && <Pencil label={`Edit ${i.title}`} onClick={() => setEditing(editing === i.id ? null : i.id)} />}
+                </span>
                 <Link to={goalPath(i.goal)} className="wgoal small">
                   {work.goals[i.goal]?.summary ?? i.goal}
                 </Link>
@@ -121,6 +125,16 @@ function Queues({ work, reload, single }: { work: WorkResponse; reload: () => vo
                   ))}
                 </select>
                 {box(i)}
+                {editing === i.id && (
+                  <EditWorkItem
+                    item={i}
+                    actors={work.actors}
+                    onDone={(saved) => {
+                      setEditing(null);
+                      if (saved) reload();
+                    }}
+                  />
+                )}
               </div>
             ));
             // Completed work is one muted line per person, opening in place (design check).

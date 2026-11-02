@@ -5,6 +5,11 @@ import { labelWidth } from "./timeline.ts";
 
 /** The goal page's pure parts: work items by status (G23), the history filters, and how an Event's values read. */
 
+/** W6: a human may edit any work item; an agent only the ones it owns. The server's rule agent-own-work-items decides; this only hides the pencil. */
+export function mayEditWorkItem(me: Pick<ApiActor, "id" | "kind">, item: Pick<ApiWorkItem, "owner">): boolean {
+  return me.kind === "human" || item.owner === me.id;
+}
+
 /** Work items group in this order. Deleted items show only in History (G23). */
 const STATUS_ORDER: WorkItemStatus[] = ["In Progress", "Backlog", "Completed"];
 

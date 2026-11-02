@@ -147,6 +147,7 @@ W2. Work items lists one queue per owner (the team view, the org unit's name und
 W3. The page updates live: a change to any work item, by anyone, reloads it (ADR 0007). Ticking a row asks for its reason, as on a goal page.
 W4. Each row has a status picker (Backlog, In Progress, Completed, Deleted); a new status opens the row's reason box, as the tick does (QA U6, product D8). On a phone the due date and the picker share a line. People keep the order they had when the page loaded until the next visit (QA U5).
 W5. Owner "Chelsea" shows her work and the work of every seat she operates; each seat's queue reads "Frontend Engineer agent, operated by Chelsea", with "operated by Chelsea" on its own line on a phone (QA U4). The server returns them; the page groups by each item's owner.
+W6. A pencil after a work item's title opens its editor under the row, on the Work items page and on a goal page (#66). It holds Title, Owner, Due Date, and Reason, with Save and Cancel; status keeps its own picker. The title starts selected, so typing replaces it. Enter saves, Escape closes and keeps the stored values. Save sends only the fields that changed, in one update with the reason, and is off until one changes. A human sees the pencil on every work item; an agent only on the ones it owns (rule agent-own-work-items). This follows work item rights, not the goal's, so the pencil shows on a goal page the viewer may not change. A stale save shows "Someone saved this after you opened it."
 
 ## Access
 

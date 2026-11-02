@@ -397,7 +397,7 @@ button.chev:hover{background:var(--grid);color:var(--ink)}
 .wgroup{background:var(--card);border-radius:var(--radius);box-shadow:0 1px 2px var(--shadow),0 4px 16px var(--shadow);padding:6px 16px;margin:0 0 8px}
 .wghead{display:flex;gap:6px;width:100%;padding:8px 0;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
 .wrow{display:grid;grid-template-columns:20px minmax(0,1fr) auto 90px 80px;align-items:center;gap:12px;min-height:40px;border-top:1px solid var(--line);font-size:13px}
-.wrow input{width:16px;height:16px;margin:0}
+.wrow input[type=checkbox]{width:16px;height:16px;margin:0}
 .wtitle{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wrow.done .wtitle{text-decoration:line-through;color:var(--mute)}
 .wowner{display:inline-flex;align-items:center;gap:6px;font-weight:600}
@@ -462,6 +462,8 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 .addgrid{display:grid;grid-template-columns:2fr 1fr;gap:0 12px}
 .addgrid.four{grid-template-columns:2fr 1fr 1fr 1fr}
 .tickreason{grid-column:2/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:0 0 8px}
+.wtitle .pencil{margin-left:4px;width:24px;height:24px;vertical-align:middle}
+.wiedit{grid-column:1/-1;margin:4px 0 8px}
 .tickreason input{flex:1;min-width:160px;font:500 13px var(--font);border:1px solid var(--cut);border-radius:10px;padding:7px 10px}
 .phone .addgrid,.phone .addgrid.four{grid-template-columns:1fr}
 
