@@ -173,17 +173,27 @@ class WritePathTests(unittest.TestCase):
         self.ok(update("goal", "GOAL-57", 1, {"description": "A new description."}, "Clearer"))
 
     def test_a_slip_moves_the_date_later(self) -> None:
-        # Codebase QA: a changed_due_date on or before the current date is not a slip.
-        for date in ("2026-11-15", "2026-11-01"):
-            result = self.rejected(update("goal", "GOAL-57", 1, {"changed_due_date": date}, "Slip"), "slip-moves-later")
-            self.assertEqual(result["violations"][-1]["field"], "changed_due_date")
+        # Codebase QA: a changed_due_date on the current date is no move.
+        result = self.rejected(update("goal", "GOAL-57", 1, {"changed_due_date": "2026-11-15"}, "Slip"), "date-moves")
+        self.assertEqual(result["violations"][-1]["field"], "changed_due_date")
         self.ok(update("goal", "GOAL-57", 1, {"changed_due_date": "2026-11-30"}, "Slip"))
-        self.rejected(update("goal", "GOAL-57", 2, {"changed_due_date": "2026-11-20"}, "Slip back"), "slip-moves-later")
+        self.assertEqual(self.ok(update("goal", "GOAL-57", 2, {"changed_due_date": "2026-11-30"}, "Slip again"))["events"], [])
+
+    def test_a_pull_in_moves_the_date_earlier_not_before_today(self) -> None:
+        # tig/goalie#64: a Committed date that will be hit early is pulled in (SPEC.md §4 Pull-in). Today is 2026-10-23.
+        for date in ("2026-10-22", "2026-01-01"):
+            result = self.rejected(update("goal", "GOAL-57", 1, {"changed_due_date": date}, "Pull in"), "pull-in-not-before-today")
+            self.assertEqual(result["violations"][-1]["field"], "changed_due_date")
+        self.ok(update("goal", "GOAL-57", 1, {"changed_due_date": "2026-11-01"}, "Vendor shipped early"))
+        self.ok(update("goal", "GOAL-57", 2, {"changed_due_date": "2026-11-30"}, "Vendor slipped after all"))
+        self.ok(update("goal", "GOAL-57", 3, {"changed_due_date": "2026-10-23"}, "Done ahead"))
+        goal = self.store.read("goal", "GOAL-57")
+        self.assertEqual((goal["due_date"], goal["changed_due_date"]), ("2026-11-15", "2026-10-23"))
 
     def test_a_slip_cannot_be_cleared_to_step_around_it(self) -> None:
         # Codebase QA Q12: slip, clear, slip earlier moved the date back 9 days.
         self.ok(update("goal", "GOAL-57", 1, {"changed_due_date": "2026-11-25"}, "Slip"))
-        result = self.rejected(update("goal", "GOAL-57", 2, {"changed_due_date": None}, "Undo"), "slip-moves-later")
+        result = self.rejected(update("goal", "GOAL-57", 2, {"changed_due_date": None}, "Undo"), "changed-date-kept")
         self.assertEqual(result["violations"][-1]["field"], "changed_due_date")
 
     def test_a_reason_message_names_fields_in_spec_words(self) -> None:

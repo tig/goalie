@@ -2,14 +2,14 @@ import { useCallback, useState, type CSSProperties } from "react";
 import type { ApiActor, ApiEvent, ApiWorkItem, GoalEventsResponse, GoalPageResponse, Health, PathToGreen, SubGoalCard } from "../../src/api.ts";
 import { shortDate } from "../../src/dates.ts";
 import { getJson, postCommands, useJson } from "./data.ts";
-import { AddSubGoal, AddWorkItem, useTick } from "./GoalAdd.tsx";
+import { AddSubGoal, AddWorkItem, EditWorkItem, useTick } from "./GoalAdd.tsx";
 import { Crumbs, Props } from "./GoalSide.tsx";
-import { ClosePanel, DescriptionPanel, HealthPanel, PromotePanel, PursuePanel, SlipPanel, type Done, type PanelName } from "./GoalPanels.tsx";
+import { ClosePanel, DescriptionPanel, HealthPanel, PromotePanel, PullInPanel, PursuePanel, SlipPanel, type Done, type PanelName } from "./GoalPanels.tsx";
 import { commentBatch } from "./model/commands.ts";
-import { activity, ACTIVITY, changeParts, createdFields, ptgChanges, historyNames, joinPages, dateBar, labelRows, eventValue, fieldLabel, groupEvents, groupWorkItems, type ActivityChip, type EventGroup, type Names } from "./model/goalpage.ts";
+import { activity, ACTIVITY, changeParts, createdFields, ptgChanges, historyNames, joinPages, dateBar, labelPlaces, eventValue, fieldLabel, groupEvents, groupWorkItems, mayEditWorkItem, type ActivityChip, type EventGroup, type Names } from "./model/goalpage.ts";
 import { dateLabel } from "./model/labels.ts";
 import { backPath, goalPath } from "./model/route.ts";
-import { Avatar, HealthDot } from "./parts.tsx";
+import { Avatar, HealthDot, Markdown } from "./parts.tsx";
 import { homeSearch, Link } from "./router.tsx";
 import { encodeFocus, formFocus } from "./model/feedback.ts";
 
@@ -122,6 +122,7 @@ function Goal({ data, reload, status, setStatus }: { data: GoalPageResponse; rel
           {/* GP2-4: every multi-field action opens its panel here, under the title. */}
           {panel?.name === "health" && panel.health && <HealthPanel data={data} health={panel.health} onDone={done} />}
           {panel?.name === "slip" && <SlipPanel data={data} onDone={done} />}
+          {panel?.name === "pullin" && <PullInPanel data={data} onDone={done} />}
           {panel?.name === "promote" && <PromotePanel data={data} onDone={done} />}
           {panel?.name === "close" && <ClosePanel data={data} onDone={done} />}
           {panel?.name === "pursue" && <PursuePanel data={data} onDone={done} />}
@@ -140,7 +141,7 @@ function Goal({ data, reload, status, setStatus }: { data: GoalPageResponse; rel
                 Description
                 {may && <Pencil label="Edit Description" onClick={() => setPanel({ name: "description" })} />}
               </h2>
-              {goal.description ? goal.description.split(/\n{2,}/).map((p, k) => <p key={k}>{p}</p>) : <p className="muted">No description yet.</p>}
+              {goal.description ? <Markdown text={goal.description} /> : <p className="muted">No description yet.</p>}
               {/* GP2-5: the missing parts, for owners only, plain muted text. */}
               {may && data.hints.some((h) => h.field === "description") && <p className="hint">{data.hints.filter((h) => h.field === "description").map((h) => h.text).join(" · ")}</p>}
             </section>
@@ -170,11 +171,11 @@ function Goal({ data, reload, status, setStatus }: { data: GoalPageResponse; rel
                 </tbody>
               </table>
               <p className="note">
-                <b>When it is On track again</b> {goal.path_to_green.criteria || <span className="muted">None</span>}
+                <b>When it is On track again</b> {goal.path_to_green.criteria ? <Markdown text={goal.path_to_green.criteria} inline /> : <span className="muted">None</span>}
               </p>
               {goal.health === "YELLOW" && (
                 <p className="note">
-                  <b>What makes it Off track</b> {goal.path_to_green.trigger || <span className="muted">None</span>}
+                  <b>What makes it Off track</b> {goal.path_to_green.trigger ? <Markdown text={goal.path_to_green.trigger} inline /> : <span className="muted">None</span>}
                 </p>
               )}
             </section>
@@ -231,7 +232,7 @@ function Changers({ data }: { data: GoalPageResponse }) {
 function DateBar({ data }: { data: GoalPageResponse }) {
   const bar = dateBar(data.started, data.today, data.dates);
   const [width, setWidth] = useState(0);
-  // The bar's width decides which labels would touch; a label that would drops to a second row (labelRows).
+  // The bar's width decides which labels would touch; a label that would drops to a second row. Each stays inside the bar (labelPlaces).
   const measured = useCallback((el: HTMLDivElement | null) => {
     if (!el) return;
     setWidth(el.clientWidth);
@@ -245,9 +246,9 @@ function DateBar({ data }: { data: GoalPageResponse }) {
     ...(bar.start === null || Math.abs(bar.today - bar.start) > 12 ? [{ key: "today", at: bar.today, text: "Today", align: bar.start === null && bar.today < 5 ? ("start" as const) : ("center" as const) }] : []),
     ...bar.marks.map((m) => ({ key: m.kind, at: m.at, text: shortDate(m.date, data.today), align: m.at > 85 ? ("end" as const) : ("center" as const) })),
   ];
-  const rows = labelRows(labels, width || 1000);
+  const places = labelPlaces(labels, width || 1000);
   return (
-    <div className={`datebar${rows.includes(1) ? " two" : ""}`} aria-hidden="true" ref={measured}>
+    <div className={`datebar${places.some((p) => p.row) ? " two" : ""}`} aria-hidden="true" ref={measured}>
       <span className="dbtrack" />
       {bar.start !== null && <span className="dbfill" style={{ left: `${bar.start}%`, width: `${Math.max(0, bar.today - bar.start)}%` }} />}
       <span className="dbtoday" style={{ left: `${bar.today}%` }} />
@@ -256,7 +257,7 @@ function DateBar({ data }: { data: GoalPageResponse }) {
       ))}
       <span className="dblabels small">
         {labels.map((l, i) => (
-          <span key={l.key} className={`${l.align}${rows[i] ? " low" : ""}`} style={{ left: `${l.at}%` }}>
+          <span key={l.key} className={places[i].row ? "low" : undefined} style={{ left: places[i].left }}>
             {l.text}
           </span>
         ))}
@@ -266,7 +267,7 @@ function DateBar({ data }: { data: GoalPageResponse }) {
 }
 
 /** The pencil icon that makes a card editable in place. */
-function Pencil({ label, onClick }: { label: string; onClick: () => void }) {
+export function Pencil({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button type="button" className="pencil" aria-label={label} onClick={onClick}>
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -339,6 +340,7 @@ function WorkItems({ items, data, adding, onAdd, onDone, reload, status }: { ite
   const counts = groupWorkItems(live).map((g) => ({ status: g.status, n: g.items.length }));
   const [shown, setShown] = useState<Record<string, boolean>>({ "In Progress": true, Backlog: true, Completed: false });
   const [picking, setPicking] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
   const { move, chosen, box } = useTick(reload);
   const rows = live.filter((i) => shown[i.status]);
   return (
@@ -363,7 +365,10 @@ function WorkItems({ items, data, adding, onAdd, onDone, reload, status }: { ite
             <div key={i.id} className={`wrow2${i.status === "Completed" ? " done" : ""}`}>
               {/* The circle is a named control: empty Backlog, half In Progress, checked Completed. */}
               <button type="button" className={`scircle ${i.status === "Completed" ? "full" : i.status === "In Progress" ? "half" : "empty"}`} aria-label={`Status: ${i.status}. Change`} title="Change status" onClick={() => setPicking(picking === i.id ? null : i.id)} />
-              <span className="wtitle">{i.title}</span>
+              <span className="wtitle">
+                {i.title}
+                {mayEditWorkItem(data.me, i) && <Pencil label={`Edit ${i.title}`} onClick={() => setEditing(editing === i.id ? null : i.id)} />}
+              </span>
               <span className="wwho">
                 <Avatar actor={owner} mine={owner.id === data.me.id} />
                 <span className="wfirst">{owner.name.split(" ")[0]}</span>
@@ -377,6 +382,16 @@ function WorkItems({ items, data, adding, onAdd, onDone, reload, status }: { ite
                 </select>
               )}
               {box(i)}
+              {editing === i.id && (
+                <EditWorkItem
+                  item={i}
+                  actors={data.actors}
+                  onDone={(saved) => {
+                    setEditing(null);
+                    if (saved) reload();
+                  }}
+                />
+              )}
             </div>
           );
         })}
@@ -422,7 +437,7 @@ function EventRow({ group, data }: { group: EventGroup; data: GoalPageResponse }
           {group.events.every((x) => x.entity !== data.goal.id) && <span className="muted"> · {e.entity}</span>}
         </p>
         {e.field === "comment" ? (
-          <p>{String(e.new)}</p>
+          <Markdown text={String(e.new)} />
         ) : group.created ? (
           <details className="created">
             <summary>

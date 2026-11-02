@@ -3,7 +3,7 @@ import type { ApiActor, ApiViolation, ApiWorkItem, CommandsRequest, CommandsResp
 import { addDays } from "../../src/dates.ts";
 import { postCommands, useJson } from "./data.ts";
 import type { Done } from "./GoalPanels.tsx";
-import { goalTypes, savedStatus, subGoalBatch, workItemBatch, workItemStatusBatch, type SubGoalRow } from "./model/commands.ts";
+import { goalTypes, savedStatus, subGoalBatch, workItemBatch, workItemFieldsBatch, workItemStatusBatch, type SubGoalRow } from "./model/commands.ts";
 import { humans } from "./model/goalpage.ts";
 import { dateLabel } from "./model/labels.ts";
 import { formFocus } from "./model/feedback.ts";
@@ -27,12 +27,15 @@ function usePost(onSaved: (answer: CommandsResponse) => void): [Result, (batch: 
   return [result, post];
 }
 
+/** tig/goalie#65: these forms add something new, and its key is not shown until it saves, so a message drops the key it starts with. */
+const unkeyed = (message: string) => message.replace(/^[A-Z]+-\d+: (.)/, (_, c: string) => c.toUpperCase());
+
 const Errors = ({ result }: { result: Result }) => (
   <>
     {result.message && <p className="ferror">{result.message}</p>}
     {result.violations.map((v, i) => (
       <p key={i} className="ferror">
-        {v.message}
+        {unkeyed(v.message)}
       </p>
     ))}
   </>
@@ -52,10 +55,12 @@ export function AddSubGoal({ data, onDone }: { data: GoalPageResponse; onDone: D
   const [own, setOwn] = useState(false);
   const [date, setDate] = useState({ due_date: goal.due_date ?? today, date_type: (goal.date_type ?? "Committed") as "Committed" | "Ambition" | "Fantasy" });
   const [ms, setMs] = useState({ summary: "", due_date: addDays(today, 14), owner: goal.owner });
+  const [plan, setPlan] = useState({ plan: "", plan_maturity: goal.plan_maturity });
   const [result, post] = usePost((b) => onDone(true, savedStatus("subgoal", b)));
   const parentDate = data.dates.find((d) => d.kind !== "Promotion Milestone") ?? data.dates[0];
   const uncommitted = own && date.date_type !== "Committed";
-  const row: SubGoalRow = { summary, owner, ...(own ? { date } : {}), ...(uncommitted ? { milestone: { ...ms, summary: ms.summary || `Commit a date for ${summary}` } } : {}) };
+  const committed = own && date.date_type === "Committed";
+  const row: SubGoalRow = { summary, owner, ...(own ? { date } : {}), ...(uncommitted ? { milestone: { ...ms, summary: ms.summary || `Commit a date for ${summary}` } } : {}), ...(committed ? { plan } : {}) };
   return (
     <section className="panel addrow" aria-label="Sub-goal" data-focus={formFocus("Sub-goal")}>
       <div className="addgrid">
@@ -98,6 +103,26 @@ export function AddSubGoal({ data, onDone }: { data: GoalPageResponse; onDone: D
               ))}
             </select>
           </label>
+        </div>
+      )}
+      {/* tig/goalie#65: a Committed date needs a Plan at Pencil, so its own Committed date asks for the plan here, not after Add. */}
+      {committed && (
+        <div className="pmbox">
+          <p className="small">A Committed date needs a Plan at Pencil. Link the plan, or pick Ambition.</p>
+          <div className="addgrid">
+            <label className="field">
+              <span className="flabel">Plan</span>
+              <input value={plan.plan} placeholder="A link or a path" onChange={(e) => setPlan({ ...plan, plan: e.target.value })} />
+            </label>
+            <label className="field">
+              <span className="flabel">Plan Maturity</span>
+              <select value={plan.plan_maturity} onChange={(e) => setPlan({ ...plan, plan_maturity: e.target.value as typeof plan.plan_maturity })}>
+                {(["Watercolor", "Crayon", "Pencil"] as const).map((m) => (
+                  <option key={m}>{m}</option>
+                ))}
+              </select>
+            </label>
+          </div>
         </div>
       )}
       {uncommitted && (
@@ -172,6 +197,62 @@ export function AddWorkItem({ data, statuses, onDone }: { data: GoalPageResponse
       <div className="pactions">
         <button type="button" className="btn primary" disabled={result.saving} onClick={() => post(workItemBatch(data.goal.id, { title, owner, status, due_date: due || null }))}>
           Add
+        </button>
+        <button type="button" className="btn" onClick={() => onDone(false)}>
+          Cancel
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * W6: edit a work item in place: its title, owner, and due date, with one reason. Status keeps its own picker.
+ * The title starts selected, so typing replaces it. Enter saves; Escape closes and keeps the stored values.
+ */
+export function EditWorkItem({ item, actors, onDone }: { item: ApiWorkItem; actors: Record<string, ApiActor>; onDone: (saved: boolean) => void }) {
+  const [title, setTitle] = useState(item.title);
+  const [owner, setOwner] = useState(item.owner);
+  const [due, setDue] = useState(item.due_date ?? "");
+  const [reason, setReason] = useState("");
+  const [result, post] = usePost(() => onDone(true));
+  const batch = workItemFieldsBatch(item, { title, owner, due_date: due || null }, reason);
+  const save = () => batch && post(batch);
+  const keys = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") save();
+    if (e.key === "Escape") onDone(false);
+  };
+  return (
+    <section className="panel wiedit" aria-label={`Edit ${item.title}`} onKeyDown={keys}>
+      <div className="addgrid four">
+        <label className="field">
+          <span className="flabel">Title</span>
+          <input value={title} aria-label="Title" onChange={(e) => setTitle(e.target.value)} onFocus={(e) => e.target.select()} autoFocus />
+        </label>
+        <label className="field">
+          <span className="flabel">Owner</span>
+          <select value={owner} onChange={(e) => setOwner(e.target.value)}>
+            {Object.values(actors).map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+                {a.kind === "agent" ? " (agent)" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span className="flabel">Due Date</span>
+          <input type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+        </label>
+        <label className="field">
+          <span className="flabel">Reason</span>
+          <input value={reason} aria-label="Reason" onChange={(e) => setReason(e.target.value)} />
+        </label>
+      </div>
+      <Errors result={result} />
+      <div className="pactions">
+        <button type="button" className="btn primary" disabled={result.saving || !batch} onClick={save}>
+          Save
         </button>
         <button type="button" className="btn" onClick={() => onDone(false)}>
           Cancel

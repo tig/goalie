@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import type { ApiActor, ApiViolation, CommandsRequest, CommandsResponse, FormOptions, GoalPageResponse, Health, PathToGreen, StoredGoal } from "../../src/api.ts";
 import { addDays, shortDate } from "../../src/dates.ts";
 import { postCommands, useJson } from "./data.ts";
-import { closeBatch, fieldsBatch, goalTypes, healthBatch, promoteAndClose, promoteToAmbition, promoteToCommitted, pursueBatch, savedStatus, slipBatch, staleMerge } from "./model/commands.ts";
+import { closeBatch, fieldsBatch, goalTypes, healthBatch, promoteAndClose, promoteToAmbition, promoteToCommitted, pullInBatch, pursueBatch, savedStatus, slipBatch, staleMerge } from "./model/commands.ts";
 import { eventValue, humans } from "./model/goalpage.ts";
 import { healthWord } from "./model/labels.ts";
 import { HealthDot } from "./parts.tsx";
@@ -13,7 +13,7 @@ import { formFocus } from "./model/feedback.ts";
  * A rule broken shows at the field it names. A stale save keeps the typed values and shows the current ones beside them.
  */
 
-export type PanelName = "health" | "slip" | "promote" | "close" | "pursue" | "fields" | "description";
+export type PanelName = "health" | "slip" | "pullin" | "promote" | "close" | "pursue" | "fields" | "description";
 
 type Saved = { saving: boolean; violations: ApiViolation[]; message?: string; stale?: { current: Record<string, unknown> } };
 
@@ -180,7 +180,7 @@ export function HealthPanel({ data, health, onDone }: { data: GoalPageResponse; 
 /** G13: Record a slip. The original committed date is locked; the changed due date, health, and the Path to Green save together. */
 export function SlipPanel({ data, onDone }: { data: GoalPageResponse; onDone: Done }) {
   const { goal, today } = data;
-  // A slip moves the date later (slip-moves-later), so no date is picked for you.
+  // A slip moves the date later, so no date is picked for you.
   const [date, setDate] = useState("");
   const [health, setHealth] = useState<"YELLOW" | "RED">(goal.health === "RED" ? "RED" : "YELLOW");
   const [ptg, setPtg] = useState(emptyPtg(data));
@@ -194,7 +194,7 @@ export function SlipPanel({ data, onDone }: { data: GoalPageResponse; onDone: Do
       onSave={() => saved.save((g) => slipBatch(g, date, health, ptg, reason), { changed_due_date: date, health, path_to_green: ptg })}
       onCancel={() => onDone(false)}
     >
-      <p className="small">A Committed date can't be demoted. A slip is the only way to move it.</p>
+      <p className="small">A Committed date can't be demoted. A slip moves it later.</p>
       <p className="note">
         Original Committed Date <b className="date">{shortDate(goal.original_committed_date ?? goal.due_date ?? today, today)}</b>
       </p>
@@ -214,6 +214,35 @@ export function SlipPanel({ data, onDone }: { data: GoalPageResponse; onDone: Do
         ))}
       </span>
       <PtgEditor value={ptg} onChange={setPtg} health={health} data={data} saved={saved} />
+      <Reason value={reason} onChange={setReason} saved={saved} />
+    </Shell>
+  );
+}
+
+/** Record a pull-in (tig/goalie#64): an earlier changed due date, not before today, with a reason. The Original Committed Date stays on record. */
+export function PullInPanel({ data, onDone }: { data: GoalPageResponse; onDone: Done }) {
+  const { goal, today } = data;
+  const [date, setDate] = useState("");
+  const [reason, setReason] = useState("");
+  const saved = useSave(goal, (b) => onDone(true, savedStatus("pull-in", b, { date: shortDate(date, today) })));
+  return (
+    <Shell
+      title="Record a pull-in"
+      saved={saved}
+      fields={["changed_due_date", "reason"]}
+      onSave={() => saved.save((g) => pullInBatch(g, date, reason), { changed_due_date: date })}
+      onCancel={() => onDone(false)}
+    >
+      <p className="small">A pull-in moves a Committed date earlier, not before today.</p>
+      <p className="note">
+        Original Committed Date <b className="date">{shortDate(goal.original_committed_date ?? goal.due_date ?? today, today)}</b>
+      </p>
+      <label className="field">
+        <span className="flabel">Changed Due Date</span>
+        <input type="date" value={date} min={today} max={goal.changed_due_date ?? goal.due_date ?? undefined} onChange={(e) => setDate(e.target.value)} />
+        <FieldError saved={saved} field="changed_due_date" />
+        <Current saved={saved} field="changed_due_date" data={data} />
+      </label>
       <Reason value={reason} onChange={setReason} saved={saved} />
     </Shell>
   );

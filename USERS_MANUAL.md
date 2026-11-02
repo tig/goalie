@@ -41,7 +41,7 @@ If you only read one section, read **§4 Rules**.
 | **Presence** | Who is viewing or editing a goal right now. A human or an agent. |
 | **Comment** | Prose you attach to any record. In this version a comment does not reply to another comment. |
 | **Version** | The version of a record a save was based on. The save names it. Docs keep older versions. |
-| **Feedback** | A note about GOALIE itself, filed as a public issue on the GOALIE repo with the page's address. Send it from the top bar's Feedback button, or right-click the thing it is about and choose Feedback... so the note names it. It never carries what you typed in a field. |
+| **Feedback** | A note about GOALIE itself, filed as a public issue on the GOALIE repo with the page's address. Send it from the top bar's Feedback button, or right-click the thing it is about (on a phone, press and hold it) and choose Feedback... so the note names it. It never carries what you typed in a field. |
 | ‹local terms› | ‹any renames or additions› |
 
 ## 3. Who does what
@@ -63,8 +63,8 @@ If you only read one section, read **§4 Rules**.
    - an Ambition date's milestone is when it becomes Committed;
    - a Fantasy date's milestone is when it becomes Ambition.
 4. A **Committed** date has a **Plan at Pencil**.
-5. The **Original Committed Date** can't be edited. Slips are recorded as a changed date with a reason. ‹Who, if anyone, may correct a data-entry error.›
-6. A Committed date can't be demoted. If you can't hit it, that's a slip.
+5. The **Original Committed Date** can't be edited. Slips and pull-ins are recorded as a changed date with a reason. ‹Who, if anyone, may correct a data-entry error.›
+6. A Committed date can't be demoted. If you can't hit it, that's a slip. If you will hit it early, that's a pull-in.
 7. Changing a **date, date type, or state** needs a written **reason**.
 8. **YELLOW or RED** needs a **PTG**.
 9. A priority list has **no ties**.
@@ -164,6 +164,10 @@ The GOALIE owner inspects these each quarter and changes the configuration, revi
 1. Set the changed due date, with a reason.
 2. Set health to YELLOW or RED, and write a PTG.
 3. The original date stays on record.
+
+**Record a pull-in**
+1. Set the changed due date earlier, not before today, with a reason.
+2. The original date stays on record.
 
 **Close a goal**
 - Set it to Completed, Completed Late, Did Not Meet, or Deleted, with a reason. Lateness is measured against the original committed date.

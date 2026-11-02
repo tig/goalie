@@ -13,7 +13,7 @@ FIXTURE = Path(__file__).resolve().parents[1] / "web" / "fixtures" / "priorities
 
 def run(body: str) -> object:
     """Run an ES module that imports the model as `m` and the seed fixture as `api`, and return what it prints as JSON."""
-    imports = "".join(f'import * as {name} from "{(MODEL / f"{name}.ts").as_uri()}";\n' for name in ("query", "filter", "timeline", "calendar", "popover", "labels", "scroll", "route", "goalpage", "commands", "newgoal"))
+    imports = "".join(f'import * as {name} from "{(MODEL / f"{name}.ts").as_uri()}";\n' for name in ("query", "filter", "timeline", "calendar", "popover", "labels", "scroll", "route", "goalpage", "commands", "newgoal", "markdown"))
     script = f"""{imports}
 import {{ readFileSync }} from "node:fs";
 const api = JSON.parse(readFileSync({json.dumps(str(FIXTURE))}, "utf-8"));
@@ -412,8 +412,17 @@ class GoalPageTests(unittest.TestCase):
 
     def test_date_bar_labels_that_would_touch_drop_to_a_second_row(self) -> None:
         labels = '[{ at: 0, text: "In Progress since Oct 24", align: "start" }, { at: 37, text: "Nov 6", align: "center" }, { at: 100, text: "Nov 30", align: "end" }]'
-        self.assertEqual(run(f"return goalpage.labelRows({labels}, 310);"), [0, 1, 0])  # a phone
-        self.assertEqual(run(f"return goalpage.labelRows({labels}, 990);"), [0, 0, 0])  # 1440
+        self.assertEqual(run(f"return goalpage.labelPlaces({labels}, 310).map((p) => p.row);"), [0, 1, 0])  # a phone
+        self.assertEqual(run(f"return goalpage.labelPlaces({labels}, 990).map((p) => p.row);"), [0, 0, 0])  # 1440
+
+    def test_date_bar_labels_stay_inside_the_bar(self) -> None:
+        # tig/goalie#62: on XW-0001 the start label ran past the card's right edge and the first date past its left.
+        labels = '[{ at: 0, text: "Oct 1", align: "center" }, { at: 72, text: "In Progress since Today", align: "start" }, { at: 100, text: "Today", align: "center" }]'
+        places = run(f"return goalpage.labelPlaces({labels}, 268);")
+        widths = [5 * 7, 23 * 7, 5 * 7]
+        for p, w in zip(places, widths):  # type: ignore[arg-type]
+            self.assertGreaterEqual(p["left"], 0)
+            self.assertLessEqual(p["left"] + w, 268)
 
     def test_a_goal_never_in_progress_has_no_start_on_the_bar(self) -> None:
         bar = run('return goalpage.dateBar(null, "2026-10-25", [{ date: "2026-12-11", kind: "Committed" }]);')
@@ -552,6 +561,12 @@ class GoalPageTests(unittest.TestCase):
         self.assertEqual(sorted(b["commands"][0]["fields"]), ["changed_due_date", "health", "path_to_green"])  # type: ignore[index]
         self.assertEqual(b["commands"][0]["fields"]["changed_due_date"], "2026-11-20")  # type: ignore[index]
 
+    def test_a_pull_in_sets_only_an_earlier_changed_due_date(self) -> None:
+        # tig/goalie#64: health and the Path to Green stay as they are.
+        b = run('const g = page("XW-0001").goal; return commands.pullInBatch(g, "2026-11-05", "Done ahead");')
+        self.assertEqual(b["commands"][0]["fields"], {"changed_due_date": "2026-11-05"})  # type: ignore[index]
+        self.assertEqual(b["commands"][0]["reason"], "Done ahead")  # type: ignore[index]
+
     def test_promoting_fantasy_makes_a_new_milestone_first(self) -> None:
         b = run('const g = page("XW-0003").goal; return commands.promoteToAmbition(g, { summary: "Commit a date for the launch", due_date: "2026-12-01", owner: "chelsea" }, "2026-12-15", "Plan is clearer", "Milestone (Commit)");')
         c = b["commands"]  # type: ignore[index]
@@ -593,6 +608,12 @@ class GoalPageTests(unittest.TestCase):
         b = run('return commands.subGoalBatch(page("XW-0003").goal, { summary: "Load the tree", owner: "chelsea" }, TYPES);')
         self.assertEqual(b, {"commands": [{"op": "create", "kind": "goal", "ref": "$s1", "fields": {"summary": "Load the tree", "owner": "chelsea", "parent": "XW-0003", "type": "Milestone (Launch)", "org_unit": "excaliwire", "level": "Company", "severity": "sev1", "origination": "New", "visibility": "organization-wide", "plan_maturity": "Crayon", "state": "Backlog"}, "reason": "Sub-goal of XW-0003"}]})
 
+    def test_a_committed_sub_goal_sends_its_own_plan(self) -> None:
+        # tig/goalie#65: a sub-goal with its own Committed date needs a Plan at Pencil, so the form sends the plan with the date.
+        b = run('return commands.subGoalBatch(page("XW-0004").goal, { summary: "Open a goal", owner: "chelsea", date: { due_date: "2026-12-01", date_type: "Committed" }, plan: { plan: "docs/plans/open.md", plan_maturity: "Pencil" } }, TYPES);')
+        f = b["commands"][0]["fields"]  # type: ignore[index]
+        self.assertEqual((f["date_type"], f["plan"], f["plan_maturity"]), ("Committed", "docs/plans/open.md", "Pencil"))
+
     def test_an_uncommitted_sub_goal_brings_its_own_milestone_in_the_create_order(self) -> None:
         b = run('return commands.subGoalBatch(page("XW-0004").goal, { summary: "Open a goal", owner: "chelsea", date: { due_date: "2026-12-01", date_type: "Ambition" }, milestone: { summary: "Commit a date for Open a goal", due_date: "2026-11-20", owner: "chelsea" } }, TYPES);')
         c = b["commands"]  # type: ignore[index]
@@ -607,6 +628,24 @@ class GoalPageTests(unittest.TestCase):
     def test_ticking_a_work_item_is_a_status_change_with_a_reason(self) -> None:
         b = run('return commands.workItemStatusBatch({ id: "WI-0001", version: 1 }, "Completed", "Shipped");')
         self.assertEqual(b, {"commands": [{"op": "update", "kind": "work_item", "id": "WI-0001", "base_version": 1, "fields": {"status": "Completed"}, "reason": "Shipped"}]})
+
+    def test_editing_a_work_item_sends_only_the_changed_fields_with_a_reason(self) -> None:
+        item = '{ id: "WI-0001", version: 3, title: "Draw the board", owner: "chelsea", due_date: null }'
+        b = run(f'return commands.workItemFieldsBatch({item}, {{ title: "Draw the board again", owner: "chelsea", due_date: "2026-11-20" }}, "Tig asked");')
+        self.assertEqual(b, {"commands": [{"op": "update", "kind": "work_item", "id": "WI-0001", "base_version": 3, "fields": {"title": "Draw the board again", "due_date": "2026-11-20"}, "reason": "Tig asked"}]})
+        self.assertIsNone(run(f'return commands.workItemFieldsBatch({item}, {{ title: "Draw the board", owner: "chelsea", due_date: null }}, "No change");'))
+
+    def test_a_human_may_edit_any_work_item_and_an_agent_only_its_own(self) -> None:
+        # rules.ts: a human writes any work item; an agent writes only the ones it owns (agent-own-work-items).
+        got = run("""
+          const item = { owner: "frontend-engineer" };
+          return [
+            goalpage.mayEditWorkItem({ id: "chelsea", kind: "human" }, item),
+            goalpage.mayEditWorkItem({ id: "frontend-engineer", kind: "agent" }, item),
+            goalpage.mayEditWorkItem({ id: "backend-engineer", kind: "agent" }, item),
+          ];
+        """)
+        self.assertEqual(got, [True, True, False])
 
     FORM = {
         "summary": "Launch the goal page", "description": "", "owner": "chelsea", "priority": "PRI-3",
@@ -652,6 +691,7 @@ process.stdout.write(JSON.stringify([a.body.message, b.body.message]));"""
             ("close", {"ok": True, "ids": {}, "events": []}, {"state": "Completed Late"}),
             ("promote-close", {"ok": True, "ids": {}, "events": []}, {"state": "Completed"}),
             ("slip", {"ok": True, "ids": {}, "events": []}, {"date": "Dec 4, 2026"}),
+            ("pull-in", {"ok": True, "ids": {}, "events": []}, {"date": "Nov 5, 2026"}),
         ]
         self.assertEqual(run(f"return {json.dumps(cases)}.map(([k, a, x]) => commands.savedStatus(k, a, x));"), [
             "Added XW-0020 under this goal.",
@@ -661,6 +701,7 @@ process.stdout.write(JSON.stringify([a.body.message, b.body.message]));"""
             "Closed as Completed Late.",
             "Promoted to Committed and closed as Completed.",
             "Recorded a slip to Dec 4, 2026.",
+            "Recorded a pull-in to Nov 5, 2026.",
         ])
 
     def test_reordering_priorities_sends_one_batch_of_the_ranks_that_changed(self) -> None:
@@ -811,3 +852,44 @@ class NewGoalV2Tests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MarkdownTests(unittest.TestCase):
+    """Issue #61: multi-line text is Markdown, and a GitHub issue or pull request reference is a link (GL8)."""
+
+    def test_tig_s_example_links_to_the_factory_issue(self) -> None:
+        got = run('return markdown.markdown("See factory/issues/172 now");')
+        self.assertEqual(got, [{"t": "p", "c": [{"t": "text", "v": "See "}, {"t": "link", "href": "https://github.com/excaliwire/factory/issues/172", "c": [{"t": "text", "v": "factory#172"}]}, {"t": "text", "v": " now"}]}])
+
+    def test_every_reference_form_links_with_a_short_name(self) -> None:
+        src = "factory#3 web/pull/9 excaliwire/operations#179 tig/goalie#56 goalie#57 someone/thing/issues/4 https://github.com/excaliwire/factory/pull/3192"
+        got = run(f"return markdown.markdown({json.dumps(src)})[0].c.filter((x) => x.t === 'link').map((x) => [x.href, x.c[0].v]);")
+        self.assertEqual(got, [
+            ["https://github.com/excaliwire/factory/issues/3", "factory#3"],
+            ["https://github.com/excaliwire/web/pull/9", "web#9"],
+            ["https://github.com/excaliwire/operations/issues/179", "operations#179"],
+            ["https://github.com/tig/goalie/issues/56", "goalie#56"],
+            ["https://github.com/tig/goalie/issues/57", "goalie#57"],
+            ["https://github.com/someone/thing/issues/4", "someone/thing#4"],
+            ["https://github.com/excaliwire/factory/pull/3192", "factory#3192"],
+        ])
+
+    def test_a_number_alone_is_not_a_reference(self) -> None:
+        got = run('return markdown.markdown("Priority #1 and C# and a/b").flatMap((b) => b.c).map((x) => x.t);')
+        self.assertEqual(got, ["text"])
+
+    def test_raw_html_stays_text_and_only_web_links_open(self) -> None:
+        got = run('return markdown.markdown("<script>alert(1)</script> [x](javascript:void) [y](https://e.com/a)")[0].c;')
+        self.assertEqual(got, [{"t": "text", "v": "<script>alert(1)</script> "}, {"t": "text", "v": "[x](javascript:void)"}, {"t": "text", "v": " "}, {"t": "link", "href": "https://e.com/a", "c": [{"t": "text", "v": "y"}]}])
+
+    def test_blocks_and_emphasis(self) -> None:
+        src = "# Key results\n\n- **one**\n- *two* and `code`\n\n1. first\n2. second\n\n> quoted\n\nline one\nline two\n\n```\nraw **not bold**\n```"
+        got = run(f"return markdown.markdown({json.dumps(src)});")
+        self.assertEqual([b["t"] for b in got], ["h", "ul", "ol", "quote", "p", "code"])  # type: ignore[index]
+        self.assertEqual(got[1]["items"], [[{"t": "strong", "c": [{"t": "text", "v": "one"}]}], [{"t": "em", "c": [{"t": "text", "v": "two"}]}, {"t": "text", "v": " and "}, {"t": "code", "v": "code"}]])  # type: ignore[index]
+        self.assertEqual(got[4]["c"], [{"t": "text", "v": "line one"}, {"t": "br"}, {"t": "text", "v": "line two"}])  # type: ignore[index]
+        self.assertEqual(got[5], {"t": "code", "v": "raw **not bold**"})  # type: ignore[index]
+
+    def test_a_bare_address_links_without_its_trailing_stop(self) -> None:
+        got = run('return markdown.markdown("Read https://e.com/x.")[0].c;')
+        self.assertEqual(got, [{"t": "text", "v": "Read "}, {"t": "link", "href": "https://e.com/x", "c": [{"t": "text", "v": "https://e.com/x"}]}, {"t": "text", "v": "."}])

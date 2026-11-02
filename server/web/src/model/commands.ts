@@ -27,6 +27,11 @@ export function slipBatch(goal: StoredGoal, changedDueDate: string, health: Excl
   return update(goal, { changed_due_date: changedDueDate, health, path_to_green: health === "GREEN" ? null : ptg }, reason);
 }
 
+/** Record a pull-in (tig/goalie#64): an earlier changed due date, not before today. Health and the Path to Green stay as they are. */
+export function pullInBatch(goal: StoredGoal, changedDueDate: string, reason: string): CommandsRequest {
+  return update(goal, { changed_due_date: changedDueDate }, reason);
+}
+
 export type NewMilestone = { summary: string; due_date: string; owner: string };
 
 /** A new Promotion Milestone is pursued with the health of the goal it backs (N6a). A goal with no health yet is not pursued, so neither is its milestone. */
@@ -117,6 +122,8 @@ export type SubGoalRow = {
   date?: { due_date: string; date_type: "Committed" | "Ambition" | "Fantasy" };
   /** Its own Promotion Milestone, when its own date is Ambition or Fantasy. */
   milestone?: NewMilestone;
+  /** Its own plan, when its own date is Committed: a Committed date needs a Plan at Pencil (tig/goalie#65). */
+  plan?: { plan: string; plan_maturity: StoredGoal["plan_maturity"] };
 };
 
 /**
@@ -127,7 +134,7 @@ export function subGoalBatch(parent: StoredGoal, row: SubGoalRow, types: GoalTyp
   const reason = `Sub-goal of ${parent.id}`;
   const base = { summary: row.summary, owner: row.owner, parent: parent.id, type: types.goal, org_unit: parent.org_unit, level: parent.level, ...kept(parent), state: "Backlog" as const };
   if (!row.date) return { commands: [{ op: "create", kind: "goal", ref: "$s1", fields: base, reason }] };
-  if (row.date.date_type === "Committed" || !row.milestone) return { commands: [{ op: "create", kind: "goal", ref: "$s1", fields: { ...base, ...row.date }, reason }] };
+  if (row.date.date_type === "Committed" || !row.milestone) return { commands: [{ op: "create", kind: "goal", ref: "$s1", fields: { ...base, ...row.date, ...(row.date.date_type === "Committed" ? row.plan : {}) }, reason }] };
   return {
     commands: [
       { op: "create", kind: "goal", ref: "$m1", fields: { ...row.milestone, type: types.milestone, date_type: "Committed", org_unit: parent.org_unit, level: parent.level, ...kept(parent), state: "Backlog" }, reason },
@@ -145,6 +152,15 @@ export function workItemBatch(goal: string, item: Pick<WorkItemFields, "title" |
 /** The work item tick (G24), or any status change: one update with its reason. */
 export function workItemStatusBatch(item: Pick<ApiWorkItem, "id" | "version">, status: WorkItemStatus, reason: string): CommandsRequest {
   return { commands: [{ op: "update", kind: "work_item", id: item.id, base_version: item.version, fields: { status }, reason }] };
+}
+
+type EditedWorkItem = Pick<WorkItemFields, "title" | "owner" | "due_date">;
+
+/** Edit a work item in place (W6): one update of the fields that changed, with its reason. Null when nothing changed. */
+export function workItemFieldsBatch(item: Pick<ApiWorkItem, "id" | "version"> & EditedWorkItem, next: EditedWorkItem, reason: string): CommandsRequest | null {
+  const fields = Object.fromEntries((["title", "owner", "due_date"] as const).filter((f) => next[f] !== item[f]).map((f) => [f, next[f]]));
+  if (!Object.keys(fields).length) return null;
+  return { commands: [{ op: "update", kind: "work_item", id: item.id, base_version: item.version, fields, reason }] };
 }
 
 /** The New goal form (N1 to N16), as the batch builder reads it. A work item's `goal` is 0 for this goal, or k for the k-th sub-goal. */
@@ -269,7 +285,7 @@ export function commandsAnswer(body: unknown): CommandsResponse {
   return { ok: false, at: 0, error: "bad_command", message: b?.reason ?? String(b?.error ?? "The server refused the save.") };
 }
 
-type SavedAction = "subgoal" | "workitem" | "promote" | "promote-close" | "slip" | "close";
+type SavedAction = "subgoal" | "workitem" | "promote" | "promote-close" | "slip" | "pull-in" | "close";
 
 /** G26: after a save that adds or moves something out of view, one line says what happened, naming the new key from the answer. */
 export function savedStatus(action: SavedAction, answer: CommandsResponse, x: { to?: string; state?: string; date?: string } = {}): string {
@@ -285,6 +301,8 @@ export function savedStatus(action: SavedAction, answer: CommandsResponse, x: { 
       return `Promoted to Committed and closed as ${x.state}.`;
     case "slip":
       return `Recorded a slip to ${x.date}.`;
+    case "pull-in":
+      return `Recorded a pull-in to ${x.date}.`;
     case "close":
       return `Closed as ${x.state}.`;
   }
