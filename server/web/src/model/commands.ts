@@ -147,6 +147,15 @@ export function workItemStatusBatch(item: Pick<ApiWorkItem, "id" | "version">, s
   return { commands: [{ op: "update", kind: "work_item", id: item.id, base_version: item.version, fields: { status }, reason }] };
 }
 
+type EditedWorkItem = Pick<WorkItemFields, "title" | "owner" | "due_date">;
+
+/** Edit a work item in place (W6): one update of the fields that changed, with its reason. Null when nothing changed. */
+export function workItemFieldsBatch(item: Pick<ApiWorkItem, "id" | "version"> & EditedWorkItem, next: EditedWorkItem, reason: string): CommandsRequest | null {
+  const fields = Object.fromEntries((["title", "owner", "due_date"] as const).filter((f) => next[f] !== item[f]).map((f) => [f, next[f]]));
+  if (!Object.keys(fields).length) return null;
+  return { commands: [{ op: "update", kind: "work_item", id: item.id, base_version: item.version, fields, reason }] };
+}
+
 /** The New goal form (N1 to N16), as the batch builder reads it. A work item's `goal` is 0 for this goal, or k for the k-th sub-goal. */
 export type NewGoalForm = {
   summary: string;

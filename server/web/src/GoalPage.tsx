@@ -2,11 +2,11 @@ import { useCallback, useState, type CSSProperties } from "react";
 import type { ApiActor, ApiEvent, ApiWorkItem, GoalEventsResponse, GoalPageResponse, Health, PathToGreen, SubGoalCard } from "../../src/api.ts";
 import { shortDate } from "../../src/dates.ts";
 import { getJson, postCommands, useJson } from "./data.ts";
-import { AddSubGoal, AddWorkItem, useTick } from "./GoalAdd.tsx";
+import { AddSubGoal, AddWorkItem, EditWorkItem, useTick } from "./GoalAdd.tsx";
 import { Crumbs, Props } from "./GoalSide.tsx";
 import { ClosePanel, DescriptionPanel, HealthPanel, PromotePanel, PursuePanel, SlipPanel, type Done, type PanelName } from "./GoalPanels.tsx";
 import { commentBatch } from "./model/commands.ts";
-import { activity, ACTIVITY, changeParts, createdFields, ptgChanges, historyNames, joinPages, dateBar, labelRows, eventValue, fieldLabel, groupEvents, groupWorkItems, type ActivityChip, type EventGroup, type Names } from "./model/goalpage.ts";
+import { activity, ACTIVITY, changeParts, createdFields, ptgChanges, historyNames, joinPages, dateBar, labelRows, eventValue, fieldLabel, groupEvents, groupWorkItems, mayEditWorkItem, type ActivityChip, type EventGroup, type Names } from "./model/goalpage.ts";
 import { dateLabel } from "./model/labels.ts";
 import { backPath, goalPath } from "./model/route.ts";
 import { Avatar, HealthDot } from "./parts.tsx";
@@ -266,7 +266,7 @@ function DateBar({ data }: { data: GoalPageResponse }) {
 }
 
 /** The pencil icon that makes a card editable in place. */
-function Pencil({ label, onClick }: { label: string; onClick: () => void }) {
+export function Pencil({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button type="button" className="pencil" aria-label={label} onClick={onClick}>
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -339,6 +339,7 @@ function WorkItems({ items, data, adding, onAdd, onDone, reload, status }: { ite
   const counts = groupWorkItems(live).map((g) => ({ status: g.status, n: g.items.length }));
   const [shown, setShown] = useState<Record<string, boolean>>({ "In Progress": true, Backlog: true, Completed: false });
   const [picking, setPicking] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
   const { move, chosen, box } = useTick(reload);
   const rows = live.filter((i) => shown[i.status]);
   return (
@@ -363,7 +364,10 @@ function WorkItems({ items, data, adding, onAdd, onDone, reload, status }: { ite
             <div key={i.id} className={`wrow2${i.status === "Completed" ? " done" : ""}`}>
               {/* The circle is a named control: empty Backlog, half In Progress, checked Completed. */}
               <button type="button" className={`scircle ${i.status === "Completed" ? "full" : i.status === "In Progress" ? "half" : "empty"}`} aria-label={`Status: ${i.status}. Change`} title="Change status" onClick={() => setPicking(picking === i.id ? null : i.id)} />
-              <span className="wtitle">{i.title}</span>
+              <span className="wtitle">
+                {i.title}
+                {mayEditWorkItem(data.me, i) && <Pencil label={`Edit ${i.title}`} onClick={() => setEditing(editing === i.id ? null : i.id)} />}
+              </span>
               <span className="wwho">
                 <Avatar actor={owner} mine={owner.id === data.me.id} />
                 <span className="wfirst">{owner.name.split(" ")[0]}</span>
@@ -377,6 +381,16 @@ function WorkItems({ items, data, adding, onAdd, onDone, reload, status }: { ite
                 </select>
               )}
               {box(i)}
+              {editing === i.id && (
+                <EditWorkItem
+                  item={i}
+                  actors={data.actors}
+                  onDone={(saved) => {
+                    setEditing(null);
+                    if (saved) reload();
+                  }}
+                />
+              )}
             </div>
           );
         })}

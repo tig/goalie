@@ -3,7 +3,7 @@ import type { ApiActor, ApiViolation, ApiWorkItem, CommandsRequest, CommandsResp
 import { addDays } from "../../src/dates.ts";
 import { postCommands, useJson } from "./data.ts";
 import type { Done } from "./GoalPanels.tsx";
-import { goalTypes, savedStatus, subGoalBatch, workItemBatch, workItemStatusBatch, type SubGoalRow } from "./model/commands.ts";
+import { goalTypes, savedStatus, subGoalBatch, workItemBatch, workItemFieldsBatch, workItemStatusBatch, type SubGoalRow } from "./model/commands.ts";
 import { humans } from "./model/goalpage.ts";
 import { dateLabel } from "./model/labels.ts";
 import { formFocus } from "./model/feedback.ts";
@@ -172,6 +172,62 @@ export function AddWorkItem({ data, statuses, onDone }: { data: GoalPageResponse
       <div className="pactions">
         <button type="button" className="btn primary" disabled={result.saving} onClick={() => post(workItemBatch(data.goal.id, { title, owner, status, due_date: due || null }))}>
           Add
+        </button>
+        <button type="button" className="btn" onClick={() => onDone(false)}>
+          Cancel
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * W6: edit a work item in place: its title, owner, and due date, with one reason. Status keeps its own picker.
+ * The title starts selected, so typing replaces it. Enter saves; Escape closes and keeps the stored values.
+ */
+export function EditWorkItem({ item, actors, onDone }: { item: ApiWorkItem; actors: Record<string, ApiActor>; onDone: (saved: boolean) => void }) {
+  const [title, setTitle] = useState(item.title);
+  const [owner, setOwner] = useState(item.owner);
+  const [due, setDue] = useState(item.due_date ?? "");
+  const [reason, setReason] = useState("");
+  const [result, post] = usePost(() => onDone(true));
+  const batch = workItemFieldsBatch(item, { title, owner, due_date: due || null }, reason);
+  const save = () => batch && post(batch);
+  const keys = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") save();
+    if (e.key === "Escape") onDone(false);
+  };
+  return (
+    <section className="panel wiedit" aria-label={`Edit ${item.title}`} onKeyDown={keys}>
+      <div className="addgrid four">
+        <label className="field">
+          <span className="flabel">Title</span>
+          <input value={title} aria-label="Title" onChange={(e) => setTitle(e.target.value)} onFocus={(e) => e.target.select()} autoFocus />
+        </label>
+        <label className="field">
+          <span className="flabel">Owner</span>
+          <select value={owner} onChange={(e) => setOwner(e.target.value)}>
+            {Object.values(actors).map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+                {a.kind === "agent" ? " (agent)" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span className="flabel">Due Date</span>
+          <input type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+        </label>
+        <label className="field">
+          <span className="flabel">Reason</span>
+          <input value={reason} aria-label="Reason" onChange={(e) => setReason(e.target.value)} />
+        </label>
+      </div>
+      <Errors result={result} />
+      <div className="pactions">
+        <button type="button" className="btn primary" disabled={result.saving || !batch} onClick={save}>
+          Save
         </button>
         <button type="button" className="btn" onClick={() => onDone(false)}>
           Cancel

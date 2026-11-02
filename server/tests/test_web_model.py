@@ -608,6 +608,24 @@ class GoalPageTests(unittest.TestCase):
         b = run('return commands.workItemStatusBatch({ id: "WI-0001", version: 1 }, "Completed", "Shipped");')
         self.assertEqual(b, {"commands": [{"op": "update", "kind": "work_item", "id": "WI-0001", "base_version": 1, "fields": {"status": "Completed"}, "reason": "Shipped"}]})
 
+    def test_editing_a_work_item_sends_only_the_changed_fields_with_a_reason(self) -> None:
+        item = '{ id: "WI-0001", version: 3, title: "Draw the board", owner: "chelsea", due_date: null }'
+        b = run(f'return commands.workItemFieldsBatch({item}, {{ title: "Draw the board again", owner: "chelsea", due_date: "2026-11-20" }}, "Tig asked");')
+        self.assertEqual(b, {"commands": [{"op": "update", "kind": "work_item", "id": "WI-0001", "base_version": 3, "fields": {"title": "Draw the board again", "due_date": "2026-11-20"}, "reason": "Tig asked"}]})
+        self.assertIsNone(run(f'return commands.workItemFieldsBatch({item}, {{ title: "Draw the board", owner: "chelsea", due_date: null }}, "No change");'))
+
+    def test_a_human_may_edit_any_work_item_and_an_agent_only_its_own(self) -> None:
+        # rules.ts: a human writes any work item; an agent writes only the ones it owns (agent-own-work-items).
+        got = run("""
+          const item = { owner: "frontend-engineer" };
+          return [
+            goalpage.mayEditWorkItem({ id: "chelsea", kind: "human" }, item),
+            goalpage.mayEditWorkItem({ id: "frontend-engineer", kind: "agent" }, item),
+            goalpage.mayEditWorkItem({ id: "backend-engineer", kind: "agent" }, item),
+          ];
+        """)
+        self.assertEqual(got, [True, True, False])
+
     FORM = {
         "summary": "Launch the goal page", "description": "", "owner": "chelsea", "priority": "PRI-3",
         "due_date": "2027-02-28", "date_type": "Fantasy", "health": "GREEN", "path_to_green": None, "plan": None, "plan_maturity": "Watercolor",
