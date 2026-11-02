@@ -21,9 +21,14 @@ function pickedChain(target: Element): { items: FocusItem[]; picked: Element | n
 
 type Menu = { x: number; y: number; focus?: FeedbackFocus; back: Element | null };
 
+/** A long press (#58): one finger held this long, moving no more than LONG_PRESS_SLOP px. The Android and iOS system long press is about 500 ms. */
+const LONG_PRESS_MS = 500;
+const LONG_PRESS_SLOP = 10;
+
 /**
  * Feedback (tig/goalie#56). The top-bar button opens the dialog with no picked element. A right-click anywhere else in GOALIE opens GOALIE's menu in place of the browser's,
  * and its "Feedback..." opens the dialog about the element that was right-clicked. The ContextMenu key and Shift+F10 open the menu on the focused element.
+ * On a phone, a long press opens the same menu on the pressed element (#58).
  * A text field keeps the browser's menu, as in the Canon Viewer.
  * The dialog shows what was picked, says that the note was sent or why not, and keeps a note that was not sent. The Canon Viewer's pattern, ported in model/feedback.ts.
  */
@@ -49,6 +54,11 @@ export function Feedback() {
     };
     const mine = (target: EventTarget | null): target is Element => target instanceof Element && !isFeedbackChrome(target) && !isTyping(target);
     const onMenu = (e: MouseEvent) => {
+      // A held finger's own contextmenu (Android): this event opens the menu, and the press timer must not open a second one.
+      if (press) {
+        clearTimeout(press.timer);
+        press.opened = true;
+      }
       // A contextmenu while GOALIE's menu is open, such as the ContextMenu key on its item, must not open the browser's menu over it.
       if (document.querySelector(".ctxmenu") || (e.target instanceof Element && e.target.closest(".ctxmenu"))) {
         e.preventDefault();
@@ -66,11 +76,53 @@ export function Feedback() {
       e.preventDefault();
       open(target, { clientX: 0, clientY: 0 });
     };
+    // #58: a long press on a phone opens the menu too. iOS Safari sends no contextmenu for it, so GOALIE times the press: one finger held LONG_PRESS_MS without moving.
+    // Android Chrome may also send a contextmenu: whichever comes first opens the menu, and onMenu prevents the other while it is open.
+    let press: { timer: number; x: number; y: number; opened: boolean } | null = null;
+    const cancel = () => {
+      if (!press || press.opened) return;
+      clearTimeout(press.timer);
+      press = null;
+    };
+    const onTouchStart = (e: TouchEvent) => {
+      cancel();
+      press = null;
+      if (e.touches.length !== 1 || !mine(e.target)) return;
+      const target = e.target;
+      const { clientX: x, clientY: y } = e.touches[0];
+      const held = { x, y, opened: false, timer: 0 };
+      held.timer = window.setTimeout(() => {
+        held.opened = true;
+        if (!document.querySelector(".ctxmenu")) open(target, { clientX: x, clientY: y });
+      }, LONG_PRESS_MS);
+      press = held;
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (press && !press.opened && (!t || Math.hypot(t.clientX - press.x, t.clientY - press.y) > LONG_PRESS_SLOP)) cancel();
+    };
+    // The finger that opened the menu lifts: no click on the row under it, so the page stays.
+    const onTouchEnd = (e: TouchEvent) => {
+      if (press?.opened) e.preventDefault();
+      cancel();
+      press = null;
+    };
     document.addEventListener("contextmenu", onMenu, true);
     document.addEventListener("keydown", onKey, true);
+    document.addEventListener("touchstart", onTouchStart, { capture: true, passive: true });
+    document.addEventListener("touchmove", onTouchMove, { capture: true, passive: true });
+    document.addEventListener("touchend", onTouchEnd, { capture: true, passive: false });
+    document.addEventListener("touchcancel", onTouchEnd, true);
+    window.addEventListener("scroll", cancel, true);
     return () => {
+      cancel();
       document.removeEventListener("contextmenu", onMenu, true);
       document.removeEventListener("keydown", onKey, true);
+      document.removeEventListener("touchstart", onTouchStart, true);
+      document.removeEventListener("touchmove", onTouchMove, true);
+      document.removeEventListener("touchend", onTouchEnd, true);
+      document.removeEventListener("touchcancel", onTouchEnd, true);
+      window.removeEventListener("scroll", cancel, true);
     };
   }, [mark]);
 

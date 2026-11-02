@@ -15,6 +15,9 @@ html{scrollbar-gutter:stable}
 body{cursor:default;margin:0;background:var(--ground);color:var(--ink);font:14px/1.4 var(--font);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;-webkit-tap-highlight-color:transparent}
 .top,.cards,.board,.legend,.signin,.tip{user-select:none;-webkit-user-select:none}
 input,textarea{user-select:text;-webkit-user-select:text;cursor:text}
+/* #58: a long press opens GOALIE's menu, so iOS shows no link preview or callout over it. Text fields keep the system text menu. */
+body{-webkit-touch-callout:none}
+input,textarea,[contenteditable]{-webkit-touch-callout:default}
 button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0}
 a,button,.row.parent,[role="button"]{cursor:pointer}
 .gbtn.off,.meter span{cursor:default}
