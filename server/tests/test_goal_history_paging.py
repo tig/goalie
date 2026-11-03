@@ -27,8 +27,8 @@ class HistoryPagingTests(unittest.TestCase):
         cls.auth = {"Authorization": f"Bearer {token}"}
         server = running_server(cls.store.path, env)
         cls.proc, cls.port = server.__enter__()
-        cls.addClassCleanup(server.__exit__, None, None, None)
         cls.addClassCleanup(cls.store.close)
+        cls.addClassCleanup(server.__exit__, None, None, None)
         assert get(cls.proc, cls.port, "/health").status == 200
         for start in range(0, COMMENTS, 1_000):
             batch = [{"op": "comment", "kind": "goal", "id": "XW-0003", "text": f"Comment {n}"} for n in range(start, start + 1_000)]

@@ -38,8 +38,8 @@ class GoalPermissionTests(unittest.TestCase):
         cls.auth = {name: {"Authorization": f"Bearer {tokens[f'sub-{name}']}"} for name in ("chelsea", "tig", "galahad")}
         server = running_server(cls.store.path, env)
         cls.proc, cls.port = server.__enter__()
-        cls.addClassCleanup(server.__exit__, None, None, None)
         cls.addClassCleanup(cls.store.close)
+        cls.addClassCleanup(server.__exit__, None, None, None)
         assert get(cls.proc, cls.port, "/health").status == 200
 
     def health(self, who: str, goal: str, health: str = "YELLOW") -> tuple[int, dict[str, Any]]:

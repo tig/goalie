@@ -83,7 +83,7 @@ export function runCommands(db: DatabaseSync, actor: string, request: unknown, t
         }
         lint(at, command, result);
         if (!result.ok) {
-          if (!check || result.error !== "invalid") throw new Stop(failure(at, command.kind, result, today));
+          if (!check || result.error !== "invalid") throw new Stop(failure(db, at, command.kind, result, today));
           first ??= { at, violations: result.violations };
           all.push(...result.violations.map((v) => ({ ...v, at })));
           return undefined;
@@ -121,7 +121,7 @@ export function runCommands(db: DatabaseSync, actor: string, request: unknown, t
             const probe = inTransaction(db, () => false, () => write(db, actor, command, today, time));
             lint(at, command, probe);
             if (!probe.ok) {
-              if (probe.error !== "invalid") throw new Stop(failure(at, command.kind, probe, today));
+              if (probe.error !== "invalid") throw new Stop(failure(db, at, command.kind, probe, today));
               first ??= { at, violations: probe.violations };
               all.push(...probe.violations.map((v) => ({ ...v, at })));
               if (ref) refused.add(ref);
@@ -188,10 +188,10 @@ function resolve(at: number, raw: unknown, ids: Record<Ref, string>, refused: Se
   throw bad(at, "op is create, update, or comment");
 }
 
-function failure(at: number, kind: string, result: Exclude<WriteResult, { ok: true }>, today: string): CommandsAnswer {
+function failure(db: DatabaseSync, at: number, kind: string, result: Exclude<WriteResult, { ok: true }>, today: string): CommandsAnswer {
   const status = STATUS[result.error];
   if (result.error === "stale") {
-    const current = kind === "work_item" ? toApiWorkItem(result.current, today) : kind === "priority" ? (result.current as StoredPriority) : (result.current as StoredGoal);
+    const current = kind === "work_item" ? toApiWorkItem(db, result.current, today) : kind === "priority" ? (result.current as StoredPriority) : (result.current as StoredGoal);
     return { status, body: { ok: false, at, error: "stale", current } };
   }
   if (result.error === "invalid") return { status, body: { ok: false, at, error: "invalid", violations: result.violations } };

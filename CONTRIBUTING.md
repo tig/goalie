@@ -49,6 +49,12 @@ Unset means no issuer, so every token is refused.
 A deployment's issuer list lives with its host configuration, not in this repo. Keys come from the issuer's discovery document.
 Tests do not need Entra. `server/tests/sign_token.mjs` signs tokens with a fresh key, and the test sets a test issuer with that key inline in `jwks`.
 Every token is still verified: RS256 signature, issuer, audience, and expiry.
+`GOALIE_GITHUB_APP_ID`, `GOALIE_GITHUB_INSTALLATION_ID`, `GOALIE_GITHUB_PRIVATE_KEY_FILE`, `GOALIE_GITHUB_REPO`, and `GOALIE_PUBLIC_URL` configure a push of a work item's status to one GitHub issue ([ADR 0012](docs/adr/0012-github-app.md)).
+`GOALIE_GITHUB_REPO` is `owner/repo`.
+`GOALIE_GITHUB_PRIVATE_KEY_FILE` is a path. The key stays out of this repo.
+`GOALIE_PUBLIC_URL` is the base URL of this deployment, with no trailing slash. The issue body links back through it.
+`GOALIE_GITHUB_API` overrides the GitHub API base. The default is `https://api.github.com`.
+Unset means GitHub is not configured. A status change still commits, and the work item shows which names are missing. No call is made.
 `node src/cli.ts` is a local tool against the `GOALIE_DB` file: `write --as <actor>`, `read <kind> <id>`, `events [after]`, `seed [file]`, `check`, and `whoami`. It is not reachable over HTTP.
 A seed is a data file of writes, each with its `as` actor. `server/seed/excaliwire.json` is the default. A seed lives outside `src/`, so the publish does not carry it.
 `server/seed/build-team.json` is our build team: each seat an agent actor with `app_id` `app-<seat>`, and each seat's current tasks as work items. It loads onto the Excaliwire seed with `node src/cli.ts seed seed/build-team.json`, and loads again after an edit: an existing actor, or a work item with the same owner and title, is updated, and an unchanged one writes nothing. `server/tests/sign_token.mjs` signs a seat token with claims `idtyp: "app"` and `azp: "app-<seat>"`.

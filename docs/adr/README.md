@@ -19,3 +19,4 @@ Every other file under `docs/` runs no CI commands.
 - [0009. Presence](0009-presence.md). Accepted 2026-10-01.
 - [0010. Web-and-mobile app shape](0010-app-shape.md). Accepted 2026-10-01.
 - [0011. Owner settings and user settings](0011-owner-and-user-settings.md). Accepted 2026-10-01.
+- [0012. GitHub App](0012-github-app.md). Accepted 2026-11-03.

@@ -1,0 +1,288 @@
+"""A committed status change pushes the work item's status to its linked GitHub issue (issue #72, phase 1).
+
+The push sets one status label, keeps a body trailer that links back to the work item, and closes the issue
+when the status is Completed or Deleted. The push is not an Event. A failed push leaves the work item committed
+and shows on the work item. Reopen is out: a later open status does not open a closed issue.
+
+Prediction before the implementation: every test here fails, because a status change never calls GitHub.
+"""
+
+from __future__ import annotations
+
+import json
+import sqlite3
+import subprocess
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from typing import Any
+from urllib.parse import unquote, urlparse
+
+from goalie_cli import SERVER, Store, create, update
+from live_server import get, running_server, signed
+
+REPO = "tig/goalie"
+ISSUE = f"https://github.com/{REPO}/issues/72"
+OTHER = "https://github.com/excaliwire/factory/issues/3"
+PUBLIC = "http://goalie.test"
+ITEM = "WI-9001"
+GOAL = "XW-0007"
+
+
+class GitHub(ThreadingHTTPServer):
+    """A stand-in for the GitHub API. It records one issue and the calls made on it."""
+
+    def __init__(self) -> None:
+        super().__init__(("127.0.0.1", 0), Handler)
+        self.issue: dict[str, Any] = {"body": "Keep this.", "state": "open", "state_reason": None, "labels": ["pinned"]}
+        self.calls: list[str] = []
+        self.fail_token = False
+        self.token = "ghs_test"
+
+
+class Handler(BaseHTTPRequestHandler):
+    server: GitHub
+
+    def log_message(self, format: str, *args: object) -> None:
+        return
+
+    def do_GET(self) -> None:
+        self._call()
+        if self._path() == f"/repos/{REPO}/issues/72":
+            issue = self.server.issue
+            self._send(200, {"body": issue["body"], "state": issue["state"], "state_reason": issue["state_reason"], "labels": [{"name": name} for name in issue["labels"]]})
+            return
+        self._send(404, {"message": "not found"})
+
+    def do_POST(self) -> None:
+        self._call()
+        path, body = self._path(), self._body()
+        if path == "/app/installations/77/access_tokens":
+            if self.server.fail_token:
+                self._send(500, {"message": "no"})
+                return
+            self._send(201, {"token": self.server.token})
+            return
+        if path == f"/repos/{REPO}/issues/72/labels":
+            for name in body.get("labels", []):
+                if name not in self.server.issue["labels"]:
+                    self.server.issue["labels"].append(name)
+            self._send(200, {})
+            return
+        if path == f"/repos/{REPO}/labels":
+            self._send(201, {"name": body.get("name")})
+            return
+        self._send(404, {"message": "not found"})
+
+    def do_PATCH(self) -> None:
+        self._call()
+        if self._path() != f"/repos/{REPO}/issues/72":
+            self._send(404, {"message": "not found"})
+            return
+        body = self._body()
+        issue = self.server.issue
+        if "body" in body:
+            issue["body"] = body["body"]
+        if "state" in body:
+            issue["state"] = body["state"]
+        if "state_reason" in body:
+            issue["state_reason"] = body["state_reason"]
+        self._send(200, {})
+
+    def do_DELETE(self) -> None:
+        self._call()
+        prefix = f"/repos/{REPO}/issues/72/labels/"
+        path = self._path()
+        if path.startswith(prefix):
+            name = unquote(path[len(prefix):])
+            self.server.issue["labels"] = [label for label in self.server.issue["labels"] if label != name]
+            self._send(200, {})
+            return
+        self._send(404, {"message": "not found"})
+
+    def _path(self) -> str:
+        return urlparse(self.path).path
+
+    def _call(self) -> None:
+        self.server.calls.append(f"{self.command} {self._path()}")
+
+    def _body(self) -> dict[str, Any]:
+        raw = self.rfile.read(int(self.headers.get("Content-Length", "0")))
+        return json.loads(raw) if raw else {}
+
+    def _send(self, status: int, payload: dict[str, Any]) -> None:
+        data = json.dumps(payload).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+
+def private_key() -> str:
+    script = "import { generateKeyPairSync } from 'node:crypto'; const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 }); process.stdout.write(privateKey.export({ type: 'pkcs8', format: 'pem' }));"
+    return subprocess.run(["node", "--input-type=module", "-e", script], cwd=SERVER, capture_output=True, check=True, text=True).stdout
+
+
+class PushTests:
+    """Shared store and fake GitHub for the push tests."""
+
+    store: Store
+    github: GitHub
+    env: dict[str, str]
+
+    @classmethod
+    def start(cls) -> None:
+        cls.store = Store()
+        assert cls.store.run("seed")[0] == 0
+        assert cls.store.run("seed", str(SERVER / "seed" / "build-team.json"))[0] == 0
+        key = cls.store._scratch.name + "/github.pem"  # noqa: SLF001
+        with open(key, "w", encoding="utf-8") as handle:
+            handle.write(private_key())
+        cls.github = GitHub()
+        threading.Thread(target=cls.github.serve_forever, daemon=True).start()
+        host, port = cls.github.server_address
+        cls.env = {
+            "GOALIE_GITHUB_APP_ID": "123456",
+            "GOALIE_GITHUB_INSTALLATION_ID": "77",
+            "GOALIE_GITHUB_PRIVATE_KEY_FILE": key,
+            "GOALIE_GITHUB_REPO": REPO,
+            "GOALIE_GITHUB_API": f"http://{host}:{port}",
+            "GOALIE_PUBLIC_URL": PUBLIC,
+        }
+
+    @classmethod
+    def stop(cls) -> None:
+        cls.github.shutdown()
+        cls.store.close()
+
+    def write(self, command: dict[str, Any]) -> Any:
+        return self.store.run("write", "--as", "tig", stdin=command, env=self.env)[1]
+
+    def item(self, links: list[str], status: str = "Backlog") -> dict[str, Any]:
+        return {"goal": GOAL, "title": "Ship the push", "owner": "tig", "status": status, "links": links}
+
+
+import unittest
+
+
+class GitHubPushTests(unittest.TestCase, PushTests):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.start()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.stop()
+
+    def setUp(self) -> None:
+        self.github.calls.clear()
+        self.github.fail_token = False
+        self.github.issue = {"body": "Keep this.", "state": "open", "state_reason": None, "labels": ["pinned"]}
+
+    def test_a_status_change_sets_the_label_the_trailer_and_the_close(self) -> None:
+        created = self.write(create("work_item", ITEM, self.item([ISSUE]), "Filed"))
+        self.assertTrue(created["ok"], created)
+        self.assertIn("POST /app/installations/77/access_tokens", self.github.calls)
+        self.assertEqual(set(self.github.issue["labels"]), {"pinned", "Backlog"})
+        self.assertEqual(self.github.issue["state"], "open")
+        self.assert_trailer()
+
+        moved = self.write(update("work_item", ITEM, 1, {"status": "In Progress"}, "Started"))
+        self.assertTrue(moved["ok"], moved)
+        self.assertEqual(set(self.github.issue["labels"]), {"pinned", "In Progress"})
+        self.assertEqual(self.github.issue["state"], "open")
+        self.assert_trailer()
+
+        done = self.write(update("work_item", ITEM, 2, {"status": "Completed"}, "Shipped"))
+        self.assertTrue(done["ok"], done)
+        self.assertEqual(set(self.github.issue["labels"]), {"pinned", "Completed"})
+        self.assertEqual(self.github.issue["state"], "closed")
+        self.assertEqual(self.github.issue["state_reason"], "completed")
+        self.assert_trailer()
+
+        deleted = self.write(update("work_item", ITEM, 3, {"status": "Deleted"}, "Dropped"))
+        self.assertTrue(deleted["ok"], deleted)
+        self.assertEqual(set(self.github.issue["labels"]), {"pinned", "Deleted"})
+        self.assertEqual(self.github.issue["state"], "closed")
+        self.assertEqual(self.github.issue["state_reason"], "not_planned")
+        self.assert_trailer()
+
+        # Reopen is out. The label follows the work item. The issue stays closed.
+        again = self.write(update("work_item", ITEM, 4, {"status": "In Progress"}, "Picked up"))
+        self.assertTrue(again["ok"], again)
+        self.assertEqual(set(self.github.issue["labels"]), {"pinned", "In Progress"})
+        self.assertEqual(self.github.issue["state"], "closed")
+        self.assertEqual(self.github.issue["state_reason"], "not_planned")
+        self.assertIsNone(self.error(ITEM))
+        self.assertNotIn("github", {event["field"] for event in self.store.events() if event["entity"] == ITEM})
+
+    def test_a_failed_push_leaves_the_work_item_committed_and_shows_the_failure(self) -> None:
+        assert self.write(create("work_item", "WI-9002", self.item([ISSUE]), "Filed"))["ok"]
+        self.github.fail_token = True
+        self.github.issue = {"body": "Keep this.", "state": "open", "state_reason": None, "labels": ["pinned"]}
+        result = self.write(update("work_item", "WI-9002", 1, {"status": "Completed"}, "Shipped"))
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(self.store.read("work_item", "WI-9002")["status"], "Completed")
+        self.assertEqual(self.github.issue["state"], "open")
+        self.assertIn("500", self.error("WI-9002") or "")
+        page = self.goal_page()
+        shown = next(item for item in page["workItems"] if item["id"] == "WI-9002")
+        self.assertEqual(shown["github_error"], self.error("WI-9002"))
+        fields = [event["field"] for event in result["events"]]
+        self.assertEqual(fields, ["status"])
+
+    def test_a_refused_write_does_not_push(self) -> None:
+        assert self.write(create("work_item", "WI-9003", self.item([ISSUE]), "Filed"))["ok"]
+        self.github.calls.clear()
+        refused = self.write(update("work_item", "WI-9003", 1, {"status": "Completed"}))
+        self.assertFalse(refused["ok"])
+        self.assertEqual(self.github.calls, [])
+        self.assertEqual(self.store.read("work_item", "WI-9003")["status"], "Backlog")
+
+    def test_a_title_change_and_another_repo_do_not_push(self) -> None:
+        assert self.write(create("work_item", "WI-9004", self.item([ISSUE]), "Filed"))["ok"]
+        self.github.calls.clear()
+        retitled = self.write(update("work_item", "WI-9004", 1, {"title": "Rename only"}, "Clearer"))
+        self.assertTrue(retitled["ok"], retitled)
+        self.assertEqual(self.github.calls, [])
+        other = self.write(create("work_item", "WI-9005", self.item([OTHER]), "Filed"))
+        self.assertTrue(other["ok"], other)
+        self.assertEqual(self.github.calls, [])
+
+    def test_missing_configuration_shows_on_the_work_item(self) -> None:
+        bare = dict(self.env)
+        bare.pop("GOALIE_GITHUB_APP_ID")
+        result = self.store.run("write", "--as", "tig", stdin=create("work_item", "WI-9006", self.item([ISSUE]), "Filed"), env=bare)[1]
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(self.store.read("work_item", "WI-9006")["status"], "Backlog")
+        self.assertIn("GOALIE_GITHUB_APP_ID", self.error("WI-9006") or "")
+        self.assertEqual(self.github.calls, [])
+
+    def assert_trailer(self) -> None:
+        body = self.github.issue["body"]
+        self.assertIn("Keep this.", body)
+        self.assertIn("<!-- goalie -->", body)
+        self.assertIn(f"{PUBLIC}/goals/{GOAL}#work-item-{ITEM}", body)
+        self.assertIn(ITEM, body)
+
+    def error(self, item: str) -> str | None:
+        db = sqlite3.connect(self.store.path)
+        try:
+            row = db.execute("SELECT error FROM github_push WHERE work_item = ?", (item,)).fetchone()
+        finally:
+            db.close()
+        return None if row is None else row[0]
+
+    def goal_page(self) -> dict[str, Any]:
+        tig = self.store.read("actor", "tig")
+        if tig["subject"] != "sub-tig":
+            assert self.store.write("tig", update("actor", "tig", tig["version"], {"subject": "sub-tig"}))["ok"]
+        token, env = signed("sub-tig")
+        with running_server(self.store.path, env) as (proc, port):
+            reply = get(proc, port, f"/api/goals/{GOAL}", {"Authorization": f"Bearer {token}"})
+        self.assertEqual(reply.status, 200, reply.body)
+        return json.loads(reply.body)
+
+
+if __name__ == "__main__":
+    unittest.main()

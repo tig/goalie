@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import gc
 import json
 import os
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +22,18 @@ class Store:
         self.path = Path(self._scratch.name) / "goalie.db"
 
     def close(self) -> None:
-        self._scratch.cleanup()
+        # A test connection can outlive its `with` block until a collection. Windows then refuses to delete the file.
+        last: PermissionError | None = None
+        for _ in range(5):
+            gc.collect()
+            try:
+                self._scratch.cleanup()
+                return
+            except PermissionError as error:
+                last = error
+                time.sleep(0.05)
+        if last is not None:
+            raise last
 
     def run(self, *args: str, stdin: Any = None, env: dict[str, str] | None = None) -> tuple[int, Any]:
         """Run one CLI command. Return the exit code and the parsed JSON it printed."""
