@@ -29,7 +29,7 @@ def scenario(steps: str, ready: str) -> str:
     return f"(async () => {{ const READY = {json.dumps(ready)}; {SETUP} {steps} }})()"
 
 
-# Press a row's pill, choose Completed, see Save wait for a reason, write one, and save with Enter.
+# Completed saves in one press, with the reason "Marked Completed": no reason row opens.
 COMPLETE_ON_WORK_PAGE = scenario("""
   const row = [...document.querySelectorAll(".wrow")].find((r) => r.querySelector(".spill")?.textContent.includes("In Progress"));
   if (!row) return { pill: false };
@@ -38,14 +38,26 @@ COMPLETE_ON_WORK_PAGE = scenario("""
   await click(row.querySelector(".spill"));
   const menu = [...document.querySelectorAll("[role=menu] [role=menuitemradio]")].map((b) => b.textContent.trim());
   await click(item("Completed"));
+  const asked = Boolean(row.querySelector(".tickreason input"));
+  await sleep(800);
+  const after = await (await fetch("/api/work")).json();
+  return { pill: true, controls, menu, asked, status: after.items.find((i) => i.id === id).status };
+""", ready=".wrow")
+
+# Any other status asks for its reason: the field takes the keys, Save waits for a reason, and Enter saves.
+BACKLOG_ON_WORK_PAGE = scenario("""
+  const row = [...document.querySelectorAll(".wrow")].find((r) => r.querySelector(".spill")?.textContent.includes("In Progress"));
+  const id = JSON.parse(row.dataset.focus).id;
+  await click(row.querySelector(".spill"));
+  await click(item("Backlog"));
   const reason = row.querySelector(".tickreason input");
   const focused = document.activeElement === reason;
   const waits = row.querySelector(".tickreason button.primary")?.disabled ?? null;
-  await type("Shipped");
+  await type("Not this week");
   await key("Enter");
   await sleep(800);
   const after = await (await fetch("/api/work")).json();
-  return { pill: true, controls, menu, focused, waits, status: after.items.find((i) => i.id === id).status };
+  return { focused, waits, status: after.items.find((i) => i.id === id).status };
 """, ready=".wrow")
 
 # On a goal page, choose Backlog, then Escape: the reason box closes and the pill shows the stored status again.
@@ -67,7 +79,8 @@ class StatusPillTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         with signed_app("seed/build-team.json") as (open_page, api):
             cls.work = open_page(1280, COMPLETE_ON_WORK_PAGE, "/work")
-            goal = next(i["goal"] for i in api("/api/work")["items"] if i["status"] == "In Progress")
+            cls.backlog = open_page(1280, BACKLOG_ON_WORK_PAGE, "/work")
+            goal = next(i["goal"] for i in api("/api/work")["items"] if i["status"] in ("In Progress", "Backlog"))
             cls.goal = open_page(1280, ESCAPE_ON_GOAL_PAGE, f"/goals/{goal}")
 
     def test_a_row_has_one_status_control_a_pill_with_a_menu_of_every_status(self) -> None:
@@ -75,10 +88,14 @@ class StatusPillTests(unittest.TestCase):
         self.assertEqual(self.work["controls"], 0, "no checkbox and no select beside it")
         self.assertEqual(self.work["menu"], ["Backlog", "In Progress", "Completed", "Deleted"])
 
-    def test_a_new_status_asks_for_its_reason_and_enter_saves_it(self) -> None:
-        self.assertTrue(self.work["focused"], "the reason field takes the keys at once")
-        self.assertTrue(self.work["waits"], "Save waits for a reason")
+    def test_completed_saves_in_one_press_without_asking_a_reason(self) -> None:
+        self.assertFalse(self.work["asked"], "no reason row for Completed")
         self.assertEqual(self.work["status"], "Completed")
+
+    def test_another_status_asks_for_its_reason_and_enter_saves_it(self) -> None:
+        self.assertTrue(self.backlog["focused"], "the reason field takes the keys at once")
+        self.assertTrue(self.backlog["waits"], "Save waits for a reason")
+        self.assertEqual(self.backlog["status"], "Backlog")
 
     def test_escape_on_a_goal_page_undoes_the_choice(self) -> None:
         self.assertTrue(self.goal["pill"], "a goal page work row has the same pill")

@@ -338,9 +338,12 @@ function StatusPill({ item, value, onPick }: { item: ApiWorkItem; value: WorkIte
   );
 }
 
+/** Every change is an Event with a reason (SPEC.md §13 item 24); marking an item Completed says so itself. */
+const DONE_REASON = "Marked Completed";
+
 export function useStatus(onSaved: () => void) {
-  // The item being moved and the status it moves to.
-  const [moving, setMoving] = useState<{ item: ApiWorkItem; status: WorkItemStatus } | null>(null);
+  // The item being moved and the status it moves to. Completed saves at once with its own reason; any other status asks for one.
+  const [moving, setMoving] = useState<{ item: ApiWorkItem; status: WorkItemStatus; quick?: boolean } | null>(null);
   const [reason, setReason] = useState("");
   const [result, post] = usePost(() => {
     setMoving(null);
@@ -358,12 +361,19 @@ export function useStatus(onSaved: () => void) {
       value={moving?.item.id === item.id ? moving.status : item.status}
       onPick={(status) => {
         setReason("");
-        setMoving(status === item.status ? null : { item, status });
+        if (status === item.status) return setMoving(null);
+        if (status !== "Completed") return setMoving({ item, status });
+        setMoving({ item, status, quick: true });
+        void post(workItemStatusBatch(item, status, DONE_REASON));
       }}
     />
   );
   const box = (item: ApiWorkItem) =>
-    moving?.item.id === item.id ? (
+    moving?.item.id !== item.id ? null : moving.quick ? (
+      <div className="tickreason">
+        <Errors result={result} />
+      </div>
+    ) : (
       <div className="tickreason">
         <input
           value={reason}
@@ -384,6 +394,6 @@ export function useStatus(onSaved: () => void) {
         </button>
         <Errors result={result} />
       </div>
-    ) : null;
+    );
   return { pill, box };
 }
