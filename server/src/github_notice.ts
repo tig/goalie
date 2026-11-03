@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import type { Context } from "hono";
 import { canonicalIssueUrl, drainGitHub } from "./github.ts";
+import { publish, toApiEvent } from "./live.ts";
 import { goalieOwner, read, readAll } from "./read.ts";
 import { isGitHubAgent } from "./rules.ts";
 import { write } from "./write.ts";
@@ -52,20 +53,43 @@ function readClose(event: string | undefined, payload: unknown): Close | undefin
   return { repo, number: number as number, status, login: login.trim() };
 }
 
-/** Set status through the one write path. A stale write is tried once more. True when the row ends on that status. */
-function setStatus(db: DatabaseSync, actor: string, id: string, status: string, reason: string, today: string): boolean {
-  const once = (version: number) => write(db, actor, { op: "update", kind: "work_item", id, base_version: version, fields: { status }, reason }, today);
+function namesIssue(links: unknown, url: string): boolean {
+  return Array.isArray(links) && links.some((link) => typeof link === "string" && canonicalIssueUrl(link) === url);
+}
+
+/**
+ * Set status through the one write path when the work item still names `url`.
+ * A stale write is tried once more, and that read checks the links again.
+ * True when nothing remains to write.
+ * `beforeWrite` runs after the read and before the write. The stale-relink test passes it. The route does not.
+ */
+export async function setStatus(
+  db: DatabaseSync,
+  actor: string,
+  id: string,
+  status: string,
+  reason: string,
+  today: string,
+  url: string,
+  beforeWrite?: () => Promise<void>,
+): Promise<boolean> {
+  const once = (version: number) => {
+    const result = write(db, actor, { op: "update", kind: "work_item", id, base_version: version, fields: { status }, reason }, today);
+    if (result.ok && result.events.length > 0) publish(result.events.map(toApiEvent));
+    return result;
+  };
   const current = read(db, "work_item", id);
-  if (current === undefined || current.status === status) return true;
+  if (current === undefined || !namesIssue(current.links, url) || current.status === status) return true;
+  await beforeWrite?.();
   const first = once(current.version as number);
   if (first.ok) return true;
   if (first.error !== "stale") return false;
   const again = read(db, "work_item", id);
-  if (again === undefined || again.status === status) return true;
+  if (again === undefined || !namesIssue(again.links, url) || again.status === status) return true;
   const second = once(again.version as number);
   if (second.ok) return true;
   const after = read(db, "work_item", id);
-  return after === undefined || after.status === status;
+  return after === undefined || !namesIssue(after.links, url) || after.status === status;
 }
 
 /** Answer one delivery. Call this before the bearer-token check. The route is not anonymous: the signature authenticates it. */
@@ -99,7 +123,7 @@ export async function receiveGitHubWebhook(db: DatabaseSync, c: Context, today: 
     const links = row.links;
     if (typeof id !== "string" || !Array.isArray(links)) continue;
     if (!links.some((link) => typeof link === "string" && canonicalIssueUrl(link) === url)) continue;
-    if (!setStatus(db, actorId, id, close.status, reason, today)) wrote = false;
+    if (!(await setStatus(db, actorId, id, close.status, reason, today, url))) wrote = false;
   }
   await drainGitHub(db);
   return wrote ? c.json({ ok: true }) : c.json({ error: "not_written", reason: "the work item was not updated" }, 500);

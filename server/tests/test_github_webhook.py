@@ -4,7 +4,8 @@ completed sets status to Completed. not_planned and duplicate set status to Dele
 write as any other change of status: it names the version it read, and it is an Event. The actor is an agent
 whose operator is the GOALIE owner. The reason names the GitHub login. A notice that matches the current
 status writes nothing, including the echo of our own close. A bad signature, a reopen, and another repository
-write nothing.
+write nothing. An open event stream receives that Event. A stale retry that finds the work item no longer
+names the issue writes nothing and queues no push.
 """
 
 from __future__ import annotations
@@ -12,11 +13,14 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import os
+import subprocess
 import unittest
 from typing import Any
 
-from goalie_cli import Store, create, update
-from live_server import Reply, get, post, running_server
+from goalie_cli import SERVER, Store, create, update
+from live_server import Reply, get, post, running_server, signed
+from test_events_stream import Stream
 
 REPO = "tig/goalie"
 OTHER = "excaliwire/factory"
@@ -276,6 +280,108 @@ class GitHubActorTests(unittest.TestCase):
         named = self.write_as("side", update("work_item", "WI-9130", 1, {"status": "Completed"}, "No"), named="side")
         self.assertFalse(named["ok"], named)
         self.assertEqual(self.store.read("work_item", "WI-9130")["status"], "Backlog")
+
+
+# Relink the work item after setStatus has read it and before it writes. The retry must notice.
+STALE_RETRY = r"""
+import { openStore } from "./src/store.ts";
+import { read } from "./src/read.ts";
+import { write } from "./src/write.ts";
+import { setStatus } from "./src/github_notice.ts";
+
+const db = openStore(process.env.GOALIE_DB);
+const today = "2026-10-23";
+const at = "2026-10-23T00:00:00Z";
+const issue = "https://github.com/tig/goalie/issues/301";
+const other = "https://github.com/tig/goalie/issues/302";
+process.env.GOALIE_GITHUB_ACTOR = "github";
+process.env.GOALIE_GITHUB_REPO = "tig/goalie";
+
+const fail = (detail) => {
+  process.stdout.write(JSON.stringify(detail));
+  db.close();
+  process.exit(1);
+};
+
+const detached = await setStatus(db, "github", "WI-9302", "Completed", "Closed on GitHub by octocat.", today, issue);
+const detachedRow = read(db, "work_item", "WI-9302");
+if (!detached || detachedRow.status !== "Backlog") fail({ step: "detached", detached, status: detachedRow.status });
+
+const relinked = await setStatus(db, "github", "WI-9301", "Completed", "Closed on GitHub by octocat.", today, issue, async () => {
+  const row = read(db, "work_item", "WI-9301");
+  const result = write(db, "tig", { op: "update", kind: "work_item", id: "WI-9301", base_version: row.version, fields: { links: [other] }, reason: "Relink" }, today, at);
+  if (!result.ok) fail({ step: "relink", result });
+});
+const after = read(db, "work_item", "WI-9301");
+const push = db.prepare("SELECT issue, status FROM github_push WHERE work_item = ?").get("WI-9301");
+const statusEvent = db.prepare("SELECT actor, new FROM event WHERE entity = ? AND field = 'status' AND actor = 'github'").get("WI-9301");
+if (!relinked || after.status !== "Backlog" || after.links[0] !== other || statusEvent) fail({ step: "retry", relinked, status: after.status, links: after.links, push, statusEvent });
+if (push && (push.issue !== issue || push.status !== "Backlog")) fail({ step: "push", push });
+db.close();
+process.stdout.write("ok");
+"""
+
+
+class GitHubWebhookLiveTests(unittest.TestCase):
+    """A browser that already has the event stream open receives the status Event."""
+
+    def test_an_open_stream_receives_the_status_event(self) -> None:
+        store = Store()
+        self.addCleanup(store.close)
+        code, result = store.run("seed", env=QUIET)
+        self.assertEqual(code, 0, result)
+        tig = store.read("actor", "tig")
+        subject = store.run("write", "--as", "tig", stdin=update("actor", "tig", tig["version"], {"subject": "sub-tig"}), env=QUIET)[1]
+        self.assertTrue(subject["ok"], subject)
+        actor = store.run("write", "--as", "tig", stdin=create("actor", ACTOR, {"kind": "agent", "display_name": "GitHub", "operator": "tig"}), env=QUIET)[1]
+        self.assertTrue(actor["ok"], actor)
+        filed = store.run("write", "--as", "tig", stdin=create("work_item", "WI-9401", item(401), "Filed"), env=QUIET)[1]
+        self.assertTrue(filed["ok"], filed)
+        token, issuers = signed("sub-tig")
+        body = notice(401)
+        with running_server(store.path, {**QUIET, **issuers, "GOALIE_GITHUB_WEBHOOK_SECRET": SECRET, "GOALIE_GITHUB_REPO": REPO, "GOALIE_GITHUB_ACTOR": ACTOR}) as (proc, port):
+            self.assertEqual(get(proc, port, "/health").status, 200)
+            stream = Stream(port, {"Authorization": f"Bearer {token}"})
+            self.addCleanup(stream.close)
+            self.assertEqual(stream.response.status, 200)
+            self.assertTrue(stream.response.getheader("Content-Type", "").startswith("text/event-stream"))
+            reply = post(proc, port, "/api/github/webhook", body, {"X-GitHub-Event": "issues", "X-Hub-Signature-256": sign(SECRET, body)})
+            self.assertEqual(reply.status, 200, reply.body)
+            message = stream.next(within=1.0)
+            self.assertIsNotNone(message, "the open stream did not receive the status Event")
+            assert message is not None
+            self.assertEqual(message["data"]["entity"], "WI-9401")
+            self.assertEqual((message["data"]["actor"], message["data"]["field"], message["data"]["old"], message["data"]["new"]), (ACTOR, "status", "Backlog", "Completed"))
+            self.assertEqual(message["data"]["reason"], "Closed on GitHub by octocat.")
+            again = post(proc, port, "/api/github/webhook", body, {"X-GitHub-Event": "issues", "X-Hub-Signature-256": sign(SECRET, body)})
+            self.assertEqual(again.status, 200, again.body)
+            self.assertIsNone(stream.next(within=0.4), "a delivery that matches the current status published an Event")
+
+
+class GitHubWebhookRetryTests(unittest.TestCase):
+    """A stale retry writes nothing when the work item no longer names the delivered issue."""
+
+    def test_a_stale_retry_does_not_write_a_relinked_work_item(self) -> None:
+        store = Store()
+        self.addCleanup(store.close)
+        code, result = store.run("seed", env=QUIET)
+        self.assertEqual(code, 0, result)
+        for command in (
+            create("actor", ACTOR, {"kind": "agent", "display_name": "GitHub", "operator": "tig"}),
+            create("work_item", "WI-9301", item(301), "Filed"),
+            create("work_item", "WI-9302", item(302), "Filed"),
+        ):
+            wrote = store.run("write", "--as", "tig", stdin=command, env=QUIET)[1]
+            self.assertTrue(wrote["ok"], (command["id"], wrote))
+        proc = subprocess.run(
+            ["node", "--no-warnings", "--input-type=module", "-e", STALE_RETRY],
+            cwd=SERVER,
+            env={**os.environ, **QUIET, "GOALIE_DB": str(store.path), "GOALIE_GITHUB_ACTOR": ACTOR, "GOALIE_GITHUB_REPO": REPO, "GOALIE_TODAY": "2026-10-23"},
+            capture_output=True,
+            timeout=30,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stdout.decode() + proc.stderr.decode())
+        self.assertEqual(proc.stdout.decode(), "ok")
 
 
 if __name__ == "__main__":
