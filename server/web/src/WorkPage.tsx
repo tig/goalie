@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import type { ApiEvent, PrioritiesResponse, WorkItemStatus, WorkResponse } from "../../src/api.ts";
+import type { ApiEvent, PrioritiesResponse, WorkResponse } from "../../src/api.ts";
 import { shortDate } from "../../src/dates.ts";
 import { useJson } from "./data.ts";
-import { EditWorkItem, useTick } from "./GoalAdd.tsx";
+import { EditWorkItem, useStatus } from "./GoalAdd.tsx";
 import { Owner, Pencil } from "./GoalPage.tsx";
 import { keepOrder, mayEditWorkItem, queues } from "./model/goalpage.ts";
 import { goalPath, workPath } from "./model/route.ts";
@@ -76,12 +76,10 @@ function Due({ date, late, today, done }: { date: string | null; late: boolean; 
   );
 }
 
-const STATUSES: WorkItemStatus[] = ["Backlog", "In Progress", "Completed", "Deleted"];
-
 function Queues({ work, reload, single }: { work: WorkResponse; reload: () => void; single: boolean }) {
   const [closed, setClosed] = useState<Record<string, boolean>>({});
   const [editing, setEditing] = useState<string | null>(null);
-  const { ticked, tick, move, chosen, box } = useTick(reload);
+  const { pill, box } = useStatus(reload);
   // QA U5: a save does not move a person's queue; the order from page load holds until the next visit.
   const sorted = queues(work.items, work.actors, work.me.id);
   const [first] = useState(() => sorted.map((q) => q.owner.id));
@@ -106,10 +104,6 @@ function Queues({ work, reload, single }: { work: WorkResponse; reload: () => vo
             const shut = closed[key] ?? done;
             const rows = g.items.map((i) => (
               <div key={i.id} className={`wrow qrow${i.status === "Completed" ? " done" : ""}`} data-focus={encodeFocus({ kind: "work item", id: i.id, label: i.title })}>
-                {/* The tick's label is its 44 px tap area on touch (rule 29). */}
-                <label className="wtick">
-                  <input type="checkbox" checked={i.status === "Completed" || ticked?.id === i.id} disabled={i.status === "Completed"} onChange={() => tick(i)} aria-label={`Mark ${i.title} Completed`} />
-                </label>
                 <span className="wtitle">
                   {i.title}
                   {mayEditWorkItem(work.me, i) && <Pencil label={`Edit ${i.title}`} onClick={() => setEditing(editing === i.id ? null : i.id)} />}
@@ -118,12 +112,8 @@ function Queues({ work, reload, single }: { work: WorkResponse; reload: () => vo
                   {work.goals[i.goal]?.summary ?? i.goal}
                 </Link>
                 <Due date={i.due_date} late={i.late} today={work.today} done={done} />
-                {/* QA U6: any status can be set here, each with its reason (product D8). */}
-                <select className="wstatus small" value={chosen(i)} aria-label={`Status of ${i.title}`} onChange={(e) => move(i, e.target.value as WorkItemStatus)}>
-                  {STATUSES.map((st) => (
-                    <option key={st}>{st}</option>
-                  ))}
-                </select>
+                {/* W7: the one status control, a pill with a menu of every status. */}
+                {pill(i)}
                 {box(i)}
                 {editing === i.id && (
                   <EditWorkItem

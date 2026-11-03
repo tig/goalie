@@ -399,7 +399,7 @@ button.chev:hover{background:var(--grid);color:var(--ink)}
 .chev.static{cursor:default}
 .wgroup{background:var(--card);border-radius:var(--radius);box-shadow:0 1px 2px var(--shadow),0 4px 16px var(--shadow);padding:6px 16px;margin:0 0 8px}
 .wghead{display:flex;gap:6px;width:100%;padding:8px 0;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
-.wrow{display:grid;grid-template-columns:20px minmax(0,1fr) auto 90px 80px;align-items:center;gap:12px;min-height:40px;border-top:1px solid var(--line);font-size:13px}
+.wrow{display:grid;grid-template-columns:minmax(0,1fr) auto 90px 128px;align-items:center;gap:12px;min-height:40px;border-top:1px solid var(--line);font-size:13px}
 .wrow input[type=checkbox]{width:16px;height:16px;margin:0}
 .wtitle{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wrow.done .wtitle{text-decoration:line-through;color:var(--mute)}
@@ -429,8 +429,7 @@ button.chev:hover{background:var(--grid);color:var(--ink)}
 .phone .hpick{height:44px}.phone .hopt{flex:1;justify-content:center}
 .phone .gtwo{grid-template-columns:1fr}
 .phone .gfields dl{grid-template-columns:1fr}
-.phone .wrow{grid-template-columns:20px minmax(0,1fr);row-gap:2px;padding:6px 0}
-.phone .wrow>.wowner,.phone .wrow>.wstatus,.phone .wrow>.wdue{grid-column:2;text-align:left}
+.phone .wrow{row-gap:2px;padding:6px 0}
 
 /* Goal page panels (G9 to G19): one at a time, in place. */
 .btn.primary{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
@@ -474,7 +473,7 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 .addrow{margin:0 0 10px}
 .addgrid{display:grid;grid-template-columns:2fr 1fr;gap:0 12px}
 .addgrid.four{grid-template-columns:2fr 1fr 1fr 1fr}
-.tickreason{grid-column:2/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:0 0 8px}
+.tickreason{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:0 0 8px}
 .wtitle .pencil{margin-left:4px;width:24px;height:24px;vertical-align:middle}
 .wiedit{grid-column:1/-1;margin:4px 0 8px}
 .tickreason input{flex:1;min-width:160px;font:500 13px var(--font);border:1px solid var(--cut);border-radius:10px;padding:7px 10px}
@@ -574,15 +573,15 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 .queue h2{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:800;margin:0 0 10px}
 .qowner{color:inherit;text-decoration:none}
 .qowner:hover{text-decoration:underline}
-.qrow{grid-template-columns:20px minmax(0,1fr) minmax(0,.8fr) 80px 120px}
+.qrow{grid-template-columns:minmax(0,1fr) minmax(0,.8fr) 80px 128px}
 .wgoal{color:var(--link);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wgoal:hover{text-decoration:underline}
 .phone .toptabs{margin-left:0}
-.phone .qrow{grid-template-columns:20px minmax(0,1fr) auto}
-.phone .qrow>.wtitle,.phone .qrow>.wgoal{grid-column:2/-1}
-.phone .qrow>.wdue{grid-column:2;text-align:left}
+.phone .qrow{grid-template-columns:minmax(0,1fr) auto}
+.phone .qrow>.wtitle,.phone .qrow>.wgoal{grid-column:1/-1}
+.phone .qrow>.wdue{grid-column:1;text-align:left}
 .phone .qrow>.wgoal{text-align:left}
-.phone .qrow>.wstatus{grid-column:3}
+.phone .qrow>.smenu{grid-column:2}
 .phone .top .org{display:none}
 .phone .toptabs .tab{height:32px;padding:0 10px;white-space:nowrap}
 .phone .top{gap:6px}
@@ -592,7 +591,7 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 .qdone{margin:0 0 8px}
 .qdone>.linkbtn{padding:4px 0}
 .wdue.today{color:var(--ink);font-weight:700}
-@media (pointer:coarse){.wrow input[type=checkbox]{position:relative}.wrow{min-height:44px}}
+@media (pointer:coarse){.wrow{min-height:44px}}
 
 /* New goal, design check (N8, N15, rule 29). */
 .mchips{display:flex;flex-wrap:wrap;gap:8px}
@@ -635,15 +634,12 @@ main.newgoal{padding-bottom:84px}
 /* Rows of small controls keep their 44 px areas apart. */
 .chips{row-gap:16px}.gtalk .chips{margin-top:18px}
 .counts{margin:22px 0 28px;display:flex;flex-wrap:wrap;align-items:center;column-gap:10px;row-gap:18px}
-.fchip,.chev,.qowner,.qdone .linkbtn,.wtick,.cancel{position:relative}
-.fchip::after,.chev::after,.qowner::after,.qdone .linkbtn::after,.wtick::after,.cancel::after{content:"";position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}
-.wtick{display:inline-flex;align-items:center;justify-content:center}
+.fchip,.chev,.qowner,.qdone .linkbtn,.cancel{position:relative}
+.fchip::after,.chev::after,.qowner::after,.qdone .linkbtn::after,.cancel::after{content:"";position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%)}
 .chev{z-index:8}
 .zoom .gbtn{min-width:44px}
 .search input{min-height:44px}}
 .gstatus{margin:8px 0 0;font-size:13px;font-weight:600;color:var(--green-ink)}.gstatus:empty{margin:0}
-select.wstatus{height:28px;border:1px solid var(--cut);border-radius:8px;background:var(--card);padding:0 6px}
-@media (pointer:coarse){select.wstatus{min-height:44px;position:relative;z-index:2}}
 .qwho{display:inline-flex;align-items:baseline;flex-wrap:wrap}.qop{color:var(--mute);font-weight:500;font-size:14px}
 .phone .qwho{flex-direction:column;align-items:flex-start}.phone .qcomma{display:none}.phone .qop{font-size:13px}
 /* New goal v2 (NF1 to NF18). */
@@ -781,18 +777,41 @@ select.wstatus{height:28px;border:1px solid var(--cut);border-radius:8px;backgro
 .subrows,.wrows{border-top:1px solid var(--line)}
 .gsub2{display:flex;align-items:center;gap:10px;min-height:44px;padding:6px 0;border-bottom:1px solid var(--line)}
 .addrow{display:block;width:100%;min-height:36px;padding:8px 0;border:0;background:none;text-align:left;color:var(--link);font:700 13px var(--font);cursor:pointer}
-.wstatushead{margin:0 0 2px;color:var(--mute);font-weight:700}
-.wrow2{display:grid;grid-template-columns:28px minmax(0,1fr) auto 96px;align-items:center;gap:4px 10px;min-height:36px;border-bottom:1px solid var(--line)}
+.wrow2{display:grid;grid-template-columns:minmax(0,1fr) auto 96px 128px;align-items:center;gap:4px 10px;min-height:36px;border-bottom:1px solid var(--line)}
 .wrow2 .wtitle{font-size:13px}
 .wrow2 .wdue{text-align:right}
-.wrow2>.wpick,.wrow2>.tickreason{grid-column:2/-1}
+.wrow2>.tickreason{grid-column:1/-1}
+.phone .wrow2{grid-template-columns:auto minmax(0,1fr) auto;padding:8px 0}
+.phone .wrow2>.wtitle{grid-column:1/-1}
+.phone .wrow2 .wdue{text-align:left}
 .wwho{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600}
-.scircle{position:relative;width:16px;height:16px;padding:0;border:2px solid var(--mute);border-radius:50%;background:none;cursor:pointer}
-.scircle.half{background:linear-gradient(90deg,var(--mute) 50%,transparent 50%)}
-.scircle.full{background:var(--green);border-color:var(--green)}
-.scircle:hover,.scircle:focus-visible{border-color:var(--ink)}
-.gtalk .commentbox{margin:0 0 12px}
-@media (pointer:coarse){.scircle::after,.addrow{min-height:44px}.scircle::after{content:"";position:absolute;left:50%;top:50%;width:44px;height:44px;transform:translate(-50%,-50%)}}
+@media (pointer:coarse){.addrow{min-height:44px}}
+/* W7: a work item's status is one pastel pill; its menu lists every status with its shape. */
+.smenu{position:relative;justify-self:end}
+.spill,.sitem{display:inline-flex;align-items:center;gap:7px;font:700 12px var(--font);color:var(--ink);cursor:pointer;white-space:nowrap}
+.spill{box-sizing:border-box;width:128px;height:28px;padding:0 10px;border-radius:999px;border:1px solid transparent;background:var(--none-bg)}
+.spill .schev{margin-left:auto;width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:translateY(-2px) rotate(45deg);opacity:.6}
+.spill.sprogress{background:var(--yellow-bg);color:var(--yellow-ink)}
+.spill.sdone{background:var(--green-bg);color:var(--green-ink)}
+.spill.sdeleted{background:var(--red-bg);color:var(--red-ink)}
+.spill:hover{filter:brightness(.97)}
+.spill.pending{border:1px dashed currentColor}
+.sicon{position:relative;flex:none;box-sizing:border-box;width:14px;height:14px;border-radius:50%;border:2px solid currentColor}
+.sprogress .sicon{background:linear-gradient(90deg,currentColor 50%,transparent 50%)}
+.sdone .sicon{background:currentColor}
+.sdone .sicon::after{content:"";position:absolute;left:3px;top:0;width:3px;height:6px;border:solid var(--card);border-width:0 1.5px 1.5px 0;transform:rotate(45deg)}
+.sdeleted .sicon{border-radius:3px}
+.sdeleted .sicon::before,.sdeleted .sicon::after{content:"";position:absolute;left:50%;top:50%;width:8px;height:1.5px;background:currentColor;transform:translate(-50%,-50%) rotate(45deg)}
+.sdeleted .sicon::after{transform:translate(-50%,-50%) rotate(-45deg)}
+.slist{position:absolute;right:0;top:calc(100% + 6px);z-index:30;display:flex;flex-direction:column;min-width:168px;padding:6px;background:var(--card);border-radius:14px;box-shadow:0 1px 2px var(--shadow),0 8px 28px var(--tip-shadow)}
+.sitem{height:34px;padding:0 10px;border:0;border-radius:10px;background:none;font-size:13px;text-align:left}
+.sitem:hover,.sitem:focus-visible{background:var(--hover);outline:none}
+.sitem[aria-checked=true]{background:var(--control)}
+.sitem[aria-checked=true]::after{content:"";margin-left:auto;width:4px;height:8px;border:solid var(--ink);border-width:0 2px 2px 0;transform:translateY(-1px) rotate(45deg)}
+.sitem.sbacklog .sicon{color:var(--mute)}.sitem.sprogress .sicon{color:var(--yellow)}.sitem.sdone .sicon{color:var(--green)}.sitem.sdeleted{color:var(--red-ink)}
+.sitem.sdeleted{margin-top:4px;border-top:1px solid var(--line);border-radius:0 0 10px 10px}
+.tickreason .cancel{padding:4px 2px}
+@media (pointer:coarse){.spill{height:36px}.spill::after{content:"";position:absolute;left:0;right:0;top:50%;height:44px;transform:translateY(-50%)}.spill{position:relative}.sitem{height:44px}}
 /* GP2-14: under 1100 px, one column: header, a compact properties block, then the sections. */
 @media (max-width:1099px){
 .glayout{grid-template-columns:minmax(0,1fr);grid-template-areas:"head" "side" "body"}

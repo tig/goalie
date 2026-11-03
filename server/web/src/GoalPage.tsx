@@ -2,7 +2,7 @@ import { useCallback, useState, type CSSProperties } from "react";
 import type { ApiActor, ApiEvent, ApiWorkItem, GoalEventsResponse, GoalPageResponse, Health, PathToGreen, SubGoalCard } from "../../src/api.ts";
 import { shortDate } from "../../src/dates.ts";
 import { getJson, postCommands, useJson } from "./data.ts";
-import { AddSubGoal, AddWorkItem, EditWorkItem, useTick } from "./GoalAdd.tsx";
+import { AddSubGoal, AddWorkItem, EditWorkItem, useStatus } from "./GoalAdd.tsx";
 import { Crumbs, Props } from "./GoalSide.tsx";
 import { ClosePanel, CompletePanel, DescriptionPanel, HealthPanel, PromotePanel, PullInPanel, PursuePanel, SlipPanel, type Done, type PanelName } from "./GoalPanels.tsx";
 import { commentBatch } from "./model/commands.ts";
@@ -333,16 +333,14 @@ export function Owner({ actor, me }: { actor: ApiActor; me: string }) {
   );
 }
 
-const STATUSES = ["In Progress", "Backlog", "Completed", "Deleted"] as const;
 
 /** GP2-8, GL4: compact rows under a "Status" heading; status chips with counts filter them, and Completed is closed until its chip is pressed. */
 function WorkItems({ items, data, adding, onAdd, onDone, reload, status }: { items: ApiWorkItem[]; data: GoalPageResponse; adding: boolean; onAdd: () => void; onDone: Done; reload: () => void; status: React.ReactNode }) {
   const live = items.filter((i) => i.status !== "Deleted");
   const counts = groupWorkItems(live).map((g) => ({ status: g.status, n: g.items.length }));
   const [shown, setShown] = useState<Record<string, boolean>>({ "In Progress": true, Backlog: true, Completed: false });
-  const [picking, setPicking] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
-  const { move, chosen, box } = useTick(reload);
+  const { pill, box } = useStatus(reload);
   const rows = live.filter((i) => shown[i.status]);
   return (
     <section className="gsec gwork" id="g-work" data-focus={encodeFocus({ kind: "section", id: "Work items", label: "Work items" })}>
@@ -357,15 +355,11 @@ function WorkItems({ items, data, adding, onAdd, onDone, reload, status }: { ite
         </span>
       </h2>
       {status}
-      {rows.length > 0 && <div className="wstatushead small">Status</div>}
       <div className="wrows">
         {rows.map((i) => {
           const owner = data.actors[i.owner] ?? { id: i.owner, name: i.owner, kind: "human" as const };
-          const now = chosen(i);
           return (
             <div key={i.id} className={`wrow2${i.status === "Completed" ? " done" : ""}`} data-focus={encodeFocus({ kind: "work item", id: i.id, label: i.title })}>
-              {/* The circle is a named control: empty Backlog, half In Progress, checked Completed. */}
-              <button type="button" className={`scircle ${i.status === "Completed" ? "full" : i.status === "In Progress" ? "half" : "empty"}`} aria-label={`Status: ${i.status}. Change`} title="Change status" onClick={() => setPicking(picking === i.id ? null : i.id)} />
               <span className="wtitle">
                 {i.title}
                 {mayEditWorkItem(data.me, i) && <Pencil label={`Edit ${i.title}`} onClick={() => setEditing(editing === i.id ? null : i.id)} />}
@@ -375,13 +369,8 @@ function WorkItems({ items, data, adding, onAdd, onDone, reload, status }: { ite
                 <span className="wfirst">{owner.name.split(" ")[0]}</span>
               </span>
               <span className={`wdue small${i.late ? " late" : ""}`}>{i.due_date ? `${shortDate(i.due_date, data.today)}${i.late ? " late" : i.due_date === data.today ? " today" : ""}` : ""}</span>
-              {picking === i.id && (
-                <select className="wpick" aria-label={`Status of ${i.title}`} value={now} onChange={(e) => move(i, e.target.value as (typeof STATUSES)[number])} autoFocus>
-                  {STATUSES.map((st) => (
-                    <option key={st}>{st}</option>
-                  ))}
-                </select>
-              )}
+              {/* W7: the same status pill as the Work items page. */}
+              {pill(i)}
               {box(i)}
               {editing === i.id && (
                 <EditWorkItem

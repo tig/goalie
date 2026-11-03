@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ApiActor, ApiViolation, ApiWorkItem, CommandsRequest, CommandsResponse, FormOptions, GoalPageResponse, WorkItemStatus } from "../../src/api.ts";
 import { addDays } from "../../src/dates.ts";
 import { postCommands, useJson } from "./data.ts";
@@ -262,12 +262,84 @@ export function EditWorkItem({ item, actors, onDone }: { item: ApiWorkItem; acto
   );
 }
 
+const STATUSES: WorkItemStatus[] = ["Backlog", "In Progress", "Completed", "Deleted"];
+
+/** The status's shape, drawn in CSS: empty Backlog, half In Progress, checked Completed, crossed Deleted. */
+const shape = (status: WorkItemStatus) => ({ Backlog: "sbacklog", "In Progress": "sprogress", Completed: "sdone", Deleted: "sdeleted" })[status];
+
 /**
- * G24: ticking the box marks the item Completed. Every status change needs a reason, so the row shows one box, "Reason", with Save.
- * Enter saves; Escape undoes the tick.
+ * W7: one status control per work item, the same on the Work items page and a goal page. The pill names the status; pressing it opens
+ * a menu of every status. A new status opens the row's reason box, since every status change needs a reason. Enter or Save saves it;
+ * Escape or Cancel puts the pill back.
  */
-export function useTick(onSaved: () => void) {
-  // The item being moved and the status it moves to; the tick moves it to Completed (G24), the picker to any status (QA U6).
+function StatusPill({ item, value, onPick }: { item: ApiWorkItem; value: WorkItemStatus; onPick: (status: WorkItemStatus) => void }) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLSpanElement>(null);
+  const pill = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => {
+      if (!wrap.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", away);
+    return () => document.removeEventListener("pointerdown", away);
+  }, [open]);
+  const shut = () => {
+    setOpen(false);
+    pill.current?.focus();
+  };
+  const step = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const items = [...e.currentTarget.querySelectorAll<HTMLButtonElement>("[role=menuitemradio]")];
+    const at = items.indexOf(document.activeElement as HTMLButtonElement);
+    if (e.key === "Escape") shut();
+    else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      items[(at + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length]?.focus();
+    } else return;
+    e.stopPropagation();
+  };
+  return (
+    <span className="smenu" ref={wrap}>
+      <button
+        ref={pill}
+        type="button"
+        className={`spill ${shape(value)}${value !== item.status ? " pending" : ""}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`Status: ${value}. Change the status of ${item.title}`}
+        onClick={() => setOpen(!open)}
+      >
+        <span className="sicon" aria-hidden="true" />
+        {value}
+        <span className="schev" aria-hidden="true" />
+      </button>
+      {open && (
+        <div className="slist" role="menu" aria-label={`Status of ${item.title}`} onKeyDown={step}>
+          {STATUSES.map((status) => (
+            <button
+              key={status}
+              type="button"
+              role="menuitemradio"
+              aria-checked={status === value}
+              className={`sitem ${shape(status)}`}
+              autoFocus={status === value}
+              onClick={() => {
+                setOpen(false);
+                onPick(status);
+              }}
+            >
+              <span className="sicon" aria-hidden="true" />
+              {status}
+            </button>
+          ))}
+        </div>
+      )}
+    </span>
+  );
+}
+
+export function useStatus(onSaved: () => void) {
+  // The item being moved and the status it moves to.
   const [moving, setMoving] = useState<{ item: ApiWorkItem; status: WorkItemStatus } | null>(null);
   const [reason, setReason] = useState("");
   const [result, post] = usePost(() => {
@@ -275,33 +347,43 @@ export function useTick(onSaved: () => void) {
     setReason("");
     onSaved();
   });
-  const save = () => moving && post(workItemStatusBatch(moving.item, moving.status, reason));
+  const cancel = () => {
+    setMoving(null);
+    setReason("");
+  };
+  const save = () => moving && reason.trim() && post(workItemStatusBatch(moving.item, moving.status, reason));
+  const pill = (item: ApiWorkItem) => (
+    <StatusPill
+      item={item}
+      value={moving?.item.id === item.id ? moving.status : item.status}
+      onPick={(status) => {
+        setReason("");
+        setMoving(status === item.status ? null : { item, status });
+      }}
+    />
+  );
   const box = (item: ApiWorkItem) =>
     moving?.item.id === item.id ? (
       <div className="tickreason">
         <input
           value={reason}
-          placeholder={`Reason for ${moving.status}`}
-          aria-label="Reason"
+          placeholder={`Why is it ${moving.status} now?`}
+          aria-label={`Reason for ${moving.status}`}
           autoFocus
           onChange={(e) => setReason(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") save();
-            if (e.key === "Escape") setMoving(null);
+            if (e.key === "Escape") cancel();
           }}
         />
-        <button type="button" className="btn primary" disabled={result.saving} onClick={save}>
+        <button type="button" className="btn primary" disabled={result.saving || !reason.trim()} onClick={save}>
           Save
+        </button>
+        <button type="button" className="linkbtn cancel" onClick={cancel}>
+          Cancel
         </button>
         <Errors result={result} />
       </div>
     ) : null;
-  const ticked = moving?.status === "Completed" ? moving.item : null;
-  return {
-    ticked,
-    tick: (item: ApiWorkItem) => setMoving(ticked?.id === item.id ? null : { item, status: "Completed" }),
-    move: (item: ApiWorkItem, status: WorkItemStatus) => setMoving(status === item.status ? null : { item, status }),
-    chosen: (item: ApiWorkItem) => (moving?.item.id === item.id ? moving.status : item.status),
-    box,
-  };
+  return { pill, box };
 }
