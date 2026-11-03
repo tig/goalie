@@ -4,7 +4,7 @@ import { shortDate } from "../../src/dates.ts";
 import { getJson, postCommands, useJson } from "./data.ts";
 import { AddSubGoal, AddWorkItem, EditWorkItem, useTick } from "./GoalAdd.tsx";
 import { Crumbs, Props } from "./GoalSide.tsx";
-import { ClosePanel, DescriptionPanel, HealthPanel, PromotePanel, PullInPanel, PursuePanel, SlipPanel, type Done, type PanelName } from "./GoalPanels.tsx";
+import { ClosePanel, CompletePanel, DescriptionPanel, HealthPanel, PromotePanel, PullInPanel, PursuePanel, SlipPanel, type Done, type PanelName } from "./GoalPanels.tsx";
 import { commentBatch } from "./model/commands.ts";
 import { activity, ACTIVITY, changeParts, createdFields, ptgChanges, historyNames, joinPages, dateBar, labelPlaces, eventValue, fieldLabel, groupEvents, groupWorkItems, mayEditWorkItem, type ActivityChip, type EventGroup, type Names } from "./model/goalpage.ts";
 import { dateLabel } from "./model/labels.ts";
@@ -125,6 +125,7 @@ function Goal({ data, reload, status, setStatus }: { data: GoalPageResponse; rel
           {panel?.name === "pullin" && <PullInPanel data={data} onDone={done} />}
           {panel?.name === "promote" && <PromotePanel data={data} onDone={done} />}
           {panel?.name === "close" && <ClosePanel data={data} onDone={done} />}
+          {panel?.name === "complete" && <CompletePanel data={data} onDone={done} />}
           {panel?.name === "pursue" && <PursuePanel data={data} onDone={done} />}
         </header>
         <aside className="gprops" aria-label="Properties">

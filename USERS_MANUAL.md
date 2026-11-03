@@ -171,6 +171,7 @@ The GOALIE owner inspects these each quarter and changes the configuration, revi
 
 **Close a goal**
 - Set it to Completed, Completed Late, Did Not Meet, or Deleted, with a reason. Lateness is measured against the original committed date.
+- On a goal page, Complete closes an In Progress Committed goal as Completed, or Completed Late after the original committed date, with only a reason.
 - If the work finished while the date was still Ambition, promote the date and complete the goal in one step.
 
 **Re-rank priorities**
