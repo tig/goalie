@@ -13,7 +13,7 @@ import { formFocus } from "./model/feedback.ts";
  * A rule broken shows at the field it names. A stale save keeps the typed values and shows the current ones beside them.
  */
 
-export type PanelName = "health" | "slip" | "pullin" | "promote" | "close" | "pursue" | "fields" | "description";
+export type PanelName = "health" | "slip" | "pullin" | "complete" | "promote" | "close" | "pursue" | "fields" | "description";
 
 type Saved = { saving: boolean; violations: ApiViolation[]; message?: string; stale?: { current: Record<string, unknown> } };
 
@@ -81,11 +81,24 @@ function Shell({ title, tone, saved, fields, onSave, onCancel, saveLabel = "Save
   );
 }
 
-function Reason({ value, onChange, saved }: { value: string; onChange: (v: string) => void; saved: Saved }) {
+function Reason({ value, onChange, saved, onEnter }: { value: string; onChange: (v: string) => void; saved: Saved; onEnter?: () => void }) {
+  // A panel whose only field is the reason takes the keys at once, and Enter saves it (Shift+Enter is a new line).
   return (
     <label className="field">
       <span className="flabel">Reason</span>
-      <textarea rows={2} value={value} placeholder="Why it changed" onChange={(e) => onChange(e.target.value)} />
+      <textarea
+        rows={2}
+        value={value}
+        placeholder="Why it changed"
+        autoFocus={onEnter !== undefined}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (onEnter && e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            onEnter();
+          }
+        }}
+      />
       <FieldError saved={saved} field="reason" />
     </label>
   );
@@ -369,6 +382,23 @@ export function ClosePanel({ data, onDone }: { data: GoalPageResponse; onDone: D
 }
 
 const PROMOTE_AND_CLOSE = "Promote and close";
+
+/** Complete (tig/goalie#68): close an In Progress goal as the state the server says it closes as now, with only a reason. Close goal keeps every other way to close. */
+export function CompletePanel({ data, onDone }: { data: GoalPageResponse; onDone: Done }) {
+  const state = data.closesAs as StoredGoal["state"];
+  const [reason, setReason] = useState("");
+  const saved = useSave(data.goal, (b) => onDone(true, savedStatus("close", b, { state })));
+  const save = () => saved.save((g) => closeBatch(g, state, reason), { state });
+  return (
+    <Shell title="Complete" saved={saved} fields={["state", "reason"]} saveLabel="Complete" onSave={save} onCancel={() => onDone(false)}>
+      <p className="small">
+        Closes this goal as <b>{state}</b>.{state === "Completed Late" && ` The Original Committed Date was ${shortDate(data.goal.original_committed_date ?? "", data.today)}.`}
+      </p>
+      <FieldError saved={saved} field="state" />
+      <Reason value={reason} onChange={setReason} saved={saved} onEnter={save} />
+    </Shell>
+  );
+}
 
 /** G16: Pursue moves a Backlog goal to In Progress, with a health (GREEN by default). */
 export function PursuePanel({ data, onDone }: { data: GoalPageResponse; onDone: Done }) {

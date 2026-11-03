@@ -123,7 +123,7 @@ const pick = (list: readonly string[], field: string) => (value: unknown, set: (
   </select>
 );
 
-type Act = { name: "health" | "pursue" | "slip" | "pullin" | "promote" | "close"; health?: Exclude<Health, null> };
+type Act = { name: "health" | "pursue" | "slip" | "pullin" | "promote" | "complete" | "close"; health?: Exclude<Health, null> };
 
 /** GP2-10 to GP2-13: the properties column. Actions that need more than one field open their panel in the main column (`onAct`). */
 export function Props({ data, reload, onAct, chosen, dateBar }: { data: GoalPageResponse; reload: () => void; onAct: (a: Act | null) => void; chosen?: Health; dateBar: ReactNode }) {
@@ -210,15 +210,26 @@ export function Props({ data, reload, onAct, chosen, dateBar }: { data: GoalPage
       )}
       <Prop label="State" data={data} reload={reload}>
         <span>{goal.state}</span>
-        {may && goal.state === "Backlog" && (
-          <button type="button" className="linkbtn" onClick={() => onAct({ name: "pursue" })}>
-            Pursue
-          </button>
-        )}
-        {may && closable && (
-          <button type="button" className="linkbtn" onClick={() => onAct({ name: "close" })}>
-            Close goal
-          </button>
+        {may && (goal.state === "Backlog" || closable) && (
+          // GL6e: the State actions sit on one line under the state, like the date row's.
+          <span className="pacts">
+            {goal.state === "Backlog" && (
+              <button type="button" className="linkbtn" onClick={() => onAct({ name: "pursue" })}>
+                Pursue
+              </button>
+            )}
+            {/* tig/goalie#68: the quick way to close, when the server says how an In Progress goal closes now. */}
+            {goal.state === "In Progress" && data.closesAs && (
+              <button type="button" className="linkbtn" onClick={() => onAct({ name: "complete" })}>
+                Complete
+              </button>
+            )}
+            {closable && (
+              <button type="button" className="linkbtn" onClick={() => onAct({ name: "close" })}>
+                Close goal
+              </button>
+            )}
+          </span>
         )}
       </Prop>
       <Prop label="Owner" data={data} reload={reload} edit={{ field: "owner", initial: goal.owner, input: pick(humans.map((h) => h.id), "owner") }}>
