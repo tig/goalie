@@ -155,7 +155,7 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
   if (before !== undefined && changed.length === 0) return { ok: true, entity: before, events: [] };
 
   const reason = command.reason?.trim() || null;
-  const violations: Violation[] = [...(author ? checkAuthor(author, goalieOwner(db), kind, before, after, lookup(db)) : []), ...checkTransition(kind, before, after, today, (id) => read(db, "goal", id))];
+  const violations: Violation[] = [...(author ? checkAuthor(author, goalieOwner(db), kind, before, after, lookup(db), process.env.GOALIE_GITHUB_ACTOR) : []), ...checkTransition(kind, before, after, today, (id) => read(db, "goal", id))];
   const needReason = REASONED_KINDS.includes(kind) ? changed : [];
   if (needReason.length > 0 && reason === null) {
     violations.push({ rule: "reason-required", message: `a change to ${needReason.map(fieldWords).join(", ")} needs a reason.`, field: "reason" });
