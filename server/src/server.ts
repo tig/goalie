@@ -7,6 +7,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
 import type { ActorRef, ApiError, CommandsResponse, FormOptions, GoalEventsResponse, GoalPageResponse, PrioritiesResponse, WorkResponse } from "./api.ts";
 import { runCommands } from "./commands.ts";
+import { drainGitHub } from "./github.ts";
 import { goalEvents, goalPage } from "./goalpage.ts";
 import { eventStream } from "./live.ts";
 import { formOptions } from "./options.ts";
@@ -132,6 +133,7 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
   app.post("/api/commands", async (c) => {
     const request: unknown = await c.req.json().catch(() => undefined);
     const answer = runCommands(db, c.get("actor").id, request, todayIn(db));
+    await drainGitHub(db);
     return c.json<CommandsResponse>(answer.body, answer.status);
   });
   app.all("/api/*", (c) => refuse(c, 404, "not_found", `no API route ${c.req.method} ${c.req.path}`));
@@ -171,11 +173,17 @@ function startedAsMain(): boolean {
 }
 
 if (startedAsMain()) {
+  void start();
+}
+
+async function start(): Promise<void> {
   try {
     checkConfiguration();
   } catch (error) {
     process.stderr.write(`${(error as Error).message}\n`);
     process.exit(1);
   }
-  listen(createApp(openStore(configuredDatabase()), configuredIssuers()), configuredPort(), process.env.HOST);
+  const db = openStore(configuredDatabase());
+  await drainGitHub(db);
+  listen(createApp(db, configuredIssuers()), configuredPort(), process.env.HOST);
 }

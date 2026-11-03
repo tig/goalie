@@ -91,7 +91,7 @@ export function goalPage(db: DatabaseSync, id: string, me: string, today: string
     };
   });
 
-  const workItems: ApiWorkItem[] | null = on ? itemsOf(id).map((w) => toApiWorkItem(w, today)) : null;
+  const workItems: ApiWorkItem[] | null = on ? itemsOf(id).map((w) => toApiWorkItem(db, w, today)) : null;
   const itemIds = (workItems ?? []).map((w) => w.id);
   const history = historyOf(db, stored, itemIds);
   const counts = countEntityEvents(db, history);

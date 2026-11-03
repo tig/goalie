@@ -402,6 +402,7 @@ button.chev:hover{background:var(--grid);color:var(--ink)}
 .wrow{display:grid;grid-template-columns:minmax(0,1fr) auto 90px 128px;align-items:center;gap:12px;min-height:40px;border-top:1px solid var(--line);font-size:13px}
 .wrow input[type=checkbox]{width:16px;height:16px;margin:0}
 .wtitle{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wgithub{grid-column:1/-1;color:var(--red-ink);font-size:12px;white-space:normal}
 .wrow.done .wtitle{text-decoration:line-through;color:var(--mute)}
 .wowner{display:inline-flex;align-items:center;gap:6px;font-weight:600}
 .wowner.agent .av{box-shadow:0 0 0 1.5px var(--card),0 0 0 3px var(--mute);outline:1.5px dashed var(--mute);outline-offset:2px}

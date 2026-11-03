@@ -6,6 +6,7 @@ import { configuredDatabase, configuredTimeZone, configuredToday } from "./confi
 import { openStore } from "./store.ts";
 import { seed, type SeedFile } from "./seed.ts";
 import { isKind, read, readEvents } from "./read.ts";
+import { drainGitHub } from "./github.ts";
 import { checkStore, write, type Command } from "./write.ts";
 
 /**
@@ -20,6 +21,18 @@ import { checkStore, write, type Command } from "./write.ts";
  */
 async function main(args: string[]): Promise<number> {
   const db = openStore(configuredDatabase());
+  try {
+    return await run(db, args);
+  } finally {
+    try {
+      db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+    } finally {
+      db.close();
+    }
+  }
+}
+
+async function run(db: DatabaseSync, args: string[]): Promise<number> {
   const [command, ...rest] = args;
   switch (command) {
     case "write": {
@@ -27,6 +40,7 @@ async function main(args: string[]): Promise<number> {
       const command = stdinJson();
       if (command === undefined) return badInput("stdin is not JSON");
       const result = write(db, rest[1], command as Command, today(db));
+      if (result.ok) await drainGitHub(db);
       print(result);
       return result.ok ? 0 : 2;
     }
@@ -43,6 +57,7 @@ async function main(args: string[]): Promise<number> {
       const file = jsonFile(rest[0] ?? fileURLToPath(new URL("../seed/excaliwire.json", import.meta.url)));
       if (file === undefined) return badInput("the seed file is not JSON");
       const result = seed(db, file as SeedFile, today(db));
+      if (result.ok) await drainGitHub(db);
       print(result);
       return result.ok ? 0 : 2;
     }

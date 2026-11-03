@@ -2,7 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 
 /**
  * The one SQLite file per deployment (ADR 0002). Fields are SPEC.md §6.
- * Every writable table has a version. Only the write path changes these tables.
+ * Every entity table has a version. Only the write path changes an entity table. github_push is not an entity and not an Event.
  */
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS actor (
@@ -77,6 +77,13 @@ CREATE TABLE IF NOT EXISTS work_item (
   status TEXT NOT NULL,
   due_date TEXT,
   links TEXT
+);
+CREATE TABLE IF NOT EXISTS github_push (
+  work_item TEXT PRIMARY KEY REFERENCES work_item(id),
+  issue TEXT NOT NULL,
+  status TEXT NOT NULL,
+  goal TEXT NOT NULL,
+  error TEXT
 );
 CREATE TABLE IF NOT EXISTS draft (
   id TEXT PRIMARY KEY,

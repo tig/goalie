@@ -359,7 +359,7 @@ function WorkItems({ items, data, adding, onAdd, onDone, reload, status }: { ite
         {rows.map((i) => {
           const owner = data.actors[i.owner] ?? { id: i.owner, name: i.owner, kind: "human" as const };
           return (
-            <div key={i.id} className={`wrow2${i.status === "Completed" ? " done" : ""}`} data-focus={encodeFocus({ kind: "work item", id: i.id, label: i.title })}>
+            <div key={i.id} id={`work-item-${i.id}`} className={`wrow2${i.status === "Completed" ? " done" : ""}`} data-focus={encodeFocus({ kind: "work item", id: i.id, label: i.title })}>
               <span className="wtitle">
                 {i.title}
                 {mayEditWorkItem(data.me, i) && <Pencil label={`Edit ${i.title}`} onClick={() => setEditing(editing === i.id ? null : i.id)} />}
@@ -372,6 +372,7 @@ function WorkItems({ items, data, adding, onAdd, onDone, reload, status }: { ite
               {/* W7: the same status pill as the Work items page. */}
               {pill(i)}
               {box(i)}
+              {i.github_error && <span className="wgithub">{i.github_error}</span>}
               {editing === i.id && (
                 <EditWorkItem
                   item={i}

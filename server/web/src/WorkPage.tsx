@@ -103,7 +103,7 @@ function Queues({ work, reload, single }: { work: WorkResponse; reload: () => vo
             const done = g.status === "Completed";
             const shut = closed[key] ?? done;
             const rows = g.items.map((i) => (
-              <div key={i.id} className={`wrow qrow${i.status === "Completed" ? " done" : ""}`} data-focus={encodeFocus({ kind: "work item", id: i.id, label: i.title })}>
+              <div key={i.id} id={`work-item-${i.id}`} className={`wrow qrow${i.status === "Completed" ? " done" : ""}`} data-focus={encodeFocus({ kind: "work item", id: i.id, label: i.title })}>
                 <span className="wtitle">
                   {i.title}
                   {mayEditWorkItem(work.me, i) && <Pencil label={`Edit ${i.title}`} onClick={() => setEditing(editing === i.id ? null : i.id)} />}
@@ -115,6 +115,7 @@ function Queues({ work, reload, single }: { work: WorkResponse; reload: () => vo
                 {/* W7: the one status control, a pill with a menu of every status. */}
                 {pill(i)}
                 {box(i)}
+                {i.github_error && <span className="wgithub">{i.github_error}</span>}
                 {editing === i.id && (
                   <EditWorkItem
                     item={i}
