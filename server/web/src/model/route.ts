@@ -1,10 +1,11 @@
 /** The app's pages and their paths. The server answers index.html for every path that is not the API or an asset, so the app routes in the browser. */
 
-export type Route = { page: "home" } | { page: "goal"; key: string } | { page: "new"; parent?: string } | { page: "work"; owner?: string };
+export type Route = { page: "home" } | { page: "goal"; key: string } | { page: "new"; parent?: string } | { page: "work"; owner?: string } | { page: "github" };
 
 /** The page for a path. A goal key is written upper case. A path the app does not know opens Home. */
 export function parseRoute(pathname: string, search = ""): Route {
   const parts = pathname.split("/").filter(Boolean);
+  if (parts[0] === "github" && parts.length === 1) return { page: "github" };
   if (parts[0] === "work" && parts.length === 1) {
     const owner = new URLSearchParams(search).get("owner");
     return owner ? { page: "work", owner } : { page: "work" };

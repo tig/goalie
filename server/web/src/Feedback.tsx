@@ -6,7 +6,7 @@ import { parseRoute, type Route } from "./model/route.ts";
 import { useDismiss } from "./useScreen.ts";
 
 /** The first name in a focus breadcrumb: the page the element is on. */
-const PAGE_NAME: Record<Route["page"], string> = { home: "Home", work: "Work items", new: "New goal", goal: "Goal page" };
+const PAGE_NAME: Record<Route["page"], string> = { home: "Home", work: "Work items", new: "New goal", goal: "Goal page", github: "GitHub" };
 
 /** What a control pick is: a button, a link, or a tab. A goal row's [role=link] names its goal in data-focus instead. */
 const CONTROL = "button, a[href], [role=button], [role=tab]";

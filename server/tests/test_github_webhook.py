@@ -384,5 +384,36 @@ class GitHubWebhookRetryTests(unittest.TestCase):
         self.assertEqual(proc.stdout.decode(), "ok")
 
 
+class GitHubStatusNoticeTests(unittest.TestCase):
+    """A signed close is the last notice the GOALIE owner can see."""
+
+    def test_a_signed_close_shows_inbound_ok(self) -> None:
+        store = Store()
+        self.addCleanup(store.close)
+        code, result = store.run("seed", env=QUIET)
+        self.assertEqual(code, 0, result)
+        tig = store.read("actor", "tig")
+        subject = store.run("write", "--as", "tig", stdin=update("actor", "tig", tig["version"], {"subject": "sub-tig"}), env=QUIET)[1]
+        self.assertTrue(subject["ok"], subject)
+        actor = store.run("write", "--as", "tig", stdin=create("actor", ACTOR, {"kind": "agent", "display_name": "GitHub", "operator": "tig"}), env=QUIET)[1]
+        self.assertTrue(actor["ok"], actor)
+        filed = store.run("write", "--as", "tig", stdin=create("work_item", "WI-9501", item(501), "Filed"), env=QUIET)[1]
+        self.assertTrue(filed["ok"], filed)
+        token, issuers = signed("sub-tig")
+        body = notice(501)
+        env = {**QUIET, **issuers, "GOALIE_GITHUB_WEBHOOK_SECRET": SECRET, "GOALIE_GITHUB_REPO": REPO, "GOALIE_GITHUB_ACTOR": ACTOR}
+        with running_server(store.path, env) as (proc, port):
+            self.assertEqual(get(proc, port, "/health").status, 200)
+            reply = post(proc, port, "/api/github/webhook", body, {"X-GitHub-Event": "issues", "X-Hub-Signature-256": sign(SECRET, body)})
+            self.assertEqual(reply.status, 200, reply.body)
+            status = get(proc, port, "/api/github/status", {"Authorization": f"Bearer {token}"})
+        self.assertEqual(status.status, 200, status.body)
+        got = json.loads(status.body)
+        self.assertNotIn("privateKey", got)
+        self.assertNotIn(SECRET, status.body.decode())
+        self.assertTrue(got["inbound"]["ok"])
+        self.assertEqual(got["inbound"]["detail"], "Closed tig/goalie#501.")
+
+
 if __name__ == "__main__":
     unittest.main()

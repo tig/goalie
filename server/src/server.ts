@@ -5,9 +5,9 @@ import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
-import type { ActorRef, ApiError, CommandsResponse, FormOptions, GoalEventsResponse, GoalPageResponse, PrioritiesResponse, WorkResponse } from "./api.ts";
+import type { ActorRef, ApiError, CommandsResponse, FormOptions, GitHubStatusResponse, GoalEventsResponse, GoalPageResponse, PrioritiesResponse, WorkResponse } from "./api.ts";
 import { runCommands } from "./commands.ts";
-import { drainGitHub } from "./github.ts";
+import { drainGitHub, githubView } from "./github.ts";
 import { receiveGitHubWebhook } from "./github_notice.ts";
 import { goalEvents, goalPage } from "./goalpage.ts";
 import { eventStream } from "./live.ts";
@@ -104,8 +104,13 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
   const unit = () => (orgUnit ||= configuredOrgUnit(db));
   app.get("/api/priorities", (c) => {
     const me = c.get("actor");
-    const mayRank = mayRankPriorities(me.id, goalieOwner(db), read(db, "org_unit", unit()));
-    return c.json<PrioritiesResponse>({ ...prioritiesView(db, unit(), ...todayAndZone(db)), me, mayRank });
+    const owner = goalieOwner(db);
+    const mayRank = mayRankPriorities(me.id, owner, read(db, "org_unit", unit()));
+    return c.json<PrioritiesResponse>({ ...prioritiesView(db, unit(), ...todayAndZone(db)), me, mayRank, goalieOwner: me.id === owner });
+  });
+  app.get("/api/github/status", (c) => {
+    if (c.get("actor").id !== goalieOwner(db)) return refuse(c, 403, "forbidden", "only the GOALIE owner can see GitHub");
+    return c.json<GitHubStatusResponse>(githubView(db));
   });
   app.get("/api/goals/:id", (c) => {
     const page = goalPage(db, c.req.param("id"), c.get("actor").id, ...todayAndZone(db));

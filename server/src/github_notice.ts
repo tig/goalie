@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import type { Context } from "hono";
-import { canonicalIssueUrl, drainGitHub } from "./github.ts";
+import { canonicalIssueUrl, drainGitHub, recordGitHubResult } from "./github.ts";
 import { publish, toApiEvent } from "./live.ts";
 import { goalieOwner, read, readAll } from "./read.ts";
 import { isGitHubAgent } from "./rules.ts";
@@ -94,11 +94,15 @@ export async function setStatus(
 
 /** Answer one delivery. Call this before the bearer-token check. The route is not anonymous: the signature authenticates it. */
 export async function receiveGitHubWebhook(db: DatabaseSync, c: Context, today: string): Promise<Response> {
+  const refused = (status: 401 | 503 | 500, error: string, reason: string) => {
+    recordGitHubResult(db, "inbound", false, reason);
+    return c.json({ error, reason }, status);
+  };
   const secret = process.env.GOALIE_GITHUB_WEBHOOK_SECRET?.trim();
-  if (!secret) return c.json({ error: "not_configured", reason: "GitHub is not configured. Missing GOALIE_GITHUB_WEBHOOK_SECRET." }, 503);
+  if (!secret) return refused(503, "not_configured", "GitHub is not configured. Missing GOALIE_GITHUB_WEBHOOK_SECRET.");
   const raw = Buffer.from(await c.req.arrayBuffer());
   const signature = signatureError(secret, raw, c.req.header("X-Hub-Signature-256"));
-  if (signature !== undefined) return c.json({ error: "unauthenticated", reason: signature }, 401);
+  if (signature !== undefined) return refused(401, "unauthenticated", signature);
   let payload: unknown;
   try {
     payload = JSON.parse(raw.toString("utf8")) as unknown;
@@ -108,23 +112,28 @@ export async function receiveGitHubWebhook(db: DatabaseSync, c: Context, today: 
   const close = readClose(c.req.header("X-GitHub-Event"), payload);
   if (close === undefined) return c.json({ ok: true });
   const repo = configuredRepo();
-  if (repo === undefined) return c.json({ error: "not_configured", reason: "GitHub is not configured. GOALIE_GITHUB_REPO must be owner/repo." }, 503);
+  if (repo === undefined) return refused(503, "not_configured", "GitHub is not configured. GOALIE_GITHUB_REPO must be owner/repo.");
   if (close.repo !== repo) return c.json({ ok: true });
   const actorId = process.env.GOALIE_GITHUB_ACTOR?.trim();
   const actor = actorId === undefined || actorId === "" ? undefined : read(db, "actor", actorId);
   if (actorId === undefined || actorId === "" || actor === undefined || !isGitHubAgent(actor, goalieOwner(db), actorId)) {
-    return c.json({ error: "not_configured", reason: "GitHub is not configured. GOALIE_GITHUB_ACTOR must be an agent whose operator is the GOALIE owner." }, 503);
+    return refused(503, "not_configured", "GitHub is not configured. GOALIE_GITHUB_ACTOR must be an agent whose operator is the GOALIE owner.");
   }
   const url = `https://github.com/${close.repo}/issues/${close.number}`;
   const reason = `Closed on GitHub by ${close.login}.`;
   let wrote = true;
+  let changed = false;
   for (const row of readAll(db, "work_item")) {
     const id = row.id;
     const links = row.links;
     if (typeof id !== "string" || !Array.isArray(links)) continue;
     if (!links.some((link) => typeof link === "string" && canonicalIssueUrl(link) === url)) continue;
+    const before = row.status;
     if (!(await setStatus(db, actorId, id, close.status, reason, today, url))) wrote = false;
+    else if (read(db, "work_item", id)?.status !== before) changed = true;
   }
   await drainGitHub(db);
-  return wrote ? c.json({ ok: true }) : c.json({ error: "not_written", reason: "the work item was not updated" }, 500);
+  if (!wrote) return refused(500, "not_written", "the work item was not updated");
+  recordGitHubResult(db, "inbound", true, changed ? `Closed ${close.repo}#${close.number}.` : "No linked work item changed.");
+  return c.json({ ok: true });
 }

@@ -18,6 +18,7 @@ import { usePhone, useScreen } from "./useScreen.ts";
 import { GoalPage } from "./GoalPage.tsx";
 import { NewGoal } from "./NewGoal.tsx";
 import { WorkPage } from "./WorkPage.tsx";
+import { GitHubPage } from "./GitHubPage.tsx";
 import { Feedback } from "./Feedback.tsx";
 import { backPath, newGoalPath, workPath } from "./model/route.ts";
 import { homeSearch, Link, rememberHome, useRoute } from "./router.tsx";
@@ -36,17 +37,23 @@ async function load(): Promise<Load> {
   return { state: "refused", status: reply.status, reason: error.reason ?? reply.statusText };
 }
 
-/** The top bar's pages: Home and Work items. The one you are on is filled. */
-function TopTabs() {
+/** The top bar's pages: Home, Work items, and GitHub for the GOALIE owner. The one you are on is filled. */
+function TopTabs({ owner }: { owner: boolean }) {
   const route = useRoute();
+  const homeOff = route.page === "work" || route.page === "github";
   return (
     <nav className="toptabs" aria-label="Pages">
-      <Link to={backPath(route.page === "home" ? location.search : homeSearch())} className={`tab${route.page === "work" ? " off" : ""}`}>
+      <Link to={backPath(route.page === "home" ? location.search : homeSearch())} className={`tab${homeOff ? " off" : ""}`}>
         Home
       </Link>
       <Link to={workPath()} className={`tab${route.page === "work" ? "" : " off"}`}>
         Work items
       </Link>
+      {owner && (
+        <Link to="/github" className={`tab${route.page === "github" ? "" : " off"}`}>
+          GitHub
+        </Link>
+      )}
     </nav>
   );
 }
@@ -57,7 +64,7 @@ function TopBar({ data }: { data?: PrioritiesResponse }) {
       <span className="logo">{BRAND.mark}</span>
       <span className="brand">{BRAND.app}</span>
       {data && <span className="org">/ {data.org.name}</span>}
-      {data && <TopTabs />}
+      {data && <TopTabs owner={data.goalieOwner} />}
       {/* Feedback is in the top bar on every page, before New goal (#56). */}
       <Feedback />
       {/* NG1: New goal is in the top bar on every page, before the avatar; on a phone a 44 px + named "New goal". */}
@@ -160,6 +167,8 @@ function Pages({ data, reload }: { data: PrioritiesResponse; reload: () => void 
         <WorkPage data={data} owner={route.owner} />
       ) : route.page === "new" ? (
         <NewGoal key={route.parent ?? ""} parent={route.parent} viewName={data.view.name} />
+      ) : route.page === "github" ? (
+        <GitHubPage />
       ) : (
         <Home data={data} reload={reload} />
       )}

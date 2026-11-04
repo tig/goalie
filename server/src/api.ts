@@ -58,11 +58,21 @@ export type PrioritiesResponse = {
   view: { name: string; columns: readonly string[] };
   /** True when the signed-in actor may re-rank these Priorities: the org unit's owner or the GOALIE owner (SPEC.md §6.3). */
   mayRank: boolean;
+  /** True only when the signed-in actor is the GOALIE owner. */
+  goalieOwner: boolean;
   /** Priorities above the cut line, in rank order. */
   funded: ApiPriority[];
   /** Priorities below the cut line, in rank order. */
   backlog: ApiPriority[];
   summary: ApiSummary;
+};
+
+/** GET /api/github/status. The GOALIE owner sees whether the repository is configured, the last update, and the last signed notice. */
+export type GitHubStatusResponse = {
+  configured: boolean;
+  repository: string | null;
+  outbound: { ok: boolean; detail: string } | null;
+  inbound: { ok: boolean; detail: string } | null;
 };
 
 /** Every refusal from the API: 401 with no verified actor, 4xx for a bad request. */
