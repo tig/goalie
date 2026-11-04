@@ -402,10 +402,11 @@ button.chev:hover{background:var(--grid);color:var(--ink)}
 .wrow{display:grid;grid-template-columns:minmax(0,1fr) auto 90px 128px;align-items:center;gap:12px;min-height:40px;border-top:1px solid var(--line);font-size:13px}
 .wrow input[type=checkbox]{width:16px;height:16px;margin:0}
 .wtitle{font-weight:600;min-width:0;display:flex;align-items:center}
-.wname{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.wissue{flex:none;margin-left:8px;font-weight:700;text-decoration:none;white-space:nowrap}
-.wissue+.wissue{margin-left:6px}
+.wname{min-width:0;flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wissues{display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px;min-width:0;flex:1 1 8em;margin-left:8px}
+.wissue{min-width:0;font-weight:700;text-decoration:none;overflow-wrap:anywhere}
 .wissue:hover{text-decoration:underline}
+@media (pointer:coarse){.wissue{display:inline-flex;align-items:center;box-sizing:border-box;min-width:44px;min-height:44px}}
 .wgithub{grid-column:1/-1;color:var(--red-ink);font-size:12px;white-space:normal}
 .wrow.done .wname{text-decoration:line-through;color:var(--mute)}
 .wowner{display:inline-flex;align-items:center;gap:6px;font-weight:600}

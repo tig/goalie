@@ -27,8 +27,8 @@ function refText(owner: string, repo: string, n: string): string {
   return owner === ownerOf(repo) ? `${repo}#${n}` : `${owner}/${repo}#${n}`;
 }
 
-/** Same shape as the issue URL in server/src/github.ts. A trailing slash is the same issue. */
-const ISSUE_URL = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)\/?$/;
+/** A trailing slash is the same issue. A query or a fragment is the same issue. */
+const ISSUE_URL = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)\/?(?:[?#][^\s]*)?$/;
 
 /** Each GitHub issue named in a work item's links, once, in that order. The label is the short name Markdown already uses. */
 export function githubIssues(links: string[] | null): { href: string; label: string }[] {
