@@ -913,7 +913,7 @@ class MarkdownTests(unittest.TestCase):
         links = [
             "https://github.com/tig/goalie/issues/72#issuecomment-123",
             "https://github.com/tig/goalie/issues/72?x=1",
-            "https://github.com/tig/goalie/issues/72",
+            "https://github.com/excaliwire/factory/pull/9#discussion_r1",
         ]
         got = run(f"return markdown.githubIssues({json.dumps(links)});")
         self.assertEqual(got, [{"href": "https://github.com/tig/goalie/issues/72", "label": "goalie#72"}])
