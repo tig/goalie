@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import type { FormOptions, GoalFields, GoalPageResponse, Health } from "../../src/api.ts";
 import { postCommands, useJson } from "./data.ts";
 import { fieldsBatch } from "./model/commands.ts";
-import { eventValue, fieldLabel } from "./model/goalpage.ts";
+import { eventValue, fieldLabel, nameHover } from "./model/goalpage.ts";
 import { healthWord, slipLabel } from "./model/labels.ts";
 import { backPath, goalPath } from "./model/route.ts";
 import { Avatar, HealthDot } from "./parts.tsx";
@@ -35,17 +35,17 @@ export function Crumbs({ data }: { data: GoalPageResponse }) {
         {above.map((g) => (
           <span key={g.id} className="crumbstep">
             <Link to={goalPath(g.id)} className="crumb mid" aria-label={g.summary}>
-              <span title={`${g.id} · ${g.summary}`}>{g.summary}</span>
+              <span title={nameHover(g.id, g.summary)}>{g.summary}</span>
             </Link>
             <span className="sep">›</span>
           </span>
         ))}
-        <span className="crumb end here" aria-current="page" title={`${data.goal.id} · ${data.goal.summary}`}>
+        <span className="crumb end here" aria-current="page" title={nameHover(data.goal.id, data.goal.summary)}>
           {data.goal.summary}
         </span>
       </span>
       <span className="crumbs-phone">
-        {nearest ? <Link to={goalPath(nearest.id)} title={`${nearest.id} · ${nearest.summary}`}>‹ {nearest.summary}</Link> : <Link to={backPath(homeSearch())}>‹ {data.priority ? `Priority ${data.priority.rank} ${data.priority.title}` : "Priorities"}</Link>}
+        {nearest ? <Link to={goalPath(nearest.id)} title={nameHover(nearest.id, nearest.summary)}>‹ {nearest.summary}</Link> : <Link to={backPath(homeSearch())}>‹ {data.priority ? `Priority ${data.priority.rank} ${data.priority.title}` : "Priorities"}</Link>}
       </span>
     </nav>
   );
@@ -295,14 +295,14 @@ function Family({ data }: { data: GoalPageResponse }) {
         {data.parent && (
           <li>
             <Link to={goalPath(data.parent.id)}>
-              <span className="fname" title={`${data.parent.id} · ${data.parent.summary}`}>{data.parent.summary}</span>
+              <span className="fname" title={nameHover(data.parent.id, data.parent.summary)}>{data.parent.summary}</span>
             </Link>
           </li>
         )}
         <li className={data.parent ? "fchild" : ""}>
           <span className="fthis" style={{ boxShadow: goal.health ? `inset 3px 0 0 var(--${goal.health.toLowerCase()})` : undefined }}>
             <HealthDot health={goal.state === "In Progress" ? goal.health : null} word={false} />
-            <b className="fname" title={`${goal.id} · ${goal.summary}`}>{goal.summary}</b>
+            <b className="fname" title={nameHover(goal.id, goal.summary)}>{goal.summary}</b>
             <span className="muted">(this goal)</span>
           </span>
           {backs && <span className="fbacks small">◆ backs {backs.id}'s date</span>}
@@ -312,7 +312,7 @@ function Family({ data }: { data: GoalPageResponse }) {
                 <li key={c.id}>
                   <Link to={goalPath(c.id)}>
                     <HealthDot health={c.state === "In Progress" ? c.health : null} word={false} />
-                    <span className="fname" title={`${c.id} · ${c.summary}`}>{c.summary}</span>
+                    <span className="fname" title={nameHover(c.id, c.summary)}>{c.summary}</span>
                   </Link>
                 </li>
               ))}
@@ -326,7 +326,7 @@ function Family({ data }: { data: GoalPageResponse }) {
               siblings.map((s) => (
                 <span key={s.id} className="fsib">
                   <Link to={goalPath(s.id)}>
-                    <span className="fname" title={`${s.id} · ${s.summary}`}>{s.summary}</span>
+                    <span className="fname" title={nameHover(s.id, s.summary)}>{s.summary}</span>
                   </Link>
                 </span>
               ))

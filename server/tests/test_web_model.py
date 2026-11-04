@@ -893,3 +893,9 @@ class MarkdownTests(unittest.TestCase):
     def test_a_bare_address_links_without_its_trailing_stop(self) -> None:
         got = run('return markdown.markdown("Read https://e.com/x.")[0].c;')
         self.assertEqual(got, [{"t": "text", "v": "Read "}, {"t": "link", "href": "https://e.com/x", "c": [{"t": "text", "v": "https://e.com/x"}]}, {"t": "text", "v": "."}])
+
+
+class HoverTests(unittest.TestCase):
+    def test_a_name_hover_shows_the_id_and_keeps_a_full_name(self) -> None:
+        got = run('return [goalpage.nameHover("WI-0002"), goalpage.nameHover("XW-0007", "Open a goal")];')
+        self.assertEqual(got, ["WI-0002", "XW-0007 · Open a goal"])
