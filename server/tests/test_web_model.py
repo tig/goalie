@@ -893,3 +893,18 @@ class MarkdownTests(unittest.TestCase):
     def test_a_bare_address_links_without_its_trailing_stop(self) -> None:
         got = run('return markdown.markdown("Read https://e.com/x.")[0].c;')
         self.assertEqual(got, [{"t": "text", "v": "Read "}, {"t": "link", "href": "https://e.com/x", "c": [{"t": "text", "v": "https://e.com/x"}]}, {"t": "text", "v": "."}])
+
+    def test_a_work_item_link_list_names_each_github_issue_once(self) -> None:
+        links = [
+            "https://github.com/tig/goalie/issues/72",
+            "https://github.com/tig/goalie/issues/72/",
+            "notes",
+            "https://github.com/excaliwire/factory/pull/9",
+            "https://github.com/someone/thing/issues/4",
+        ]
+        got = run(f"return markdown.githubIssues({json.dumps(links)});")
+        self.assertEqual(got, [
+            {"href": "https://github.com/tig/goalie/issues/72", "label": "goalie#72"},
+            {"href": "https://github.com/someone/thing/issues/4", "label": "someone/thing#4"},
+        ])
+        self.assertEqual(run("return markdown.githubIssues(null);"), [])

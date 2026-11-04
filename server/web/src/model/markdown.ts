@@ -27,6 +27,26 @@ function refText(owner: string, repo: string, n: string): string {
   return owner === ownerOf(repo) ? `${repo}#${n}` : `${owner}/${repo}#${n}`;
 }
 
+/** Same shape as the issue URL in server/src/github.ts. A trailing slash is the same issue. */
+const ISSUE_URL = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)\/?$/;
+
+/** Each GitHub issue named in a work item's links, once, in that order. The label is the short name Markdown already uses. */
+export function githubIssues(links: string[] | null): { href: string; label: string }[] {
+  if (!Array.isArray(links)) return [];
+  const out: { href: string; label: string }[] = [];
+  const seen = new Set<string>();
+  for (const link of links) {
+    if (typeof link !== "string") continue;
+    const match = ISSUE_URL.exec(link);
+    if (match === null) continue;
+    const href = `https://github.com/${match[1]}/${match[2]}/issues/${match[3]}`;
+    if (seen.has(href)) continue;
+    seen.add(href);
+    out.push({ href, label: refText(match[1], match[2], match[3]) });
+  }
+  return out;
+}
+
 const issueUrl = (owner: string, repo: string, kind: string, n: string) => `https://github.com/${owner}/${repo}/${kind}/${n}`;
 
 /** A link address the app may open: http or https only. */
