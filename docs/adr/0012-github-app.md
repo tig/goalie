@@ -6,6 +6,8 @@
 
 **Amended:** 2026-11-03. A signed notice that an issue was closed updates the linked work item. Reopening a closed issue stays out.
 
+**Amended:** 2026-11-04. The repositories in scope are the owner setting `github_repos`, not one repository named in process configuration. An entry is `owner/repo` or `owner/*`. A goal's repositories are the `repo` entries on its work product.
+
 ## Context
 
 [#72 (Enable Github integration)](https://github.com/tig/goalie/issues/72) pushes a work item's status to one linked GitHub issue.
@@ -16,15 +18,18 @@ The private key must stay off this repo.
 ## Decision
 
 The deployment calls GitHub as a GitHub App.
-Process configuration names the app id, the installation id, the path of the private key, one repository (`owner/repo`), and the public URL of this deployment.
+Process configuration names the app id, the installation id, the path of the private key, and the public URL of this deployment.
 The private key is a file outside this repo.
-A committed change of a work item's status, when its links name an issue in that repository, updates that issue after the commit.
+The owner setting `github_repos` names the repositories in scope. An entry is `owner/repo` or `owner/*`.
+A goal's repositories are the `repo` entries on its work product.
+A committed change of a work item's status, when its links name an issue in a repository that is in `github_repos` and on that goal, updates that issue after the commit.
 The update sets one status label, keeps a body trailer that links back to the work item, closes the issue as completed when the status is Completed, and closes it as not planned when the status is Deleted.
 The update is not an Event.
 A failed update leaves the work item committed and shows the failure on the work item.
 A later open status does not reopen a closed issue.
 Tests call a stand-in API and hold no real key.
-A signed notice that an issue in that repository was closed updates each linked work item through the same write as any other change of status.
+A signed notice updates a work item only when the issue's repository is in `github_repos` and on that work item's goal.
+The update uses the same write as any other change of status.
 The notice names the version it read, and the write is an Event.
 Closed as completed sets status to Completed.
 Closed as not planned, or as duplicate, sets status to Deleted.

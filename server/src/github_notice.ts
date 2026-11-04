@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import type { Context } from "hono";
-import { canonicalIssueUrl, drainGitHub, recordGitHubResult } from "./github.ts";
+import { canonicalIssueUrl, drainGitHub, githubRepos, goalNamesRepo, recordGitHubResult, repoInScope } from "./github.ts";
 import { publish, toApiEvent } from "./live.ts";
 import { goalieOwner, read, readAll } from "./read.ts";
 import { isGitHubAgent } from "./rules.ts";
@@ -16,13 +16,6 @@ import { write } from "./write.ts";
 type Close = { repo: string; number: number; status: "Completed" | "Deleted"; login: string };
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
-
-function configuredRepo(): string | undefined {
-  const repo = process.env.GOALIE_GITHUB_REPO?.trim() ?? "";
-  const parts = repo.split("/");
-  if (parts.length !== 2 || parts[0] === "" || parts[1] === "") return undefined;
-  return repo;
-}
 
 /** Undefined when the header matches. The comparison does not throw on a short header. */
 function signatureError(secret: string, body: Buffer, header: string | undefined): string | undefined {
@@ -111,9 +104,7 @@ export async function receiveGitHubWebhook(db: DatabaseSync, c: Context, today: 
   }
   const close = readClose(c.req.header("X-GitHub-Event"), payload);
   if (close === undefined) return c.json({ ok: true });
-  const repo = configuredRepo();
-  if (repo === undefined) return refused(503, "not_configured", "GitHub is not configured. GOALIE_GITHUB_REPO must be owner/repo.");
-  if (close.repo !== repo) return c.json({ ok: true });
+  if (!repoInScope(close.repo, githubRepos(db))) return c.json({ ok: true });
   const actorId = process.env.GOALIE_GITHUB_ACTOR?.trim();
   const actor = actorId === undefined || actorId === "" ? undefined : read(db, "actor", actorId);
   if (actorId === undefined || actorId === "" || actor === undefined || !isGitHubAgent(actor, goalieOwner(db), actorId)) {
@@ -128,6 +119,7 @@ export async function receiveGitHubWebhook(db: DatabaseSync, c: Context, today: 
     const links = row.links;
     if (typeof id !== "string" || !Array.isArray(links)) continue;
     if (!links.some((link) => typeof link === "string" && canonicalIssueUrl(link) === url)) continue;
+    if (!goalNamesRepo(db, row.goal, close.repo)) continue;
     const before = row.status;
     if (!(await setStatus(db, actorId, id, close.status, reason, today, url))) wrote = false;
     else if (read(db, "work_item", id)?.status !== before) changed = true;

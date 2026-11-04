@@ -67,10 +67,10 @@ export type PrioritiesResponse = {
   summary: ApiSummary;
 };
 
-/** GET /api/github/status. The GOALIE owner sees whether the repository is configured, the last update, and the last signed notice. */
+/** GET /api/github/status. The GOALIE owner sees the repositories in github_repos, whether GitHub is configured, the last update, and the last signed notice. */
 export type GitHubStatusResponse = {
   configured: boolean;
-  repository: string | null;
+  repositories: string[];
   outbound: { ok: boolean; detail: string } | null;
   inbound: { ok: boolean; detail: string } | null;
 };

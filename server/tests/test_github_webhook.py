@@ -36,7 +36,6 @@ QUIET = {
     "GOALIE_PUBLIC_URL": "",
     "GOALIE_GITHUB_WEBHOOK_SECRET": "",
     "GOALIE_GITHUB_ACTOR": "",
-    "GOALIE_GITHUB_REPO": "",
 }
 
 
@@ -55,6 +54,19 @@ def notice(number: int, *, action: str = "closed", reason: str = "completed", re
     if login is not None:
         payload["sender"] = {"login": login}
     return json.dumps(payload, separators=(",", ":")).encode()
+
+
+def set_scope(store: Store, repos: list[str], product: list[dict[str, str]] | None, goal: str = GOAL) -> None:
+    settings = store.read("owner_settings", "owner")
+    wrote = store.write("tig", update("owner_settings", "owner", settings["version"], {"settings": {**settings["settings"], "github_repos": repos}}))
+    if not wrote["ok"]:
+        raise AssertionError(wrote)
+    row = store.read("goal", goal)
+    if row.get("work_product") == product:
+        return
+    named = store.write("tig", update("goal", goal, row["version"], {"work_product": product}, "Name the repositories"))
+    if not named["ok"]:
+        raise AssertionError(named)
 
 
 def item(number: int, *, status: str = "Backlog", slash: bool = False) -> dict[str, Any]:
@@ -76,7 +88,8 @@ class GitHubWebhookTests(unittest.TestCase):
         assert code == 0, result
         created = cls.store.run("write", "--as", "tig", stdin=create("actor", ACTOR, {"kind": "agent", "display_name": "GitHub", "operator": "tig"}), env=QUIET)[1]
         assert created["ok"], created
-        cls.server = running_server(cls.store.path, {**QUIET, "GOALIE_GITHUB_WEBHOOK_SECRET": SECRET, "GOALIE_GITHUB_REPO": REPO, "GOALIE_GITHUB_ACTOR": ACTOR})
+        set_scope(cls.store, ["tig/goalie"], [{"repo": "github.com/tig/goalie"}])
+        cls.server = running_server(cls.store.path, {**QUIET, "GOALIE_GITHUB_WEBHOOK_SECRET": SECRET, "GOALIE_GITHUB_ACTOR": ACTOR})
         cls.proc, cls.port = cls.server.__enter__()
         assert get(cls.proc, cls.port, "/health").status == 200
 
@@ -195,14 +208,38 @@ class GitHubWebhookTests(unittest.TestCase):
         self.assertIn("256", json.loads(reply.body)["reason"])
 
 
+class GitHubRepoScopeTests(unittest.TestCase):
+    """A signed close for a repository the goal does not name changes nothing."""
+
+    def test_a_signed_close_skips_a_goal_that_omits_the_repository(self) -> None:
+        store = Store()
+        self.addCleanup(store.close)
+        code, result = store.run("seed", env=QUIET)
+        self.assertEqual(code, 0, result)
+        actor = store.run("write", "--as", "tig", stdin=create("actor", ACTOR, {"kind": "agent", "display_name": "GitHub", "operator": "tig"}), env=QUIET)[1]
+        self.assertTrue(actor["ok"], actor)
+        set_scope(store, ["tig/goalie"], [{"url": "https://github.com/tig/goalie"}])
+        filed = store.run("write", "--as", "tig", stdin=create("work_item", "WI-9601", item(601), "Filed"), env=QUIET)[1]
+        self.assertTrue(filed["ok"], filed)
+        last = store.events()[-1]["sequence"]
+        body = notice(601)
+        with running_server(store.path, {**QUIET, "GOALIE_GITHUB_WEBHOOK_SECRET": SECRET, "GOALIE_GITHUB_ACTOR": ACTOR}) as (proc, port):
+            self.assertEqual(get(proc, port, "/health").status, 200)
+            reply = post(proc, port, "/api/github/webhook", body, {"X-GitHub-Event": "issues", "X-Hub-Signature-256": sign(SECRET, body)})
+        self.assertEqual(reply.status, 200, reply.body)
+        self.assertEqual(store.read("work_item", "WI-9601")["status"], "Backlog")
+        self.assertEqual(store.events()[-1]["sequence"], last)
+
+
 class GitHubWebhookConfigTests(unittest.TestCase):
-    """A close is refused when the secret, the repository, or the actor is missing. The work item stays."""
+    """A close is refused when the secret or the actor is missing. A repository outside github_repos changes nothing."""
 
     def refused(self, env: dict[str, str], *, login_actor: str | None = None) -> None:
         store = Store()
         self.addCleanup(store.close)
         code, result = store.run("seed", env=QUIET)
         self.assertEqual(code, 0, result)
+        set_scope(store, ["tig/goalie"], [{"repo": "github.com/tig/goalie"}])
         if login_actor == "other":
             made = store.run("write", "--as", "tig", stdin=create("actor", ACTOR, {"kind": "agent", "display_name": "GitHub", "operator": "chelsea"}), env=QUIET)[1]
             self.assertTrue(made["ok"], made)
@@ -219,16 +256,32 @@ class GitHubWebhookConfigTests(unittest.TestCase):
         self.assertEqual(store.events()[-1]["sequence"], last)
 
     def test_a_missing_secret_refuses_the_delivery(self) -> None:
-        self.refused({"GOALIE_GITHUB_REPO": REPO, "GOALIE_GITHUB_ACTOR": ACTOR})
+        self.refused({"GOALIE_GITHUB_ACTOR": ACTOR})
 
-    def test_a_missing_repository_refuses_the_delivery(self) -> None:
-        self.refused({"GOALIE_GITHUB_WEBHOOK_SECRET": SECRET, "GOALIE_GITHUB_ACTOR": ACTOR})
+    def test_a_repository_outside_github_repos_changes_nothing(self) -> None:
+        store = Store()
+        self.addCleanup(store.close)
+        code, result = store.run("seed", env=QUIET)
+        self.assertEqual(code, 0, result)
+        made = store.run("write", "--as", "tig", stdin=create("actor", ACTOR, {"kind": "agent", "display_name": "GitHub", "operator": "tig"}), env=QUIET)[1]
+        self.assertTrue(made["ok"], made)
+        set_scope(store, ["excaliwire/factory"], [{"repo": "github.com/tig/goalie"}])
+        filed = store.run("write", "--as", "tig", stdin=create("work_item", "WI-9121", item(121), "Filed"), env=QUIET)[1]
+        self.assertTrue(filed["ok"], filed)
+        last = store.events()[-1]["sequence"]
+        body = notice(121)
+        with running_server(store.path, {**QUIET, "GOALIE_GITHUB_WEBHOOK_SECRET": SECRET, "GOALIE_GITHUB_ACTOR": ACTOR}) as (proc, port):
+            assert get(proc, port, "/health").status == 200
+            reply = post(proc, port, "/api/github/webhook", body, {"X-GitHub-Event": "issues", "X-Hub-Signature-256": sign(SECRET, body)})
+        self.assertEqual(reply.status, 200, reply.body)
+        self.assertEqual(store.read("work_item", "WI-9121")["status"], "Backlog")
+        self.assertEqual(store.events()[-1]["sequence"], last)
 
     def test_a_missing_actor_refuses_the_delivery(self) -> None:
-        self.refused({"GOALIE_GITHUB_WEBHOOK_SECRET": SECRET, "GOALIE_GITHUB_REPO": REPO, "GOALIE_GITHUB_ACTOR": ACTOR})
+        self.refused({"GOALIE_GITHUB_WEBHOOK_SECRET": SECRET, "GOALIE_GITHUB_ACTOR": ACTOR})
 
     def test_an_actor_operated_by_someone_else_refuses_the_delivery(self) -> None:
-        self.refused({"GOALIE_GITHUB_WEBHOOK_SECRET": SECRET, "GOALIE_GITHUB_REPO": REPO, "GOALIE_GITHUB_ACTOR": ACTOR}, login_actor="other")
+        self.refused({"GOALIE_GITHUB_WEBHOOK_SECRET": SECRET, "GOALIE_GITHUB_ACTOR": ACTOR}, login_actor="other")
 
 
 class GitHubActorTests(unittest.TestCase):
@@ -239,6 +292,7 @@ class GitHubActorTests(unittest.TestCase):
         self.addCleanup(self.store.close)
         code, result = self.store.run("seed", env=QUIET)
         assert code == 0, result
+        set_scope(self.store, ["tig/goalie"], [{"repo": "github.com/tig/goalie"}])
         for command in (
             create("actor", ACTOR, {"kind": "agent", "display_name": "GitHub", "operator": "tig"}),
             create("actor", "side", {"kind": "agent", "display_name": "Side", "operator": "chelsea"}),
@@ -248,7 +302,7 @@ class GitHubActorTests(unittest.TestCase):
             assert wrote["ok"], (command, wrote)
 
     def write_as(self, actor: str, command: dict[str, Any], named: str = ACTOR) -> Any:
-        return self.store.run("write", "--as", actor, stdin=command, env={**QUIET, "GOALIE_GITHUB_ACTOR": named, "GOALIE_GITHUB_REPO": REPO})[1]
+        return self.store.run("write", "--as", actor, stdin=command, env={**QUIET, "GOALIE_GITHUB_ACTOR": named})[1]
 
     def test_the_named_agent_sets_status_and_nothing_else(self) -> None:
         result = self.write_as(ACTOR, update("work_item", "WI-9130", 1, {"status": "Completed"}, "Closed on GitHub by octocat."))
@@ -295,7 +349,6 @@ const at = "2026-10-23T00:00:00Z";
 const issue = "https://github.com/tig/goalie/issues/301";
 const other = "https://github.com/tig/goalie/issues/302";
 process.env.GOALIE_GITHUB_ACTOR = "github";
-process.env.GOALIE_GITHUB_REPO = "tig/goalie";
 
 const fail = (detail) => {
   process.stdout.write(JSON.stringify(detail));
@@ -330,6 +383,7 @@ class GitHubWebhookLiveTests(unittest.TestCase):
         self.addCleanup(store.close)
         code, result = store.run("seed", env=QUIET)
         self.assertEqual(code, 0, result)
+        set_scope(store, ["tig/goalie"], [{"repo": "github.com/tig/goalie"}])
         tig = store.read("actor", "tig")
         subject = store.run("write", "--as", "tig", stdin=update("actor", "tig", tig["version"], {"subject": "sub-tig"}), env=QUIET)[1]
         self.assertTrue(subject["ok"], subject)
@@ -339,7 +393,7 @@ class GitHubWebhookLiveTests(unittest.TestCase):
         self.assertTrue(filed["ok"], filed)
         token, issuers = signed("sub-tig")
         body = notice(401)
-        with running_server(store.path, {**QUIET, **issuers, "GOALIE_GITHUB_WEBHOOK_SECRET": SECRET, "GOALIE_GITHUB_REPO": REPO, "GOALIE_GITHUB_ACTOR": ACTOR}) as (proc, port):
+        with running_server(store.path, {**QUIET, **issuers, "GOALIE_GITHUB_WEBHOOK_SECRET": SECRET, "GOALIE_GITHUB_ACTOR": ACTOR}) as (proc, port):
             self.assertEqual(get(proc, port, "/health").status, 200)
             stream = Stream(port, {"Authorization": f"Bearer {token}"})
             self.addCleanup(stream.close)
@@ -366,6 +420,7 @@ class GitHubWebhookRetryTests(unittest.TestCase):
         self.addCleanup(store.close)
         code, result = store.run("seed", env=QUIET)
         self.assertEqual(code, 0, result)
+        set_scope(store, ["tig/goalie"], [{"repo": "github.com/tig/goalie"}])
         for command in (
             create("actor", ACTOR, {"kind": "agent", "display_name": "GitHub", "operator": "tig"}),
             create("work_item", "WI-9301", item(301), "Filed"),
@@ -376,7 +431,7 @@ class GitHubWebhookRetryTests(unittest.TestCase):
         proc = subprocess.run(
             ["node", "--no-warnings", "--input-type=module", "-e", STALE_RETRY],
             cwd=SERVER,
-            env={**os.environ, **QUIET, "GOALIE_DB": str(store.path), "GOALIE_GITHUB_ACTOR": ACTOR, "GOALIE_GITHUB_REPO": REPO, "GOALIE_TODAY": "2026-10-23"},
+            env={**os.environ, **QUIET, "GOALIE_DB": str(store.path), "GOALIE_GITHUB_ACTOR": ACTOR, "GOALIE_TODAY": "2026-10-23"},
             capture_output=True,
             timeout=30,
         )
@@ -392,6 +447,7 @@ class GitHubStatusNoticeTests(unittest.TestCase):
         self.addCleanup(store.close)
         code, result = store.run("seed", env=QUIET)
         self.assertEqual(code, 0, result)
+        set_scope(store, ["tig/goalie"], [{"repo": "github.com/tig/goalie"}])
         tig = store.read("actor", "tig")
         subject = store.run("write", "--as", "tig", stdin=update("actor", "tig", tig["version"], {"subject": "sub-tig"}), env=QUIET)[1]
         self.assertTrue(subject["ok"], subject)
@@ -401,7 +457,7 @@ class GitHubStatusNoticeTests(unittest.TestCase):
         self.assertTrue(filed["ok"], filed)
         token, issuers = signed("sub-tig")
         body = notice(501)
-        env = {**QUIET, **issuers, "GOALIE_GITHUB_WEBHOOK_SECRET": SECRET, "GOALIE_GITHUB_REPO": REPO, "GOALIE_GITHUB_ACTOR": ACTOR}
+        env = {**QUIET, **issuers, "GOALIE_GITHUB_WEBHOOK_SECRET": SECRET, "GOALIE_GITHUB_ACTOR": ACTOR}
         with running_server(store.path, env) as (proc, port):
             self.assertEqual(get(proc, port, "/health").status, 200)
             reply = post(proc, port, "/api/github/webhook", body, {"X-GitHub-Event": "issues", "X-Hub-Signature-256": sign(SECRET, body)})
@@ -419,6 +475,7 @@ class GitHubStatusNoticeTests(unittest.TestCase):
         self.addCleanup(store.close)
         code, result = store.run("seed", env=QUIET)
         self.assertEqual(code, 0, result)
+        set_scope(store, ["tig/goalie"], [{"repo": "github.com/tig/goalie"}])
         tig = store.read("actor", "tig")
         subject = store.run("write", "--as", "tig", stdin=update("actor", "tig", tig["version"], {"subject": "sub-tig"}), env=QUIET)[1]
         self.assertTrue(subject["ok"], subject)
@@ -428,7 +485,7 @@ class GitHubStatusNoticeTests(unittest.TestCase):
         self.assertTrue(filed["ok"], filed)
         token, issuers = signed("sub-tig")
         body = notice(501)
-        env = {**QUIET, **issuers, "GOALIE_GITHUB_WEBHOOK_SECRET": SECRET, "GOALIE_GITHUB_REPO": REPO, "GOALIE_GITHUB_ACTOR": ACTOR}
+        env = {**QUIET, **issuers, "GOALIE_GITHUB_WEBHOOK_SECRET": SECRET, "GOALIE_GITHUB_ACTOR": ACTOR}
         with running_server(store.path, env) as (proc, port):
             self.assertEqual(get(proc, port, "/health").status, 200)
             reply = post(proc, port, "/api/github/webhook", body, {"X-GitHub-Event": "issues", "X-Hub-Signature-256": sign(SECRET, body)})
@@ -445,6 +502,7 @@ class GitHubStatusNoticeTests(unittest.TestCase):
         self.addCleanup(store.close)
         code, result = store.run("seed", env=QUIET)
         self.assertEqual(code, 0, result)
+        set_scope(store, ["tig/goalie"], [{"repo": "github.com/tig/goalie"}])
         tig = store.read("actor", "tig")
         subject = store.run("write", "--as", "tig", stdin=update("actor", "tig", tig["version"], {"subject": "sub-tig"}), env=QUIET)[1]
         self.assertTrue(subject["ok"], subject)
@@ -454,7 +512,7 @@ class GitHubStatusNoticeTests(unittest.TestCase):
         self.assertTrue(filed["ok"], filed)
         token, issuers = signed("sub-tig")
         body = notice(501)
-        env = {**QUIET, **issuers, "GOALIE_GITHUB_WEBHOOK_SECRET": SECRET, "GOALIE_GITHUB_REPO": REPO, "GOALIE_GITHUB_ACTOR": ACTOR}
+        env = {**QUIET, **issuers, "GOALIE_GITHUB_WEBHOOK_SECRET": SECRET, "GOALIE_GITHUB_ACTOR": ACTOR}
         with running_server(store.path, env) as (proc, port):
             self.assertEqual(get(proc, port, "/health").status, 200)
             reply = post(proc, port, "/api/github/webhook", body, {"X-GitHub-Event": "issues", "X-Hub-Signature-256": sign(SECRET, body)})

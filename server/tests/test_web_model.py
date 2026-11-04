@@ -945,8 +945,13 @@ class HoverTests(unittest.TestCase):
 
 
 class GitHubPageTests(unittest.TestCase):
-    def test_a_missing_key_still_shows_the_repository(self) -> None:
+    def test_a_missing_key_still_shows_the_repositories(self) -> None:
         page = (MODEL.parent / "GitHubPage.tsx").read_text(encoding="utf-8")
-        self.assertIn("{data.repository ?? \"none\"}", page)
+        self.assertIn("data.repositories.length === 0", page)
+        self.assertIn("data.repositories.map", page)
+        self.assertIn(">none</p>", page)
         self.assertIn("{data.configured ? \"Configured.\" : \"Not configured.\"}", page)
-        self.assertNotIn("data.configured && data.repository", page)
+        self.assertNotIn("data.repository ??", page)
+        self.assertNotIn("data.configured &&", page)
+        self.assertNotIn("<input", page)
+        self.assertNotIn("<button", page)

@@ -2,21 +2,25 @@ import { createSign } from "node:crypto";
 import { readFileSync } from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
 import type { GitHubStatusResponse } from "./api.ts";
+import { read } from "./read.ts";
 import type { Row } from "./rules.ts";
 
 /**
- * Push a work item's status to one linked GitHub issue (issue #72, phase 1, ADR 0012).
+ * Push a work item's status to one linked GitHub issue (issue #72, ADR 0012).
+ * The repository must be in the owner setting github_repos and on the work item's goal.
  * github_push is not an entity and not an Event. The row is written in the work item's transaction.
  * The call to GitHub runs after that transaction commits. A failure stays on the row and shows on the work item.
  * github_result is not an entity and not an Event. It keeps the last update and the last signed notice.
  */
 
 const STATUS_LABELS = ["Backlog", "In Progress", "Completed", "Deleted"] as const;
-const CONFIG_NAMES = ["GOALIE_GITHUB_APP_ID", "GOALIE_GITHUB_INSTALLATION_ID", "GOALIE_GITHUB_PRIVATE_KEY_FILE", "GOALIE_GITHUB_REPO", "GOALIE_PUBLIC_URL"] as const;
+const CONFIG_NAMES = ["GOALIE_GITHUB_APP_ID", "GOALIE_GITHUB_INSTALLATION_ID", "GOALIE_GITHUB_PRIVATE_KEY_FILE", "GOALIE_PUBLIC_URL"] as const;
 const ISSUE_URL = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)\/?$/;
+const SCOPE_ENTRY = /^([^/\s]+)\/([^/\s]+)$/;
+const GOAL_REPO = /^(?:https:\/\/github\.com\/|github\.com\/)([^/]+)\/([^/]+)\/?$/;
 const TRAILER = /<!-- goalie -->[\s\S]*?<!-- \/goalie -->/;
 
-type GitHubConfig = { appId: string; installationId: string; privateKey: string; owner: string; repo: string; api: string; publicUrl: string };
+type GitHubConfig = { appId: string; installationId: string; privateKey: string; api: string; publicUrl: string };
 type Ready = { ok: true; config: GitHubConfig } | { ok: false; error: string };
 type PushRow = { work_item: string; issue: string; status: string; goal: string };
 
@@ -28,13 +32,14 @@ export function githubError(db: DatabaseSync, id: string): string | null {
 
 /**
  * Record the push for a committed status change, in the same transaction as the Event.
- * No linked issue in the configured repository clears a pending push.
- * With no repository configured, the first GitHub issue link is recorded so the failure can show.
+ * The linked issue's repository must be in github_repos and on the work item's goal.
+ * Anything else clears a pending push.
  */
 export function queueGitHubPush(db: DatabaseSync, after: Row): void {
   const id = after.id;
   if (typeof id !== "string") return;
-  const issue = linkedIssue(after.links, process.env.GOALIE_GITHUB_REPO?.trim());
+  const goalRow = typeof after.goal === "string" ? read(db, "goal", after.goal) : undefined;
+  const issue = linkedIssue(after.links, githubRepos(db), goalRepos(goalRow?.work_product));
   if (issue === undefined) {
     db.prepare("DELETE FROM github_push WHERE work_item = ?").run(id);
     return;
@@ -67,11 +72,11 @@ export async function drainGitHub(db: DatabaseSync): Promise<void> {
   }
 }
 
-/** The last update and the last signed notice. The private key stays out of this. */
+/** The last update and the last signed notice. The private key stays out of this. The list is github_repos. */
 export function githubView(db: DatabaseSync): GitHubStatusResponse {
   return {
     configured: configuredGitHub().ok,
-    repository: namedRepository(),
+    repositories: githubRepos(db),
     outbound: storedResult(db, "outbound"),
     inbound: storedResult(db, "inbound"),
   };
@@ -91,11 +96,38 @@ function updatedDetail(row: PushRow): string {
   return `Updated ${name} to ${row.status}.`;
 }
 
-function namedRepository(): string | null {
-  const repo = process.env.GOALIE_GITHUB_REPO?.trim() ?? "";
-  const parts = repo.split("/");
-  if (parts.length !== 2 || parts[0] === "" || parts[1] === "") return null;
-  return `${parts[0]}/${parts[1]}`;
+/** `owner/repo` and `owner/*` from owner settings. Any other entry is dropped. */
+export function githubRepos(db: DatabaseSync): string[] {
+  const settings = read(db, "owner_settings", "owner")?.settings;
+  if (typeof settings !== "object" || settings === null || Array.isArray(settings)) return [];
+  const list = (settings as Row).github_repos;
+  if (!Array.isArray(list)) return [];
+  const kept: string[] = [];
+  for (const entry of list) {
+    if (typeof entry !== "string") continue;
+    const match = SCOPE_ENTRY.exec(entry);
+    if (match === null) continue;
+    kept.push(`${match[1]}/${match[2]}`);
+  }
+  return kept;
+}
+
+/** True when `owner/*` covers repo, or the entry is that `owner/repo`. */
+export function repoInScope(repo: string, scopes: readonly string[]): boolean {
+  const slash = repo.indexOf("/");
+  if (slash <= 0 || slash !== repo.lastIndexOf("/")) return false;
+  const owner = repo.slice(0, slash);
+  const name = repo.slice(slash + 1);
+  return scopes.some((entry) => {
+    const cut = entry.indexOf("/");
+    return entry.slice(0, cut) === owner && (entry.slice(cut + 1) === "*" || entry.slice(cut + 1) === name);
+  });
+}
+
+/** True when the goal's work_product names repo as a `repo` entry. */
+export function goalNamesRepo(db: DatabaseSync, goalId: unknown, repo: string): boolean {
+  if (typeof goalId !== "string") return false;
+  return goalRepos(read(db, "goal", goalId)?.work_product).has(repo);
 }
 
 function storedResult(db: DatabaseSync, kind: "outbound" | "inbound"): { ok: boolean; detail: string } | null {
@@ -111,28 +143,40 @@ export function canonicalIssueUrl(link: string): string | undefined {
   return `https://github.com/${match[1]}/${match[2]}/issues/${match[3]}`;
 }
 
-function linkedIssue(links: unknown, repo: string | undefined): string | undefined {
+/** The first linked issue whose repository is in scope and on the goal. */
+function linkedIssue(links: unknown, scopes: readonly string[], onGoal: ReadonlySet<string>): string | undefined {
   if (!Array.isArray(links)) return undefined;
-  const parts = repo?.split("/") ?? [];
-  const named = parts.length === 2 && parts[0] !== "" && parts[1] !== "";
   for (const link of links) {
     if (typeof link !== "string") continue;
     const url = canonicalIssueUrl(link);
     if (url === undefined) continue;
-    const owner = url.split("/")[3];
-    const repoName = url.split("/")[4];
-    if (named && (owner !== parts[0] || repoName !== parts[1])) continue;
+    const match = ISSUE_URL.exec(url);
+    if (match === null) continue;
+    const repo = `${match[1]}/${match[2]}`;
+    if (!onGoal.has(repo) || !repoInScope(repo, scopes)) continue;
     return url;
   }
   return undefined;
 }
 
+/** `repo` values written `github.com/owner/repo` or `https://github.com/owner/repo`. Other entries are not repositories. */
+function goalRepos(workProduct: unknown): Set<string> {
+  const found = new Set<string>();
+  if (!Array.isArray(workProduct)) return found;
+  for (const entry of workProduct) {
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) continue;
+    const value = (entry as Row).repo;
+    if (typeof value !== "string") continue;
+    const match = GOAL_REPO.exec(value);
+    if (match === null) continue;
+    found.add(`${match[1]}/${match[2]}`);
+  }
+  return found;
+}
+
 function configuredGitHub(): Ready {
   const missing = CONFIG_NAMES.filter((name) => !process.env[name]?.trim());
   if (missing.length > 0) return { ok: false, error: `GitHub is not configured. Missing ${missing.join(", ")}.` };
-  const repo = process.env.GOALIE_GITHUB_REPO?.trim() ?? "";
-  const parts = repo.split("/");
-  if (parts.length !== 2 || parts[0] === "" || parts[1] === "") return { ok: false, error: "GitHub is not configured. GOALIE_GITHUB_REPO must be owner/repo." };
   let privateKey: string;
   try {
     privateKey = readFileSync(process.env.GOALIE_GITHUB_PRIVATE_KEY_FILE as string, "utf8");
@@ -145,8 +189,6 @@ function configuredGitHub(): Ready {
       appId: process.env.GOALIE_GITHUB_APP_ID as string,
       installationId: process.env.GOALIE_GITHUB_INSTALLATION_ID as string,
       privateKey,
-      owner: parts[0],
-      repo: parts[1],
       api: (process.env.GOALIE_GITHUB_API?.trim() || "https://api.github.com").replace(/\/$/, ""),
       publicUrl: (process.env.GOALIE_PUBLIC_URL as string).trim().replace(/\/$/, ""),
     },

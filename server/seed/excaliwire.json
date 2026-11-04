@@ -30,7 +30,8 @@
           "owner": "tig",
           "settings": {
             "goal_key_prefix": "XW",
-            "work_items": true
+            "work_items": true,
+            "github_repos": ["tig/goalie"]
           }
         }
       }

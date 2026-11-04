@@ -2,7 +2,7 @@ import type { GitHubStatusResponse } from "../../src/api.ts";
 import { useJson } from "./data.ts";
 
 /**
- * The GitHub page. The GOALIE owner sees whether the repository is configured, the last update, and the last signed notice.
+ * The GitHub page. The GOALIE owner sees the repositories in github_repos, whether GitHub is configured, the last update, and the last signed notice.
  * It reads GET /api/github/status. It has no input and no button that writes.
  */
 export function GitHubPage() {
@@ -20,8 +20,8 @@ export function GitHubPage() {
 function Status({ data }: { data: GitHubStatusResponse }) {
   return (
     <section className="card">
-      <div className="lbl">Repository</div>
-      <p>{data.repository ?? "none"}</p>
+      <div className="lbl">Repositories</div>
+      {data.repositories.length === 0 ? <p>none</p> : data.repositories.map((name, index) => <p key={`${name}-${index}`}>{name}</p>)}
       <div className="lbl">Configured</div>
       <p>{data.configured ? "Configured." : "Not configured."}</p>
       <div className="lbl">Last update</div>
