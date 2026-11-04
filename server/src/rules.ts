@@ -243,11 +243,32 @@ export function checkTransition(kind: string, before: Row | undefined, after: Ro
   return found;
 }
 
+const sameValue = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+/**
+ * SPEC.md §6.7: the agent a deployment names for a GitHub notice, when its operator is the GOALIE owner.
+ * `named` is that actor id. The caller reads it from process configuration. This rule does not.
+ */
+export function isGitHubAgent(actor: Row, owner: string | undefined, named: string | undefined): boolean {
+  const id = named?.trim();
+  return id !== undefined && id !== "" && actor.id === id && actor.kind === "agent" && owner !== undefined && actor.operator === owner;
+}
+
+/**
+ * That agent may set status on a work item it does not own.
+ * Every other field stays as it was. A create is not this case.
+ */
+function githubStatusOnly(actor: Row, owner: string | undefined, before: Row | undefined, after: Row, named: string | undefined): boolean {
+  if (before === undefined || !isGitHubAgent(actor, owner, named) || sameValue(before.status, after.status)) return false;
+  const rest = (row: Row) => Object.fromEntries(Object.entries(row).filter(([key]) => key !== "id" && key !== "version" && key !== "status"));
+  return sameValue(rest(before), rest(after));
+}
+
 /**
  * Who may write what (SPEC.md §6.9, §10, §12; ADR 0011). `actor` is the writer's row; `before` is the row the write replaces.
  * `owner` is the GOALIE owner, or undefined before the owner settings exist.
  */
-export function checkAuthor(actor: Row, owner: string | undefined, kind: string, before: Row | undefined, after: Row, store: Pick<Lookup, "get">): Violation[] {
+export function checkAuthor(actor: Row, owner: string | undefined, kind: string, before: Row | undefined, after: Row, store: Pick<Lookup, "get">, githubActor: string | undefined): Violation[] {
   const getGoal = (id: string) => store.get("goal", id);
   if (actor.kind === "agent" && (kind === "goal" || kind === "priority")) {
     return [{ rule: "agent-writes-a-draft", message: `${actor.id} is an agent. An agent proposes a change to a ${kind} as a Draft.` }];
@@ -274,7 +295,8 @@ export function checkAuthor(actor: Row, owner: string | undefined, kind: string,
   }
   // A Draft is its agent's proposal (SPEC.md §6.9). Only that agent writes it, and its actor never changes.
   // SPEC.md §6.7, story 29: an agent works its own work items. It may file one for itself.
-  if (kind === "work_item" && actor.kind === "agent" && (after.owner !== actor.id || (before !== undefined && before.owner !== actor.id))) {
+  // The GitHub agent is the one exception, and only for status (SPEC.md §6.7).
+  if (kind === "work_item" && actor.kind === "agent" && !githubStatusOnly(actor, owner, before, after, githubActor) && (after.owner !== actor.id || (before !== undefined && before.owner !== actor.id))) {
     return [{ rule: "agent-own-work-items", message: `${actor.id}: an agent writes only the work items it owns.`, field: "owner" }];
   }
   if (kind === "draft" && (actor.kind !== "agent" || after.actor !== actor.id || (before !== undefined && before.actor !== actor.id))) {

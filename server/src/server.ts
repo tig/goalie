@@ -8,6 +8,7 @@ import { pathToFileURL } from "node:url";
 import type { ActorRef, ApiError, CommandsResponse, FormOptions, GoalEventsResponse, GoalPageResponse, PrioritiesResponse, WorkResponse } from "./api.ts";
 import { runCommands } from "./commands.ts";
 import { drainGitHub } from "./github.ts";
+import { receiveGitHubWebhook } from "./github_notice.ts";
 import { goalEvents, goalPage } from "./goalpage.ts";
 import { eventStream } from "./live.ts";
 import { formOptions } from "./options.ts";
@@ -80,11 +81,18 @@ function signInHref(url: string): string {
 
 /**
  * The one Hono application. /api/* is the JSON API (ADR 0003). Every other path is the built React app (ADR 0010).
- * No request is anonymous except /health (ADR 0005).
+ * /health needs no actor (ADR 0005). POST /api/github/webhook is authenticated by the signature of its body.
+ * Every other request needs a verified actor.
  */
 export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string = configuredWebDist()): Hono<Env> {
   const app = new Hono<Env>();
   app.get("/health", (c) => c.text("ok"));
+  // Before the bearer-token check. A bad signature answers 401. The actor is the configured agent, not the caller.
+  app.post(
+    "/api/github/webhook",
+    bodyLimit({ maxSize: MAX_BODY, onError: (c) => c.json({ error: "bad_command", reason: `a request body is at most ${MAX_BODY / 1024} KB` }, 413) }),
+    (c) => receiveGitHubWebhook(db, c, todayIn(db)),
+  );
   app.use("*", async (c, next) => {
     const who = await resolveActor(db, c.req.header(), issuers);
     if (!who.ok) return c.req.path.startsWith("/api/") ? refuse(c, 401, "unauthenticated", who.reason) : c.html(signInPage(who.reason, signInHref(c.req.url)), 401);

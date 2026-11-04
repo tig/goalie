@@ -63,16 +63,25 @@ export async function drainGitHub(db: DatabaseSync): Promise<void> {
   }
 }
 
+/** The issue URL in canonical form, or undefined when link is not a GitHub issue URL. A trailing slash is the same issue. */
+export function canonicalIssueUrl(link: string): string | undefined {
+  const match = ISSUE_URL.exec(link);
+  if (match === null) return undefined;
+  return `https://github.com/${match[1]}/${match[2]}/issues/${match[3]}`;
+}
+
 function linkedIssue(links: unknown, repo: string | undefined): string | undefined {
   if (!Array.isArray(links)) return undefined;
-  const want = repo?.split("/");
-  const named = want !== undefined && want.length === 2 && want[0] !== "" && want[1] !== "";
+  const parts = repo?.split("/") ?? [];
+  const named = parts.length === 2 && parts[0] !== "" && parts[1] !== "";
   for (const link of links) {
     if (typeof link !== "string") continue;
-    const match = ISSUE_URL.exec(link);
-    if (match === null) continue;
-    if (named && (match[1] !== want[0] || match[2] !== want[1])) continue;
-    return `https://github.com/${match[1]}/${match[2]}/issues/${match[3]}`;
+    const url = canonicalIssueUrl(link);
+    if (url === undefined) continue;
+    const owner = url.split("/")[3];
+    const repoName = url.split("/")[4];
+    if (named && (owner !== parts[0] || repoName !== parts[1])) continue;
+    return url;
   }
   return undefined;
 }
