@@ -270,6 +270,7 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         raw = reply.body.decode()
         body = json.loads(raw)
         self.assertFalse(body["configured"])
+        self.assertEqual(body["repository"], "tig/goalie")
         self.assertEqual(set(body), {"configured", "repository", "outbound", "inbound"})
         self.assertNotIn("privateKey", body)
         self.assertNotIn("CANARYKEYPATH", raw)

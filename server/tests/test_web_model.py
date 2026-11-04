@@ -942,3 +942,11 @@ class HoverTests(unittest.TestCase):
         self.assertIn("title={nameHover(goal.id, goal.summary)}", page)
         self.assertIn("title={nameHover(card.id, card.summary)}", page)
         self.assertIn("title={nameHover(i.goal, work.goals[i.goal]?.summary)}", work)
+
+
+class GitHubPageTests(unittest.TestCase):
+    def test_a_missing_key_still_shows_the_repository(self) -> None:
+        page = (MODEL.parent / "GitHubPage.tsx").read_text(encoding="utf-8")
+        self.assertIn("{data.repository ?? \"none\"}", page)
+        self.assertIn("{data.configured ? \"Configured.\" : \"Not configured.\"}", page)
+        self.assertNotIn("data.configured && data.repository", page)

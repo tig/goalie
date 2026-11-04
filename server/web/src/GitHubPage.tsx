@@ -18,11 +18,12 @@ export function GitHubPage() {
 }
 
 function Status({ data }: { data: GitHubStatusResponse }) {
-  const repository = data.configured && data.repository ? data.repository : "Not configured.";
   return (
     <section className="card">
       <div className="lbl">Repository</div>
-      <p>{repository}</p>
+      <p>{data.repository ?? "none"}</p>
+      <div className="lbl">Configured</div>
+      <p>{data.configured ? "Configured." : "Not configured."}</p>
       <div className="lbl">Last update</div>
       <p>{data.outbound ? data.outbound.detail : "none"}</p>
       <div className="lbl">Last signed notice</div>
