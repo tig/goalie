@@ -20,7 +20,7 @@ function Chip({ mark, today, lit }: { mark: CalendarMark; today: string; lit: Li
   const label = `${dateLabel(date, today)}${date.slipDays !== undefined ? ` · ${slipLabel(date.slipDays)}` : ""}`;
   const on = isLit(goal, lit);
   return (
-    <span className={`chip${on ? " lit" : ""}`} data-health={goal.health ?? ""} title={`${goal.summary} · ${label}`} data-focus={encodeFocus({ kind: "goal", id: goal.id, label: goal.summary })}>
+    <span className={`chip${on ? " lit" : ""}`} data-health={goal.health ?? ""} title={`${goal.id} · ${goal.summary} · ${label}`} data-focus={encodeFocus({ kind: "goal", id: goal.id, label: goal.summary })}>
       <HealthDot health={goal.health} />
       <span className="ctitle">{goal.summary}</span>
       <i className={`mk ${markClass(mark)}`} aria-hidden="true" />

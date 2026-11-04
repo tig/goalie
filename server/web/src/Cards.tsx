@@ -76,7 +76,7 @@ export function Cards(props: Props) {
         </div>
         {slip ? (
           <p className="note">
-            <span className="late">{slipLabel(slip.days)}</span> past <span className="date">{slip.kind} {shortDate(slip.date, today)}</span> · {slip.summary}
+            <span className="late">{slipLabel(slip.days)}</span> past <span className="date">{slip.kind} {shortDate(slip.date, today)}</span> · <span title={slip.goal}>{slip.summary}</span>
           </p>
         ) : (
           <p className="note muted">No slips.</p>
@@ -94,7 +94,7 @@ export function Cards(props: Props) {
               <span className="num">{nextPromotion.days} days</span> <small>to the Promotion Milestone</small>
             </p>
             <p className="note">
-              <span className="date">{shortDate(nextPromotion.date, today)}</span> · {nextPromotion.summary}
+              <span className="date">{shortDate(nextPromotion.date, today)}</span> · <span title={nextPromotion.goal}>{nextPromotion.summary}</span>
             </p>
           </>
         ) : (

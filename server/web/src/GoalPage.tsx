@@ -96,7 +96,7 @@ function Goal({ data, reload, status, setStatus }: { data: GoalPageResponse; rel
         <header className="ghead2">
           {/* The key shows here; rule 7 keeps keys off Home only (G3). */}
           <span className="gkey">{goal.id}</span>
-          <h1 className="gtitle">{goal.summary}</h1>
+          <h1 className="gtitle" title={goal.id}>{goal.summary}</h1>
           {/* GP2-3: what needs the owner, each a link to it; silence reads as "Nothing needs you now", never as not built. */}
           {may &&
             (late || data.needsYou.missingPtg ? (
@@ -287,7 +287,7 @@ function SubGoal({ card, data }: { card: SubGoalCard; data: GoalPageResponse }) 
     <div className="gsub2" data-focus={encodeFocus({ kind: "goal", id: card.id, label: card.summary })}>
       <HealthDot health={card.state === "In Progress" ? card.health : null} word={false} />
       <div className="gsubmain">
-        <Link to={goalPath(card.id)} className="title">
+        <Link to={goalPath(card.id)} className="title" title={card.id}>
           {card.summary}
         </Link>
         <span className="gsubmeta small">
@@ -361,7 +361,7 @@ function WorkItems({ items, data, adding, onAdd, onDone, reload, status }: { ite
           return (
             <div key={i.id} id={`work-item-${i.id}`} className={`wrow2${i.status === "Completed" ? " done" : ""}`} data-focus={encodeFocus({ kind: "work item", id: i.id, label: i.title })}>
               <span className="wtitle">
-                {i.title}
+                <span title={i.id}>{i.title}</span>
                 {mayEditWorkItem(data.me, i) && <Pencil label={`Edit ${i.title}`} onClick={() => setEditing(editing === i.id ? null : i.id)} />}
               </span>
               <span className="wwho">
