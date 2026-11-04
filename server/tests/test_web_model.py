@@ -899,3 +899,13 @@ class HoverTests(unittest.TestCase):
     def test_a_name_hover_shows_the_id_and_keeps_a_full_name(self) -> None:
         got = run('return [goalpage.nameHover("WI-0002"), goalpage.nameHover("XW-0007", "Open a goal")];')
         self.assertEqual(got, ["WI-0002", "XW-0007 · Open a goal"])
+
+    def test_a_clipped_goal_name_keeps_its_summary_in_the_tooltip(self) -> None:
+        src = MODEL.parent
+        tree = (src / "GoalTree.tsx").read_text(encoding="utf-8")
+        page = (src / "GoalPage.tsx").read_text(encoding="utf-8")
+        work = (src / "WorkPage.tsx").read_text(encoding="utf-8")
+        self.assertIn("title={nameHover(g.id, g.summary)}", tree)
+        self.assertIn("title={nameHover(goal.id, goal.summary)}", page)
+        self.assertIn("title={nameHover(card.id, card.summary)}", page)
+        self.assertIn("title={nameHover(i.goal, work.goals[i.goal]?.summary)}", work)
