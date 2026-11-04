@@ -1,5 +1,6 @@
 import type { Health, PrioritiesResponse } from "../../src/api.ts";
 import { shortDate } from "../../src/dates.ts";
+import { nameHover } from "./model/goalpage.ts";
 import { slipLabel } from "./model/labels.ts";
 import { HEALTH_MEANINGS, healthWord } from "./model/labels.ts";
 import { HEALTHS, type Filter } from "./model/query.ts";
@@ -76,7 +77,7 @@ export function Cards(props: Props) {
         </div>
         {slip ? (
           <p className="note">
-            <span className="late">{slipLabel(slip.days)}</span> past <span className="date">{slip.kind} {shortDate(slip.date, today)}</span> · {slip.summary}
+            <span className="late">{slipLabel(slip.days)}</span> past <span className="date">{slip.kind} {shortDate(slip.date, today)}</span> · <span title={nameHover(slip.goal)}>{slip.summary}</span>
           </p>
         ) : (
           <p className="note muted">No slips.</p>
@@ -94,7 +95,7 @@ export function Cards(props: Props) {
               <span className="num">{nextPromotion.days} days</span> <small>to the Promotion Milestone</small>
             </p>
             <p className="note">
-              <span className="date">{shortDate(nextPromotion.date, today)}</span> · {nextPromotion.summary}
+              <span className="date">{shortDate(nextPromotion.date, today)}</span> · <span title={nameHover(nextPromotion.goal)}>{nextPromotion.summary}</span>
             </p>
           </>
         ) : (
