@@ -110,7 +110,7 @@ function Queues({ work, reload, single }: { work: WorkResponse; reload: () => vo
                   <IssueLinks links={i.links} />
                   {mayEditWorkItem(work.me, i) && <Pencil label={`Edit ${i.title}`} onClick={() => setEditing(editing === i.id ? null : i.id)} />}
                 </span>
-                <Link to={goalPath(i.goal)} className="wgoal small" title={nameHover(i.goal)}>
+                <Link to={goalPath(i.goal)} className="wgoal small" title={nameHover(i.goal, work.goals[i.goal]?.summary)}>
                   {work.goals[i.goal]?.summary ?? i.goal}
                 </Link>
                 <Due date={i.due_date} late={i.late} today={work.today} done={done} />
