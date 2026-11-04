@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import type { Health } from "../../src/api.ts";
 import { monthYear, shortDate, weekday } from "../../src/dates.ts";
 import { isLit } from "./model/filter.ts";
+import { nameHover } from "./model/goalpage.ts";
 import { dateLabel, slipLabel } from "./model/labels.ts";
 import { dayChips, type CalendarDay, type CalendarMark, type CalendarMonth } from "./model/calendar.ts";
 import { HealthDot, Legend } from "./parts.tsx";
@@ -20,7 +21,7 @@ function Chip({ mark, today, lit }: { mark: CalendarMark; today: string; lit: Li
   const label = `${dateLabel(date, today)}${date.slipDays !== undefined ? ` · ${slipLabel(date.slipDays)}` : ""}`;
   const on = isLit(goal, lit);
   return (
-    <span className={`chip${on ? " lit" : ""}`} data-health={goal.health ?? ""} title={`${goal.id} · ${goal.summary} · ${label}`} data-focus={encodeFocus({ kind: "goal", id: goal.id, label: goal.summary })}>
+    <span className={`chip${on ? " lit" : ""}`} data-health={goal.health ?? ""} title={nameHover(goal.id, `${goal.summary} · ${label}`)} data-focus={encodeFocus({ kind: "goal", id: goal.id, label: goal.summary })}>
       <HealthDot health={goal.health} />
       <span className="ctitle">{goal.summary}</span>
       <i className={`mk ${markClass(mark)}`} aria-hidden="true" />

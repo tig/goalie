@@ -5,6 +5,11 @@ import { labelWidth } from "./timeline.ts";
 
 /** The goal page's pure parts: work items by status (G23), the history filters, and how an Event's values read. */
 
+/** The tooltip on a name. The id, or the id and then the full name when the tooltip already showed that name. */
+export function nameHover(id: string, full?: string): string {
+  return full === undefined ? id : `${id} · ${full}`;
+}
+
 /** W6: a human may edit any work item; an agent only the ones it owns. The server's rule agent-own-work-items decides; this only hides the pencil. */
 export function mayEditWorkItem(me: Pick<ApiActor, "id" | "kind">, item: Pick<ApiWorkItem, "owner">): boolean {
   return me.kind === "human" || item.owner === me.id;

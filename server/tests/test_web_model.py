@@ -908,3 +908,9 @@ class MarkdownTests(unittest.TestCase):
             {"href": "https://github.com/someone/thing/issues/4", "label": "someone/thing#4"},
         ])
         self.assertEqual(run("return markdown.githubIssues(null);"), [])
+
+
+class HoverTests(unittest.TestCase):
+    def test_a_name_hover_shows_the_id_and_keeps_a_full_name(self) -> None:
+        got = run('return [goalpage.nameHover("WI-0002"), goalpage.nameHover("XW-0007", "Open a goal")];')
+        self.assertEqual(got, ["WI-0002", "XW-0007 · Open a goal"])
