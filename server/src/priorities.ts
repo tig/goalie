@@ -73,7 +73,7 @@ function firstStep(ptg: unknown, names: Map<string, string>): PtgStep | undefine
 }
 
 /** The view on `todayIso`, the org's calendar day. Event timestamps are UTC instants, read as days in `timeZone`. */
-export function prioritiesView(db: DatabaseSync, orgUnit: string, todayIso: string, timeZone: string): Omit<PrioritiesResponse, "me" | "mayRank"> {
+export function prioritiesView(db: DatabaseSync, orgUnit: string, todayIso: string, timeZone: string): Omit<PrioritiesResponse, "me" | "mayRank" | "goalieOwner"> {
   const today = day(todayIso);
   const unit = read(db, "org_unit", orgUnit);
   const org = { id: orgUnit, name: (unit?.name as string) ?? orgUnit, level: (unit?.level as string) ?? "" };

@@ -1,12 +1,14 @@
 import { createSign } from "node:crypto";
 import { readFileSync } from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
+import type { GitHubStatusResponse } from "./api.ts";
 import type { Row } from "./rules.ts";
 
 /**
  * Push a work item's status to one linked GitHub issue (issue #72, phase 1, ADR 0012).
  * github_push is not an entity and not an Event. The row is written in the work item's transaction.
  * The call to GitHub runs after that transaction commits. A failure stays on the row and shows on the work item.
+ * github_result is not an entity and not an Event. It keeps the last update and the last signed notice.
  */
 
 const STATUS_LABELS = ["Backlog", "In Progress", "Completed", "Deleted"] as const;
@@ -58,9 +60,48 @@ export async function drainGitHub(db: DatabaseSync): Promise<void> {
     } catch {
       error = "GitHub could not be reached.";
     }
+    const detail = error === null ? updatedDetail(row) : error.slice(0, 500);
+    recordGitHubResult(db, "outbound", error === null, detail);
     if (error === null) db.prepare("DELETE FROM github_push WHERE work_item = ?").run(row.work_item);
-    else db.prepare("UPDATE github_push SET error = ? WHERE work_item = ?").run(error.slice(0, 500), row.work_item);
+    else db.prepare("UPDATE github_push SET error = ? WHERE work_item = ?").run(detail, row.work_item);
   }
+}
+
+/** The last update and the last signed notice. The private key stays out of this. */
+export function githubView(db: DatabaseSync): GitHubStatusResponse {
+  return {
+    configured: configuredGitHub().ok,
+    repository: namedRepository(),
+    outbound: storedResult(db, "outbound"),
+    inbound: storedResult(db, "inbound"),
+  };
+}
+
+/** Keep the last result of one kind. The last push in a drain is the one that remains. */
+export function recordGitHubResult(db: DatabaseSync, kind: "outbound" | "inbound", ok: boolean, detail: string): void {
+  db.prepare(
+    `INSERT INTO github_result (kind, ok, detail) VALUES (?, ?, ?)
+     ON CONFLICT(kind) DO UPDATE SET ok = excluded.ok, detail = excluded.detail`,
+  ).run(kind, ok ? 1 : 0, detail);
+}
+
+function updatedDetail(row: PushRow): string {
+  const match = ISSUE_URL.exec(row.issue);
+  const name = match === null ? row.issue : `${match[1]}/${match[2]}#${match[3]}`;
+  return `Updated ${name} to ${row.status}.`;
+}
+
+function namedRepository(): string | null {
+  const repo = process.env.GOALIE_GITHUB_REPO?.trim() ?? "";
+  const parts = repo.split("/");
+  if (parts.length !== 2 || parts[0] === "" || parts[1] === "") return null;
+  return `${parts[0]}/${parts[1]}`;
+}
+
+function storedResult(db: DatabaseSync, kind: "outbound" | "inbound"): { ok: boolean; detail: string } | null {
+  const row = db.prepare("SELECT ok, detail FROM github_result WHERE kind = ?").get(kind) as { ok: number; detail: string } | undefined;
+  if (row === undefined) return null;
+  return { ok: row.ok === 1, detail: row.detail };
 }
 
 /** The issue URL in canonical form, or undefined when link is not a GitHub issue URL. A trailing slash is the same issue. */

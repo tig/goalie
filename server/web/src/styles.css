@@ -572,6 +572,7 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 .tab.off{background:none;color:var(--mute)}
 .tab.off:hover{background:var(--control);color:var(--ink)}
 .workpage{max-width:1104px}
+.githubpage{max-width:640px}
 .workhead{display:flex;align-items:center;flex-wrap:wrap;gap:16px;margin:0 0 16px}
 .workhead h1{margin:0}
 .workhead .vtab{text-decoration:none;display:inline-flex;align-items:center}

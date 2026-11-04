@@ -10,6 +10,7 @@ Prediction before the implementation: every test here fails, because a status ch
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import subprocess
 import threading
@@ -18,7 +19,7 @@ from typing import Any
 from urllib.parse import unquote, urlparse
 
 from goalie_cli import SERVER, Store, create, update
-from live_server import get, running_server, signed
+from live_server import Reply, get, running_server, signed
 
 REPO = "tig/goalie"
 ISSUE = f"https://github.com/{REPO}/issues/72"
@@ -257,6 +258,66 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertEqual(self.store.read("work_item", "WI-9006")["status"], "Backlog")
         self.assertIn("GOALIE_GITHUB_APP_ID", self.error("WI-9006") or "")
         self.assertEqual(self.github.calls, [])
+
+    def test_a_missing_private_key_is_not_configured_and_stays_out_of_the_body(self) -> None:
+        # The file is a directory, so the key cannot be read. The body must not carry the path or the key text.
+        root = self.store._scratch.name + "/CANARYKEYPATH"  # noqa: SLF001
+        os.makedirs(root, exist_ok=True)
+        with open(root + "/key.pem", "w", encoding="utf-8") as handle:
+            handle.write("CANARYKEYTEXT\n")
+        reply = self.status_as("tig", "sub-tig", {"GOALIE_GITHUB_PRIVATE_KEY_FILE": root})
+        self.assertEqual(reply.status, 200, reply.body)
+        raw = reply.body.decode()
+        body = json.loads(raw)
+        self.assertFalse(body["configured"])
+        self.assertEqual(body["repository"], "tig/goalie")
+        self.assertEqual(set(body), {"configured", "repository", "outbound", "inbound"})
+        self.assertNotIn("privateKey", body)
+        self.assertNotIn("CANARYKEYPATH", raw)
+        self.assertNotIn("CANARYKEYTEXT", raw)
+        self.assertNotIn("BEGIN PRIVATE KEY", raw)
+
+    def test_a_successful_push_shows_the_issue_on_the_status(self) -> None:
+        created = self.write(create("work_item", "WI-9010", self.item([ISSUE]), "Filed"))
+        self.assertTrue(created["ok"], created)
+        reply = self.status_as("tig", "sub-tig")
+        self.assertEqual(reply.status, 200, reply.body)
+        raw = reply.body.decode()
+        body = json.loads(raw)
+        self.assertEqual(set(body), {"configured", "repository", "outbound", "inbound"})
+        self.assertNotIn("privateKey", body)
+        self.assertNotIn("BEGIN PRIVATE KEY", raw)
+        self.assertNotIn("github.pem", raw)
+        self.assertTrue(body["outbound"]["ok"])
+        self.assertIn("72", body["outbound"]["detail"])
+        self.assertEqual(body["outbound"]["detail"], "Updated tig/goalie#72 to Backlog.")
+
+    def test_a_failed_push_shows_the_same_detail_as_the_work_item(self) -> None:
+        assert self.write(create("work_item", "WI-9011", self.item([ISSUE]), "Filed"))["ok"]
+        self.github.fail_token = True
+        result = self.write(update("work_item", "WI-9011", 1, {"status": "Completed"}, "Shipped"))
+        self.assertTrue(result["ok"], result)
+        shown = next(item for item in self.goal_page()["workItems"] if item["id"] == "WI-9011")
+        reply = self.status_as("tig", "sub-tig")
+        self.assertEqual(reply.status, 200, reply.body)
+        body = json.loads(reply.body)
+        self.assertNotIn("privateKey", body)
+        self.assertFalse(body["outbound"]["ok"])
+        self.assertEqual(body["outbound"]["detail"], shown["github_error"])
+
+    def test_a_human_who_is_not_the_goalie_owner_gets_403(self) -> None:
+        reply = self.status_as("chelsea", "sub-chelsea")
+        self.assertEqual(reply.status, 403, reply.body)
+        self.assertEqual(json.loads(reply.body)["error"], "forbidden")
+
+    def status_as(self, actor: str, subject: str, env: dict[str, str] | None = None) -> Reply:
+        row = self.store.read("actor", actor)
+        if row.get("subject") != subject:
+            wrote = self.store.write("tig", update("actor", actor, row["version"], {"subject": subject}))
+            self.assertTrue(wrote["ok"], wrote)
+        token, issuers = signed(subject)
+        with running_server(self.store.path, {**self.env, **issuers, **(env or {})}) as (proc, port):
+            return get(proc, port, "/api/github/status", {"Authorization": f"Bearer {token}"})
 
     def assert_trailer(self) -> None:
         body = self.github.issue["body"]
