@@ -4,6 +4,7 @@ import { shortDate } from "../../src/dates.ts";
 import { useJson } from "./data.ts";
 import { EditWorkItem, useStatus } from "./GoalAdd.tsx";
 import { Owner, Pencil } from "./GoalPage.tsx";
+import { IssueLinks } from "./parts.tsx";
 import { keepOrder, mayEditWorkItem, nameHover, queues } from "./model/goalpage.ts";
 import { goalPath, workPath } from "./model/route.ts";
 import { Link } from "./router.tsx";
@@ -105,7 +106,8 @@ function Queues({ work, reload, single }: { work: WorkResponse; reload: () => vo
             const rows = g.items.map((i) => (
               <div key={i.id} id={`work-item-${i.id}`} className={`wrow qrow${i.status === "Completed" ? " done" : ""}`} data-focus={encodeFocus({ kind: "work item", id: i.id, label: i.title })}>
                 <span className="wtitle">
-                  <span title={nameHover(i.id)}>{i.title}</span>
+                  <span className="wname" title={nameHover(i.id)}>{i.title}</span>
+                  <IssueLinks links={i.links} />
                   {mayEditWorkItem(work.me, i) && <Pencil label={`Edit ${i.title}`} onClick={() => setEditing(editing === i.id ? null : i.id)} />}
                 </span>
                 <Link to={goalPath(i.goal)} className="wgoal small" title={nameHover(i.goal, work.goals[i.goal]?.summary)}>

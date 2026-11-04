@@ -9,7 +9,7 @@ import { commentBatch } from "./model/commands.ts";
 import { activity, ACTIVITY, changeParts, createdFields, ptgChanges, historyNames, joinPages, dateBar, labelPlaces, eventValue, fieldLabel, groupEvents, groupWorkItems, mayEditWorkItem, nameHover, type ActivityChip, type EventGroup, type Names } from "./model/goalpage.ts";
 import { dateLabel } from "./model/labels.ts";
 import { backPath, goalPath } from "./model/route.ts";
-import { Avatar, HealthDot, Markdown } from "./parts.tsx";
+import { Avatar, HealthDot, IssueLinks, Markdown } from "./parts.tsx";
 import { homeSearch, Link } from "./router.tsx";
 import { encodeFocus, formFocus } from "./model/feedback.ts";
 
@@ -361,7 +361,8 @@ function WorkItems({ items, data, adding, onAdd, onDone, reload, status }: { ite
           return (
             <div key={i.id} id={`work-item-${i.id}`} className={`wrow2${i.status === "Completed" ? " done" : ""}`} data-focus={encodeFocus({ kind: "work item", id: i.id, label: i.title })}>
               <span className="wtitle">
-                <span title={nameHover(i.id)}>{i.title}</span>
+                <span className="wname" title={nameHover(i.id)}>{i.title}</span>
+                <IssueLinks links={i.links} />
                 {mayEditWorkItem(data.me, i) && <Pencil label={`Edit ${i.title}`} onClick={() => setEditing(editing === i.id ? null : i.id)} />}
               </span>
               <span className="wwho">

@@ -894,6 +894,39 @@ class MarkdownTests(unittest.TestCase):
         got = run('return markdown.markdown("Read https://e.com/x.")[0].c;')
         self.assertEqual(got, [{"t": "text", "v": "Read "}, {"t": "link", "href": "https://e.com/x", "c": [{"t": "text", "v": "https://e.com/x"}]}, {"t": "text", "v": "."}])
 
+    def test_a_work_item_link_list_names_each_github_issue_once(self) -> None:
+        links = [
+            "https://github.com/tig/goalie/issues/72",
+            "https://github.com/tig/goalie/issues/72/",
+            "notes",
+            "https://github.com/excaliwire/factory/pull/9",
+            "https://github.com/someone/thing/issues/4",
+        ]
+        got = run(f"return markdown.githubIssues({json.dumps(links)});")
+        self.assertEqual(got, [
+            {"href": "https://github.com/tig/goalie/issues/72", "label": "goalie#72"},
+            {"href": "https://github.com/someone/thing/issues/4", "label": "someone/thing#4"},
+        ])
+        self.assertEqual(run("return markdown.githubIssues(null);"), [])
+
+    def test_an_issue_url_with_a_suffix_names_that_issue(self) -> None:
+        links = [
+            "https://github.com/tig/goalie/issues/72#issuecomment-123",
+            "https://github.com/tig/goalie/issues/72?x=1",
+            "https://github.com/excaliwire/factory/pull/9#discussion_r1",
+        ]
+        got = run(f"return markdown.githubIssues({json.dumps(links)});")
+        self.assertEqual(got, [{"href": "https://github.com/tig/goalie/issues/72", "label": "goalie#72"}])
+
+    def test_issue_links_stay_in_the_title_and_answer_a_coarse_tap(self) -> None:
+        src = MODEL.parent
+        parts = (src / "parts.tsx").read_text(encoding="utf-8")
+        css = (src / "styles.css").read_text(encoding="utf-8")
+        self.assertIn('className="wissues"', parts)
+        self.assertIn(".wissues{display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px;min-width:0;flex:1 1 8em;margin-left:8px}", css)
+        self.assertIn(".wissue{min-width:0;font-weight:700;text-decoration:none;overflow-wrap:anywhere}", css)
+        self.assertIn("@media (pointer:coarse){.wissue{display:inline-flex;align-items:center;box-sizing:border-box;min-width:44px;min-height:44px}}", css)
+
 
 class HoverTests(unittest.TestCase):
     def test_a_name_hover_shows_the_id_and_keeps_a_full_name(self) -> None:

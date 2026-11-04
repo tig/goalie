@@ -5,9 +5,24 @@ import type { ActorRef, Health } from "../../src/api.ts";
 import { placePopover, popoverWidth } from "./model/popover.ts";
 import { useDismiss } from "./useScreen.ts";
 import { encodeFocus } from "./model/feedback.ts";
-import { markdown, type Inline } from "./model/markdown.ts";
+import { githubIssues, markdown, type Inline } from "./model/markdown.ts";
 
 /** The shared parts every view is built from. */
+
+/** Each GitHub issue named in a work item's links. The link opens that issue. */
+export function IssueLinks({ links }: { links: string[] | null }) {
+  const issues = githubIssues(links);
+  if (issues.length === 0) return null;
+  return (
+    <span className="wissues">
+      {issues.map((issue) => (
+        <a key={issue.href} className="wissue" href={issue.href} target="_blank" rel="noopener noreferrer">
+          {issue.label}
+        </a>
+      ))}
+    </span>
+  );
+}
 
 /** The brand the server writes into the page (review E4). One source: server/src/brand.ts. */
 export const BRAND = JSON.parse(document.getElementById("goalie-brand")?.textContent ?? '{"app":"","mark":""}') as { app: string; mark: string };
