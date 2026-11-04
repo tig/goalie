@@ -8,6 +8,8 @@
 
 **Amended:** 2026-11-04. The repositories in scope are the owner setting `github_repos`, not one repository named in process configuration. An entry is `owner/repo` or `owner/*`. A goal's repositories are the `repo` entries on its work product.
 
+**Amended:** 2026-11-04. The update uses the installation GitHub reports for that repository.
+
 ## Context
 
 [#72 (Enable Github integration)](https://github.com/tig/goalie/issues/72) pushes a work item's status to one linked GitHub issue.

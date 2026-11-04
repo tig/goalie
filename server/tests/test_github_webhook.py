@@ -209,7 +209,7 @@ class GitHubWebhookTests(unittest.TestCase):
 
 
 class GitHubRepoScopeTests(unittest.TestCase):
-    """A signed close for a repository the goal does not name changes nothing."""
+    """A signed close applies only when the repository is in github_repos and on the goal. The names compare without case."""
 
     def test_a_signed_close_skips_a_goal_that_omits_the_repository(self) -> None:
         store = Store()
@@ -229,6 +229,23 @@ class GitHubRepoScopeTests(unittest.TestCase):
         self.assertEqual(reply.status, 200, reply.body)
         self.assertEqual(store.read("work_item", "WI-9601")["status"], "Backlog")
         self.assertEqual(store.events()[-1]["sequence"], last)
+
+    def test_a_signed_close_matches_the_repository_without_case(self) -> None:
+        store = Store()
+        self.addCleanup(store.close)
+        code, result = store.run("seed", env=QUIET)
+        self.assertEqual(code, 0, result)
+        actor = store.run("write", "--as", "tig", stdin=create("actor", ACTOR, {"kind": "agent", "display_name": "GitHub", "operator": "tig"}), env=QUIET)[1]
+        self.assertTrue(actor["ok"], actor)
+        set_scope(store, ["tig/goalie"], [{"repo": "github.com/Tig/Goalie"}])
+        filed = store.run("write", "--as", "tig", stdin=create("work_item", "WI-9602", item(602), "Filed"), env=QUIET)[1]
+        self.assertTrue(filed["ok"], filed)
+        body = notice(602, repo="Tig/Goalie")
+        with running_server(store.path, {**QUIET, "GOALIE_GITHUB_WEBHOOK_SECRET": SECRET, "GOALIE_GITHUB_ACTOR": ACTOR}) as (proc, port):
+            self.assertEqual(get(proc, port, "/health").status, 200)
+            reply = post(proc, port, "/api/github/webhook", body, {"X-GitHub-Event": "issues", "X-Hub-Signature-256": sign(SECRET, body)})
+        self.assertEqual(reply.status, 200, reply.body)
+        self.assertEqual(store.read("work_item", "WI-9602")["status"], "Completed")
 
 
 class GitHubWebhookConfigTests(unittest.TestCase):
@@ -375,6 +392,87 @@ process.stdout.write("ok");
 """
 
 
+# Move the work item after setStatus has read it. The goal it lands on does not name tig/goalie.
+MOVED_GOAL = r"""
+import { openStore } from "./src/store.ts";
+import { read } from "./src/read.ts";
+import { write } from "./src/write.ts";
+import { setStatus } from "./src/github_notice.ts";
+import { githubRepos, goalNamesRepo, repoInScope } from "./src/github.ts";
+
+const db = openStore(process.env.GOALIE_DB);
+const today = "2026-10-23";
+const at = "2026-10-23T00:00:00Z";
+const issue = "https://github.com/tig/goalie/issues/701";
+const repo = "tig/goalie";
+process.env.GOALIE_GITHUB_ACTOR = "github";
+
+const fail = (detail) => {
+  process.stdout.write(JSON.stringify(detail));
+  db.close();
+  process.exit(1);
+};
+
+const inScope = (row) => goalNamesRepo(db, row.goal, repo) && repoInScope(repo, githubRepos(db));
+const moved = await setStatus(db, "github", "WI-9701", "Completed", "Closed on GitHub by octocat.", today, issue, async () => {
+  const row = read(db, "work_item", "WI-9701");
+  const result = write(db, "tig", { op: "update", kind: "work_item", id: "WI-9701", base_version: row.version, fields: { goal: "XW-0001" }, reason: "Move" }, today, at);
+  if (!result.ok) fail({ step: "move", result });
+}, inScope);
+const after = read(db, "work_item", "WI-9701");
+const statusEvent = db.prepare("SELECT actor, new FROM event WHERE entity = ? AND field = 'status' AND actor = 'github'").get("WI-9701");
+if (!moved || after.status !== "Backlog" || after.goal !== "XW-0001" || statusEvent) fail({ step: "close", moved, status: after.status, goal: after.goal, statusEvent });
+db.close();
+process.stdout.write("ok");
+"""
+
+
+# Drop the repo entry after setStatus has read the work item. The work item itself stays put.
+DROPPED_REPO = r"""
+import { openStore } from "./src/store.ts";
+import { read } from "./src/read.ts";
+import { write } from "./src/write.ts";
+import { setStatus } from "./src/github_notice.ts";
+import { githubRepos, goalNamesRepo, repoInScope } from "./src/github.ts";
+
+const db = openStore(process.env.GOALIE_DB);
+const today = "2026-10-23";
+const at = "2026-10-23T00:00:00Z";
+const issue = "https://github.com/tig/goalie/issues/702";
+const repo = "tig/goalie";
+process.env.GOALIE_GITHUB_ACTOR = "github";
+
+const fail = (detail) => {
+  process.stdout.write(JSON.stringify(detail));
+  db.close();
+  process.exit(1);
+};
+
+const inScope = (row) => goalNamesRepo(db, row.goal, repo) && repoInScope(repo, githubRepos(db));
+const dropped = await setStatus(db, "github", "WI-9702", "Completed", "Closed on GitHub by octocat.", today, issue, async () => {
+  const goal = read(db, "goal", "XW-0007");
+  const product = goal.work_product.filter((entry) => entry.repo !== "github.com/tig/goalie");
+  const result = write(db, "tig", { op: "update", kind: "goal", id: "XW-0007", base_version: goal.version, fields: { work_product: product }, reason: "Drop the repository" }, today, at);
+  if (!result.ok) fail({ step: "drop", result });
+}, inScope);
+const after = read(db, "work_item", "WI-9702");
+const statusEvent = db.prepare("SELECT actor, new FROM event WHERE entity = ? AND field = 'status' AND actor = 'github'").get("WI-9702");
+if (!dropped || after.status !== "Backlog" || after.version !== 1 || statusEvent) fail({ step: "close", dropped, status: after.status, version: after.version, statusEvent });
+db.close();
+process.stdout.write("ok");
+"""
+
+
+def run_close_script(store: Store, script: str) -> subprocess.CompletedProcess[bytes]:
+    return subprocess.run(
+        ["node", "--no-warnings", "--input-type=module", "-e", script],
+        cwd=SERVER,
+        env={**os.environ, **QUIET, "GOALIE_DB": str(store.path), "GOALIE_GITHUB_ACTOR": ACTOR, "GOALIE_TODAY": "2026-10-23"},
+        capture_output=True,
+        timeout=30,
+    )
+
+
 class GitHubWebhookLiveTests(unittest.TestCase):
     """A browser that already has the event stream open receives the status Event."""
 
@@ -435,6 +533,36 @@ class GitHubWebhookRetryTests(unittest.TestCase):
             capture_output=True,
             timeout=30,
         )
+        self.assertEqual(proc.returncode, 0, proc.stdout.decode() + proc.stderr.decode())
+        self.assertEqual(proc.stdout.decode(), "ok")
+
+
+class GitHubCloseScopeTests(unittest.TestCase):
+    """A close is applied only when the work item still links the issue and the repository is still in scope."""
+
+    def prepare(self, entity: str, number: int) -> Store:
+        store = Store()
+        self.addCleanup(store.close)
+        code, result = store.run("seed", env=QUIET)
+        self.assertEqual(code, 0, result)
+        set_scope(store, ["tig/goalie"], [{"repo": "github.com/tig/goalie"}])
+        for command in (
+            create("actor", ACTOR, {"kind": "agent", "display_name": "GitHub", "operator": "tig"}),
+            create("work_item", entity, item(number), "Filed"),
+        ):
+            wrote = store.run("write", "--as", "tig", stdin=command, env=QUIET)[1]
+            self.assertTrue(wrote["ok"], (command["id"], wrote))
+        return store
+
+    def test_a_stale_retry_does_not_close_a_work_item_moved_to_another_goal(self) -> None:
+        store = self.prepare("WI-9701", 701)
+        proc = run_close_script(store, MOVED_GOAL)
+        self.assertEqual(proc.returncode, 0, proc.stdout.decode() + proc.stderr.decode())
+        self.assertEqual(proc.stdout.decode(), "ok")
+
+    def test_a_close_does_not_apply_after_the_goal_drops_the_repository(self) -> None:
+        store = self.prepare("WI-9702", 702)
+        proc = run_close_script(store, DROPPED_REPO)
         self.assertEqual(proc.returncode, 0, proc.stdout.decode() + proc.stderr.decode())
         self.assertEqual(proc.stdout.decode(), "ok")
 

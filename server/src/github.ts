@@ -20,7 +20,7 @@ const SCOPE_ENTRY = /^([^/\s]+)\/([^/\s]+)$/;
 const GOAL_REPO = /^(?:https:\/\/github\.com\/|github\.com\/)([^/]+)\/([^/]+)\/?$/;
 const TRAILER = /<!-- goalie -->[\s\S]*?<!-- \/goalie -->/;
 
-type GitHubConfig = { appId: string; installationId: string; privateKey: string; api: string; publicUrl: string };
+type GitHubConfig = { appId: string; privateKey: string; api: string; publicUrl: string };
 type Ready = { ok: true; config: GitHubConfig } | { ok: false; error: string };
 type PushRow = { work_item: string; issue: string; status: string; goal: string };
 
@@ -53,12 +53,16 @@ export function queueGitHubPush(db: DatabaseSync, after: Row): void {
   ).run(id, issue, status, goal);
 }
 
-/** Send every pending push. Call this only after the work item transaction has committed. */
+/** Send every pending push. Call this only after the work item transaction has committed. A row whose repository is not in github_repos and on the work item's current goal is deleted and not sent. */
 export async function drainGitHub(db: DatabaseSync): Promise<void> {
   const pending = db.prepare("SELECT work_item, issue, status, goal FROM github_push WHERE error IS NULL").all() as PushRow[];
   if (pending.length === 0) return;
   const ready = configuredGitHub();
   for (const row of pending) {
+    if (!pushInScope(db, row)) {
+      db.prepare("DELETE FROM github_push WHERE work_item = ?").run(row.work_item);
+      continue;
+    }
     let error: string | null;
     try {
       error = ready.ok ? await push(ready.config, row) : ready.error;
@@ -70,6 +74,14 @@ export async function drainGitHub(db: DatabaseSync): Promise<void> {
     if (error === null) db.prepare("DELETE FROM github_push WHERE work_item = ?").run(row.work_item);
     else db.prepare("UPDATE github_push SET error = ? WHERE work_item = ?").run(detail, row.work_item);
   }
+}
+
+/** The issue's repository is in github_repos and on the work item's current goal. */
+function pushInScope(db: DatabaseSync, row: PushRow): boolean {
+  const match = ISSUE_URL.exec(row.issue);
+  if (match === null) return false;
+  const repo = `${match[1]}/${match[2]}`;
+  return repoInScope(repo, githubRepos(db)) && goalNamesRepo(db, read(db, "work_item", row.work_item)?.goal, repo);
 }
 
 /** The last update and the last signed notice. The private key stays out of this. The list is github_repos. */
@@ -112,22 +124,23 @@ export function githubRepos(db: DatabaseSync): string[] {
   return kept;
 }
 
-/** True when `owner/*` covers repo, or the entry is that `owner/repo`. */
+/** True when `owner/*` covers repo, or the entry is that `owner/repo`. GitHub compares the names without case. */
 export function repoInScope(repo: string, scopes: readonly string[]): boolean {
   const slash = repo.indexOf("/");
   if (slash <= 0 || slash !== repo.lastIndexOf("/")) return false;
-  const owner = repo.slice(0, slash);
-  const name = repo.slice(slash + 1);
+  const owner = repo.slice(0, slash).toLowerCase();
+  const name = repo.slice(slash + 1).toLowerCase();
   return scopes.some((entry) => {
     const cut = entry.indexOf("/");
-    return entry.slice(0, cut) === owner && (entry.slice(cut + 1) === "*" || entry.slice(cut + 1) === name);
+    const entryName = entry.slice(cut + 1).toLowerCase();
+    return entry.slice(0, cut).toLowerCase() === owner && (entryName === "*" || entryName === name);
   });
 }
 
-/** True when the goal's work_product names repo as a `repo` entry. */
+/** True when the goal's work_product names repo as a `repo` entry. The names compare without case. */
 export function goalNamesRepo(db: DatabaseSync, goalId: unknown, repo: string): boolean {
   if (typeof goalId !== "string") return false;
-  return goalRepos(read(db, "goal", goalId)?.work_product).has(repo);
+  return goalRepos(read(db, "goal", goalId)?.work_product).has(repo.toLowerCase());
 }
 
 function storedResult(db: DatabaseSync, kind: "outbound" | "inbound"): { ok: boolean; detail: string } | null {
@@ -153,13 +166,13 @@ function linkedIssue(links: unknown, scopes: readonly string[], onGoal: Readonly
     const match = ISSUE_URL.exec(url);
     if (match === null) continue;
     const repo = `${match[1]}/${match[2]}`;
-    if (!onGoal.has(repo) || !repoInScope(repo, scopes)) continue;
+    if (!onGoal.has(repo.toLowerCase()) || !repoInScope(repo, scopes)) continue;
     return url;
   }
   return undefined;
 }
 
-/** `repo` values written `github.com/owner/repo` or `https://github.com/owner/repo`. Other entries are not repositories. */
+/** `repo` values written `github.com/owner/repo` or `https://github.com/owner/repo`. The names compare without case. Other entries are not repositories. */
 function goalRepos(workProduct: unknown): Set<string> {
   const found = new Set<string>();
   if (!Array.isArray(workProduct)) return found;
@@ -169,7 +182,7 @@ function goalRepos(workProduct: unknown): Set<string> {
     if (typeof value !== "string") continue;
     const match = GOAL_REPO.exec(value);
     if (match === null) continue;
-    found.add(`${match[1]}/${match[2]}`);
+    found.add(`${match[1]}/${match[2]}`.toLowerCase());
   }
   return found;
 }
@@ -187,7 +200,6 @@ function configuredGitHub(): Ready {
     ok: true,
     config: {
       appId: process.env.GOALIE_GITHUB_APP_ID as string,
-      installationId: process.env.GOALIE_GITHUB_INSTALLATION_ID as string,
       privateKey,
       api: (process.env.GOALIE_GITHUB_API?.trim() || "https://api.github.com").replace(/\/$/, ""),
       publicUrl: (process.env.GOALIE_PUBLIC_URL as string).trim().replace(/\/$/, ""),
@@ -200,7 +212,7 @@ async function push(config: GitHubConfig, row: PushRow): Promise<string | null> 
   const parsed = ISSUE_URL.exec(row.issue);
   if (parsed === null) return "The linked issue is not a GitHub issue URL.";
   try {
-    const issued = await installationToken(config);
+    const issued = await installationToken(config, parsed[1], parsed[2]);
     if ("error" in issued) return issued.error;
     const token = issued.token;
     const path = `/repos/${parsed[1]}/${parsed[2]}/issues/${parsed[3]}`;
@@ -250,15 +262,29 @@ function bodyWithTrailer(body: string, line: string): string {
   return `${base}${base ? "\n\n" : ""}${block}\n`;
 }
 
-async function installationToken(config: GitHubConfig): Promise<{ token: string } | { error: string }> {
+/** The installation GitHub reports for this repository. A non-200 lookup is the push failure. It must not fall back to GOALIE_GITHUB_INSTALLATION_ID. */
+async function installationToken(config: GitHubConfig, owner: string, repo: string): Promise<{ token: string } | { error: string }> {
   const now = Math.floor(Date.now() / 1000);
   const appToken = signJwt(config.appId, config.privateKey, now - 60, now + 540);
-  const path = `/app/installations/${config.installationId}/access_tokens`;
+  const lookup = `/repos/${owner}/${repo}/installation`;
+  const found = await call(config, appToken, "GET", lookup);
+  if (found.status !== 200) return { error: refused(found.status, `GET ${lookup}`, found.body) };
+  const id = reportedInstallation(found.body);
+  if (id === undefined) return { error: `GitHub answered ${found.status} for GET ${lookup} without an installation.` };
+  const path = `/app/installations/${id}/access_tokens`;
   const response = await call(config, appToken, "POST", path);
   if (response.status !== 201 && response.status !== 200) return { error: refused(response.status, `POST ${path}`, response.body) };
   const issued = (response.body as { token?: unknown }).token;
   if (typeof issued !== "string" || issued === "") return { error: `GitHub answered ${response.status} for POST ${path} without a token.` };
   return { token: issued };
+}
+
+function reportedInstallation(body: unknown): string | undefined {
+  if (typeof body !== "object" || body === null || !("id" in body)) return undefined;
+  const id = (body as { id: unknown }).id;
+  if (typeof id === "number" && Number.isInteger(id)) return String(id);
+  if (typeof id === "string" && id !== "") return id;
+  return undefined;
 }
 
 function signJwt(appId: string, privateKey: string, iat: number, exp: number): string {

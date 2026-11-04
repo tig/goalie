@@ -19,7 +19,7 @@ from typing import Any
 from urllib.parse import unquote, urlparse
 
 from goalie_cli import SERVER, Store, create, update
-from live_server import Reply, get, running_server, signed
+from live_server import Reply, get, post, running_server, signed
 
 REPO = "tig/goalie"
 ISSUE = f"https://github.com/{REPO}/issues/72"
@@ -48,7 +48,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         self._call()
-        if self._path() == f"/repos/{REPO}/issues/72":
+        path = self._path()
+        if path == f"/repos/{REPO}/installation":
+            self._send(200, {"id": 77})
+            return
+        if path == "/repos/excaliwire/factory/installation":
+            self._send(200, {"id": 88})
+            return
+        if path == f"/repos/{REPO}/issues/72":
             issue = self.server.issue
             self._send(200, {"body": issue["body"], "state": issue["state"], "state_reason": issue["state_reason"], "labels": [{"name": name} for name in issue["labels"]]})
             return
@@ -57,7 +64,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         self._call()
         path, body = self._path(), self._body()
-        if path == "/app/installations/77/access_tokens":
+        if path == "/app/installations/77/access_tokens" or path == "/app/installations/88/access_tokens":
             if self.server.fail_token:
                 self._send(500, {"message": "no"})
                 return
@@ -347,6 +354,43 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertTrue(other["ok"], other)
         self.assertEqual(self.github.calls, [])
         self.assertIsNone(self.error("WI-9032"))
+
+    def test_a_push_uses_the_installation_on_that_repository(self) -> None:
+        set_scope(self.store, ["excaliwire/*"], [{"repo": "https://github.com/excaliwire/factory"}])
+        created = self.write(create("work_item", "WI-9041", self.item([OTHER]), "Filed"))
+        self.assertTrue(created["ok"], created)
+        self.assertIn("GET /repos/excaliwire/factory/installation", self.github.calls)
+        self.assertIn("POST /app/installations/88/access_tokens", self.github.calls)
+        self.assertNotIn("POST /app/installations/77/access_tokens", self.github.calls)
+
+    def test_a_batch_that_drops_the_repository_does_not_push(self) -> None:
+        created = self.write(create("work_item", "WI-9040", self.item([ISSUE]), "Filed"))
+        self.assertTrue(created["ok"], created)
+        self.github.calls.clear()
+        actor = self.store.read("actor", "tig")
+        if actor.get("subject") != "sub-tig":
+            wrote = self.store.write("tig", update("actor", "tig", actor["version"], {"subject": "sub-tig"}))
+            self.assertTrue(wrote["ok"], wrote)
+        item = self.store.read("work_item", "WI-9040")
+        goal = self.store.read("goal", GOAL)
+        token, issuers = signed("sub-tig")
+        commands = [
+            {"op": "update", "kind": "work_item", "id": "WI-9040", "base_version": item["version"], "fields": {"status": "In Progress"}, "reason": "Started"},
+            {"op": "update", "kind": "goal", "id": GOAL, "base_version": goal["version"], "fields": {"work_product": []}, "reason": "Drop the repository"},
+        ]
+        with running_server(self.store.path, {**self.env, **issuers}) as (proc, port):
+            self.assertEqual(get(proc, port, "/health").status, 200)
+            reply = post(proc, port, "/api/commands", {"commands": commands}, {"Authorization": f"Bearer {token}"})
+        self.assertEqual(reply.status, 200, reply.body)
+        self.assertEqual(self.github.calls, [])
+        self.assertEqual(self.store.read("work_item", "WI-9040")["status"], "In Progress")
+
+    def test_a_goal_repository_matches_without_case(self) -> None:
+        set_scope(self.store, ["tig/goalie"], [{"repo": "github.com/Tig/Goalie"}])
+        created = self.write(create("work_item", "WI-9042", self.item([ISSUE]), "Filed"))
+        self.assertTrue(created["ok"], created)
+        self.assertIn("Backlog", self.github.issue["labels"])
+        self.assertNotEqual(self.github.calls, [])
 
     def test_a_goal_without_the_repository_does_not_push(self) -> None:
         set_scope(self.store, ["tig/goalie"], [{"url": "https://github.com/tig/goalie"}])
