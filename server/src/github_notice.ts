@@ -92,17 +92,17 @@ export async function setStatus(
   return after === undefined || !namesIssue(after.links, url) || after.status === status;
 }
 
-/** Answer one delivery. Call this before the bearer-token check. The route is not anonymous: the signature authenticates it. */
+/** Answer one delivery. Call this before the bearer-token check. The route is not anonymous: the signature authenticates it. Only a verified delivery is stored. */
 export async function receiveGitHubWebhook(db: DatabaseSync, c: Context, today: string): Promise<Response> {
-  const refused = (status: 401 | 503 | 500, error: string, reason: string) => {
+  const secret = process.env.GOALIE_GITHUB_WEBHOOK_SECRET?.trim();
+  if (!secret) return c.json({ error: "not_configured", reason: "GitHub is not configured. Missing GOALIE_GITHUB_WEBHOOK_SECRET." }, 503);
+  const raw = Buffer.from(await c.req.arrayBuffer());
+  const signature = signatureError(secret, raw, c.req.header("X-Hub-Signature-256"));
+  if (signature !== undefined) return c.json({ error: "unauthenticated", reason: signature }, 401);
+  const refused = (status: 503 | 500, error: string, reason: string) => {
     recordGitHubResult(db, "inbound", false, reason);
     return c.json({ error, reason }, status);
   };
-  const secret = process.env.GOALIE_GITHUB_WEBHOOK_SECRET?.trim();
-  if (!secret) return refused(503, "not_configured", "GitHub is not configured. Missing GOALIE_GITHUB_WEBHOOK_SECRET.");
-  const raw = Buffer.from(await c.req.arrayBuffer());
-  const signature = signatureError(secret, raw, c.req.header("X-Hub-Signature-256"));
-  if (signature !== undefined) return refused(401, "unauthenticated", signature);
   let payload: unknown;
   try {
     payload = JSON.parse(raw.toString("utf8")) as unknown;
@@ -134,6 +134,6 @@ export async function receiveGitHubWebhook(db: DatabaseSync, c: Context, today: 
   }
   await drainGitHub(db);
   if (!wrote) return refused(500, "not_written", "the work item was not updated");
-  recordGitHubResult(db, "inbound", true, changed ? `Closed ${close.repo}#${close.number}.` : "No linked work item changed.");
+  recordGitHubResult(db, "inbound", true, changed ? `Closed ${close.repo}#${close.number}.` : `No linked work item changed for ${close.repo}#${close.number}.`);
   return c.json({ ok: true });
 }
