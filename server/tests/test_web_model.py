@@ -945,6 +945,40 @@ class HoverTests(unittest.TestCase):
 
 
 class GitHubPageTests(unittest.TestCase):
+    def test_github_opens_from_the_owner_menu(self) -> None:
+        """The GitHub tab is gone. Github... on the GOALIE owner's avatar opens the page. Tab closes that menu from the avatar."""
+        app = (MODEL.parent / "App.tsx").read_text(encoding="utf-8")
+        self.assertIn("Github...", app)
+        self.assertIn("goalieOwner ? <OwnerMenu", app)
+        self.assertNotIn('to="/github" className={`tab', app)
+        css = (MODEL.parent / "styles.css").read_text(encoding="utf-8")
+        rule = css.split(".me button.av{", 1)[1].split("}", 1)[0]
+        self.assertNotIn("font", rule)
+        item = css.split(".ctxmenu [role=menuitem]{", 1)[1].split("}", 1)[0]
+        self.assertIn("box-sizing:border-box", item)
+        self.assertIn("button.current?.focus()", app)
+        menu = app.split("function OwnerMenu", 1)[1].split("function TopBar", 1)[0]
+        self.assertIn('kind: "actor", id: actor.id, label: actor.name', menu)
+        tab = menu.split('if (e.key === "Tab")', 1)
+        self.assertEqual(len(tab), 2)
+        handler = tab[1].split("}", 1)[0]
+        self.assertIn("button.current?.focus()", handler)
+        self.assertIn("close()", handler)
+
+    def test_the_owner_menu_is_not_the_feedback_menu(self) -> None:
+        """A right-click on Github... opens feedback. The owner menu is not the feedback menu."""
+        feedback = (MODEL.parent / "Feedback.tsx").read_text(encoding="utf-8")
+        self.assertNotIn('querySelector(".ctxmenu")', feedback)
+        self.assertNotIn('closest(".ctxmenu")', feedback)
+        self.assertIn("${FEEDBACK_CHROME}[role=menu]", feedback)
+
+    def test_feedback_about_github_returns_to_the_avatar(self) -> None:
+        """Feedback opened on Github... returns focus to the avatar. That link is gone when the dialog closes."""
+        feedback = (MODEL.parent / "Feedback.tsx").read_text(encoding="utf-8")
+        close = feedback.split("onClose={() => {", 1)[1].split("dialog.current?.close()", 1)[0]
+        self.assertIn('back?.closest(".usermenu")', close)
+        self.assertIn('querySelector<HTMLElement>(".me button.av")', close)
+
     def test_a_missing_key_still_shows_the_repositories(self) -> None:
         page = (MODEL.parent / "GitHubPage.tsx").read_text(encoding="utf-8")
         self.assertIn("data.repositories.length === 0", page)

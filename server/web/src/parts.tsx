@@ -46,12 +46,17 @@ function slot(id: string): number {
   return hash % AVATAR_COLORS;
 }
 
+/** The avatar colors for an actor. The same id keeps the same color. */
+export function avatarStyle(id: string): CSSProperties {
+  const n = slot(id);
+  return { background: `var(--av-${n}-bg)`, color: `var(--av-${n}-ink)` };
+}
+
 /**
  * An actor's initial on a palette color. `mine` outlines the signed-in actor's own avatar.
  * The name is the tooltip under the pointer, and a tap shows it too (rule 12). A tap does not open or close the row.
  */
 export function Avatar({ actor, mine = false }: { actor: ActorRef; mine?: boolean }) {
-  const n = slot(actor.id);
   const [open, setOpen] = useState(false);
   const [at, setAt] = useState<CSSProperties>({});
   const box = useRef<HTMLSpanElement>(null);
@@ -62,7 +67,7 @@ export function Avatar({ actor, mine = false }: { actor: ActorRef; mine?: boolea
       ref={box}
       className={`av${mine ? " mine" : ""}`}
       data-focus={encodeFocus({ kind: "actor", id: actor.id, label: actor.name })}
-      style={{ background: `var(--av-${n}-bg)`, color: `var(--av-${n}-ink)` }}
+      style={avatarStyle(actor.id)}
       title={actor.name}
       role="img"
       aria-label={actor.name}

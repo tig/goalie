@@ -49,7 +49,7 @@ function useMedia(query: string): boolean {
 }
 
 /** Call `close` on Escape or on a press outside every element in `inside`. */
-export function useDismiss(open: boolean, inside: React.RefObject<HTMLElement | null>[], close: () => void): void {
+export function useDismiss(open: boolean, inside: React.RefObject<HTMLElement | null>[], close: (reason?: "escape" | "pointer") => void): void {
   const within = useRef(inside);
   useEffect(() => {
     within.current = inside;
@@ -57,10 +57,10 @@ export function useDismiss(open: boolean, inside: React.RefObject<HTMLElement | 
   useEffect(() => {
     if (!open) return;
     const onDown = (e: PointerEvent) => {
-      if (!within.current.some((r) => r.current?.contains(e.target as Node))) close();
+      if (!within.current.some((r) => r.current?.contains(e.target as Node))) close("pointer");
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (e.key === "Escape") close("escape");
     };
     document.addEventListener("pointerdown", onDown);
     document.addEventListener("keydown", onKey);

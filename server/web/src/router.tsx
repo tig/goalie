@@ -31,17 +31,21 @@ export function useRoute(): Route {
 }
 
 /** A link inside the app. A plain click opens the page in place; a click with a modifier key opens it the browser's way. */
-export function Link({ to, className, children, ...rest }: { to: string; className?: string; children: ReactNode; "aria-label"?: string; tabIndex?: number; style?: React.CSSProperties; title?: string }) {
+export function Link({ to, className, children, onClick, ...rest }: { to: string; className?: string; children: ReactNode; onClick?: () => void; role?: string; "aria-current"?: "page"; "aria-label"?: string; tabIndex?: number; style?: React.CSSProperties; title?: string }) {
   return (
     <a
       href={to}
       className={className}
       {...rest}
       onClick={(e) => {
-        if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
+          onClick?.();
+          return;
+        }
         e.preventDefault();
         e.stopPropagation();
         navigate(to);
+        onClick?.();
       }}
     >
       {children}

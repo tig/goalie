@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { postFeedback } from "./data.ts";
-import { createFeedbackMark, decodeFocus, feedbackFocus, focusChain, isFeedbackChrome, isTyping, menuPoint, NOTE_MAX, type FeedbackAnswer, type FeedbackFocus, type FocusItem } from "./model/feedback.ts";
+import { createFeedbackMark, decodeFocus, FEEDBACK_CHROME, feedbackFocus, focusChain, isFeedbackChrome, isTyping, menuPoint, NOTE_MAX, type FeedbackAnswer, type FeedbackFocus, type FocusItem } from "./model/feedback.ts";
 import { parseRoute, type Route } from "./model/route.ts";
 import { useDismiss } from "./useScreen.ts";
 
@@ -63,14 +63,15 @@ export function Feedback() {
       setMenu({ ...menuPoint(point, (picked ?? target).getBoundingClientRect()), focus: feedbackFocus(PAGE_NAME[parseRoute(location.pathname).page], items), back: document.activeElement });
     };
     const mine = (target: EventTarget | null): target is Element => target instanceof Element && !isFeedbackChrome(target) && !isTyping(target);
+    const feedbackMenu = `${FEEDBACK_CHROME}[role=menu]`;
     const onMenu = (e: MouseEvent) => {
       // A held finger's own contextmenu (Android): this event opens the menu, and the press timer must not open a second one.
       if (press) {
         clearTimeout(press.timer);
         press.opened = true;
       }
-      // A contextmenu while GOALIE's menu is open, such as the ContextMenu key on its item, must not open the browser's menu over it.
-      if (document.querySelector(".ctxmenu") || (e.target instanceof Element && e.target.closest(".ctxmenu"))) {
+      // A contextmenu while the feedback menu is open must not open the browser's menu over it. The owner menu is not that menu.
+      if (document.querySelector(feedbackMenu) || (e.target instanceof Element && e.target.closest(feedbackMenu))) {
         e.preventDefault();
         return;
       }
@@ -103,7 +104,7 @@ export function Feedback() {
       const held = { x, y, opened: false, timer: 0 };
       held.timer = window.setTimeout(() => {
         held.opened = true;
-        if (!document.querySelector(".ctxmenu")) open(target, { clientX: x, clientY: y });
+        if (!document.querySelector(feedbackMenu)) open(target, { clientX: x, clientY: y });
       }, LONG_PRESS_MS);
       press = held;
     };
@@ -213,8 +214,11 @@ export function Feedback() {
         onClose={() => {
           mark.set(null);
           setFocus(undefined);
-          if (returnTo.current?.isConnected) returnTo.current.focus();
+          const back = returnTo.current;
           returnTo.current = null;
+          if (back?.isConnected) back.focus();
+          // Github... is gone with the owner menu. The avatar is still there.
+          else if (back?.closest(".usermenu")) document.querySelector<HTMLElement>(".me button.av")?.focus();
         }}
       >
         <form
