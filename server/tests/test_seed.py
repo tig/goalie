@@ -80,6 +80,10 @@ class SeedTests(unittest.TestCase):
         actors = {e["actor"] for e in self.store.events() if e["entity_kind"] == "owner_settings"}
         self.assertEqual(actors, {"tig"})
 
+    def test_the_excaliwire_seed_sets_github_repos(self) -> None:
+        settings = self.store.read("owner_settings", "owner")
+        self.assertEqual(settings["settings"]["github_repos"], ["tig/goalie"])
+
     def test_a_new_goal_after_the_seed_takes_the_next_xw_key(self) -> None:
         fields = {**self.store.read("goal", "XW-0005"), "summary": "Ship the next MLP slice to Tig"}
         fields = {k: v for k, v in fields.items() if k not in ("id", "version", "original_committed_date", "committed_plan_version")}

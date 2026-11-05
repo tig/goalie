@@ -1,10 +1,10 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import type { Context } from "hono";
-import { canonicalIssueUrl, drainGitHub, recordGitHubResult } from "./github.ts";
+import { canonicalIssueUrl, drainGitHub, githubRepos, goalNamesRepo, recordGitHubResult, repoInScope } from "./github.ts";
 import { publish, toApiEvent } from "./live.ts";
 import { goalieOwner, read, readAll } from "./read.ts";
-import { isGitHubAgent } from "./rules.ts";
+import { isGitHubAgent, type Row } from "./rules.ts";
 import { write } from "./write.ts";
 
 /**
@@ -16,13 +16,6 @@ import { write } from "./write.ts";
 type Close = { repo: string; number: number; status: "Completed" | "Deleted"; login: string };
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
-
-function configuredRepo(): string | undefined {
-  const repo = process.env.GOALIE_GITHUB_REPO?.trim() ?? "";
-  const parts = repo.split("/");
-  if (parts.length !== 2 || parts[0] === "" || parts[1] === "") return undefined;
-  return repo;
-}
 
 /** Undefined when the header matches. The comparison does not throw on a short header. */
 function signatureError(secret: string, body: Buffer, header: string | undefined): string | undefined {
@@ -53,15 +46,19 @@ function readClose(event: string | undefined, payload: unknown): Close | undefin
   return { repo, number: number as number, status, login: login.trim() };
 }
 
+/** The owner and repository compare without case. A trailing slash is the same issue. */
 function namesIssue(links: unknown, url: string): boolean {
-  return Array.isArray(links) && links.some((link) => typeof link === "string" && canonicalIssueUrl(link) === url);
+  const wanted = canonicalIssueUrl(url)?.toLowerCase();
+  if (wanted === undefined) return false;
+  return Array.isArray(links) && links.some((link) => typeof link === "string" && canonicalIssueUrl(link)?.toLowerCase() === wanted);
 }
 
 /**
  * Set status through the one write path when the work item still names `url`.
- * A stale write is tried once more, and that read checks the links again.
+ * After `beforeWrite`, and again on a stale retry, the read must still name `url` and `inScope` must still allow it.
  * True when nothing remains to write.
- * `beforeWrite` runs after the read and before the write. The stale-relink test passes it. The route does not.
+ * `beforeWrite` runs after the first read and before the write. The stale-relink test passes it. The route does not.
+ * `inScope` is the route's scope check. The stale-relink test does not pass it.
  */
 export async function setStatus(
   db: DatabaseSync,
@@ -72,24 +69,29 @@ export async function setStatus(
   today: string,
   url: string,
   beforeWrite?: () => Promise<void>,
+  inScope?: (row: Row) => boolean,
 ): Promise<boolean> {
   const once = (version: number) => {
     const result = write(db, actor, { op: "update", kind: "work_item", id, base_version: version, fields: { status }, reason }, today);
     if (result.ok && result.events.length > 0) publish(result.events.map(toApiEvent));
     return result;
   };
+  const applies = (row: Row | undefined): row is Row =>
+    row !== undefined && namesIssue(row.links, url) && row.status !== status && (inScope === undefined || inScope(row));
   const current = read(db, "work_item", id);
-  if (current === undefined || !namesIssue(current.links, url) || current.status === status) return true;
+  if (!applies(current)) return true;
   await beforeWrite?.();
-  const first = once(current.version as number);
+  const ready = read(db, "work_item", id);
+  if (!applies(ready)) return true;
+  const first = once(ready.version as number);
   if (first.ok) return true;
   if (first.error !== "stale") return false;
   const again = read(db, "work_item", id);
-  if (again === undefined || !namesIssue(again.links, url) || again.status === status) return true;
+  if (!applies(again)) return true;
   const second = once(again.version as number);
   if (second.ok) return true;
   const after = read(db, "work_item", id);
-  return after === undefined || !namesIssue(after.links, url) || after.status === status;
+  return !applies(after);
 }
 
 /** Answer one delivery. Call this before the bearer-token check. The route is not anonymous: the signature authenticates it. Only a verified delivery is stored. */
@@ -111,9 +113,7 @@ export async function receiveGitHubWebhook(db: DatabaseSync, c: Context, today: 
   }
   const close = readClose(c.req.header("X-GitHub-Event"), payload);
   if (close === undefined) return c.json({ ok: true });
-  const repo = configuredRepo();
-  if (repo === undefined) return refused(503, "not_configured", "GitHub is not configured. GOALIE_GITHUB_REPO must be owner/repo.");
-  if (close.repo !== repo) return c.json({ ok: true });
+  if (!repoInScope(close.repo, githubRepos(db))) return c.json({ ok: true });
   const actorId = process.env.GOALIE_GITHUB_ACTOR?.trim();
   const actor = actorId === undefined || actorId === "" ? undefined : read(db, "actor", actorId);
   if (actorId === undefined || actorId === "" || actor === undefined || !isGitHubAgent(actor, goalieOwner(db), actorId)) {
@@ -121,15 +121,16 @@ export async function receiveGitHubWebhook(db: DatabaseSync, c: Context, today: 
   }
   const url = `https://github.com/${close.repo}/issues/${close.number}`;
   const reason = `Closed on GitHub by ${close.login}.`;
+  const inScope = (row: Row) => goalNamesRepo(db, row.goal, close.repo) && repoInScope(close.repo, githubRepos(db));
   let wrote = true;
   let changed = false;
   for (const row of readAll(db, "work_item")) {
     const id = row.id;
     const links = row.links;
-    if (typeof id !== "string" || !Array.isArray(links)) continue;
-    if (!links.some((link) => typeof link === "string" && canonicalIssueUrl(link) === url)) continue;
+    if (typeof id !== "string" || !namesIssue(links, url)) continue;
+    if (!goalNamesRepo(db, row.goal, close.repo)) continue;
     const before = row.status;
-    if (!(await setStatus(db, actorId, id, close.status, reason, today, url))) wrote = false;
+    if (!(await setStatus(db, actorId, id, close.status, reason, today, url, undefined, inScope))) wrote = false;
     else if (read(db, "work_item", id)?.status !== before) changed = true;
   }
   await drainGitHub(db);

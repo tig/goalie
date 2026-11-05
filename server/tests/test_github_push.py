@@ -19,7 +19,7 @@ from typing import Any
 from urllib.parse import unquote, urlparse
 
 from goalie_cli import SERVER, Store, create, update
-from live_server import Reply, get, running_server, signed
+from live_server import Reply, get, post, running_server, signed
 
 REPO = "tig/goalie"
 ISSUE = f"https://github.com/{REPO}/issues/72"
@@ -48,7 +48,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         self._call()
-        if self._path() == f"/repos/{REPO}/issues/72":
+        path = self._path()
+        if path == f"/repos/{REPO}/installation":
+            self._send(200, {"id": 77})
+            return
+        if path == "/repos/excaliwire/factory/installation":
+            self._send(200, {"id": 88})
+            return
+        if path == f"/repos/{REPO}/issues/72":
             issue = self.server.issue
             self._send(200, {"body": issue["body"], "state": issue["state"], "state_reason": issue["state_reason"], "labels": [{"name": name} for name in issue["labels"]]})
             return
@@ -57,7 +64,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         self._call()
         path, body = self._path(), self._body()
-        if path == "/app/installations/77/access_tokens":
+        if path == "/app/installations/77/access_tokens" or path == "/app/installations/88/access_tokens":
             if self.server.fail_token:
                 self._send(500, {"message": "no"})
                 return
@@ -119,6 +126,20 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
 
+def set_scope(store: Store, repos: list[str], product: list[dict[str, str]] | None, goal: str = GOAL) -> None:
+    """The owner setting github_repos and the repo entries on the goal. The env var is not this."""
+    settings = store.read("owner_settings", "owner")
+    wrote = store.write("tig", update("owner_settings", "owner", settings["version"], {"settings": {**settings["settings"], "github_repos": repos}}))
+    if not wrote["ok"]:
+        raise AssertionError(wrote)
+    row = store.read("goal", goal)
+    if row.get("work_product") == product:
+        return
+    named = store.write("tig", update("goal", goal, row["version"], {"work_product": product}, "Name the repositories"))
+    if not named["ok"]:
+        raise AssertionError(named)
+
+
 def private_key() -> str:
     script = "import { generateKeyPairSync } from 'node:crypto'; const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 }); process.stdout.write(privateKey.export({ type: 'pkcs8', format: 'pem' }));"
     return subprocess.run(["node", "--input-type=module", "-e", script], cwd=SERVER, capture_output=True, check=True, text=True).stdout
@@ -146,7 +167,6 @@ class PushTests:
             "GOALIE_GITHUB_APP_ID": "123456",
             "GOALIE_GITHUB_INSTALLATION_ID": "77",
             "GOALIE_GITHUB_PRIVATE_KEY_FILE": key,
-            "GOALIE_GITHUB_REPO": REPO,
             "GOALIE_GITHUB_API": f"http://{host}:{port}",
             "GOALIE_PUBLIC_URL": PUBLIC,
         }
@@ -179,6 +199,7 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.github.calls.clear()
         self.github.fail_token = False
         self.github.issue = {"body": "Keep this.", "state": "open", "state_reason": None, "labels": ["pinned"]}
+        set_scope(self.store, ["tig/goalie"], [{"repo": "github.com/tig/goalie"}])
 
     def test_a_status_change_sets_the_label_the_trailer_and_the_close(self) -> None:
         created = self.write(create("work_item", ITEM, self.item([ISSUE]), "Filed"))
@@ -270,8 +291,9 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         raw = reply.body.decode()
         body = json.loads(raw)
         self.assertFalse(body["configured"])
-        self.assertEqual(body["repository"], "tig/goalie")
-        self.assertEqual(set(body), {"configured", "repository", "outbound", "inbound"})
+        self.assertEqual(body["repositories"], ["tig/goalie"])
+        self.assertNotIn("repository", body)
+        self.assertEqual(set(body), {"configured", "repositories", "outbound", "inbound"})
         self.assertNotIn("privateKey", body)
         self.assertNotIn("CANARYKEYPATH", raw)
         self.assertNotIn("CANARYKEYTEXT", raw)
@@ -284,7 +306,9 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertEqual(reply.status, 200, reply.body)
         raw = reply.body.decode()
         body = json.loads(raw)
-        self.assertEqual(set(body), {"configured", "repository", "outbound", "inbound"})
+        self.assertEqual(set(body), {"configured", "repositories", "outbound", "inbound"})
+        self.assertEqual(body["repositories"], ["tig/goalie"])
+        self.assertNotIn("repository", body)
         self.assertNotIn("privateKey", body)
         self.assertNotIn("BEGIN PRIVATE KEY", raw)
         self.assertNotIn("github.pem", raw)
@@ -304,6 +328,111 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertNotIn("privateKey", body)
         self.assertFalse(body["outbound"]["ok"])
         self.assertEqual(body["outbound"]["detail"], shown["github_error"])
+
+    def env_without_repo(self) -> dict[str, str]:
+        env = dict(self.env)
+        env["GOALIE_GITHUB_REPO"] = ""
+        return env
+
+    def test_a_status_change_pushes_tig_goalie_from_the_owner_setting(self) -> None:
+        set_scope(self.store, ["tig/goalie"], [{"repo": "github.com/tig/goalie"}])
+        created = self.store.run("write", "--as", "tig", stdin=create("work_item", "WI-9030", self.item([ISSUE]), "Filed"), env=self.env_without_repo())[1]
+        self.assertTrue(created["ok"], created)
+        self.assertIn("POST /app/installations/77/access_tokens", self.github.calls)
+        self.assertIn("GET /repos/tig/goalie/issues/72", self.github.calls)
+        self.assertEqual(set(self.github.issue["labels"]), {"pinned", "Backlog"})
+        self.assertIsNone(self.error("WI-9030"))
+
+    def test_a_missing_list_uses_the_deployment_repository(self) -> None:
+        """A status change still pushes when owner settings have no github_repos list and the deployment names that repository."""
+        settings = self.store.read("owner_settings", "owner")
+        fields = {key: value for key, value in settings["settings"].items() if key != "github_repos"}
+        wrote = self.store.write("tig", update("owner_settings", "owner", settings["version"], {"settings": fields}))
+        self.assertTrue(wrote["ok"], wrote)
+        self.assertNotIn("github_repos", self.store.read("owner_settings", "owner")["settings"])
+        env = dict(self.env)
+        env["GOALIE_GITHUB_REPO"] = "tig/goalie"
+        created = self.store.run("write", "--as", "tig", stdin=create("work_item", "WI-9055", self.item([ISSUE]), "Filed"), env=env)[1]
+        self.assertTrue(created["ok"], created)
+        self.assertIn("GET /repos/tig/goalie/issues/72", self.github.calls)
+
+    def test_an_empty_list_ignores_the_deployment_repository(self) -> None:
+        """An empty github_repos list is the scope. The deployment repository does not fill it."""
+        set_scope(self.store, [], [{"repo": "github.com/tig/goalie"}])
+        env = dict(self.env)
+        env["GOALIE_GITHUB_REPO"] = "tig/goalie"
+        created = self.store.run("write", "--as", "tig", stdin=create("work_item", "WI-9056", self.item([ISSUE]), "Filed"), env=env)[1]
+        self.assertTrue(created["ok"], created)
+        self.assertEqual(self.github.calls, [])
+
+    def test_excaliwire_wildcard_matches_factory_not_tig_goalie(self) -> None:
+        set_scope(self.store, ["excaliwire/*"], [{"repo": "https://github.com/excaliwire/factory"}, {"repo": "github.com/tig/goalie"}])
+        env = self.env_without_repo()
+        factory = self.store.run("write", "--as", "tig", stdin=create("work_item", "WI-9031", self.item([OTHER]), "Filed"), env=env)[1]
+        self.assertTrue(factory["ok"], factory)
+        self.assertTrue(any(call.startswith("GET /repos/excaliwire/factory/") for call in self.github.calls), self.github.calls)
+        self.github.calls.clear()
+        other = self.store.run("write", "--as", "tig", stdin=create("work_item", "WI-9032", self.item([ISSUE]), "Filed"), env=env)[1]
+        self.assertTrue(other["ok"], other)
+        self.assertEqual(self.github.calls, [])
+        self.assertIsNone(self.error("WI-9032"))
+
+    def test_a_push_uses_the_installation_on_that_repository(self) -> None:
+        set_scope(self.store, ["excaliwire/*"], [{"repo": "https://github.com/excaliwire/factory"}])
+        created = self.write(create("work_item", "WI-9041", self.item([OTHER]), "Filed"))
+        self.assertTrue(created["ok"], created)
+        self.assertIn("GET /repos/excaliwire/factory/installation", self.github.calls)
+        self.assertIn("POST /app/installations/88/access_tokens", self.github.calls)
+        self.assertNotIn("POST /app/installations/77/access_tokens", self.github.calls)
+
+    def test_a_batch_that_drops_the_repository_does_not_push(self) -> None:
+        created = self.write(create("work_item", "WI-9040", self.item([ISSUE]), "Filed"))
+        self.assertTrue(created["ok"], created)
+        self.github.calls.clear()
+        actor = self.store.read("actor", "tig")
+        if actor.get("subject") != "sub-tig":
+            wrote = self.store.write("tig", update("actor", "tig", actor["version"], {"subject": "sub-tig"}))
+            self.assertTrue(wrote["ok"], wrote)
+        item = self.store.read("work_item", "WI-9040")
+        goal = self.store.read("goal", GOAL)
+        token, issuers = signed("sub-tig")
+        commands = [
+            {"op": "update", "kind": "work_item", "id": "WI-9040", "base_version": item["version"], "fields": {"status": "In Progress"}, "reason": "Started"},
+            {"op": "update", "kind": "goal", "id": GOAL, "base_version": goal["version"], "fields": {"work_product": []}, "reason": "Drop the repository"},
+        ]
+        with running_server(self.store.path, {**self.env, **issuers}) as (proc, port):
+            self.assertEqual(get(proc, port, "/health").status, 200)
+            reply = post(proc, port, "/api/commands", {"commands": commands}, {"Authorization": f"Bearer {token}"})
+        self.assertEqual(reply.status, 200, reply.body)
+        self.assertEqual(self.github.calls, [])
+        self.assertEqual(self.store.read("work_item", "WI-9040")["status"], "In Progress")
+
+    def test_a_goal_repository_matches_without_case(self) -> None:
+        set_scope(self.store, ["tig/goalie"], [{"repo": "github.com/Tig/Goalie"}])
+        created = self.write(create("work_item", "WI-9042", self.item([ISSUE]), "Filed"))
+        self.assertTrue(created["ok"], created)
+        self.assertIn("Backlog", self.github.issue["labels"])
+        self.assertNotEqual(self.github.calls, [])
+
+    def test_a_goal_without_the_repository_does_not_push(self) -> None:
+        set_scope(self.store, ["tig/goalie"], [{"url": "https://github.com/tig/goalie"}])
+        created = self.store.run("write", "--as", "tig", stdin=create("work_item", "WI-9033", self.item([ISSUE]), "Filed"), env=self.env_without_repo())[1]
+        self.assertTrue(created["ok"], created)
+        self.assertEqual(self.store.read("work_item", "WI-9033")["status"], "Backlog")
+        self.assertEqual(self.github.calls, [])
+        self.assertIsNone(self.error("WI-9033"))
+
+    def test_status_json_has_repositories_not_repository(self) -> None:
+        set_scope(self.store, ["tig/goalie"], [{"repo": "github.com/tig/goalie"}])
+        reply = self.status_as("tig", "sub-tig", {"GOALIE_GITHUB_REPO": ""})
+        self.assertEqual(reply.status, 200, reply.body)
+        body = json.loads(reply.body)
+        self.assertEqual(set(body), {"configured", "repositories", "outbound", "inbound"})
+        self.assertNotIn("repository", body)
+        self.assertEqual(body["repositories"], ["tig/goalie"])
+        self.assertTrue(body["configured"])
+        self.assertNotIn("privateKey", body)
+        self.assertNotIn("BEGIN PRIVATE KEY", reply.body.decode())
 
     def test_a_human_who_is_not_the_goalie_owner_gets_403(self) -> None:
         reply = self.status_as("chelsea", "sub-chelsea")
