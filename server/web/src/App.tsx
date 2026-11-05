@@ -20,6 +20,7 @@ import { NewGoal } from "./NewGoal.tsx";
 import { WorkPage } from "./WorkPage.tsx";
 import { GitHubPage } from "./GitHubPage.tsx";
 import { Feedback } from "./Feedback.tsx";
+import { encodeFocus } from "./model/feedback.ts";
 import { backPath, newGoalPath, workPath } from "./model/route.ts";
 import { homeSearch, Link, rememberHome, useRoute } from "./router.tsx";
 
@@ -58,14 +59,18 @@ function OwnerMenu({ actor }: { actor: PrioritiesResponse["me"] }) {
   const route = useRoute();
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLSpanElement>(null);
-  const close = useCallback(() => setOpen(false), []);
+  const button = useRef<HTMLButtonElement>(null);
+  const close = useCallback((reason?: "escape" | "pointer") => {
+    if (reason === "escape") button.current?.focus();
+    setOpen(false);
+  }, []);
   useDismiss(open, [box], close);
   useEffect(() => {
     if (open) box.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus();
   }, [open]);
   return (
     <span className="me" ref={box}>
-      <button type="button" className="av" style={avatarStyle(actor.id)} aria-label={actor.name} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+      <button ref={button} type="button" className="av" style={avatarStyle(actor.id)} data-focus={encodeFocus({ kind: "actor", id: actor.id, label: actor.name })} aria-label={actor.name} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
         {actor.name.slice(0, 1)}
       </button>
       {open && (

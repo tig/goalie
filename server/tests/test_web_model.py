@@ -954,6 +954,11 @@ class GitHubPageTests(unittest.TestCase):
         css = (MODEL.parent / "styles.css").read_text(encoding="utf-8")
         rule = css.split(".me button.av{", 1)[1].split("}", 1)[0]
         self.assertNotIn("font", rule)
+        item = css.split(".ctxmenu [role=menuitem]{", 1)[1].split("}", 1)[0]
+        self.assertIn("box-sizing:border-box", item)
+        self.assertIn("button.current?.focus()", app)
+        menu = app.split("function OwnerMenu", 1)[1].split("function TopBar", 1)[0]
+        self.assertIn('kind: "actor", id: actor.id, label: actor.name', menu)
 
     def test_a_missing_key_still_shows_the_repository(self) -> None:
         page = (MODEL.parent / "GitHubPage.tsx").read_text(encoding="utf-8")
