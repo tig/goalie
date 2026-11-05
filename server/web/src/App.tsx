@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ApiError, Health, PrioritiesResponse } from "../../src/api.ts";
 import { monthYear } from "../../src/dates.ts";
 import { labelSizers, rangeLabel } from "./model/labels.ts";
@@ -11,15 +11,16 @@ import { postCommands } from "./data.ts";
 import { Cards, HealthCounts } from "./Cards.tsx";
 import { CalendarView } from "./CalendarView.tsx";
 import { ListView } from "./ListView.tsx";
-import { Avatar, BRAND } from "./parts.tsx";
+import { Avatar, avatarStyle, BRAND } from "./parts.tsx";
 import { Search } from "./Search.tsx";
 import { TimelineView } from "./TimelineView.tsx";
-import { usePhone, useScreen } from "./useScreen.ts";
+import { useDismiss, usePhone, useScreen } from "./useScreen.ts";
 import { GoalPage } from "./GoalPage.tsx";
 import { NewGoal } from "./NewGoal.tsx";
 import { WorkPage } from "./WorkPage.tsx";
 import { GitHubPage } from "./GitHubPage.tsx";
 import { Feedback } from "./Feedback.tsx";
+import { encodeFocus } from "./model/feedback.ts";
 import { backPath, newGoalPath, workPath } from "./model/route.ts";
 import { homeSearch, Link, rememberHome, useRoute } from "./router.tsx";
 
@@ -37,8 +38,8 @@ async function load(): Promise<Load> {
   return { state: "refused", status: reply.status, reason: error.reason ?? reply.statusText };
 }
 
-/** The top bar's pages: Home, Work items, and GitHub for the GOALIE owner. The one you are on is filled. */
-function TopTabs({ owner }: { owner: boolean }) {
+/** The top bar's pages: Home and Work items. The one you are on is filled. */
+function TopTabs() {
   const route = useRoute();
   const homeOff = route.page === "work" || route.page === "github";
   return (
@@ -49,12 +50,37 @@ function TopTabs({ owner }: { owner: boolean }) {
       <Link to={workPath()} className={`tab${route.page === "work" ? "" : " off"}`}>
         Work items
       </Link>
-      {owner && (
-        <Link to="/github" className={`tab${route.page === "github" ? "" : " off"}`}>
-          GitHub
-        </Link>
-      )}
     </nav>
+  );
+}
+
+/** Github... on the GOALIE owner's avatar. It opens the GitHub page. Anyone else keeps the name tooltip. Tab closes the menu from the avatar. */
+function OwnerMenu({ actor }: { actor: PrioritiesResponse["me"] }) {
+  const route = useRoute();
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLSpanElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const close = useCallback((reason?: "escape" | "pointer") => {
+    if (reason === "escape") button.current?.focus();
+    setOpen(false);
+  }, []);
+  useDismiss(open, [box], close);
+  useEffect(() => {
+    if (open) box.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus();
+  }, [open]);
+  return (
+    <span className="me" ref={box}>
+      <button ref={button} type="button" className="av" style={avatarStyle(actor.id)} data-focus={encodeFocus({ kind: "actor", id: actor.id, label: actor.name })} aria-label={actor.name} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+        {actor.name.slice(0, 1)}
+      </button>
+      {open && (
+        <div className="ctxmenu usermenu" role="menu" aria-label={actor.name} onKeyDown={(e) => { if (e.key === "Tab") { button.current?.focus(); close(); } }}>
+          <Link to="/github" role="menuitem" aria-current={route.page === "github" ? "page" : undefined} onClick={close}>
+            Github...
+          </Link>
+        </div>
+      )}
+    </span>
   );
 }
 
@@ -64,7 +90,7 @@ function TopBar({ data }: { data?: PrioritiesResponse }) {
       <span className="logo">{BRAND.mark}</span>
       <span className="brand">{BRAND.app}</span>
       {data && <span className="org">/ {data.org.name}</span>}
-      {data && <TopTabs owner={data.goalieOwner} />}
+      {data && <TopTabs />}
       {/* Feedback is in the top bar on every page, before New goal (#56). */}
       <Feedback />
       {/* NG1: New goal is in the top bar on every page, before the avatar; on a phone a 44 px + named "New goal". */}
@@ -76,11 +102,11 @@ function TopBar({ data }: { data?: PrioritiesResponse }) {
           <span className="topnewword">New goal</span>
         </Link>
       )}
-      {data && (
+      {data && (data.goalieOwner ? <OwnerMenu actor={data.me} /> : (
         <span className="me">
           <Avatar actor={data.me} />
         </span>
-      )}
+      ))}
     </header>
   );
 }
