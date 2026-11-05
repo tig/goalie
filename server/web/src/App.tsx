@@ -54,7 +54,7 @@ function TopTabs() {
   );
 }
 
-/** Github... on the GOALIE owner's avatar. It opens the GitHub page. Anyone else keeps the name tooltip. */
+/** Github... on the GOALIE owner's avatar. It opens the GitHub page. Anyone else keeps the name tooltip. Tab closes the menu from the avatar. */
 function OwnerMenu({ actor }: { actor: PrioritiesResponse["me"] }) {
   const route = useRoute();
   const [open, setOpen] = useState(false);
@@ -74,7 +74,7 @@ function OwnerMenu({ actor }: { actor: PrioritiesResponse["me"] }) {
         {actor.name.slice(0, 1)}
       </button>
       {open && (
-        <div className="ctxmenu usermenu" role="menu" aria-label={actor.name}>
+        <div className="ctxmenu usermenu" role="menu" aria-label={actor.name} onKeyDown={(e) => { if (e.key === "Tab") { button.current?.focus(); close(); } }}>
           <Link to="/github" role="menuitem" aria-current={route.page === "github" ? "page" : undefined} onClick={close}>
             Github...
           </Link>

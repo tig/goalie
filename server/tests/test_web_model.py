@@ -946,7 +946,7 @@ class HoverTests(unittest.TestCase):
 
 class GitHubPageTests(unittest.TestCase):
     def test_github_opens_from_the_owner_menu(self) -> None:
-        """The GitHub tab is gone. Github... on the GOALIE owner's avatar opens the page."""
+        """The GitHub tab is gone. Github... on the GOALIE owner's avatar opens the page. Tab closes that menu from the avatar."""
         app = (MODEL.parent / "App.tsx").read_text(encoding="utf-8")
         self.assertIn("Github...", app)
         self.assertIn("goalieOwner ? <OwnerMenu", app)
@@ -959,6 +959,11 @@ class GitHubPageTests(unittest.TestCase):
         self.assertIn("button.current?.focus()", app)
         menu = app.split("function OwnerMenu", 1)[1].split("function TopBar", 1)[0]
         self.assertIn('kind: "actor", id: actor.id, label: actor.name', menu)
+        tab = menu.split('if (e.key === "Tab")', 1)
+        self.assertEqual(len(tab), 2)
+        handler = tab[1].split("}", 1)[0]
+        self.assertIn("button.current?.focus()", handler)
+        self.assertIn("close()", handler)
 
     def test_the_owner_menu_is_not_the_feedback_menu(self) -> None:
         """A right-click on Github... opens feedback. The owner menu is not the feedback menu."""
