@@ -347,24 +347,37 @@ function Form({ options, parent, under, back }: { options: FormOptions; parent?:
                 )}
                 <span className="flabel">Priority</span>
                 {/* NF4a: a deliberate choice, none chosen. Home lists only goals mapped to a Priority. */}
-                <div className="prows" role="radiogroup" aria-label="Priority" id="ng-priority" {...invalid("priority")}>
-                  {[{ id: null, rank: null, title: "None" }, ...options.priorities].map((p) => (
-                    <label key={p.id ?? "none"} className={`prow${picked && form.priority === p.id ? " on" : ""}`}>
-                      <input
-                        type="radio"
-                        name="priority"
-                        checked={picked && form.priority === p.id}
-                        onChange={() => {
+                {/* NG4a: tiles, as Date Type and Plan Maturity. No priority is last. */}
+                <div className="tiles ptiles" role="radiogroup" aria-label="Priority" id="ng-priority" {...invalid("priority")}>
+                  {[...options.priorities, { id: null, rank: null, title: "No priority" }].map((p) => {
+                    const on = picked && form.priority === p.id;
+                    return (
+                      <button
+                        key={p.id ?? "none"}
+                        type="button"
+                        role="radio"
+                        aria-checked={on}
+                        className={`tile${on ? " on" : ""}${p.id ? "" : " none"}`}
+                        onClick={() => {
                           setPicked(true);
                           set({ priority: p.id });
                         }}
-                      />
-                      <span className="rnum">{p.rank ?? ""}</span>
-                      <span className={p.id ? "" : "muted"}>{p.title}</span>
-                    </label>
-                  ))}
+                      >
+                        {p.id ? (
+                          <>
+                            <span className="tcost">Priority {p.rank}</span>
+                            <b>{p.title}</b>
+                          </>
+                        ) : (
+                          <>
+                            <b>{p.title}</b>
+                            <span className="tcost">Not on Priorities</span>
+                          </>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
-                {picked && !form.priority && <p className="small muted">It will not show on Priorities.</p>}
                 {miss("priority")}
               </>
             )}

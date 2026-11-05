@@ -24,7 +24,7 @@ const WORDS: Record<string, [string, string]> = {
   milestone_date: ["Promotion Milestone date", "Pick a Committed date between tomorrow and this goal's date."],
   milestone: ["Promotion Milestone", "The Promotion Milestone needs a summary and a human owner."],
   plan_maturity: ["Plan at Pencil", "A Committed date needs a plan at Pencil."],
-  priority: ["Priority, or None", "Choose a Priority, or None. With None, it will not show on Priorities."],
+  priority: ["Priority, or No priority", "Choose a Priority, or No priority. With No priority, it will not show on Priorities."],
   owner: ["Owner", "Choose one human owner."],
   health: ["Health", "An In Progress goal needs a health: On track, At risk, or Off track."],
   path_to_green: ["Path to Green", "An At risk or Off track goal needs a Path to Green: a step with an owner and a date, and when it is On track again."],

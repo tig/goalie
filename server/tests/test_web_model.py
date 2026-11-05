@@ -805,15 +805,15 @@ class NewGoalV2Tests(unittest.TestCase):
         return run(f"return newgoal.toSave({json.dumps({**self.BASE, **form})}, {json.dumps(answer)}, {json.dumps(details)}).map((l) => [l.key, l.text, l.done]);")
 
     def test_an_empty_form_lists_the_foundation_with_nothing_done(self) -> None:
-        self.assertEqual(self.lines({}), [["summary", "Summary", False], ["due_date", "Date", False], ["date_type", "Date Type", False], ["priority", "Priority, or None", False]])
+        self.assertEqual(self.lines({}), [["summary", "Summary", False], ["due_date", "Date", False], ["date_type", "Date Type", False], ["priority", "Priority, or No priority", False]])
 
     def test_priority_is_met_once_picked_even_as_none_and_from_a_parent(self) -> None:
-        self.assertEqual(self.lines({"priorityPicked": True})[-1], ["priority", "Priority, or None", True])
+        self.assertEqual(self.lines({"priorityPicked": True})[-1], ["priority", "Priority, or No priority", True])
         self.assertEqual(self.lines({"summary": "Help text", "parent": "XW-0004"}), [["summary", "Summary", True]])
 
     def test_an_uncommitted_date_adds_the_milestone_date_and_a_committed_one_the_plan(self) -> None:
         fantasy = self.lines({"summary": "Ship it", "due_date": "2027-02-26", "date_type": "Fantasy", "milestone": {"summary": "Commit", "due_date": "", "owner": "chelsea"}})
-        self.assertEqual(fantasy, [["summary", "Summary", True], ["due_date", "Date", True], ["date_type", "Date Type", True], ["milestone_date", "Promotion Milestone date", False], ["priority", "Priority, or None", False]])
+        self.assertEqual(fantasy, [["summary", "Summary", True], ["due_date", "Date", True], ["date_type", "Date Type", True], ["milestone_date", "Promotion Milestone date", False], ["priority", "Priority, or No priority", False]])
         committed = self.lines({"summary": "Ship it", "due_date": "2027-02-26", "date_type": "Committed"}, {"ok": True, "ids": {}, "events": []})
         self.assertEqual(committed[-2], ["plan_maturity", "Plan at Pencil", True])
 
