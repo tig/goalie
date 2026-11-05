@@ -951,6 +951,9 @@ class GitHubPageTests(unittest.TestCase):
         self.assertIn("Github...", app)
         self.assertIn("goalieOwner ? <OwnerMenu", app)
         self.assertNotIn('to="/github" className={`tab', app)
+        css = (MODEL.parent / "styles.css").read_text(encoding="utf-8")
+        rule = css.split(".me button.av{", 1)[1].split("}", 1)[0]
+        self.assertNotIn("font", rule)
 
     def test_a_missing_key_still_shows_the_repository(self) -> None:
         page = (MODEL.parent / "GitHubPage.tsx").read_text(encoding="utf-8")
