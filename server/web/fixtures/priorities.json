@@ -240,6 +240,7 @@
     }
   ],
   "backlog": [],
+  "unprioritized": [],
   "summary": {
     "counts": {
       "RED": 1,

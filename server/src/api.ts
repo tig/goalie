@@ -64,6 +64,8 @@ export type PrioritiesResponse = {
   funded: ApiPriority[];
   /** Priorities below the cut line, in rank order. */
   backlog: ApiPriority[];
+  /** Open top goals of this view with no Priority, each with its tree. Home shows them as No priority (rule 35b). */
+  unprioritized: ApiGoal[];
   summary: ApiSummary;
 };
 

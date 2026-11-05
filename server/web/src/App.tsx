@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ApiError, Health, PrioritiesResponse } from "../../src/api.ts";
+import type { ApiError, GoalPageResponse, Health, PrioritiesResponse } from "../../src/api.ts";
 import { monthYear } from "../../src/dates.ts";
 import { labelSizers, rangeLabel } from "./model/labels.ts";
 import { calendarMonth } from "./model/calendar.ts";
 import { filterPriorities, isFiltering } from "./model/filter.ts";
 import { ZOOM_ORDER, type View } from "./model/query.ts";
 import { moveFrom, timelineWindow } from "./model/timeline.ts";
-import { rankBatch } from "./model/commands.ts";
-import { postCommands } from "./data.ts";
+import { fieldsBatch, rankBatch } from "./model/commands.ts";
+import { moveFields, type Spot } from "./model/arrange.ts";
+import { getJson, postCommands } from "./data.ts";
 import { Cards, HealthCounts } from "./Cards.tsx";
 import { CalendarView } from "./CalendarView.tsx";
 import { ListView } from "./ListView.tsx";
@@ -235,7 +236,25 @@ function Home({ data, reload }: { data: PrioritiesResponse; reload: () => void }
           },
         }
       : undefined;
-  const tree = { funded, backlog, me: data.me, today: data.today, filtering, selected: screen.health, hot, rank };
+  // Rule 35b: goals with no Priority show last, as No priority. Unfiltered, a goal its owner may change is dragged to arrange it.
+  const none = useMemo(() => filterPriorities([{ id: "none", version: 0, rank: 0, title: "No priority", goals: data.unprioritized ?? [] }], { health: screen.health, q: screen.q })[0]?.goals ?? [], [data, screen.health, screen.q]);
+  const arrange = filtering
+    ? undefined
+    : {
+        may: (g: { owner: { id: string } }) => g.owner.id === data.me.id || data.goalieOwner,
+        save: async (goal: string, spot: Spot, reason: string) => {
+          // The Home tree holds no versions, so the move reads the goal first and writes on that version.
+          const page = await getJson<GoalPageResponse>(`/api/goals/${encodeURIComponent(goal)}`);
+          if (page.state !== "ok") return page.state === "refused" ? page.reason : "Try again.";
+          const { body } = await postCommands(fieldsBatch(page.data.goal, moveFields(spot), reason));
+          if (body.ok) {
+            reload();
+            return undefined;
+          }
+          return body.error === "invalid" ? body.violations.map((v) => v.message).join(" ") : body.error === "stale" ? "Someone changed this goal after you opened the page. Reload and try again." : body.message;
+        },
+      };
+  const tree = { funded, backlog, me: data.me, today: data.today, filtering, selected: screen.health, hot, rank, none, arrange };
   const zoomAt = ZOOM_ORDER.indexOf(screen.zoom);
   const zoomStep = (to: number, label: string, sign: string) => {
     const zoom = ZOOM_ORDER[to];

@@ -126,6 +126,8 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, todayIso: stri
   const rows: ApiPriority[] = priorities.map((p, i) => ({ id: p.id as string, version: p.version as number, rank: p.rank as number, title: p.title as string, goals: built[i] }));
   const funded = cut === -1 ? rows : rows.slice(0, cut + 1);
   const backlog = cut === -1 ? [] : rows.slice(cut + 1);
+  // Rule 35b: an open top goal with no Priority, with its tree. Home shows these as No priority, so a new goal is there to drag.
+  const unprioritized = [...goals.values()].filter((g) => g.priority == null && g.parent == null && shown(g)).map((g) => goalOf(g, false));
 
   const top = funded.flatMap((p) => p.goals).filter((g) => g.counted);
   const slips = top.flatMap((g) => {
@@ -153,6 +155,7 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, todayIso: stri
     view: { name: PRIORITIES_VIEW.name, columns: PRIORITIES_VIEW.columns },
     funded,
     backlog,
+    unprioritized,
     summary: {
       counts: { RED: count("RED"), YELLOW: count("YELLOW"), GREEN: count("GREEN") },
       healths: top.map((g) => g.health),

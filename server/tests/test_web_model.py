@@ -13,7 +13,7 @@ FIXTURE = Path(__file__).resolve().parents[1] / "web" / "fixtures" / "priorities
 
 def run(body: str) -> object:
     """Run an ES module that imports the model as `m` and the seed fixture as `api`, and return what it prints as JSON."""
-    imports = "".join(f'import * as {name} from "{(MODEL / f"{name}.ts").as_uri()}";\n' for name in ("query", "filter", "timeline", "calendar", "popover", "labels", "scroll", "route", "goalpage", "commands", "newgoal", "markdown"))
+    imports = "".join(f'import * as {name} from "{(MODEL / f"{name}.ts").as_uri()}";\n' for name in ("query", "filter", "timeline", "calendar", "popover", "labels", "scroll", "route", "goalpage", "commands", "newgoal", "markdown", "arrange"))
     script = f"""{imports}
 import {{ readFileSync }} from "node:fs";
 const api = JSON.parse(readFileSync({json.dumps(str(FIXTURE))}, "utf-8"));
@@ -992,25 +992,71 @@ class GitHubPageTests(unittest.TestCase):
         self.assertNotIn("<button", page)
 
 
-class PriorityLadderTests(unittest.TestCase):
-    """The Priority ladder on a goal page (rule GL9): every Priority with its goals, the cut line, and No priority last. The goal moves one rung at a time."""
+class ArrangeTests(unittest.TestCase):
+    """Rule 35b: on Home a goal is dragged into a goal (a sub-goal), beside a sub-goal, onto a Priority, or to No priority."""
 
-    def rungs(self, body: str) -> object:
-        return run(f"const L = goalpage.priorityLadder(api, {body}); return L.map((r) => [r.id, r.title, r.funded, r.here, r.goals.map((g) => g.id)]);")
-
-    def test_the_ladder_lists_every_priority_then_no_priority_and_marks_the_goal(self) -> None:
-        self.assertEqual(self.rungs('"XW-0002", "PRI-2"'), [
-            ["PRI-1", "Regenerate the E28 canon", True, False, ["XW-0001"]],
-            ["PRI-2", "Grow the XW team", True, True, []],
-            ["PRI-3", "Run Excaliwire on GOALIE", True, False, ["XW-0003"]],
-            [None, "No priority", False, False, []],
+    def test_each_spot_writes_its_priority_and_parent(self) -> None:
+        got = run("""return [
+          arrange.moveFields({ kind: "into", goal: "XW-0002" }),
+          arrange.moveFields({ kind: "beside", parent: "XW-0003" }),
+          arrange.moveFields({ kind: "top", priority: "PRI-1" }),
+          arrange.moveFields({ kind: "top", priority: null }),
+        ];""")
+        self.assertEqual(got, [
+            {"priority": None, "parent": "XW-0002"},
+            {"priority": None, "parent": "XW-0003"},
+            {"priority": "PRI-1", "parent": None},
+            {"priority": None, "parent": None},
         ])
 
-    def test_a_goal_with_no_priority_sits_on_the_last_rung(self) -> None:
-        got = self.rungs('"XW-0099", null')
-        self.assertEqual([r[3] for r in got], [False, False, False, True])  # type: ignore[index, union-attr]
+    def test_a_goal_never_goes_into_itself_or_its_own_tree(self) -> None:
+        got = run("""const trees = api.funded.flatMap((p) => p.goals);
+          return [
+            arrange.canMove(trees, "XW-0003", { kind: "into", goal: "XW-0003" }),
+            arrange.canMove(trees, "XW-0003", { kind: "into", goal: "XW-0004" }),
+            arrange.canMove(trees, "XW-0003", { kind: "beside", parent: "XW-0004" }),
+            arrange.canMove(trees, "XW-0004", { kind: "into", goal: "XW-0002" }),
+            arrange.canMove(trees, "XW-0002", { kind: "top", priority: "PRI-3" }),
+          ];""")
+        self.assertEqual(got, [False, False, False, True, True])
 
-    def test_a_move_goes_one_rung_and_stops_at_the_ends(self) -> None:
-        got = run("""const L = goalpage.priorityLadder(api, "XW-0002", "PRI-2");
-          return [goalpage.ladderMove(L, "PRI-2", -1), goalpage.ladderMove(L, "PRI-2", 1), goalpage.ladderMove(L, "PRI-1", -1), goalpage.ladderMove(L, null, 1), goalpage.ladderMove(L, "PRI-3", 1)];""")
-        self.assertEqual(got, ["PRI-1", "PRI-3", "PRI-1", None, None])
+    def test_a_drop_where_the_goal_already_is_is_no_move(self) -> None:
+        got = run("""return [
+          arrange.changes({ priority: "PRI-2", parent: null }, { kind: "top", priority: "PRI-2" }),
+          arrange.changes({ priority: null, parent: "XW-0003" }, { kind: "into", goal: "XW-0003" }),
+          arrange.changes({ priority: "PRI-2", parent: null }, { kind: "top", priority: "PRI-1" }),
+        ];""")
+        self.assertEqual(got, [False, False, True])
+
+    def test_the_middle_of_a_row_nests_and_its_edges_place_beside(self) -> None:
+        self.assertEqual(run("return [arrange.zoneOf(10, 0, 40), arrange.zoneOf(20, 0, 40), arrange.zoneOf(35, 0, 40)];"), ["edge", "in", "edge"])
+
+    def test_the_spot_for_a_row_and_zone(self) -> None:
+        got = run("""return [
+          arrange.spotAt({ goal: "XW-0002", parent: null, group: "PRI-2" }, "in"),
+          arrange.spotAt({ goal: "XW-0002", parent: null, group: "PRI-2" }, "edge"),
+          arrange.spotAt({ goal: "XW-0004", parent: "XW-0003", group: "PRI-3" }, "edge"),
+          arrange.spotAt({ goal: "XW-0095", parent: null, group: null }, "edge"),
+        ];""")
+        self.assertEqual(got, [{"kind": "into", "goal": "XW-0002"}, {"kind": "top", "priority": "PRI-2"}, {"kind": "beside", "parent": "XW-0003"}, {"kind": "top", "priority": None}])
+
+    def test_the_move_says_what_it_does_in_words(self) -> None:
+        got = run("""const names = { goal: (id) => ({ "XW-0002": "Add two more humans to XW by Nov 15" })[id] ?? id, priority: (id) => ({ "PRI-1": "Priority 1 Regenerate the E28 canon" })[id] ?? id };
+          return [
+            arrange.moveWords({ kind: "into", goal: "XW-0002" }, names),
+            arrange.moveWords({ kind: "beside", parent: "XW-0002" }, names),
+            arrange.moveWords({ kind: "top", priority: "PRI-1" }, names),
+            arrange.moveWords({ kind: "top", priority: null }, names),
+          ];""")
+        self.assertEqual(got, [
+            "Make it a sub-goal of Add two more humans to XW by Nov 15",
+            "Make it a sub-goal of Add two more humans to XW by Nov 15",
+            "Move it to Priority 1 Regenerate the E28 canon",
+            "Move it to No priority",
+        ])
+
+    def test_arrow_keys_move_a_top_goal_one_group_and_stop_at_the_ends(self) -> None:
+        got = run("""const groups = ["PRI-1", "PRI-2", "PRI-3", null];
+          return [arrange.nextGroup(groups, "PRI-2", -1), arrange.nextGroup(groups, "PRI-3", 1), arrange.nextGroup(groups, null, 1), arrange.nextGroup(groups, "PRI-1", -1)];""")
+        self.assertEqual(got, ["PRI-1", None, None, "PRI-1"])
+

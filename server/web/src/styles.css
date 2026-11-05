@@ -671,29 +671,6 @@ main.newgoal{padding-bottom:84px}
 .tosave li.miss .linkbtn{color:var(--red-ink)}
 .btn.create.muted{background:var(--control);color:var(--mute)}
 .phone .tiles{grid-template-columns:1fr}
-/* GL9: the Priority ladder on a goal page. */
-.ladder{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
-.rung{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 14px;display:flex;flex-direction:column;gap:6px;transition:background .12s,border-color .12s}
-.rung.here{background:var(--green-bg);border-color:var(--brand)}
-.rung.none{background:transparent;border-style:dashed}
-.ladder.dragging .rung{border-style:dashed}
-.rung.over{border-color:var(--brand);border-style:solid;box-shadow:0 0 0 2px var(--brand)}
-.rhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-.rhead .rnum{min-width:12px}
-.rtitle{font-size:14px}
-.rgoals{list-style:none;margin:0;padding:0 0 0 22px;display:flex;flex-direction:column;gap:4px}
-.rgoal{display:flex;align-items:center;gap:8px;font-size:13px;min-width:0}
-.rgoal a{color:inherit;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.rgoal a:hover{text-decoration:underline}
-.rme{margin-left:22px;display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--card);border:1.5px dashed var(--brand);border-radius:12px;font-size:13px;font-weight:700;box-shadow:0 4px 14px rgba(31,45,38,.10)}
-.rme[draggable=true]{cursor:grab}
-.rmetitle{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.rmove{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:0;border-radius:8px;background:transparent;color:var(--mute);cursor:grab;flex:none}
-.rmove:hover,.rmove:focus-visible{background:var(--green-bg);color:var(--ink)}
-.rcut{display:flex;align-items:center;gap:10px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
-.rcut::before,.rcut::after{content:"";flex:1;border-top:1.5px dashed var(--cut)}
-@media (pointer:coarse){.rmove{width:44px;height:44px}}
-.rsave{margin-top:10px}
 .phone .drow{grid-template-columns:minmax(0,1fr) auto}.phone .dvalue{grid-column:1;grid-row:2}
 @media (pointer:coarse){.tosave li .linkbtn,.ngtopcount{min-height:44px;min-width:44px;display:flex;align-items:center}}
 /* Rule 29 on touch (QA N2): the top bar's pages, the Completed fold, and the Details rows' links and help keep 44 px areas apart. */
@@ -868,3 +845,18 @@ main.newgoal{padding-bottom:84px}
 .rankreason{position:sticky;left:0;z-index:7;display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:min(620px,100%);box-sizing:border-box;padding:8px 12px 10px 28px;background:var(--hover);border-radius:0 0 10px 0}
 .rankreason input{flex:1;min-width:160px;max-width:360px;font:600 13px var(--font);border:1px solid var(--cut);border-radius:8px;padding:6px 8px}
 @media (pointer:coarse){.draghandle::after{content:"";position:absolute;left:50%;top:50%;width:44px;height:44px;transform:translate(-50%,-50%)}}
+/* Rule 35b: arranging goals on Home. A grip on each goal its owner may move; the new parent row or the Priority under the pointer is outlined green. */
+.ggrip{display:inline-flex;align-items:center;justify-content:center;flex:none;width:18px;height:24px;margin:0 -4px 0 -2px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--mute);cursor:grab;opacity:0;touch-action:none}
+.row:hover .ggrip,.ggrip:focus-visible,.row.moving .ggrip{opacity:1}
+.ggrip:hover,.ggrip:focus-visible{background:var(--green-bg);color:var(--ink)}
+.ggrip svg{fill:currentColor}
+.row.moving{opacity:.55}
+.row.dropinto{box-shadow:inset 0 0 0 2px var(--brand);border-radius:10px;background:var(--green-bg)}
+.row.dropinto>.left{background:var(--green-bg)}
+.group.droptop{box-shadow:inset 0 0 0 2px var(--brand);border-radius:12px}
+.nonegroup .nonehead .title{font-weight:700}
+.nonegroup{margin-top:4px}
+.movereason{flex-wrap:wrap}
+.movereason .moveitem{font-weight:700}
+@media (pointer:coarse){.ggrip{opacity:1;width:32px;height:40px}}
+
