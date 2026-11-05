@@ -179,9 +179,32 @@ export function issueRepoAllowed(db: DatabaseSync, goalId: unknown, repo: string
   return repoInScope(repo, githubRepos(db)) && goalNamesRepo(db, goalId, repo);
 }
 
-/** github_repos entries this goal's work_product names, in github_repos order. */
+/** Repositories this goal names that github_repos covers. Order follows github_repos. A wildcard offers that owner's repositories on the goal, in work_product order, and is not a choice. */
 export function reposOnGoal(db: DatabaseSync, goalId: string): string[] {
-  return githubRepos(db).filter((repo) => goalNamesRepo(db, goalId, repo));
+  const named = reposNamedOnGoal(read(db, "goal", goalId)?.work_product);
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of githubRepos(db)) {
+    const slash = entry.lastIndexOf("/");
+    const owner = entry.slice(0, slash).toLowerCase();
+    const name = entry.slice(slash + 1);
+    if (name === "*") {
+      for (const repo of named) {
+        if (repo.slice(0, repo.indexOf("/")).toLowerCase() !== owner) continue;
+        pushRepo(result, seen, repo);
+      }
+      continue;
+    }
+    if (named.some((repo) => repo.toLowerCase() === entry.toLowerCase())) pushRepo(result, seen, entry);
+  }
+  return result;
+}
+
+function pushRepo(result: string[], seen: Set<string>, repo: string): void {
+  const key = repo.toLowerCase();
+  if (seen.has(key)) return;
+  seen.add(key);
+  result.push(repo);
 }
 
 function storedResult(db: DatabaseSync, kind: "outbound" | "inbound"): { ok: boolean; detail: string } | null {
@@ -213,9 +236,9 @@ function linkedIssue(links: unknown, scopes: readonly string[], onGoal: Readonly
   return undefined;
 }
 
-/** `repo` values written `github.com/owner/repo` or `https://github.com/owner/repo`. The names compare without case. Other entries are not repositories. */
-function goalRepos(workProduct: unknown): Set<string> {
-  const found = new Set<string>();
+/** `repo` values written `github.com/owner/repo` or `https://github.com/owner/repo`, in work_product order, with the casing written on the goal. */
+function reposNamedOnGoal(workProduct: unknown): string[] {
+  const found: string[] = [];
   if (!Array.isArray(workProduct)) return found;
   for (const entry of workProduct) {
     if (typeof entry !== "object" || entry === null || Array.isArray(entry)) continue;
@@ -223,9 +246,14 @@ function goalRepos(workProduct: unknown): Set<string> {
     if (typeof value !== "string") continue;
     const match = GOAL_REPO.exec(value);
     if (match === null) continue;
-    found.add(`${match[1]}/${match[2]}`.toLowerCase());
+    found.push(`${match[1]}/${match[2]}`);
   }
   return found;
+}
+
+/** The names compare without case. Other entries are not repositories. */
+function goalRepos(workProduct: unknown): Set<string> {
+  return new Set(reposNamedOnGoal(workProduct).map((repo) => repo.toLowerCase()));
 }
 
 function configuredGitHub(): Ready {

@@ -223,7 +223,7 @@ export type GoalPageResponse = {
   /** Lints: flagged, never blocked (SPEC.md §8.1). The app shows the text as a muted hint at the field. */
   hints: { field: string; text: string }[];
   actors: Record<string, ApiActor>;
-  /** Repositories in github_repos that this goal's work_product names, in that order. Add as Github Issue uses them. */
+  /** Repositories this goal names that github_repos covers, in that order. Add as Github Issue uses them. */
   githubRepos: string[];
 };
 

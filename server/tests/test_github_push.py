@@ -517,6 +517,38 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertIsNotNone(self.error("WI-9062"))
         self.assertFalse(any(call.startswith("GET /repos/") and "/issues/" in call for call in self.github.calls), self.github.calls)
 
+    def test_wildcard_scope_lists_the_goal_repo(self) -> None:
+        """A scope of owner/* offers the concrete repository the goal names."""
+        set_scope(self.store, ["tig/*"], [{"repo": "github.com/tig/goalie"}])
+        self.assertEqual(self.goal_page()["githubRepos"], ["tig/goalie"])
+
+    def test_filing_under_a_wildcard_scope_opens_the_issue(self) -> None:
+        """Filing with that repository still opens the issue."""
+        set_scope(self.store, ["tig/*"], [{"repo": "github.com/tig/goalie"}])
+        command = create("work_item", "WI-9063", {"goal": GOAL, "title": "Ship the issue", "owner": "tig", "status": "Backlog"}, "Filed")
+        command["github_repo"] = "tig/goalie"
+        result = self.write(command)
+        self.assertTrue(result["ok"], result)
+        self.assertIn("POST /repos/tig/goalie/issues", self.github.calls)
+        self.assertIn(self.github.issue_url, self.store.read("work_item", "WI-9063")["links"])
+
+    def test_a_wildcard_of_another_owner_lists_nothing(self) -> None:
+        """A wildcard for a different owner offers no repository."""
+        set_scope(self.store, ["acme/*"], [{"repo": "github.com/tig/goalie"}])
+        self.assertEqual(self.goal_page()["githubRepos"], [])
+
+    def test_a_wildcard_plus_the_same_repo_lists_it_once(self) -> None:
+        """A wildcard and the same repository list that repository once."""
+        set_scope(self.store, ["tig/*", "tig/goalie"], [{"repo": "github.com/tig/goalie"}])
+        self.assertEqual(self.goal_page()["githubRepos"], ["tig/goalie"])
+
+    def test_a_wildcard_lists_each_named_repo_in_product_sequence(self) -> None:
+        """One wildcard lists each of that owner's repositories on the goal, in work_product order."""
+        set_scope(self.store, ["tig/*"], [{"repo": "https://github.com/tig/other"}, {"repo": "github.com/tig/goalie"}])
+        listed = self.goal_page()["githubRepos"]
+        self.assertEqual(listed, ["tig/other", "tig/goalie"])
+        self.assertNotIn("tig/*", listed)
+
     def test_a_human_who_is_not_the_goalie_owner_gets_403(self) -> None:
         reply = self.status_as("chelsea", "sub-chelsea")
         self.assertEqual(reply.status, 403, reply.body)
