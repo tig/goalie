@@ -945,6 +945,13 @@ class HoverTests(unittest.TestCase):
 
 
 class GitHubPageTests(unittest.TestCase):
+    def test_github_opens_from_the_owner_menu(self) -> None:
+        """The GitHub tab is gone. Github... on the GOALIE owner's avatar opens the page."""
+        app = (MODEL.parent / "App.tsx").read_text(encoding="utf-8")
+        self.assertIn("Github...", app)
+        self.assertIn("goalieOwner ? <OwnerMenu", app)
+        self.assertNotIn('to="/github" className={`tab', app)
+
     def test_a_missing_key_still_shows_the_repository(self) -> None:
         page = (MODEL.parent / "GitHubPage.tsx").read_text(encoding="utf-8")
         self.assertIn("{data.repository ?? \"none\"}", page)
