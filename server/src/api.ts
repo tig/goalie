@@ -67,6 +67,23 @@ export type PrioritiesResponse = {
   summary: ApiSummary;
 };
 
+/** One row of the My goals view: a goal with no tree. `priority` is the title of the Priority it serves, its own or its nearest parent's; null when it serves none. */
+export type MyGoal = Omit<ApiGoal, "children" | "counted" | "started"> & { priority: string | null };
+
+/** GET /api/my-goals. The My goals view (SPEC.md §8.2): every open goal the signed-in actor owns, with or without a Priority, sorted RED, YELLOW, GREEN, then no health. */
+export type MyGoalsResponse = {
+  me: ActorRef;
+  today: string;
+  view: { name: string; columns: readonly string[] };
+  goals: MyGoal[];
+};
+
+/** One goal search finds: any goal, in any state, org unit, or level. */
+export type GoalHit = { id: string; summary: string; owner: ActorRef; state: State; health: Health; priority: string | null };
+
+/** GET /api/goals?q=. Goal search over every goal: the text is in its key or its summary, any case (#71). */
+export type GoalsResponse = { goals: GoalHit[] };
+
 /** GET /api/github/status. The GOALIE owner sees the repositories in github_repos, whether GitHub is configured, the last update, and the last signed notice. */
 export type GitHubStatusResponse = {
   configured: boolean;
