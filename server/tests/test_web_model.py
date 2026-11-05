@@ -781,6 +781,14 @@ process.stdout.write(JSON.stringify([a.body.message, b.body.message]));"""
         self.assertEqual(m, {"base_version": 4, "current": {"severity": "sev3", "health": "GREEN"}})
 
 
+class NotInViewTests(unittest.TestCase):
+    """#71: search finds a goal the view does not draw, such as one with no Priority, and lists it under the view."""
+
+    def test_a_hit_the_view_draws_is_left_out(self) -> None:
+        hits = run('const hit = (id) => ({ id, summary: id, owner: { id: "tig", name: "Tig" }, state: "Backlog", health: null, priority: null }); return filter.notInView([hit("XW-0005"), hit("XW-0095")], [...api.funded, ...api.backlog]).map((g) => g.id);')
+        self.assertEqual(hits, ["XW-0095"])
+
+
 class RouteTests(unittest.TestCase):
     def test_each_path_opens_its_page(self) -> None:
         pages = run('return ["/", "/goals/XW-0003", "/goals/new", "/goals/new?parent=XW-0003", "/goals/xw-0003/", "/nowhere"].map((p) => { const u = new URL(p, "http://x"); return route.parseRoute(u.pathname, u.search); });')
@@ -790,6 +798,11 @@ class RouteTests(unittest.TestCase):
         pages = run('return ["/work", "/work?owner=frontend-engineer", "/work/"].map((p) => { const u = new URL(p, "http://x"); return route.parseRoute(u.pathname, u.search); });')
         self.assertEqual(pages, [{"page": "work"}, {"page": "work", "owner": "frontend-engineer"}, {"page": "work"}])
         self.assertEqual(run('return [route.workPath(), route.workPath("qa")];'), ["/work", "/work?owner=qa"])
+
+    def test_my_goals_has_its_own_path(self) -> None:
+        pages = run('return ["/my-goals", "/my-goals/"].map((p) => { const u = new URL(p, "http://x"); return route.parseRoute(u.pathname, u.search); });')
+        self.assertEqual(pages, [{"page": "mine"}, {"page": "mine"}])
+        self.assertEqual(run("return route.MY_GOALS_PATH;"), "/my-goals")
 
     def test_a_goal_link_and_the_back_link(self) -> None:
         self.assertEqual(run('return [route.goalPath("XW-0003"), route.newGoalPath(), route.newGoalPath("XW-0003"), route.backPath("?view=list&health=RED"), route.backPath("")];'), ["/goals/XW-0003", "/goals/new", "/goals/new?parent=XW-0003", "/?view=list&health=RED", "/"])
