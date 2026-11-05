@@ -1,4 +1,4 @@
-import type { ApiActor, ApiEvent, ApiWorkItem, WorkItemStatus } from "../../../src/api.ts";
+import type { ApiActor, ApiEvent, ApiGoal, ApiWorkItem, PrioritiesResponse, WorkItemStatus } from "../../../src/api.ts";
 import { day, DAY, isDate } from "../../../src/dates.ts";
 import { healthWord } from "./labels.ts";
 import { labelWidth } from "./timeline.ts";
@@ -214,4 +214,29 @@ export function queues<T extends Pick<ApiWorkItem, "owner" | "status">>(items: T
   return owners
     .map((id) => ({ owner: actor(id), groups: groupWorkItems(items.filter((i) => i.owner === id)) }))
     .sort((a, b) => rank(a) - rank(b) || a.owner.name.localeCompare(b.owner.name));
+}
+
+/** One rung of the Priority ladder (GL9): a Priority, or No priority (id null), with the goals already on it. */
+export type Rung = { id: string | null; rank: number | null; title: string; funded: boolean; here: boolean; goals: Pick<ApiGoal, "id" | "summary" | "health">[] };
+
+/**
+ * GL9: the ladder on a goal page. Every Priority in rank order, funded ones first, then No priority last.
+ * Each rung lists its top goals, not this one. `here` marks the rung the goal is on.
+ */
+export function priorityLadder(view: Pick<PrioritiesResponse, "funded" | "backlog">, goal: string, priority: string | null): Rung[] {
+  const rung = (funded: boolean) => (p: PrioritiesResponse["funded"][number]): Rung => ({
+    id: p.id,
+    rank: p.rank,
+    title: p.title,
+    funded,
+    here: p.id === priority,
+    goals: p.goals.filter((g) => g.id !== goal).map(({ id, summary, health }) => ({ id, summary, health })),
+  });
+  return [...view.funded.map(rung(true)), ...view.backlog.map(rung(false)), { id: null, rank: null, title: "No priority", funded: false, here: priority === null, goals: [] }];
+}
+
+/** GL9: the rung one step up (-1) or down (1) from `from`. At an end it stays. */
+export function ladderMove(rungs: Rung[], from: string | null, by: -1 | 1): string | null {
+  const at = rungs.findIndex((r) => r.id === from);
+  return rungs[Math.max(0, Math.min(rungs.length - 1, at + by))].id;
 }

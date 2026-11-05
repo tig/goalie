@@ -4,7 +4,7 @@ import { shortDate } from "../../src/dates.ts";
 import { getJson, postCommands, useJson } from "./data.ts";
 import { AddSubGoal, AddWorkItem, EditWorkItem, useStatus } from "./GoalAdd.tsx";
 import { Crumbs, Props } from "./GoalSide.tsx";
-import { ClosePanel, CompletePanel, DescriptionPanel, HealthPanel, PromotePanel, PullInPanel, PursuePanel, SlipPanel, type Done, type PanelName } from "./GoalPanels.tsx";
+import { ClosePanel, CompletePanel, DescriptionPanel, HealthPanel, PriorityLadder, PromotePanel, PullInPanel, PursuePanel, SlipPanel, type Done, type PanelName } from "./GoalPanels.tsx";
 import { commentBatch } from "./model/commands.ts";
 import { activity, ACTIVITY, changeParts, createdFields, ptgChanges, historyNames, joinPages, dateBar, labelPlaces, eventValue, fieldLabel, groupEvents, groupWorkItems, mayEditWorkItem, nameHover, type ActivityChip, type EventGroup, type Names } from "./model/goalpage.ts";
 import { dateLabel } from "./model/labels.ts";
@@ -147,6 +147,8 @@ function Goal({ data, reload, status, setStatus }: { data: GoalPageResponse; rel
               {may && data.hints.some((h) => h.field === "description") && <p className="hint">{data.hints.filter((h) => h.field === "description").map((h) => h.text).join(" · ")}</p>}
             </section>
           )}
+          {/* GL9: the Priority ladder, under the Description. */}
+          <PriorityLadder data={data} onDone={done} />
           {goal.path_to_green && (goal.health === "YELLOW" || goal.health === "RED") && (
             <section className={`gsec gptg ${goal.health}`} data-focus={encodeFocus({ kind: "section", id: "Path to Green", label: "Path to Green" })}>
               <h2>

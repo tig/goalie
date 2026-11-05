@@ -805,17 +805,18 @@ class NewGoalV2Tests(unittest.TestCase):
         return run(f"return newgoal.toSave({json.dumps({**self.BASE, **form})}, {json.dumps(answer)}, {json.dumps(details)}).map((l) => [l.key, l.text, l.done]);")
 
     def test_an_empty_form_lists_the_foundation_with_nothing_done(self) -> None:
-        self.assertEqual(self.lines({}), [["summary", "Summary", False], ["due_date", "Date", False], ["date_type", "Date Type", False], ["priority", "Priority, or No priority", False]])
+        self.assertEqual(self.lines({}), [["summary", "Summary", False], ["due_date", "Date", False], ["date_type", "Date Type", False]])
 
-    def test_priority_is_met_once_picked_even_as_none_and_from_a_parent(self) -> None:
-        self.assertEqual(self.lines({"priorityPicked": True})[-1], ["priority", "Priority, or No priority", True])
+    def test_new_goal_does_not_ask_for_a_priority(self) -> None:
+        # NG4a: a goal gets its Priority on its own page, from the ladder, after it is made.
+        self.assertNotIn("priority", [l[0] for l in self.lines({})])  # type: ignore[union-attr]
         self.assertEqual(self.lines({"summary": "Help text", "parent": "XW-0004"}), [["summary", "Summary", True]])
 
     def test_an_uncommitted_date_adds_the_milestone_date_and_a_committed_one_the_plan(self) -> None:
         fantasy = self.lines({"summary": "Ship it", "due_date": "2027-02-26", "date_type": "Fantasy", "milestone": {"summary": "Commit", "due_date": "", "owner": "chelsea"}})
-        self.assertEqual(fantasy, [["summary", "Summary", True], ["due_date", "Date", True], ["date_type", "Date Type", True], ["milestone_date", "Promotion Milestone date", False], ["priority", "Priority, or No priority", False]])
+        self.assertEqual(fantasy, [["summary", "Summary", True], ["due_date", "Date", True], ["date_type", "Date Type", True], ["milestone_date", "Promotion Milestone date", False]])
         committed = self.lines({"summary": "Ship it", "due_date": "2027-02-26", "date_type": "Committed"}, {"ok": True, "ids": {}, "events": []})
-        self.assertEqual(committed[-2], ["plan_maturity", "Plan at Pencil", True])
+        self.assertEqual(committed[-1], ["plan_maturity", "Plan at Pencil", True])
 
     def test_a_refusal_undoes_its_line_in_plain_words_and_details_wait_until_opened(self) -> None:
         answer = {"ok": False, "at": 0, "error": "invalid", "violations": [], "all": [
@@ -824,15 +825,15 @@ class NewGoalV2Tests(unittest.TestCase):
             {"rule": "not-checked", "message": "not checked yet: it names $m", "at": 1},
         ]}
         form = {"summary": "Ship it", "due_date": "2027-02-26", "date_type": "Committed"}
-        self.assertEqual(self.lines(form, answer)[-2], ["plan_maturity", "Plan at Pencil", False])
+        self.assertEqual(self.lines(form, answer)[-1], ["plan_maturity", "Plan at Pencil", False])
         self.assertNotIn("health", [l[0] for l in self.lines(form, answer)])  # type: ignore[union-attr]
         self.assertEqual(self.lines(form, answer, True)[-1], ["health", "Health", False])
         said = run(f"return newgoal.toSave({json.dumps({**self.BASE, **form})}, {json.dumps(answer)}, false).map((l) => l.sentence);")
-        self.assertEqual(said[-2], "A Committed date needs a plan at Pencil.")  # type: ignore[index]
+        self.assertEqual(said[-1], "A Committed date needs a plan at Pencil.")  # type: ignore[index]
 
     def test_a_stale_answer_is_no_line(self) -> None:
         form = {"summary": "Ship it", "due_date": "2027-02-26", "date_type": "Committed", "priorityPicked": True}
-        self.assertEqual([l[0] for l in self.lines(form, {"ok": False, "at": 3, "error": "stale", "current": {}})], ["summary", "due_date", "date_type", "plan_maturity", "priority"])  # type: ignore[union-attr]
+        self.assertEqual([l[0] for l in self.lines(form, {"ok": False, "at": 3, "error": "stale", "current": {}})], ["summary", "due_date", "date_type", "plan_maturity"])  # type: ignore[union-attr]
 
     def test_a_check_that_could_not_run_keeps_the_last_list_and_never_reads_ready(self) -> None:
         invalid = {"ok": False, "at": 1, "error": "invalid", "violations": [], "all": [{"rule": "ptg-when-yellow-or-red", "message": "x", "field": "path_to_green", "at": 1}]}
@@ -989,3 +990,27 @@ class GitHubPageTests(unittest.TestCase):
         self.assertNotIn("data.configured &&", page)
         self.assertNotIn("<input", page)
         self.assertNotIn("<button", page)
+
+
+class PriorityLadderTests(unittest.TestCase):
+    """The Priority ladder on a goal page (rule GL9): every Priority with its goals, the cut line, and No priority last. The goal moves one rung at a time."""
+
+    def rungs(self, body: str) -> object:
+        return run(f"const L = goalpage.priorityLadder(api, {body}); return L.map((r) => [r.id, r.title, r.funded, r.here, r.goals.map((g) => g.id)]);")
+
+    def test_the_ladder_lists_every_priority_then_no_priority_and_marks_the_goal(self) -> None:
+        self.assertEqual(self.rungs('"XW-0002", "PRI-2"'), [
+            ["PRI-1", "Regenerate the E28 canon", True, False, ["XW-0001"]],
+            ["PRI-2", "Grow the XW team", True, True, []],
+            ["PRI-3", "Run Excaliwire on GOALIE", True, False, ["XW-0003"]],
+            [None, "No priority", False, False, []],
+        ])
+
+    def test_a_goal_with_no_priority_sits_on_the_last_rung(self) -> None:
+        got = self.rungs('"XW-0099", null')
+        self.assertEqual([r[3] for r in got], [False, False, False, True])  # type: ignore[index, union-attr]
+
+    def test_a_move_goes_one_rung_and_stops_at_the_ends(self) -> None:
+        got = run("""const L = goalpage.priorityLadder(api, "XW-0002", "PRI-2");
+          return [goalpage.ladderMove(L, "PRI-2", -1), goalpage.ladderMove(L, "PRI-2", 1), goalpage.ladderMove(L, "PRI-1", -1), goalpage.ladderMove(L, null, 1), goalpage.ladderMove(L, "PRI-3", 1)];""")
+        self.assertEqual(got, ["PRI-1", "PRI-3", "PRI-1", None, None])

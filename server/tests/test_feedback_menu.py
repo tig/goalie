@@ -33,7 +33,8 @@ SETUP = """
   // A contextmenu that GOALIE does not prevent is the browser's own menu.
   const menus = [];
   window.addEventListener("contextmenu", (e) => menus.push({ browser: !e.defaultPrevented }));
-  const at = (el) => { const r = el.getBoundingClientRect(); return { x: r.left + Math.min(10, r.width / 2), y: r.top + r.height / 2 }; };
+  // A person scrolls to what they click. Real input lands at screen points, so a target below the screen comes into view first.
+  const at = (el) => { const b = el.getBoundingClientRect(); if (b.bottom > innerHeight || b.top < 0) el.scrollIntoView({ block: "center" }); const r = el.getBoundingClientRect(); return { x: r.left + Math.min(10, r.width / 2), y: r.top + r.height / 2 }; };
   const rightClick = async (el) => { await input({ mouse: "right", ...at(el) }); await sleep(80); };
   const click = async (el) => { await input({ mouse: "left", ...at(el) }); await sleep(80); };
   const key = async (name, shift = false) => { await input({ key: name, shift }); await sleep(80); };

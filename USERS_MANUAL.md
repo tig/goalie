@@ -147,7 +147,7 @@ The GOALIE owner inspects these each quarter and changes the configuration, revi
 **Create a goal**
 1. Write a short summary with a verb, e.g. "Launch self-serve onboarding".
 2. Set the owner, org unit, type, and severity.
-3. Map it to a priority (usually only for org or program goals).
+3. After you create it, map it to a priority on the goal page (usually only for org or program goals). The Priority section shows every priority and its goals. Drag the goal to the one it serves, and give a reason.
 4. Set a date and an honest date type.
 5. If the date isn't Committed, add the Promotion Milestone. An agent will draft one for you to confirm.
 6. Link a plan if you have one.
