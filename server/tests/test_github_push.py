@@ -29,6 +29,47 @@ OTHER = "https://github.com/excaliwire/factory/issues/3"
 PUBLIC = "http://goalie.test"
 ITEM = "WI-9001"
 GOAL = "XW-0007"
+LATER = "WI-9080"
+
+# Commit the create and stop. The request has to be on disk, because this process does not drain.
+COMMITTED_CREATE = r"""
+import { openStore } from "./src/store.ts";
+import { runCommands } from "./src/commands.ts";
+
+const db = openStore(process.env.GOALIE_DB);
+const answer = runCommands(db, "tig", {
+  commands: [{
+    op: "create",
+    kind: "work_item",
+    id: "WI-9080",
+    ref: "$item",
+    reason: "Filed",
+    github_repo: "tig/goalie",
+    fields: { goal: "XW-0007", title: "Ship the issue", owner: "tig", status: "Backlog" },
+  }],
+}, "2026-10-23");
+const id = answer.body.ok ? answer.body.ids["$item"] : undefined;
+if (!answer.body.ok || typeof id !== "string") {
+  process.stdout.write(JSON.stringify(answer.body));
+  db.close();
+  process.exit(1);
+}
+db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+db.close();
+process.stdout.write(id);
+"""
+
+# The next process only drains. It is the one that opens the issue.
+DRAIN_ONLY = r"""
+import { openStore } from "./src/store.ts";
+import { drainGitHub } from "./src/github.ts";
+
+const db = openStore(process.env.GOALIE_DB);
+await drainGitHub(db);
+db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+db.close();
+process.stdout.write("ok");
+"""
 
 
 class GitHub(ThreadingHTTPServer):
@@ -691,6 +732,31 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertNotIn("PATCH /repos/tig/goalie/issues/140", self.github.calls)
         self.assertEqual(self.github.opened_issue["state"], "open")
 
+    def test_a_later_drain_opens_the_issue_committed_with_the_work_item(self) -> None:
+        """The create commits the request and does not call GitHub. A second process only drains and opens the issue."""
+        self.github.calls.clear()
+        created = self.node(COMMITTED_CREATE)
+        self.assertEqual(created.returncode, 0, created.stdout.decode() + created.stderr.decode())
+        item = created.stdout.decode()
+        stored = self.store.read("work_item", item)
+        self.assertEqual(stored["status"], "Backlog")
+        self.assertIsNone(stored["links"])
+        self.assertEqual(self.github.calls, [])
+        row = self.push_row(item)
+        drained = self.node(DRAIN_ONLY)
+        self.assertEqual(drained.returncode, 0, drained.stdout.decode() + drained.stderr.decode())
+        opened = self.store.read("work_item", item)
+        self.assertIn("POST /repos/tig/goalie/issues", self.github.calls, f"links={opened.get('links')!r} push={row!r}")
+        self.assertIn(self.github.issue_url, opened["links"])
+        self.assertIsNone(self.error(item))
+        self.assertEqual(item, LATER)
+        self.assertEqual(row["issue"], "")
+        self.assertEqual(row["repo"], "tig/goalie")
+        self.assertIsNone(row["error"])
+        self.assertEqual(row["actor"], "tig")
+        self.assertEqual(row["status"], "Backlog")
+        self.assertEqual(row["goal"], GOAL)
+
     def test_the_printed_write_has_the_saved_issue_link(self) -> None:
         """The printed entity is the work item after the link write, so the next update is not stale."""
         command = create("work_item", "WI-9074", {"goal": GOAL, "title": "Ship the issue", "owner": "tig", "status": "Backlog"}, "Filed")
@@ -763,6 +829,24 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         finally:
             db.close()
         return None if row is None else row[0]
+
+    def push_row(self, item: str) -> dict[str, Any] | None:
+        db = sqlite3.connect(self.store.path)
+        db.row_factory = sqlite3.Row
+        try:
+            found = db.execute("SELECT * FROM github_push WHERE work_item = ?", (item,)).fetchone()
+        finally:
+            db.close()
+        return None if found is None else dict(found)
+
+    def node(self, script: str) -> subprocess.CompletedProcess[bytes]:
+        return subprocess.run(
+            ["node", "--no-warnings", "--input-type=module", "-e", script],
+            cwd=SERVER,
+            env={**os.environ, **self.env, "GOALIE_DB": str(self.store.path), "GOALIE_TODAY": "2026-10-23"},
+            capture_output=True,
+            timeout=30,
+        )
 
     def goal_page(self) -> dict[str, Any]:
         tig = self.store.read("actor", "tig")

@@ -2,6 +2,7 @@ import { createSign } from "node:crypto";
 import { readFileSync } from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
 import type { GitHubStatusResponse } from "./api.ts";
+import { configuredTimeZone, configuredToday } from "./config.ts";
 import { read } from "./read.ts";
 import type { Row } from "./rules.ts";
 
@@ -10,7 +11,7 @@ import type { Row } from "./rules.ts";
  * The repository must be in the owner setting github_repos and on the work item's goal.
  * github_push is not an entity and not an Event. The row is written in the work item's transaction.
  * The call to GitHub runs after that transaction commits. A failure stays on the row and shows on the work item.
- * Add as Github Issue creates the issue after the work item commits, then the link write records the issue URL. The current status is queued after that write so the caller's drain sends it. That push includes the work item's current title. A failed create sets error on this row so a later drain does not send it as a status push.
+ * Add as Github Issue writes the request in the work item's transaction: an empty issue, the repository, and the actor. drain opens the issue after that transaction commits, then the link write records the issue URL. The current status is queued after that write so this drain sends it. That push includes the work item's current title. A failed create sets error on this row so a later drain does not send it as a status push.
  * github_result is not an entity and not an Event. It keeps the last update and the last signed notice.
  */
 
@@ -52,10 +53,23 @@ export function finishGitHubCreate(db: DatabaseSync, id: string, detail: string)
   recordGitHubResult(db, "outbound", true, detail);
 }
 
+/** The request to open an issue, in the same transaction as the work item. The issue stays empty until drain opens it. */
+export function queueGitHubCreate(db: DatabaseSync, after: Row, repo: string, actor: string): void {
+  const id = after.id;
+  const status = after.status;
+  const goal = after.goal;
+  if (typeof id !== "string" || typeof status !== "string" || typeof goal !== "string" || repo === "") return;
+  db.prepare(
+    `INSERT INTO github_push (work_item, issue, status, goal, error, repo, actor) VALUES (?, '', ?, ?, NULL, ?, ?)
+     ON CONFLICT(work_item) DO UPDATE SET issue = '', status = excluded.status, goal = excluded.goal, error = NULL, repo = excluded.repo, actor = excluded.actor`,
+  ).run(id, status, goal, repo, actor);
+}
+
 /**
  * Record the push for a committed status change, in the same transaction as the Event.
  * The linked issue's repository must be in github_repos and on the work item's goal.
- * No linked issue deletes a pending push and a failed status push. A failed create, issue '' and error set, stays.
+ * No linked issue deletes a row whose issue is not empty. An empty issue stays: a create request, or a failed create.
+ * A linked issue replaces the row and clears the error. That push leaves repo and actor empty.
  */
 export function queueGitHubPush(db: DatabaseSync, after: Row): void {
   const id = after.id;
@@ -63,21 +77,22 @@ export function queueGitHubPush(db: DatabaseSync, after: Row): void {
   const goalRow = typeof after.goal === "string" ? read(db, "goal", after.goal) : undefined;
   const issue = linkedIssue(after.links, githubRepos(db), goalRepos(goalRow?.work_product));
   if (issue === undefined) {
-    db.prepare("DELETE FROM github_push WHERE work_item = ? AND NOT (issue = '' AND error IS NOT NULL)").run(id);
+    db.prepare("DELETE FROM github_push WHERE work_item = ? AND issue <> ''").run(id);
     return;
   }
   const status = after.status;
   const goal = after.goal;
   if (typeof status !== "string" || typeof goal !== "string") return;
   db.prepare(
-    `INSERT INTO github_push (work_item, issue, status, goal, error) VALUES (?, ?, ?, ?, NULL)
-     ON CONFLICT(work_item) DO UPDATE SET issue = excluded.issue, status = excluded.status, goal = excluded.goal, error = NULL`,
+    `INSERT INTO github_push (work_item, issue, status, goal, error, repo, actor) VALUES (?, ?, ?, ?, NULL, NULL, NULL)
+     ON CONFLICT(work_item) DO UPDATE SET issue = excluded.issue, status = excluded.status, goal = excluded.goal, error = NULL, repo = NULL, actor = NULL`,
   ).run(id, issue, status, goal);
 }
 
-/** Send every pending push. Call this only after the work item transaction has committed. A row whose repository is not in github_repos and on the work item's current goal is deleted and not sent. */
+/** Send every pending push. Call this only after the work item transaction has committed. A create request has an empty issue, no error, and a repository: open it here, and do not delete it as out of scope. Then send status pushes, including one the create just queued. A status row whose repository is not in github_repos and on the work item's current goal is deleted and not sent. A failed create has an empty issue and an error: leave it, and do not send it. */
 export async function drainGitHub(db: DatabaseSync): Promise<void> {
-  const pending = db.prepare("SELECT work_item, issue, status, goal FROM github_push WHERE error IS NULL").all() as PushRow[];
+  await openPendingIssues(db);
+  const pending = db.prepare("SELECT work_item, issue, status, goal FROM github_push WHERE error IS NULL AND issue <> ''").all() as PushRow[];
   if (pending.length === 0) return;
   const ready = configuredGitHub();
   for (const row of pending) {
@@ -96,6 +111,62 @@ export async function drainGitHub(db: DatabaseSync): Promise<void> {
     if (error === null) db.prepare("DELETE FROM github_push WHERE work_item = ?").run(row.work_item);
     else db.prepare("UPDATE github_push SET error = ? WHERE work_item = ?").run(detail, row.work_item);
   }
+}
+
+type CreateRow = { work_item: string; repo: string; actor: string | null };
+
+/** Open each committed create request. A link already in that repository is not opened again. Its current status is queued instead. The row is taken before the call so a second drain does not open a second issue. commands.ts imports this module, so the opener is loaded here. */
+async function openPendingIssues(db: DatabaseSync): Promise<void> {
+  const rows = db.prepare(
+    "SELECT work_item, repo, actor FROM github_push WHERE error IS NULL AND issue = '' AND repo IS NOT NULL AND repo <> ''",
+  ).all() as CreateRow[];
+  if (rows.length === 0) return;
+  const { fileGitHubIssue } = await import("./commands.ts");
+  const today = configuredToday(configuredTimeZone(db));
+  for (const row of rows) {
+    const item = read(db, "work_item", row.work_item);
+    if (item !== undefined && namesIssueInRepo(item.links, row.repo)) {
+      queueGitHubPush(db, item);
+      continue;
+    }
+    const claimed = claimCreate(db, row.work_item);
+    if (claimed === undefined) continue;
+    await fileGitHubIssue(db, claimed.actor, row.work_item, claimed.repo, today);
+  }
+}
+
+/** Take one create request. Undefined when another drain took it, or it is no longer a create request. */
+function claimCreate(db: DatabaseSync, workItem: string): { repo: string; actor: string } | undefined {
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const row = db.prepare(
+      "SELECT repo, actor FROM github_push WHERE work_item = ? AND issue = '' AND error IS NULL AND repo IS NOT NULL AND repo <> ''",
+    ).get(workItem) as { repo: string; actor: string | null } | undefined;
+    if (row === undefined || typeof row.actor !== "string" || row.actor === "") {
+      db.exec("COMMIT");
+      return undefined;
+    }
+    db.prepare("DELETE FROM github_push WHERE work_item = ? AND issue = '' AND error IS NULL").run(workItem);
+    db.exec("COMMIT");
+    return { repo: row.repo, actor: row.actor };
+  } catch (error) {
+    if (db.isTransaction) db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+/** True when links already name an issue in repo. The names compare without case. */
+function namesIssueInRepo(links: unknown, repo: string): boolean {
+  if (!Array.isArray(links)) return false;
+  const want = repo.toLowerCase();
+  for (const link of links) {
+    if (typeof link !== "string") continue;
+    const url = canonicalIssueUrl(link);
+    if (url === undefined) continue;
+    const match = ISSUE_URL.exec(url);
+    if (match !== null && `${match[1]}/${match[2]}`.toLowerCase() === want) return true;
+  }
+  return false;
 }
 
 /** The issue's repository is in github_repos and on the work item's current goal. */

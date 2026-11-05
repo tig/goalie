@@ -83,7 +83,9 @@ CREATE TABLE IF NOT EXISTS github_push (
   issue TEXT NOT NULL,
   status TEXT NOT NULL,
   goal TEXT NOT NULL,
-  error TEXT
+  error TEXT,
+  repo TEXT,
+  actor TEXT
 );
 CREATE TABLE IF NOT EXISTS github_result (
   kind TEXT PRIMARY KEY CHECK (kind IN ('outbound', 'inbound')),
@@ -136,5 +138,13 @@ export function openStore(path: string): DatabaseSync {
   db.exec("PRAGMA journal_mode = WAL");
   db.exec("PRAGMA foreign_keys = ON");
   db.exec(SCHEMA);
+  addGitHubPushColumns(db);
   return db;
+}
+
+/** repo and actor are nullable. CREATE TABLE does not add them to an existing file, so add one only when it is absent. */
+function addGitHubPushColumns(db: DatabaseSync): void {
+  const names = new Set((db.prepare("PRAGMA table_info(github_push)").all() as { name: string }[]).map((column) => column.name));
+  if (!names.has("repo")) db.exec("ALTER TABLE github_push ADD COLUMN repo TEXT");
+  if (!names.has("actor")) db.exec("ALTER TABLE github_push ADD COLUMN actor TEXT");
 }

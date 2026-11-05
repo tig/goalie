@@ -23,9 +23,7 @@ const KEY_FIELDS: Record<(typeof API_KINDS)[number], readonly string[]> = { goal
 /** A re-rank swaps ranks one command at a time, so a tie is checked once the batch ends (checkRanks). */
 const DEFERRED: Partial<Record<string, readonly string[]>> = { priority: ["no-rank-ties"] };
 
-type FiledIssue = { id: string; repo: string };
-
-type CommandsAnswer = { status: 200 | 400 | 403 | 404 | 409 | 422; body: CommandsResponse; filed?: FiledIssue[] };
+type CommandsAnswer = { status: 200 | 400 | 403 | 404 | 409 | 422; body: CommandsResponse };
 
 const STATUS = { stale: 409, exists: 409, invalid: 422, not_found: 404, bad_command: 400, unknown_actor: 403 } as const;
 
@@ -64,7 +62,6 @@ export function runCommands(db: DatabaseSync, actor: string, request: unknown, t
     const answer = inTransaction<CommandsAnswer>(db, (answer: CommandsAnswer) => answer.status === 200 && !check, () => {
       const ids: Record<Ref, string> = {};
       const events: ApiEvent[] = [];
-      const filed: FiledIssue[] = [];
       // A check goes on past an invalid command, so the New goal rail sees every check at once. Each write rolls back its own savepoint.
       const all: (ApiViolation & { at: number })[] = [];
       let first: { at: number; violations: ApiViolation[] } | undefined;
@@ -142,10 +139,6 @@ export function runCommands(db: DatabaseSync, actor: string, request: unknown, t
           return;
         }
         const result = run(at, command);
-        if (result && command.op === "create" && command.kind === "work_item" && typeof command.github_repo === "string" && command.github_repo !== "") {
-          const id = result.entity.id;
-          if (typeof id === "string") filed.push({ id, repo: command.github_repo });
-        }
         if (command.op === "create" && ref) {
           if (result) ids[ref] = result.entity.id as string;
           else refused.add(ref);
@@ -160,9 +153,7 @@ export function runCommands(db: DatabaseSync, actor: string, request: unknown, t
       }
       const found = check ? { hints: [...hints.values()].flat() } : {};
       if (first) return { status: 422, body: { ok: false, at: first.at, error: "invalid", violations: first.violations, all, ...found } };
-      const done: CommandsAnswer = { status: 200, body: { ok: true, ids, events, ...found } };
-      if (outer && !check) done.filed = filed;
-      return done;
+      return { status: 200, body: { ok: true, ids, events, ...found } };
     });
     // ADR 0007: only a committed batch is sent, and only once the outer COMMIT is done.
     if (outer && !check && answer.body.ok) publish(answer.body.events);
@@ -194,9 +185,11 @@ function resolve(at: number, raw: unknown, ids: Record<Ref, string>, refused: Se
   for (const field of KEY_FIELDS[kind]) if (field in fields) fields[field] = key(fields[field]);
   const reason = typeof raw.reason === "string" ? raw.reason : undefined;
   if (raw.op === "create") {
-    // github_repo stays on the command. It is not a field of the work item.
-    if (kind === "work_item" && Object.hasOwn(raw, "github_repo")) return { op: "create", kind, fields, reason, github_repo: raw.github_repo };
-    return { op: "create", kind, fields, reason };
+    // A concrete id is kept. A ref is not an id. github_repo stays on the command. It is not a field of the work item.
+    const id = typeof raw.id === "string" && !isRef(raw.id) ? raw.id : undefined;
+    const create = { op: "create" as const, kind, fields, reason, ...(id !== undefined ? { id } : {}) };
+    if (kind === "work_item" && Object.hasOwn(raw, "github_repo")) return { ...create, github_repo: raw.github_repo };
+    return create;
   }
   if (raw.op === "update") return { op: "update", kind, id: key(raw.id) as string, base_version: raw.base_version as number, fields, reason };
   throw bad(at, "op is create, update, or comment");

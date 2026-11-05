@@ -6,7 +6,7 @@ import { extname, resolve, sep } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
 import type { ActorRef, ApiError, CommandsResponse, FormOptions, GitHubStatusResponse, GoalEventsResponse, GoalPageResponse, PrioritiesResponse, WorkResponse } from "./api.ts";
-import { fileGitHubIssue, runCommands } from "./commands.ts";
+import { runCommands } from "./commands.ts";
 import { drainGitHub, githubView } from "./github.ts";
 import { receiveGitHubWebhook } from "./github_notice.ts";
 import { goalEvents, goalPage } from "./goalpage.ts";
@@ -148,9 +148,6 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
     const actor = c.get("actor").id;
     const today = todayIn(db);
     const answer = runCommands(db, actor, request, today);
-    if (answer.filed !== undefined) {
-      for (const item of answer.filed) await fileGitHubIssue(db, actor, item.id, item.repo, today);
-    }
     await drainGitHub(db);
     return c.json<CommandsResponse>(answer.body, answer.status);
   });

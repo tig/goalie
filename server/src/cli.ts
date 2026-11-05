@@ -6,7 +6,6 @@ import { configuredDatabase, configuredTimeZone, configuredToday } from "./confi
 import { openStore } from "./store.ts";
 import { seed, type SeedFile } from "./seed.ts";
 import { isKind, read, readEvents } from "./read.ts";
-import { fileGitHubIssue } from "./commands.ts";
 import { drainGitHub } from "./github.ts";
 import { checkStore, commandGitHubRepo, write, type Command } from "./write.ts";
 
@@ -44,17 +43,14 @@ async function run(db: DatabaseSync, args: string[]): Promise<number> {
       const filed = command as Command;
       const result = write(db, rest[1], filed, day);
       if (result.ok) {
+        await drainGitHub(db);
         const repo = commandGitHubRepo(filed);
         const id = result.entity.id;
-        if (repo !== undefined && typeof id === "string") {
-          await fileGitHubIssue(db, rest[1], id, repo, day);
-          // The link is a second write. Print that row, or the next update is stale.
-          if (isKind(filed.kind)) {
-            const current = read(db, filed.kind, id);
-            if (current !== undefined) result.entity = current;
-          }
+        // The link is a second write. Print that row, or the next update is stale.
+        if (repo !== undefined && typeof id === "string" && isKind(filed.kind)) {
+          const current = read(db, filed.kind, id);
+          if (current !== undefined) result.entity = current;
         }
-        await drainGitHub(db);
       }
       print(result);
       return result.ok ? 0 : 2;
