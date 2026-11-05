@@ -960,6 +960,13 @@ class GitHubPageTests(unittest.TestCase):
         menu = app.split("function OwnerMenu", 1)[1].split("function TopBar", 1)[0]
         self.assertIn('kind: "actor", id: actor.id, label: actor.name', menu)
 
+    def test_the_owner_menu_is_not_the_feedback_menu(self) -> None:
+        """A right-click on Github... opens feedback. The owner menu is not the feedback menu."""
+        feedback = (MODEL.parent / "Feedback.tsx").read_text(encoding="utf-8")
+        self.assertNotIn('querySelector(".ctxmenu")', feedback)
+        self.assertNotIn('closest(".ctxmenu")', feedback)
+        self.assertIn("${FEEDBACK_CHROME}[role=menu]", feedback)
+
     def test_a_missing_key_still_shows_the_repository(self) -> None:
         page = (MODEL.parent / "GitHubPage.tsx").read_text(encoding="utf-8")
         self.assertIn("{data.repository ?? \"none\"}", page)
