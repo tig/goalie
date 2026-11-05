@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import socket
 import sqlite3
 import subprocess
@@ -18,13 +19,14 @@ import threading
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlencode, urlparse
 
 from goalie_cli import SERVER, Store, create, update
 from live_server import Reply, get, post, running_server, signed
 
 REPO = "tig/goalie"
 ISSUE = f"https://github.com/{REPO}/issues/72"
+PULL = f"https://github.com/{REPO}/pull/80"
 OTHER = "https://github.com/excaliwire/factory/issues/3"
 PUBLIC = "http://goalie.test"
 ITEM = "WI-9001"
@@ -91,6 +93,8 @@ class GitHub(ThreadingHTTPServer):
         self.before_issue: Callable[[], None] | None = None
         self.fail_label = False
         self.drop_label = False
+        self.search: list[dict[str, Any]] = []
+        self.queries: list[str] = []
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -102,6 +106,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         self._call()
         path = self._path()
+        if path == "/search/issues":
+            self._search()
+            return
         if path == f"/repos/{REPO}/installation":
             self._send(200, {"id": self.server.installation_id})
             return
@@ -182,6 +189,19 @@ class Handler(BaseHTTPRequestHandler):
         if opened is not None and self.server.opened_path is not None and self._remove_label(path, f"{self.server.opened_path}/labels/", opened):
             return
         self._send(404, {"message": "not found"})
+
+    def _search(self) -> None:
+        params = parse_qs(urlparse(self.path).query)
+        text = params.get("q", [""])[0]
+        self.server.queries.append(text)
+        repos = [part.lower() for part in re.findall(r"repo:(\S+)", text)]
+        items = []
+        for hit in self.server.search:
+            url = str(hit.get("html_url", "")).lower()
+            if repos and not any(f"github.com/{repo}/" in url for repo in repos):
+                continue
+            items.append(hit)
+        self._send(200, {"items": items})
 
     def _issue(self, issue: dict[str, Any]) -> None:
         self._send(200, {"body": issue["body"], "state": issue["state"], "state_reason": issue["state_reason"], "labels": [{"name": name} for name in issue["labels"]]})
@@ -322,6 +342,8 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.github.before_issue = None
         self.github.fail_label = False
         self.github.drop_label = False
+        self.github.search = []
+        self.github.queries = []
         self.github.issue = {"body": "Keep this.", "state": "open", "state_reason": None, "labels": ["pinned"]}
         set_scope(self.store, ["tig/goalie"], [{"repo": "github.com/tig/goalie"}])
 
@@ -801,10 +823,97 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertEqual(listed, ["tig/other", "tig/goalie"])
         self.assertNotIn("tig/*", listed)
 
+    def test_a_hash_in_a_new_title_attaches_the_first_issue(self) -> None:
+        """A create titled Ship #72, with no links, stores the first issue the search returns. The push then sets that issue's status label."""
+        self.github.installation_id = 99
+        self.github.search = [
+            {"html_url": PULL, "title": "A pull request"},
+            {"html_url": ISSUE, "title": "Enable Github integration"},
+            {"html_url": f"https://github.com/{REPO}/issues/99", "title": "Later"},
+        ]
+        created = self.write(create("work_item", "WI-9082", {"goal": GOAL, "title": "Ship #72", "owner": "tig", "status": "Backlog"}, "Filed"))
+        self.assertTrue(created["ok"], created)
+        stored = self.store.read("work_item", "WI-9082")
+        self.assertEqual(stored["links"], [ISSUE])
+        self.assertEqual(self.github.queries, [f"repo:{REPO} 72"])
+        self.assertNotIn("POST /app/installations/77/access_tokens", self.github.calls)
+        self.assertIn("POST /app/installations/99/access_tokens", self.github.calls)
+        self.assertIn("Backlog", self.github.issue["labels"])
+        linked = [event for event in self.store.events() if event["entity"] == "WI-9082" and event["field"] == "links"]
+        self.assertEqual(len(linked), 1)
+        self.assertEqual(linked[0]["actor"], "tig")
+        self.assertEqual(linked[0]["reason"], "Attached")
+
+    def test_a_retitle_keeps_the_linked_issue(self) -> None:
+        """A work item that already links an issue, retitled to include #99, keeps that issue URL."""
+        created = self.write(create("work_item", "WI-9083", self.item([ISSUE]), "Filed"))
+        self.assertTrue(created["ok"], created)
+        self.github.calls.clear()
+        self.github.queries.clear()
+        self.github.search = [{"html_url": f"https://github.com/{REPO}/issues/99", "title": "Other"}]
+        retitled = self.write(update("work_item", "WI-9083", 1, {"title": "Ship #99"}, "Clearer"))
+        self.assertTrue(retitled["ok"], retitled)
+        self.assertEqual(self.store.read("work_item", "WI-9083")["links"], [ISSUE])
+        self.assertEqual(self.github.queries, [])
+
+    def test_a_completed_status_does_not_patch_a_pull_request(self) -> None:
+        """A pull request stays a link. Completed closes the attached issue and does not PATCH the pull request."""
+        created = self.write(create("work_item", "WI-9084", self.item([PULL, ISSUE]), "Filed"))
+        self.assertTrue(created["ok"], created)
+        self.github.calls.clear()
+        done = self.write(update("work_item", "WI-9084", 1, {"status": "Completed"}, "Shipped"))
+        self.assertTrue(done["ok"], done)
+        self.assertEqual(self.store.read("work_item", "WI-9084")["links"], [PULL, ISSUE])
+        self.assertFalse(any("/pull/" in call for call in self.github.calls), self.github.calls)
+        self.assertIn("PATCH /repos/tig/goalie/issues/72", self.github.calls)
+        self.assertEqual(self.github.issue["state"], "closed")
+        self.assertEqual(self.github.issue["state_reason"], "completed")
+
+    def test_search_returns_an_issue_and_a_pull_on_the_goal(self) -> None:
+        """Search returns an issue and a pull request in an in-scope repo, and nothing from a repo the goal does not name."""
+        set_scope(self.store, ["tig/*", "excaliwire/factory"], [{"repo": "github.com/tig/goalie"}, {"repo": "github.com/acme/other"}])
+        self.github.installation_id = 99
+        self.github.search = [
+            {"html_url": ISSUE, "title": "Enable Github integration"},
+            {"html_url": PULL, "title": "Show the link"},
+            {"html_url": "https://github.com/excaliwire/factory/issues/3", "title": "Factory"},
+            {"html_url": "https://github.com/acme/other/issues/1", "title": "Other"},
+        ]
+        self.github.calls.clear()
+        self.github.queries.clear()
+        reply = self.search_as("chelsea", "sub-chelsea", GOAL, "72")
+        self.assertEqual(reply.status, 200, reply.body)
+        self.assertEqual(json.loads(reply.body), {"items": [
+            {"kind": "issue", "title": "Enable Github integration", "url": ISSUE},
+            {"kind": "pull", "title": "Show the link", "url": PULL},
+        ]})
+        self.assertNotIn("POST /app/installations/77/access_tokens", self.github.calls)
+        self.assertIn("POST /app/installations/99/access_tokens", self.github.calls)
+        self.assertFalse(any("excaliwire" in call or "acme" in call for call in self.github.calls), self.github.calls)
+        self.assertIn(f"repo:{REPO} 72", self.github.queries)
+        before = self.github.calls.count("GET /search/issues")
+        empty = self.search_as("chelsea", "sub-chelsea", GOAL, "")
+        self.assertEqual(empty.status, 200, empty.body)
+        self.assertEqual(json.loads(empty.body), {"items": []})
+        self.assertEqual(self.github.calls.count("GET /search/issues"), before)
+        missing = self.search_as("chelsea", "sub-chelsea", "NO-SUCH", "72")
+        self.assertEqual(missing.status, 404, missing.body)
+        self.assertEqual(json.loads(missing.body), {"error": "not_found", "reason": "no goal NO-SUCH"})
+
     def test_a_human_who_is_not_the_goalie_owner_gets_403(self) -> None:
         reply = self.status_as("chelsea", "sub-chelsea")
         self.assertEqual(reply.status, 403, reply.body)
         self.assertEqual(json.loads(reply.body)["error"], "forbidden")
+
+    def search_as(self, actor: str, subject: str, goal: str, q: str) -> Reply:
+        row = self.store.read("actor", actor)
+        if row.get("subject") != subject:
+            wrote = self.store.write("tig", update("actor", actor, row["version"], {"subject": subject}))
+            self.assertTrue(wrote["ok"], wrote)
+        token, issuers = signed(subject)
+        path = "/api/github/search?" + urlencode({"goal": goal, "q": q})
+        with running_server(self.store.path, {**self.env, **issuers}) as (proc, port):
+            return get(proc, port, path, {"Authorization": f"Bearer {token}"})
 
     def status_as(self, actor: str, subject: str, env: dict[str, str] | None = None) -> Reply:
         row = self.store.read("actor", actor)

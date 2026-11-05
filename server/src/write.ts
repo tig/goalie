@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { ENTITIES, encode, goalieOwner, isKind, lookup, memoryLookup, read, readAll, readEvents, type EventRow, type Kind } from "./read.ts";
-import { issueRepoAllowed, queueGitHubCreate, queueGitHubPush } from "./github.ts";
+import { issueRepoAllowed, queueGitHubAttach, queueGitHubCreate, queueGitHubPush } from "./github.ts";
 import { DEFAULT_VISIBILITY, isOpen } from "./goal.ts";
 import { checkAuthor, checkTransition, checkWrite, goalLints, REASONED_KINDS, SYSTEM_FIELDS, type Row, type Violation } from "./rules.ts";
 
@@ -214,7 +214,13 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
   if (kind === "work_item" && changed.includes("status")) queueGitHubPush(db, after);
   const repo = commandGitHubRepo(command);
   if (kind === "work_item" && repo !== undefined) queueGitHubCreate(db, after, repo, actor);
+  if (kind === "work_item" && setsTitle(command)) queueGitHubAttach(db, after, actor);
   return { ok: true, entity: read(db, kind, id) as Row, events: readEvents(db, first) };
+}
+
+/** A create, or an update whose fields set title. A later status change does not. The search itself waits until drain. */
+function setsTitle(command: Command): boolean {
+  return command.op === "create" || (command.op === "update" && Object.hasOwn(command.fields, "title"));
 }
 
 /** github_repo is not stored. A repository that is not in scope and on the goal refuses the create. */

@@ -635,6 +635,16 @@ class GoalPageTests(unittest.TestCase):
         self.assertEqual(b, {"commands": [{"op": "update", "kind": "work_item", "id": "WI-0001", "base_version": 3, "fields": {"title": "Draw the board again", "due_date": "2026-11-20"}, "reason": "Tig asked"}]})
         self.assertIsNone(run(f'return commands.workItemFieldsBatch({item}, {{ title: "Draw the board", owner: "chelsea", due_date: null }}, "No change");'))
 
+    def test_an_edit_can_send_links(self) -> None:
+        """The edit save sends links when a chosen issue or pull request is added."""
+        item = '{ id: "WI-0001", version: 3, title: "Draw the board", owner: "chelsea", due_date: null, links: null }'
+        issued = "https://github.com/tig/goalie/issues/72"
+        pulled = "https://github.com/tig/goalie/pull/80"
+        issue = run(f'return commands.workItemFieldsBatch({item}, {{ title: "Draw the board", owner: "chelsea", due_date: null, links: [{json.dumps(issued)}] }}, "Attach");')
+        pull = run(f'return commands.workItemFieldsBatch({item}, {{ title: "Ship #72", owner: "chelsea", due_date: null, links: [{json.dumps(pulled)}] }}, "Attach");')
+        self.assertEqual(issue["commands"][0]["fields"], {"links": [issued]})  # type: ignore[index]
+        self.assertEqual(pull["commands"][0]["fields"], {"title": "Ship #72", "links": [pulled]})  # type: ignore[index]
+
     def test_a_human_may_edit_any_work_item_and_an_agent_only_its_own(self) -> None:
         # rules.ts: a human writes any work item; an agent writes only the ones it owns (agent-own-work-items).
         got = run("""
@@ -787,6 +797,18 @@ process.stdout.write(JSON.stringify([a.body.message, b.body.message]));"""
         self.assertIn("Add as Github Issue", form)
         self.assertIn("repos.length === 0 ? null", form)
         self.assertLess(form.index("repos.length === 0 ? null"), form.index("Add as Github Issue"))
+
+    def test_the_add_form_and_the_edit_form_render_the_search_menu_from_a_hash(self) -> None:
+        """Add and edit render the search menu when the title has # and a query."""
+        src = (MODEL.parent / "GoalAdd.tsx").read_text(encoding="utf-8")
+        add = src.split("export function AddWorkItem", 1)[1].split("export function EditWorkItem", 1)[0]
+        edit = src.split("export function EditWorkItem", 1)[1].split("const STATUSES", 1)[0]
+        self.assertIn("<GitHubAttach", add)
+        self.assertIn("<GitHubAttach", edit)
+        menu = src.split("function GitHubAttach", 1)[1].split("export function AddWorkItem", 1)[0]
+        self.assertIn("/api/github/search", menu)
+        self.assertIn('role="menu"', menu)
+        self.assertIn("#(\\S+)", menu)
 
 
 class RouteTests(unittest.TestCase):

@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { ApiCommand, ApiEvent, ApiViolation, BatchHint, CommandsResponse, Ref, StoredGoal, StoredPriority } from "./api.ts";
-import { createGitHubIssue, finishGitHubCreate, openedIssueReason, queueGitHubPush, rememberGitHubFailure } from "./github.ts";
+import { claimGitHubAttach, createGitHubIssue, finishGitHubCreate, hashQuery, hasIssueUrl, openedIssueReason, queueGitHubPush, rememberGitHubFailure, searchGitHub } from "./github.ts";
 import { publish, toApiEvent } from "./live.ts";
 import { toApiWorkItem } from "./work.ts";
 import { lookup, read } from "./read.ts";
@@ -222,6 +222,34 @@ export async function fileGitHubIssue(db: DatabaseSync, actor: string, id: strin
   // The link write does not change status, so it does not queue a push. The caller's drain sends this row.
   const current = read(db, "work_item", id);
   if (current !== undefined) queueGitHubPush(db, current);
+}
+
+/** After the commit, append the first issue for each attach request. The search is not inside a transaction. A pull request is not that issue. The current status is queued for the caller's drain. */
+export async function attachGitHubIssues(db: DatabaseSync, today: string): Promise<void> {
+  const rows = db.prepare(
+    "SELECT work_item FROM github_push WHERE error IS NULL AND issue = '' AND (repo IS NULL OR repo = '') AND actor IS NOT NULL AND actor <> ''",
+  ).all() as { work_item: string }[];
+  for (const row of rows) {
+    const claimed = claimGitHubAttach(db, row.work_item);
+    if (claimed === undefined) continue;
+    const item = read(db, "work_item", row.work_item);
+    const query = item === undefined || typeof item.title !== "string" || typeof item.goal !== "string" ? undefined : hashQuery(item.title);
+    if (item === undefined || query === undefined || hasIssueUrl(item.links) || typeof item.goal !== "string") continue;
+    const issue = (await searchGitHub(db, item.goal, query)).find((hit) => hit.kind === "issue");
+    if (issue === undefined) continue;
+    const current = read(db, "work_item", row.work_item);
+    if (current === undefined || typeof current.version !== "number" || hasIssueUrl(current.links)) continue;
+    const prior = Array.isArray(current.links) ? current.links.filter((link): link is string => typeof link === "string") : [];
+    const result = write(db, claimed.actor, { op: "update", kind: "work_item", id: row.work_item, base_version: current.version, fields: { links: [...prior, issue.url] }, reason: "Attached" }, today);
+    if (!result.ok) {
+      const detail = result.error === "invalid" ? result.violations.map((v) => v.message).join(" ") : result.error === "stale" ? "The work item changed before the issue link was saved." : result.message;
+      rememberGitHubFailure(db, row.work_item, detail);
+      continue;
+    }
+    if (result.events.length > 0) publish(result.events.map(toApiEvent));
+    const linked = read(db, "work_item", row.work_item);
+    if (linked !== undefined) queueGitHubPush(db, linked);
+  }
 }
 
 function failure(db: DatabaseSync, at: number, kind: string, result: Exclude<WriteResult, { ok: true }>, today: string): CommandsAnswer {
