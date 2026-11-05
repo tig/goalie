@@ -1,5 +1,7 @@
 import type { GitHubStatusResponse } from "../../src/api.ts";
 import { useJson } from "./data.ts";
+import { backPath } from "./model/route.ts";
+import { homeSearch, Link } from "./router.tsx";
 
 /**
  * The GitHub page. The GOALIE owner sees the repositories in github_repos, whether GitHub is configured, the last update, and the last signed notice.
@@ -11,7 +13,14 @@ export function GitHubPage() {
     <main className="githubpage">
       <h1>GitHub</h1>
       {loaded.state === "loading" && <div className="skel skel-row" />}
-      {loaded.state === "refused" && <p className="note">{loaded.reason}</p>}
+      {loaded.state === "refused" &&
+        (loaded.status === 403 ? (
+          <p className="note">
+            Only the GOALIE owner can see the GitHub page. Go to <Link to={backPath(homeSearch())}>Home</Link>.
+          </p>
+        ) : (
+          <p className="note">{loaded.reason}</p>
+        ))}
       {loaded.state === "ok" && <Status data={loaded.data} />}
     </main>
   );
