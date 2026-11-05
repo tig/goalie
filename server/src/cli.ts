@@ -7,7 +7,7 @@ import { openStore } from "./store.ts";
 import { seed, type SeedFile } from "./seed.ts";
 import { isKind, read, readEvents } from "./read.ts";
 import { drainGitHub } from "./github.ts";
-import { checkStore, write, type Command } from "./write.ts";
+import { checkStore, commandGitHubRepo, write, type Command } from "./write.ts";
 
 /**
  * A local tool against the GOALIE_DB file. It is not reachable over HTTP.
@@ -39,8 +39,19 @@ async function run(db: DatabaseSync, args: string[]): Promise<number> {
       if (rest[0] !== "--as" || !rest[1]) return usage();
       const command = stdinJson();
       if (command === undefined) return badInput("stdin is not JSON");
-      const result = write(db, rest[1], command as Command, today(db));
-      if (result.ok) await drainGitHub(db);
+      const day = today(db);
+      const filed = command as Command;
+      const result = write(db, rest[1], filed, day);
+      if (result.ok) {
+        await drainGitHub(db);
+        const repo = commandGitHubRepo(filed);
+        const id = result.entity.id;
+        // The link is a second write. Print that row, or the next update is stale.
+        if (repo !== undefined && typeof id === "string" && isKind(filed.kind)) {
+          const current = read(db, filed.kind, id);
+          if (current !== undefined) result.entity = current;
+        }
+      }
       print(result);
       return result.ok ? 0 : 2;
     }

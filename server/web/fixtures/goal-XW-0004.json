@@ -490,5 +490,8 @@
       "kind": "agent",
       "operator": "chelsea"
     }
-  }
+  },
+  "githubRepos": [
+    "tig/goalie"
+  ]
 }

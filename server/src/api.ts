@@ -223,6 +223,8 @@ export type GoalPageResponse = {
   /** Lints: flagged, never blocked (SPEC.md §8.1). The app shows the text as a muted hint at the field. */
   hints: { field: string; text: string }[];
   actors: Record<string, ApiActor>;
+  /** Repositories this goal names that github_repos covers, in that order. Add as Github Issue uses them. */
+  githubRepos: string[];
 };
 
 /** GET /api/options. What the New goal form, + Sub-goal, and + Work item offer, with the defaults the server writes. */
@@ -250,7 +252,7 @@ export type Ref = `$${string}`;
 /** One command of POST /api/commands. Only goals and work items are written through the API in the MLP. */
 export type ApiCommand =
   | { op: "create"; kind: "goal"; ref?: Ref; fields: Partial<GoalFields>; reason: string }
-  | { op: "create"; kind: "work_item"; ref?: Ref; fields: Partial<WorkItemFields>; reason: string }
+  | { op: "create"; kind: "work_item"; ref?: Ref; fields: Partial<WorkItemFields>; reason: string; github_repo?: string }
   | { op: "update"; kind: "goal"; id: string | Ref; base_version: number; fields: Partial<GoalFields>; reason?: string }
   | { op: "update"; kind: "work_item"; id: string | Ref; base_version: number; fields: Partial<WorkItemFields>; reason?: string }
   /** Drag to reorder on Home: one per moved Priority, in one batch. Its rank only (SPEC.md §6.3). */

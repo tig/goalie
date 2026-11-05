@@ -2,6 +2,7 @@ import { createSign } from "node:crypto";
 import { readFileSync } from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
 import type { GitHubStatusResponse } from "./api.ts";
+import { configuredTimeZone, configuredToday } from "./config.ts";
 import { read } from "./read.ts";
 import type { Row } from "./rules.ts";
 
@@ -10,6 +11,7 @@ import type { Row } from "./rules.ts";
  * The repository must be in the owner setting github_repos and on the work item's goal.
  * github_push is not an entity and not an Event. The row is written in the work item's transaction.
  * The call to GitHub runs after that transaction commits. A failure stays on the row and shows on the work item.
+ * Add as Github Issue writes the request in the work item's transaction: an empty issue, the repository, and the actor. drain opens the issue after that transaction commits, then the link write records the issue URL. The current status is queued after that write so this drain sends it. That push includes the work item's current title. A failed create sets error on this row so a later drain does not send it as a status push.
  * github_result is not an entity and not an Event. It keeps the last update and the last signed notice.
  */
 
@@ -30,10 +32,44 @@ export function githubError(db: DatabaseSync, id: string): string | null {
   return row?.error ?? null;
 }
 
+/** A failed issue create shows on the work item. error is set, so drain does not send the row as a status push. */
+export function rememberGitHubFailure(db: DatabaseSync, id: string, detail: string): void {
+  const item = read(db, "work_item", id);
+  if (item === undefined) return;
+  const goal = item.goal;
+  const status = item.status;
+  if (typeof goal !== "string" || typeof status !== "string") return;
+  const text = detail.slice(0, 500);
+  db.prepare(
+    `INSERT INTO github_push (work_item, issue, status, goal, error) VALUES (?, '', ?, ?, ?)
+     ON CONFLICT(work_item) DO UPDATE SET error = excluded.error`,
+  ).run(id, status, goal, text);
+  recordGitHubResult(db, "outbound", false, text);
+}
+
+/** The issue was opened. Drop a failure row. Leave a pending status push for drain. */
+export function finishGitHubCreate(db: DatabaseSync, id: string, detail: string): void {
+  db.prepare("DELETE FROM github_push WHERE work_item = ? AND (error IS NOT NULL OR issue = '')").run(id);
+  recordGitHubResult(db, "outbound", true, detail);
+}
+
+/** The request to open an issue, in the same transaction as the work item. The issue stays empty until drain opens it. */
+export function queueGitHubCreate(db: DatabaseSync, after: Row, repo: string, actor: string): void {
+  const id = after.id;
+  const status = after.status;
+  const goal = after.goal;
+  if (typeof id !== "string" || typeof status !== "string" || typeof goal !== "string" || repo === "") return;
+  db.prepare(
+    `INSERT INTO github_push (work_item, issue, status, goal, error, repo, actor) VALUES (?, '', ?, ?, NULL, ?, ?)
+     ON CONFLICT(work_item) DO UPDATE SET issue = '', status = excluded.status, goal = excluded.goal, error = NULL, repo = excluded.repo, actor = excluded.actor`,
+  ).run(id, status, goal, repo, actor);
+}
+
 /**
  * Record the push for a committed status change, in the same transaction as the Event.
  * The linked issue's repository must be in github_repos and on the work item's goal.
- * Anything else clears a pending push.
+ * No linked issue deletes a row whose issue is not empty. An empty issue stays: a create request, or a failed create.
+ * A linked issue replaces the row and clears the error. That push leaves repo and actor empty.
  */
 export function queueGitHubPush(db: DatabaseSync, after: Row): void {
   const id = after.id;
@@ -41,21 +77,22 @@ export function queueGitHubPush(db: DatabaseSync, after: Row): void {
   const goalRow = typeof after.goal === "string" ? read(db, "goal", after.goal) : undefined;
   const issue = linkedIssue(after.links, githubRepos(db), goalRepos(goalRow?.work_product));
   if (issue === undefined) {
-    db.prepare("DELETE FROM github_push WHERE work_item = ?").run(id);
+    db.prepare("DELETE FROM github_push WHERE work_item = ? AND issue <> ''").run(id);
     return;
   }
   const status = after.status;
   const goal = after.goal;
   if (typeof status !== "string" || typeof goal !== "string") return;
   db.prepare(
-    `INSERT INTO github_push (work_item, issue, status, goal, error) VALUES (?, ?, ?, ?, NULL)
-     ON CONFLICT(work_item) DO UPDATE SET issue = excluded.issue, status = excluded.status, goal = excluded.goal, error = NULL`,
+    `INSERT INTO github_push (work_item, issue, status, goal, error, repo, actor) VALUES (?, ?, ?, ?, NULL, NULL, NULL)
+     ON CONFLICT(work_item) DO UPDATE SET issue = excluded.issue, status = excluded.status, goal = excluded.goal, error = NULL, repo = NULL, actor = NULL`,
   ).run(id, issue, status, goal);
 }
 
-/** Send every pending push. Call this only after the work item transaction has committed. A row whose repository is not in github_repos and on the work item's current goal is deleted and not sent. */
+/** Send every pending push. Call this only after the work item transaction has committed. A create request has an empty issue, no error, and a repository: open it here, and do not delete it as out of scope. Then send status pushes, including one the create just queued. A status row whose repository is not in github_repos and on the work item's current goal is deleted and not sent. A failed create has an empty issue and an error: leave it, and do not send it. */
 export async function drainGitHub(db: DatabaseSync): Promise<void> {
-  const pending = db.prepare("SELECT work_item, issue, status, goal FROM github_push WHERE error IS NULL").all() as PushRow[];
+  await openPendingIssues(db);
+  const pending = db.prepare("SELECT work_item, issue, status, goal FROM github_push WHERE error IS NULL AND issue <> ''").all() as PushRow[];
   if (pending.length === 0) return;
   const ready = configuredGitHub();
   for (const row of pending) {
@@ -65,7 +102,7 @@ export async function drainGitHub(db: DatabaseSync): Promise<void> {
     }
     let error: string | null;
     try {
-      error = ready.ok ? await push(ready.config, row) : ready.error;
+      error = ready.ok ? await push(db, ready.config, row) : ready.error;
     } catch {
       error = "GitHub could not be reached.";
     }
@@ -74,6 +111,62 @@ export async function drainGitHub(db: DatabaseSync): Promise<void> {
     if (error === null) db.prepare("DELETE FROM github_push WHERE work_item = ?").run(row.work_item);
     else db.prepare("UPDATE github_push SET error = ? WHERE work_item = ?").run(detail, row.work_item);
   }
+}
+
+type CreateRow = { work_item: string; repo: string; actor: string | null };
+
+/** Open each committed create request. A link already in that repository is not opened again. Its current status is queued instead. The row is taken before the call so a second drain does not open a second issue. commands.ts imports this module, so the opener is loaded here. */
+async function openPendingIssues(db: DatabaseSync): Promise<void> {
+  const rows = db.prepare(
+    "SELECT work_item, repo, actor FROM github_push WHERE error IS NULL AND issue = '' AND repo IS NOT NULL AND repo <> ''",
+  ).all() as CreateRow[];
+  if (rows.length === 0) return;
+  const { fileGitHubIssue } = await import("./commands.ts");
+  const today = configuredToday(configuredTimeZone(db));
+  for (const row of rows) {
+    const item = read(db, "work_item", row.work_item);
+    if (item !== undefined && namesIssueInRepo(item.links, row.repo)) {
+      queueGitHubPush(db, item);
+      continue;
+    }
+    const claimed = claimCreate(db, row.work_item);
+    if (claimed === undefined) continue;
+    await fileGitHubIssue(db, claimed.actor, row.work_item, claimed.repo, today);
+  }
+}
+
+/** Take one create request. Undefined when another drain took it, or it is no longer a create request. */
+function claimCreate(db: DatabaseSync, workItem: string): { repo: string; actor: string } | undefined {
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const row = db.prepare(
+      "SELECT repo, actor FROM github_push WHERE work_item = ? AND issue = '' AND error IS NULL AND repo IS NOT NULL AND repo <> ''",
+    ).get(workItem) as { repo: string; actor: string | null } | undefined;
+    if (row === undefined || typeof row.actor !== "string" || row.actor === "") {
+      db.exec("COMMIT");
+      return undefined;
+    }
+    db.prepare("DELETE FROM github_push WHERE work_item = ? AND issue = '' AND error IS NULL").run(workItem);
+    db.exec("COMMIT");
+    return { repo: row.repo, actor: row.actor };
+  } catch (error) {
+    if (db.isTransaction) db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+/** True when links already name an issue in repo. The names compare without case. */
+function namesIssueInRepo(links: unknown, repo: string): boolean {
+  if (!Array.isArray(links)) return false;
+  const want = repo.toLowerCase();
+  for (const link of links) {
+    if (typeof link !== "string") continue;
+    const url = canonicalIssueUrl(link);
+    if (url === undefined) continue;
+    const match = ISSUE_URL.exec(url);
+    if (match !== null && `${match[1]}/${match[2]}`.toLowerCase() === want) return true;
+  }
+  return false;
 }
 
 /** The issue's repository is in github_repos and on the work item's current goal. */
@@ -151,6 +244,40 @@ export function goalNamesRepo(db: DatabaseSync, goalId: unknown, repo: string): 
   return goalRepos(read(db, "goal", goalId)?.work_product).has(repo.toLowerCase());
 }
 
+/** True when repo is a repository, in github_repos, and on the goal. A wildcard is not a repository. */
+export function issueRepoAllowed(db: DatabaseSync, goalId: unknown, repo: string): boolean {
+  if (!SCOPE_ENTRY.test(repo) || repo.endsWith("/*")) return false;
+  return repoInScope(repo, githubRepos(db)) && goalNamesRepo(db, goalId, repo);
+}
+
+/** Repositories this goal names that github_repos covers. Order follows github_repos. A wildcard offers that owner's repositories on the goal, in work_product order, and is not a choice. */
+export function reposOnGoal(db: DatabaseSync, goalId: string): string[] {
+  const named = reposNamedOnGoal(read(db, "goal", goalId)?.work_product);
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of githubRepos(db)) {
+    const slash = entry.lastIndexOf("/");
+    const owner = entry.slice(0, slash).toLowerCase();
+    const name = entry.slice(slash + 1);
+    if (name === "*") {
+      for (const repo of named) {
+        if (repo.slice(0, repo.indexOf("/")).toLowerCase() !== owner) continue;
+        pushRepo(result, seen, repo);
+      }
+      continue;
+    }
+    if (named.some((repo) => repo.toLowerCase() === entry.toLowerCase())) pushRepo(result, seen, entry);
+  }
+  return result;
+}
+
+function pushRepo(result: string[], seen: Set<string>, repo: string): void {
+  const key = repo.toLowerCase();
+  if (seen.has(key)) return;
+  seen.add(key);
+  result.push(repo);
+}
+
 function storedResult(db: DatabaseSync, kind: "outbound" | "inbound"): { ok: boolean; detail: string } | null {
   const row = db.prepare("SELECT ok, detail FROM github_result WHERE kind = ?").get(kind) as { ok: number; detail: string } | undefined;
   if (row === undefined) return null;
@@ -180,9 +307,9 @@ function linkedIssue(links: unknown, scopes: readonly string[], onGoal: Readonly
   return undefined;
 }
 
-/** `repo` values written `github.com/owner/repo` or `https://github.com/owner/repo`. The names compare without case. Other entries are not repositories. */
-function goalRepos(workProduct: unknown): Set<string> {
-  const found = new Set<string>();
+/** `repo` values written `github.com/owner/repo` or `https://github.com/owner/repo`, in work_product order, with the casing written on the goal. */
+function reposNamedOnGoal(workProduct: unknown): string[] {
+  const found: string[] = [];
   if (!Array.isArray(workProduct)) return found;
   for (const entry of workProduct) {
     if (typeof entry !== "object" || entry === null || Array.isArray(entry)) continue;
@@ -190,9 +317,14 @@ function goalRepos(workProduct: unknown): Set<string> {
     if (typeof value !== "string") continue;
     const match = GOAL_REPO.exec(value);
     if (match === null) continue;
-    found.add(`${match[1]}/${match[2]}`.toLowerCase());
+    found.push(`${match[1]}/${match[2]}`);
   }
   return found;
+}
+
+/** The names compare without case. Other entries are not repositories. */
+function goalRepos(workProduct: unknown): Set<string> {
+  return new Set(reposNamedOnGoal(workProduct).map((repo) => repo.toLowerCase()));
 }
 
 function configuredGitHub(): Ready {
@@ -215,8 +347,8 @@ function configuredGitHub(): Ready {
   };
 }
 
-/** Push one issue. Null when GitHub accepted it. */
-async function push(config: GitHubConfig, row: PushRow): Promise<string | null> {
+/** Push one issue. Null when GitHub accepted it. The title on the PATCH is the work item's title at that call. */
+async function push(db: DatabaseSync, config: GitHubConfig, row: PushRow): Promise<string | null> {
   const parsed = ISSUE_URL.exec(row.issue);
   if (parsed === null) return "The linked issue is not a GitHub issue URL.";
   try {
@@ -239,12 +371,14 @@ async function push(config: GitHubConfig, row: PushRow): Promise<string | null> 
       const added = await ensureLabel(config, token, parsed[1], parsed[2], path, row.status);
       if (added !== null) return added;
     }
-    const line = `Linked from GOALIE [${row.work_item}](${config.publicUrl}/goals/${encodeURIComponent(row.goal)}#work-item-${encodeURIComponent(row.work_item)}).`;
+    const line = trailerLine(config.publicUrl, row.goal, row.work_item);
     const patch: Record<string, string> = { body: bodyWithTrailer(issue.body ?? "", line) };
     if (row.status === "Completed" || row.status === "Deleted") {
       patch.state = "closed";
       patch.state_reason = row.status === "Completed" ? "completed" : "not_planned";
     }
+    const title = read(db, "work_item", row.work_item)?.title;
+    if (typeof title === "string") patch.title = title;
     const saved = await call(config, token, "PATCH", path, patch);
     if (saved.status !== 200) return refused(saved.status, `PATCH ${path}`, saved.body);
     return null;
@@ -261,6 +395,58 @@ async function ensureLabel(config: GitHubConfig, token: string, owner: string, r
   if (created.status !== 201 && created.status !== 422) return refused(created.status, `POST /repos/${owner}/${repo}/labels`, created.body);
   const again = await call(config, token, "POST", `${issuePath}/labels`, { labels: [name] });
   return again.status === 200 || again.status === 201 ? null : refused(again.status, `POST ${issuePath}/labels`, again.body);
+}
+
+function trailerLine(publicUrl: string, goal: string, workItem: string): string {
+  return `Linked from GOALIE [${workItem}](${publicUrl}/goals/${encodeURIComponent(goal)}#work-item-${encodeURIComponent(workItem)}).`;
+}
+
+/** The link Event's reason. It names the issue. */
+export function openedIssueReason(url: string): string {
+  const match = ISSUE_URL.exec(url);
+  const name = match === null ? url : `${match[1]}/${match[2]}#${match[3]}`;
+  return `Opened ${name}.`;
+}
+
+export type OpenedIssue = { url: string; labelError: string | null } | { error: string };
+
+/** Open one issue. The caller writes the URL onto the work item after this returns. A failure of the create has no URL. A label failure still returns the URL. */
+export async function createGitHubIssue(db: DatabaseSync, workItemId: string, repo: string): Promise<OpenedIssue> {
+  const item = read(db, "work_item", workItemId);
+  if (item === undefined) return { error: `no work item ${workItemId}` };
+  if (!issueRepoAllowed(db, item.goal, repo)) return { error: `${repo} is not in scope on this goal.` };
+  const ready = configuredGitHub();
+  if (!ready.ok) return { error: ready.error };
+  const match = SCOPE_ENTRY.exec(repo);
+  if (match === null) return { error: `${repo} is not in scope on this goal.` };
+  const title = item.title;
+  const status = item.status;
+  const goal = item.goal;
+  if (typeof title !== "string" || typeof status !== "string" || typeof goal !== "string") return { error: `${repo} is not in scope on this goal.` };
+  try {
+    const issued = await installationToken(ready.config, match[1], match[2]);
+    if ("error" in issued) return { error: issued.error };
+    const path = `/repos/${match[1]}/${match[2]}/issues`;
+    const created = await call(ready.config, issued.token, "POST", path, { title, body: bodyWithTrailer("", trailerLine(ready.config.publicUrl, goal, workItemId)) });
+    if (created.status !== 201) return { error: refused(created.status, `POST ${path}`, created.body) };
+    const url = createdIssueUrl(created.body);
+    const parsed = url === undefined ? null : ISSUE_URL.exec(url);
+    if (url === undefined || parsed === null) return { error: `GitHub answered 201 for POST ${path} without an issue URL.` };
+    try {
+      const labelError = await ensureLabel(ready.config, issued.token, match[1], match[2], `/repos/${match[1]}/${match[2]}/issues/${parsed[3]}`, status);
+      return { url, labelError };
+    } catch {
+      return { url, labelError: "GitHub could not be reached." };
+    }
+  } catch {
+    return { error: "GitHub could not be reached." };
+  }
+}
+
+function createdIssueUrl(body: unknown): string | undefined {
+  if (typeof body !== "object" || body === null || !("html_url" in body)) return undefined;
+  const url = (body as { html_url: unknown }).html_url;
+  return typeof url === "string" ? canonicalIssueUrl(url) : undefined;
 }
 
 function bodyWithTrailer(body: string, line: string): string {

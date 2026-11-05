@@ -144,9 +144,10 @@ export function subGoalBatch(parent: StoredGoal, row: SubGoalRow, types: GoalTyp
   };
 }
 
-/** + Work item (G22): step 5 alone. Its Event's reason is "Filed". */
-export function workItemBatch(goal: string, item: Pick<WorkItemFields, "title" | "owner" | "status" | "due_date">): CommandsRequest {
-  return { commands: [{ op: "create", kind: "work_item", fields: { goal, ...item }, reason: "Filed" }] };
+/** + Work item (G22): step 5 alone. Its Event's reason is "Filed". github_repo is not a stored field. */
+export function workItemBatch(goal: string, item: Pick<WorkItemFields, "title" | "owner" | "status" | "due_date">, githubRepo?: string): CommandsRequest {
+  const command = { op: "create" as const, kind: "work_item" as const, fields: { goal, ...item }, reason: "Filed" };
+  return { commands: [githubRepo === undefined ? command : { ...command, github_repo: githubRepo }] };
 }
 
 /** The work item tick (G24), or any status change: one update with its reason. */

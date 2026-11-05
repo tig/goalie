@@ -145,7 +145,9 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
   );
   app.post("/api/commands", async (c) => {
     const request: unknown = await c.req.json().catch(() => undefined);
-    const answer = runCommands(db, c.get("actor").id, request, todayIn(db));
+    const actor = c.get("actor").id;
+    const today = todayIn(db);
+    const answer = runCommands(db, actor, request, today);
     await drainGitHub(db);
     return c.json<CommandsResponse>(answer.body, answer.status);
   });

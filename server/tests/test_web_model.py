@@ -780,6 +780,14 @@ process.stdout.write(JSON.stringify([a.body.message, b.body.message]));"""
         m = run('const g = page("XW-0003").goal; return commands.staleMerge({ severity: "sev2", health: "YELLOW" }, { ...g, version: 4, severity: "sev3" });')
         self.assertEqual(m, {"base_version": 4, "current": {"severity": "sev3", "health": "GREEN"}})
 
+    def test_add_as_github_issue_hides_when_there_is_no_repository(self) -> None:
+        """Add as Github Issue sits beside Add. An empty repository list does not render it."""
+        src = (MODEL.parent / "GoalAdd.tsx").read_text(encoding="utf-8")
+        form = src.split("export function AddWorkItem", 1)[1].split("export function EditWorkItem", 1)[0]
+        self.assertIn("Add as Github Issue", form)
+        self.assertIn("repos.length === 0 ? null", form)
+        self.assertLess(form.index("repos.length === 0 ? null"), form.index("Add as Github Issue"))
+
 
 class RouteTests(unittest.TestCase):
     def test_each_path_opens_its_page(self) -> None:

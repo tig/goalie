@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { ApiCommand, ApiEvent, ApiViolation, BatchHint, CommandsResponse, Ref, StoredGoal, StoredPriority } from "./api.ts";
+import { createGitHubIssue, finishGitHubCreate, openedIssueReason, queueGitHubPush, rememberGitHubFailure } from "./github.ts";
 import { publish, toApiEvent } from "./live.ts";
 import { toApiWorkItem } from "./work.ts";
 import { lookup, read } from "./read.ts";
@@ -183,9 +184,44 @@ function resolve(at: number, raw: unknown, ids: Record<Ref, string>, refused: Se
   const fields: Row = { ...(raw.fields as Row | undefined) };
   for (const field of KEY_FIELDS[kind]) if (field in fields) fields[field] = key(fields[field]);
   const reason = typeof raw.reason === "string" ? raw.reason : undefined;
-  if (raw.op === "create") return { op: "create", kind, fields, reason };
+  if (raw.op === "create") {
+    // A concrete id is kept. A ref is not an id. github_repo stays on the command. It is not a field of the work item.
+    const id = typeof raw.id === "string" && !isRef(raw.id) ? raw.id : undefined;
+    const create = { op: "create" as const, kind, fields, reason, ...(id !== undefined ? { id } : {}) };
+    if (kind === "work_item" && Object.hasOwn(raw, "github_repo")) return { ...create, github_repo: raw.github_repo };
+    return create;
+  }
   if (raw.op === "update") return { op: "update", kind, id: key(raw.id) as string, base_version: raw.base_version as number, fields, reason };
   throw bad(at, "op is create, update, or comment");
+}
+
+/** After the batch commits, open the issue and write its URL onto the work item. The actor is the one who filed it. The current status is queued for the caller's drain. */
+export async function fileGitHubIssue(db: DatabaseSync, actor: string, id: string, repo: string, today: string): Promise<void> {
+  const opened = await createGitHubIssue(db, id, repo);
+  if ("error" in opened) {
+    rememberGitHubFailure(db, id, opened.error);
+    return;
+  }
+  const item = read(db, "work_item", id);
+  if (item === undefined || typeof item.version !== "number") return;
+  const prior = Array.isArray(item.links) ? item.links.filter((link): link is string => typeof link === "string") : [];
+  const reason = openedIssueReason(opened.url);
+  const result = write(db, actor, { op: "update", kind: "work_item", id, base_version: item.version, fields: { links: [...prior, opened.url] }, reason }, today);
+  if (!result.ok) {
+    const detail = result.error === "invalid" ? result.violations.map((v) => v.message).join(" ") : result.error === "stale" ? "The work item changed before the issue link was saved." : result.message;
+    rememberGitHubFailure(db, id, detail);
+    return;
+  }
+  if (result.events.length > 0) publish(result.events.map(toApiEvent));
+  // A label failure stays on the work item. A later push would clear it.
+  if (opened.labelError !== null) {
+    rememberGitHubFailure(db, id, opened.labelError);
+    return;
+  }
+  finishGitHubCreate(db, id, reason);
+  // The link write does not change status, so it does not queue a push. The caller's drain sends this row.
+  const current = read(db, "work_item", id);
+  if (current !== undefined) queueGitHubPush(db, current);
 }
 
 function failure(db: DatabaseSync, at: number, kind: string, result: Exclude<WriteResult, { ok: true }>, today: string): CommandsAnswer {

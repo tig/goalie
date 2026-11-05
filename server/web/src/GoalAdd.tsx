@@ -155,11 +155,15 @@ export function AddSubGoal({ data, onDone }: { data: GoalPageResponse; onDone: D
 
 /** G22: one add row for a work item. The owner may be a human or an agent. It starts In Progress; its reason is "Filed". */
 export function AddWorkItem({ data, statuses, onDone }: { data: GoalPageResponse; statuses: WorkItemStatus[]; onDone: Done }) {
+  const repos = data.githubRepos;
   const [title, setTitle] = useState("");
   const [owner, setOwner] = useState(data.me.id);
   const [status, setStatus] = useState<WorkItemStatus>("In Progress");
   const [due, setDue] = useState("");
+  const [picked, setPicked] = useState(repos[0] ?? "");
   const [result, post] = usePost((b) => onDone(true, savedStatus("workitem", b)));
+  const fields = { title, owner, status, due_date: due || null };
+  const chosen = repos.length === 1 ? repos[0] : picked;
   return (
     <section className="panel addrow" aria-label="Work item" data-focus={formFocus("Work item")}>
       <div className="addgrid four">
@@ -195,9 +199,25 @@ export function AddWorkItem({ data, statuses, onDone }: { data: GoalPageResponse
       </div>
       <Errors result={result} />
       <div className="pactions">
-        <button type="button" className="btn primary" disabled={result.saving} onClick={() => post(workItemBatch(data.goal.id, { title, owner, status, due_date: due || null }))}>
+        <button type="button" className="btn primary" disabled={result.saving} onClick={() => post(workItemBatch(data.goal.id, fields))}>
           Add
         </button>
+        {repos.length === 0 ? null : (
+          <>
+            {repos.length > 1 && (
+              <select aria-label="Repository" value={chosen} onChange={(e) => setPicked(e.target.value)}>
+                {repos.map((name, index) => (
+                  <option key={`${name}-${index}`} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button type="button" className="btn" disabled={result.saving} onClick={() => post(workItemBatch(data.goal.id, fields, chosen))}>
+              Add as Github Issue
+            </button>
+          </>
+        )}
         <button type="button" className="btn" onClick={() => onDone(false)}>
           Cancel
         </button>
