@@ -37,7 +37,12 @@ class GitHub(ThreadingHTTPServer):
         self.issue: dict[str, Any] = {"body": "Keep this.", "state": "open", "state_reason": None, "labels": ["pinned"]}
         self.calls: list[str] = []
         self.fail_token = False
+        self.fail_issue = False
+        self.installation_id = 77
         self.token = "ghs_test"
+        self.opened: dict[str, Any] | None = None
+        self.issue_url: str | None = None
+        self.label_body: dict[str, Any] | None = None
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -50,7 +55,7 @@ class Handler(BaseHTTPRequestHandler):
         self._call()
         path = self._path()
         if path == f"/repos/{REPO}/installation":
-            self._send(200, {"id": 77})
+            self._send(200, {"id": self.server.installation_id})
             return
         if path == "/repos/excaliwire/factory/installation":
             self._send(200, {"id": 88})
@@ -64,7 +69,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         self._call()
         path, body = self._path(), self._body()
-        if path == "/app/installations/77/access_tokens" or path == "/app/installations/88/access_tokens":
+        if path.startswith("/app/installations/") and path.endswith("/access_tokens"):
             if self.server.fail_token:
                 self._send(500, {"message": "no"})
                 return
@@ -75,6 +80,20 @@ class Handler(BaseHTTPRequestHandler):
                 if name not in self.server.issue["labels"]:
                     self.server.issue["labels"].append(name)
             self._send(200, {})
+            return
+        if path.startswith("/repos/") and path.endswith("/labels") and "/issues/" in path:
+            self.server.label_body = body
+            self._send(200, {})
+            return
+        parts = path.split("/")
+        if len(parts) == 5 and parts[1] == "repos" and parts[4] == "issues":
+            if self.server.fail_issue:
+                self._send(422, {"message": "no"})
+                return
+            url = f"https://github.com/{parts[2]}/{parts[3]}/issues/140"
+            self.server.opened = {"title": body.get("title"), "body": body.get("body"), "url": url}
+            self.server.issue_url = url
+            self._send(201, {"html_url": url, "number": 140, "title": body.get("title")})
             return
         if path == f"/repos/{REPO}/labels":
             self._send(201, {"name": body.get("name")})
@@ -198,6 +217,11 @@ class GitHubPushTests(unittest.TestCase, PushTests):
     def setUp(self) -> None:
         self.github.calls.clear()
         self.github.fail_token = False
+        self.github.fail_issue = False
+        self.github.installation_id = 77
+        self.github.opened = None
+        self.github.issue_url = None
+        self.github.label_body = None
         self.github.issue = {"body": "Keep this.", "state": "open", "state_reason": None, "labels": ["pinned"]}
         set_scope(self.store, ["tig/goalie"], [{"repo": "github.com/tig/goalie"}])
 
@@ -433,6 +457,65 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertTrue(body["configured"])
         self.assertNotIn("privateKey", body)
         self.assertNotIn("BEGIN PRIVATE KEY", reply.body.decode())
+
+    def test_filing_with_github_repo_opens_the_issue(self) -> None:
+        """One in-scope repository on the goal. Filing with github_repo opens the issue and links it."""
+        self.github.installation_id = 99
+        command = create("work_item", "WI-9060", {"goal": GOAL, "title": "Ship the issue", "owner": "tig", "status": "In Progress"}, "Filed")
+        command["github_repo"] = "tig/goalie"
+        created = self.write(command)
+        self.assertTrue(created["ok"], created)
+        self.assertIn("POST /repos/tig/goalie/issues", self.github.calls)
+        self.assertIn("POST /app/installations/99/access_tokens", self.github.calls)
+        self.assertNotIn("POST /app/installations/77/access_tokens", self.github.calls)
+        self.assertIsNotNone(self.github.opened)
+        self.assertEqual(self.github.opened["title"], "Ship the issue")
+        self.assertIn("<!-- goalie -->", self.github.opened["body"])
+        self.assertIn(f"{PUBLIC}/goals/{GOAL}#work-item-WI-9060", self.github.opened["body"])
+        self.assertEqual(self.github.label_body, {"labels": ["In Progress"]})
+        stored = self.store.read("work_item", "WI-9060")
+        self.assertNotIn("github_repo", stored)
+        self.assertIn(self.github.issue_url, stored["links"])
+        linked = [event for event in self.store.events() if event["entity"] == "WI-9060" and event["field"] == "links"]
+        self.assertEqual(len(linked), 1)
+        self.assertEqual(linked[0]["actor"], "tig")
+        self.assertIn("tig/goalie#140", linked[0]["reason"])
+        self.assertIsNone(self.error("WI-9060"))
+
+    def test_a_repository_not_on_the_goal_does_not_open_an_issue(self) -> None:
+        """A repository in scope but not on the goal does not call GitHub and does not create the work item."""
+        set_scope(self.store, ["tig/goalie", "excaliwire/factory"], [{"repo": "github.com/tig/goalie"}])
+        self.github.calls.clear()
+        command = create("work_item", "WI-9061", {"goal": GOAL, "title": "Ship the issue", "owner": "tig", "status": "Backlog"}, "Filed")
+        command["github_repo"] = "excaliwire/factory"
+        result = self.write(command)
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["error"], "invalid")
+        self.assertIn("excaliwire/factory", result["violations"][0]["message"])
+        self.assertEqual(self.github.calls, [])
+        self.assertIsNone(self.store.read("work_item", "WI-9061"))
+
+    def test_a_failed_issue_create_leaves_the_work_item_and_shows_the_failure(self) -> None:
+        """GitHub rejects the create. The work item stays, with no issue link, and the failure shows. It is not drained as a status push."""
+        self.github.fail_issue = True
+        command = create("work_item", "WI-9062", {"goal": GOAL, "title": "Ship the issue", "owner": "tig", "status": "Backlog"}, "Filed")
+        command["github_repo"] = "tig/goalie"
+        result = self.write(command)
+        self.assertTrue(result["ok"], result)
+        stored = self.store.read("work_item", "WI-9062")
+        self.assertEqual(stored["status"], "Backlog")
+        self.assertIsNone(stored["links"])
+        self.assertIn("POST /repos/tig/goalie/issues", self.github.calls)
+        self.assertIn("422", self.error("WI-9062") or "")
+        shown = next(item for item in self.goal_page()["workItems"] if item["id"] == "WI-9062")
+        self.assertEqual(shown["github_error"], self.error("WI-9062"))
+        self.assertNotIn("links", [event["field"] for event in self.store.events() if event["entity"] == "WI-9062"])
+        self.github.calls.clear()
+        self.github.fail_issue = False
+        retitled = self.write(update("work_item", "WI-9062", 1, {"title": "Still here"}, "Clearer"))
+        self.assertTrue(retitled["ok"], retitled)
+        self.assertIsNotNone(self.error("WI-9062"))
+        self.assertFalse(any(call.startswith("GET /repos/") and "/issues/" in call for call in self.github.calls), self.github.calls)
 
     def test_a_human_who_is_not_the_goalie_owner_gets_403(self) -> None:
         reply = self.status_as("chelsea", "sub-chelsea")

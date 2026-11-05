@@ -6,8 +6,9 @@ import { configuredDatabase, configuredTimeZone, configuredToday } from "./confi
 import { openStore } from "./store.ts";
 import { seed, type SeedFile } from "./seed.ts";
 import { isKind, read, readEvents } from "./read.ts";
+import { fileGitHubIssue } from "./commands.ts";
 import { drainGitHub } from "./github.ts";
-import { checkStore, write, type Command } from "./write.ts";
+import { checkStore, commandGitHubRepo, write, type Command } from "./write.ts";
 
 /**
  * A local tool against the GOALIE_DB file. It is not reachable over HTTP.
@@ -39,8 +40,15 @@ async function run(db: DatabaseSync, args: string[]): Promise<number> {
       if (rest[0] !== "--as" || !rest[1]) return usage();
       const command = stdinJson();
       if (command === undefined) return badInput("stdin is not JSON");
-      const result = write(db, rest[1], command as Command, today(db));
-      if (result.ok) await drainGitHub(db);
+      const day = today(db);
+      const filed = command as Command;
+      const result = write(db, rest[1], filed, day);
+      if (result.ok) {
+        const repo = commandGitHubRepo(filed);
+        const id = result.entity.id;
+        if (repo !== undefined && typeof id === "string") await fileGitHubIssue(db, rest[1], id, repo, day);
+        await drainGitHub(db);
+      }
       print(result);
       return result.ok ? 0 : 2;
     }

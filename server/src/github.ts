@@ -10,6 +10,7 @@ import type { Row } from "./rules.ts";
  * The repository must be in the owner setting github_repos and on the work item's goal.
  * github_push is not an entity and not an Event. The row is written in the work item's transaction.
  * The call to GitHub runs after that transaction commits. A failure stays on the row and shows on the work item.
+ * Add as Github Issue creates the issue after the work item commits, then the link write records the issue URL. A failed create sets error on this row so a later drain does not send it as a status push.
  * github_result is not an entity and not an Event. It keeps the last update and the last signed notice.
  */
 
@@ -28,6 +29,27 @@ type PushRow = { work_item: string; issue: string; status: string; goal: string 
 export function githubError(db: DatabaseSync, id: string): string | null {
   const row = db.prepare("SELECT error FROM github_push WHERE work_item = ?").get(id) as { error: string | null } | undefined;
   return row?.error ?? null;
+}
+
+/** A failed issue create shows on the work item. error is set, so drain does not send the row as a status push. */
+export function rememberGitHubFailure(db: DatabaseSync, id: string, detail: string): void {
+  const item = read(db, "work_item", id);
+  if (item === undefined) return;
+  const goal = item.goal;
+  const status = item.status;
+  if (typeof goal !== "string" || typeof status !== "string") return;
+  const text = detail.slice(0, 500);
+  db.prepare(
+    `INSERT INTO github_push (work_item, issue, status, goal, error) VALUES (?, '', ?, ?, ?)
+     ON CONFLICT(work_item) DO UPDATE SET error = excluded.error`,
+  ).run(id, status, goal, text);
+  recordGitHubResult(db, "outbound", false, text);
+}
+
+/** The issue was opened. Drop a failure row. Leave a pending status push for drain. */
+export function finishGitHubCreate(db: DatabaseSync, id: string, detail: string): void {
+  db.prepare("DELETE FROM github_push WHERE work_item = ? AND (error IS NOT NULL OR issue = '')").run(id);
+  recordGitHubResult(db, "outbound", true, detail);
 }
 
 /**
@@ -151,6 +173,17 @@ export function goalNamesRepo(db: DatabaseSync, goalId: unknown, repo: string): 
   return goalRepos(read(db, "goal", goalId)?.work_product).has(repo.toLowerCase());
 }
 
+/** True when repo is a repository, in github_repos, and on the goal. A wildcard is not a repository. */
+export function issueRepoAllowed(db: DatabaseSync, goalId: unknown, repo: string): boolean {
+  if (!SCOPE_ENTRY.test(repo) || repo.endsWith("/*")) return false;
+  return repoInScope(repo, githubRepos(db)) && goalNamesRepo(db, goalId, repo);
+}
+
+/** github_repos entries this goal's work_product names, in github_repos order. */
+export function reposOnGoal(db: DatabaseSync, goalId: string): string[] {
+  return githubRepos(db).filter((repo) => goalNamesRepo(db, goalId, repo));
+}
+
 function storedResult(db: DatabaseSync, kind: "outbound" | "inbound"): { ok: boolean; detail: string } | null {
   const row = db.prepare("SELECT ok, detail FROM github_result WHERE kind = ?").get(kind) as { ok: number; detail: string } | undefined;
   if (row === undefined) return null;
@@ -239,7 +272,7 @@ async function push(config: GitHubConfig, row: PushRow): Promise<string | null> 
       const added = await ensureLabel(config, token, parsed[1], parsed[2], path, row.status);
       if (added !== null) return added;
     }
-    const line = `Linked from GOALIE [${row.work_item}](${config.publicUrl}/goals/${encodeURIComponent(row.goal)}#work-item-${encodeURIComponent(row.work_item)}).`;
+    const line = trailerLine(config.publicUrl, row.goal, row.work_item);
     const patch: Record<string, string> = { body: bodyWithTrailer(issue.body ?? "", line) };
     if (row.status === "Completed" || row.status === "Deleted") {
       patch.state = "closed";
@@ -261,6 +294,54 @@ async function ensureLabel(config: GitHubConfig, token: string, owner: string, r
   if (created.status !== 201 && created.status !== 422) return refused(created.status, `POST /repos/${owner}/${repo}/labels`, created.body);
   const again = await call(config, token, "POST", `${issuePath}/labels`, { labels: [name] });
   return again.status === 200 || again.status === 201 ? null : refused(again.status, `POST ${issuePath}/labels`, again.body);
+}
+
+function trailerLine(publicUrl: string, goal: string, workItem: string): string {
+  return `Linked from GOALIE [${workItem}](${publicUrl}/goals/${encodeURIComponent(goal)}#work-item-${encodeURIComponent(workItem)}).`;
+}
+
+/** The link Event's reason. It names the issue. */
+export function openedIssueReason(url: string): string {
+  const match = ISSUE_URL.exec(url);
+  const name = match === null ? url : `${match[1]}/${match[2]}#${match[3]}`;
+  return `Opened ${name}.`;
+}
+
+export type OpenedIssue = { url: string; labelError: string | null } | { error: string };
+
+/** Open one issue. The caller writes the URL onto the work item after this returns. A failure has no URL. */
+export async function createGitHubIssue(db: DatabaseSync, workItemId: string, repo: string): Promise<OpenedIssue> {
+  const item = read(db, "work_item", workItemId);
+  if (item === undefined) return { error: `no work item ${workItemId}` };
+  if (!issueRepoAllowed(db, item.goal, repo)) return { error: `${repo} is not in scope on this goal.` };
+  const ready = configuredGitHub();
+  if (!ready.ok) return { error: ready.error };
+  const match = SCOPE_ENTRY.exec(repo);
+  if (match === null) return { error: `${repo} is not in scope on this goal.` };
+  const title = item.title;
+  const status = item.status;
+  const goal = item.goal;
+  if (typeof title !== "string" || typeof status !== "string" || typeof goal !== "string") return { error: `${repo} is not in scope on this goal.` };
+  try {
+    const issued = await installationToken(ready.config, match[1], match[2]);
+    if ("error" in issued) return { error: issued.error };
+    const path = `/repos/${match[1]}/${match[2]}/issues`;
+    const created = await call(ready.config, issued.token, "POST", path, { title, body: bodyWithTrailer("", trailerLine(ready.config.publicUrl, goal, workItemId)) });
+    if (created.status !== 201) return { error: refused(created.status, `POST ${path}`, created.body) };
+    const url = createdIssueUrl(created.body);
+    const parsed = url === undefined ? null : ISSUE_URL.exec(url);
+    if (url === undefined || parsed === null) return { error: `GitHub answered 201 for POST ${path} without an issue URL.` };
+    const labelError = await ensureLabel(ready.config, issued.token, match[1], match[2], `/repos/${match[1]}/${match[2]}/issues/${parsed[3]}`, status);
+    return { url, labelError };
+  } catch {
+    return { error: "GitHub could not be reached." };
+  }
+}
+
+function createdIssueUrl(body: unknown): string | undefined {
+  if (typeof body !== "object" || body === null || !("html_url" in body)) return undefined;
+  const url = (body as { html_url: unknown }).html_url;
+  return typeof url === "string" ? canonicalIssueUrl(url) : undefined;
 }
 
 function bodyWithTrailer(body: string, line: string): string {

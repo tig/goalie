@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { ApiCommand, ApiEvent, ApiViolation, BatchHint, CommandsResponse, Ref, StoredGoal, StoredPriority } from "./api.ts";
+import { createGitHubIssue, finishGitHubCreate, openedIssueReason, rememberGitHubFailure } from "./github.ts";
 import { publish, toApiEvent } from "./live.ts";
 import { toApiWorkItem } from "./work.ts";
 import { lookup, read } from "./read.ts";
@@ -22,7 +23,9 @@ const KEY_FIELDS: Record<(typeof API_KINDS)[number], readonly string[]> = { goal
 /** A re-rank swaps ranks one command at a time, so a tie is checked once the batch ends (checkRanks). */
 const DEFERRED: Partial<Record<string, readonly string[]>> = { priority: ["no-rank-ties"] };
 
-type CommandsAnswer = { status: 200 | 400 | 403 | 404 | 409 | 422; body: CommandsResponse };
+type FiledIssue = { id: string; repo: string };
+
+type CommandsAnswer = { status: 200 | 400 | 403 | 404 | 409 | 422; body: CommandsResponse; filed?: FiledIssue[] };
 
 const STATUS = { stale: 409, exists: 409, invalid: 422, not_found: 404, bad_command: 400, unknown_actor: 403 } as const;
 
@@ -61,6 +64,7 @@ export function runCommands(db: DatabaseSync, actor: string, request: unknown, t
     const answer = inTransaction<CommandsAnswer>(db, (answer: CommandsAnswer) => answer.status === 200 && !check, () => {
       const ids: Record<Ref, string> = {};
       const events: ApiEvent[] = [];
+      const filed: FiledIssue[] = [];
       // A check goes on past an invalid command, so the New goal rail sees every check at once. Each write rolls back its own savepoint.
       const all: (ApiViolation & { at: number })[] = [];
       let first: { at: number; violations: ApiViolation[] } | undefined;
@@ -138,6 +142,10 @@ export function runCommands(db: DatabaseSync, actor: string, request: unknown, t
           return;
         }
         const result = run(at, command);
+        if (result && command.op === "create" && command.kind === "work_item" && typeof command.github_repo === "string" && command.github_repo !== "") {
+          const id = result.entity.id;
+          if (typeof id === "string") filed.push({ id, repo: command.github_repo });
+        }
         if (command.op === "create" && ref) {
           if (result) ids[ref] = result.entity.id as string;
           else refused.add(ref);
@@ -152,7 +160,9 @@ export function runCommands(db: DatabaseSync, actor: string, request: unknown, t
       }
       const found = check ? { hints: [...hints.values()].flat() } : {};
       if (first) return { status: 422, body: { ok: false, at: first.at, error: "invalid", violations: first.violations, all, ...found } };
-      return { status: 200, body: { ok: true, ids, events, ...found } };
+      const done: CommandsAnswer = { status: 200, body: { ok: true, ids, events, ...found } };
+      if (outer && !check) done.filed = filed;
+      return done;
     });
     // ADR 0007: only a committed batch is sent, and only once the outer COMMIT is done.
     if (outer && !check && answer.body.ok) publish(answer.body.events);
@@ -183,9 +193,38 @@ function resolve(at: number, raw: unknown, ids: Record<Ref, string>, refused: Se
   const fields: Row = { ...(raw.fields as Row | undefined) };
   for (const field of KEY_FIELDS[kind]) if (field in fields) fields[field] = key(fields[field]);
   const reason = typeof raw.reason === "string" ? raw.reason : undefined;
-  if (raw.op === "create") return { op: "create", kind, fields, reason };
+  if (raw.op === "create") {
+    // github_repo stays on the command. It is not a field of the work item.
+    if (kind === "work_item" && Object.hasOwn(raw, "github_repo")) return { op: "create", kind, fields, reason, github_repo: raw.github_repo };
+    return { op: "create", kind, fields, reason };
+  }
   if (raw.op === "update") return { op: "update", kind, id: key(raw.id) as string, base_version: raw.base_version as number, fields, reason };
   throw bad(at, "op is create, update, or comment");
+}
+
+/** After the batch commits, open the issue and write its URL onto the work item. The actor is the one who filed it. */
+export async function fileGitHubIssue(db: DatabaseSync, actor: string, id: string, repo: string, today: string): Promise<void> {
+  const opened = await createGitHubIssue(db, id, repo);
+  if ("error" in opened) {
+    rememberGitHubFailure(db, id, opened.error);
+    return;
+  }
+  const item = read(db, "work_item", id);
+  if (item === undefined || typeof item.version !== "number") return;
+  const prior = Array.isArray(item.links) ? item.links.filter((link): link is string => typeof link === "string") : [];
+  const reason = openedIssueReason(opened.url);
+  const result = write(db, actor, { op: "update", kind: "work_item", id, base_version: item.version, fields: { links: [...prior, opened.url] }, reason }, today);
+  if (!result.ok) {
+    const detail = result.error === "invalid" ? result.violations.map((v) => v.message).join(" ") : result.error === "stale" ? "The work item changed before the issue link was saved." : result.message;
+    rememberGitHubFailure(db, id, detail);
+    return;
+  }
+  if (result.events.length > 0) publish(result.events.map(toApiEvent));
+  if (opened.labelError !== null) {
+    rememberGitHubFailure(db, id, opened.labelError);
+    return;
+  }
+  finishGitHubCreate(db, id, reason);
 }
 
 function failure(db: DatabaseSync, at: number, kind: string, result: Exclude<WriteResult, { ok: true }>, today: string): CommandsAnswer {
