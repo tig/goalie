@@ -343,6 +343,28 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertEqual(set(self.github.issue["labels"]), {"pinned", "Backlog"})
         self.assertIsNone(self.error("WI-9030"))
 
+    def test_a_missing_list_uses_the_deployment_repository(self) -> None:
+        """A status change still pushes when owner settings have no github_repos list and the deployment names that repository."""
+        settings = self.store.read("owner_settings", "owner")
+        fields = {key: value for key, value in settings["settings"].items() if key != "github_repos"}
+        wrote = self.store.write("tig", update("owner_settings", "owner", settings["version"], {"settings": fields}))
+        self.assertTrue(wrote["ok"], wrote)
+        self.assertNotIn("github_repos", self.store.read("owner_settings", "owner")["settings"])
+        env = dict(self.env)
+        env["GOALIE_GITHUB_REPO"] = "tig/goalie"
+        created = self.store.run("write", "--as", "tig", stdin=create("work_item", "WI-9055", self.item([ISSUE]), "Filed"), env=env)[1]
+        self.assertTrue(created["ok"], created)
+        self.assertIn("GET /repos/tig/goalie/issues/72", self.github.calls)
+
+    def test_an_empty_list_ignores_the_deployment_repository(self) -> None:
+        """An empty github_repos list is the scope. The deployment repository does not fill it."""
+        set_scope(self.store, [], [{"repo": "github.com/tig/goalie"}])
+        env = dict(self.env)
+        env["GOALIE_GITHUB_REPO"] = "tig/goalie"
+        created = self.store.run("write", "--as", "tig", stdin=create("work_item", "WI-9056", self.item([ISSUE]), "Filed"), env=env)[1]
+        self.assertTrue(created["ok"], created)
+        self.assertEqual(self.github.calls, [])
+
     def test_excaliwire_wildcard_matches_factory_not_tig_goalie(self) -> None:
         set_scope(self.store, ["excaliwire/*"], [{"repo": "https://github.com/excaliwire/factory"}, {"repo": "github.com/tig/goalie"}])
         env = self.env_without_repo()

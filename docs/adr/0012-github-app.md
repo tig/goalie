@@ -10,6 +10,8 @@
 
 **Amended:** 2026-11-04. The update uses the installation GitHub reports for that repository.
 
+**Amended:** 2026-11-05. When owner settings have no `github_repos` list, the repository named in process configuration is in scope. A written list, including an empty list, is the scope.
+
 ## Context
 
 [#72 (Enable Github integration)](https://github.com/tig/goalie/issues/72) pushes a work item's status to one linked GitHub issue.
@@ -23,6 +25,7 @@ The deployment calls GitHub as a GitHub App.
 Process configuration names the app id, the installation id, the path of the private key, and the public URL of this deployment.
 The private key is a file outside this repo.
 The owner setting `github_repos` names the repositories in scope. An entry is `owner/repo` or `owner/*`.
+When owner settings have no `github_repos` list, the repository named in process configuration is in scope. A written list, including an empty list, is the scope.
 A goal's repositories are the `repo` entries on its work product.
 A committed change of a work item's status, when its links name an issue in a repository that is in `github_repos` and on that goal, updates that issue after the commit.
 The update sets one status label, keeps a body trailer that links back to the work item, closes the issue as completed when the status is Completed, and closes it as not planned when the status is Deleted.

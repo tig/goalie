@@ -108,11 +108,13 @@ function updatedDetail(row: PushRow): string {
   return `Updated ${name} to ${row.status}.`;
 }
 
-/** `owner/repo` and `owner/*` from owner settings. Any other entry is dropped. */
+/** `owner/repo` and `owner/*` from owner settings. Any other entry is dropped. No list yet uses the deployment repository. An empty list stays empty. */
 export function githubRepos(db: DatabaseSync): string[] {
   const settings = read(db, "owner_settings", "owner")?.settings;
   if (typeof settings !== "object" || settings === null || Array.isArray(settings)) return [];
-  const list = (settings as Row).github_repos;
+  const row = settings as Row;
+  if (!Object.hasOwn(row, "github_repos")) return deploymentRepo();
+  const list = row.github_repos;
   if (!Array.isArray(list)) return [];
   const kept: string[] = [];
   for (const entry of list) {
@@ -122,6 +124,12 @@ export function githubRepos(db: DatabaseSync): string[] {
     kept.push(`${match[1]}/${match[2]}`);
   }
   return kept;
+}
+
+/** The one repository in process configuration, or none when that name is missing or not `owner/repo` or `owner/*`. */
+function deploymentRepo(): string[] {
+  const match = SCOPE_ENTRY.exec(process.env.GOALIE_GITHUB_REPO?.trim() ?? "");
+  return match === null ? [] : [`${match[1]}/${match[2]}`];
 }
 
 /** True when `owner/*` covers repo, or the entry is that `owner/repo`. GitHub compares the names without case. */
