@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import type { ApiActor, ApiViolation, CommandsRequest, CommandsResponse, FormOptions, GoalPageResponse, Health, PathToGreen, StoredGoal } from "../../src/api.ts";
 import { addDays, shortDate } from "../../src/dates.ts";
 import { postCommands, useJson } from "./data.ts";
-import { closeBatch, fieldsBatch, goalTypes, healthBatch, promoteAndClose, promoteToAmbition, promoteToCommitted, pullInBatch, pursueBatch, savedStatus, slipBatch, staleMerge } from "./model/commands.ts";
+import { closeBatch, fieldsBatch, goalTypes, healthBatch, promoteAndClose, promoteToAmbition, promoteToCommitted, pullInBatch, pullInProblem, pursueBatch, savedStatus, slipBatch, staleMerge } from "./model/commands.ts";
 import { eventValue, humans } from "./model/goalpage.ts";
 import { healthWord } from "./model/labels.ts";
 import { HealthDot } from "./parts.tsx";
@@ -237,13 +237,17 @@ export function PullInPanel({ data, onDone }: { data: GoalPageResponse; onDone: 
   const { goal, today } = data;
   const [date, setDate] = useState("");
   const [reason, setReason] = useState("");
+  // QA item 1: a later date is a slip, so the panel refuses it before it saves. A date input's max does not stop a typed date.
+  const [tried, setTried] = useState(false);
+  const current = goal.changed_due_date ?? goal.due_date ?? today;
+  const problem = pullInProblem(current, date, today);
   const saved = useSave(goal, (b) => onDone(true, savedStatus("pull-in", b, { date: shortDate(date, today) })));
   return (
     <Shell
       title="Record a pull-in"
       saved={saved}
       fields={["changed_due_date", "reason"]}
-      onSave={() => saved.save((g) => pullInBatch(g, date, reason), { changed_due_date: date })}
+      onSave={() => (problem ? setTried(true) : saved.save((g) => pullInBatch(g, date, reason), { changed_due_date: date }))}
       onCancel={() => onDone(false)}
     >
       <p className="small">A pull-in moves a Committed date earlier, not before today.</p>
@@ -252,7 +256,8 @@ export function PullInPanel({ data, onDone }: { data: GoalPageResponse; onDone: 
       </p>
       <label className="field">
         <span className="flabel">Changed Due Date</span>
-        <input type="date" value={date} min={today} max={goal.changed_due_date ?? goal.due_date ?? undefined} onChange={(e) => setDate(e.target.value)} />
+        <input type="date" value={date} min={today} max={addDays(current, -1)} onChange={(e) => setDate(e.target.value)} />
+        {problem && (tried || date !== "") && <p className="ferror">{problem}</p>}
         <FieldError saved={saved} field="changed_due_date" />
         <Current saved={saved} field="changed_due_date" data={data} />
       </label>
