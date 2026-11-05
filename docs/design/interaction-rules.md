@@ -30,6 +30,7 @@ The screens are a React app in `server/web/`. It reads `GET /api/priorities` and
 9b. Every card carries a **?** help icon. A click (or Enter) opens it. A second click, Escape, or a click outside closes it. Pointing at it also shows it. Its text uses SPEC.md §4 and §6.1 words: what the card counts, what each word means, and what a click does.
 10. Health is a mark of its color and its own shape on every screen, so color is not the only cue: GREEN a circle, YELLOW a triangle, RED a square. Each fits the same 10 px box. A diamond is only a Promotion Milestone (rule 23a). In the List the mark and the word are the Health column. On a phone the word follows the mark at the start of the row's date line. No health pills.
 10a. The Priority rank is a plain number in the first column, muted, right-aligned. No badge.
+10b. Every top goal of a Priority shows the Priority's number, not only the first. Why: with goals arranged on Home, a Priority can hold several top goals, and a goal with no number read as belonging to none (Chelsea, 2026-11-05).
 11. A goal with no health shows a hollow circle.
 12. An owner is an avatar. The signed-in actor's own avatar is outlined. The name is the avatar's tooltip.
 13. Every label is a word from SPEC.md §4, §6, §8.2, or §9. A screen with no spec word for a label uses a number or an icon, and the word goes to Tig.

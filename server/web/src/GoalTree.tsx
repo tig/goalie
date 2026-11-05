@@ -357,7 +357,8 @@ export function GoalTree(props: TreeProps) {
     <div className={`group${drag?.id === p.id ? " dragging" : ""}${over && !over.row && over.spot.kind === "top" && over.spot.priority === p.id ? " droptop" : ""}`} key={p.id} data-pid={props.rank ? p.id : undefined} data-gpid={p.id} data-focus={encodeFocus({ kind: "priority", id: p.id, label: p.title })}>
       {drag && drag.at === order.indexOf(p.id) && <div className="dropline" aria-hidden="true" />}
       {p.goals.length ? (
-        p.goals.map((g, i) => goal(g, i === 0 ? (pending ? order.indexOf(p.id) + 1 : p.rank) : undefined, undefined, undefined, i === 0 ? handle(p) : undefined, null, p.id))
+        // Every top goal of a Priority shows its number, so each goal reads as part of one Priority (rule 10b).
+        p.goals.map((g, i) => goal(g, pending ? order.indexOf(p.id) + 1 : p.rank, undefined, undefined, i === 0 ? handle(p) : undefined, null, p.id))
       ) : (
         <div className="row d0" style={{ "--depth": 0 } as CSSProperties}>
           <div className="left">

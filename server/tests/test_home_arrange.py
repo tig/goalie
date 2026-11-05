@@ -55,9 +55,13 @@ BACK = """(async () => {
   const line = { before: row('XW-0001').classList.contains('dropbefore'), ghost: document.querySelector('.dragghost')?.textContent.replace(/\s+/g, ' ').trim() ?? null };
   ev('pointercancel', edge); await sleep(60);
   const gone = !document.querySelector('.dragghost') && !document.querySelector('.dropbefore');
+  // Dropped on the edge of XW-0003, it joins Priority 3 beside it, and both rows carry the number 3.
+  await drag('XW-0004', row('XW-0003'), 0.1);
+  await saved();
+  const ranks = { XW0003: row('XW-0003').querySelector('.rnum').textContent.trim(), XW0004: row('XW-0004').querySelector('.rnum').textContent.trim() };
   const shown = await drag('XW-0004', row('XW-0003'), 0.5);
   const note = await saved();
-  return { before, line, gone, shown, words: note?.words, none: noneIds() };
+  return { before, line, gone, ranks, shown, words: note?.words, none: noneIds() };
 })()"""
 
 KEYS = """(async () => {
@@ -96,6 +100,7 @@ class HomeArrange(unittest.TestCase):
         self.assertEqual((after_out["parent"], after_out["priority"]), (None, None))
         self.assertIn("XW-0004", out["none"])
         self.assertEqual(back["before"], ["XW-0004"])
+        self.assertEqual(back["ranks"], {"XW0003": "3", "XW0004": "3"}, "every top goal of a Priority shows its number")
         self.assertTrue(back["shown"]["into"], "the row under the pointer is marked as the new parent")
         # Between goals: a line above the row, and a label at the pointer that says what the drop does.
         self.assertTrue(back["line"]["before"])
