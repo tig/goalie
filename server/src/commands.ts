@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { ApiCommand, ApiEvent, ApiViolation, BatchHint, CommandsResponse, Ref, StoredGoal, StoredPriority } from "./api.ts";
-import { createGitHubIssue, finishGitHubCreate, openedIssueReason, rememberGitHubFailure } from "./github.ts";
+import { createGitHubIssue, finishGitHubCreate, openedIssueReason, queueGitHubPush, rememberGitHubFailure } from "./github.ts";
 import { publish, toApiEvent } from "./live.ts";
 import { toApiWorkItem } from "./work.ts";
 import { lookup, read } from "./read.ts";
@@ -202,7 +202,7 @@ function resolve(at: number, raw: unknown, ids: Record<Ref, string>, refused: Se
   throw bad(at, "op is create, update, or comment");
 }
 
-/** After the batch commits, open the issue and write its URL onto the work item. The actor is the one who filed it. */
+/** After the batch commits, open the issue and write its URL onto the work item. The actor is the one who filed it. The current status is queued for the caller's drain. */
 export async function fileGitHubIssue(db: DatabaseSync, actor: string, id: string, repo: string, today: string): Promise<void> {
   const opened = await createGitHubIssue(db, id, repo);
   if ("error" in opened) {
@@ -220,11 +220,15 @@ export async function fileGitHubIssue(db: DatabaseSync, actor: string, id: strin
     return;
   }
   if (result.events.length > 0) publish(result.events.map(toApiEvent));
+  // A label failure stays on the work item. A later push would clear it.
   if (opened.labelError !== null) {
     rememberGitHubFailure(db, id, opened.labelError);
     return;
   }
   finishGitHubCreate(db, id, reason);
+  // The link write does not change status, so it does not queue a push. The caller's drain sends this row.
+  const current = read(db, "work_item", id);
+  if (current !== undefined) queueGitHubPush(db, current);
 }
 
 function failure(db: DatabaseSync, at: number, kind: string, result: Exclude<WriteResult, { ok: true }>, today: string): CommandsAnswer {

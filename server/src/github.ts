@@ -10,7 +10,7 @@ import type { Row } from "./rules.ts";
  * The repository must be in the owner setting github_repos and on the work item's goal.
  * github_push is not an entity and not an Event. The row is written in the work item's transaction.
  * The call to GitHub runs after that transaction commits. A failure stays on the row and shows on the work item.
- * Add as Github Issue creates the issue after the work item commits, then the link write records the issue URL. A failed create sets error on this row so a later drain does not send it as a status push.
+ * Add as Github Issue creates the issue after the work item commits, then the link write records the issue URL. The current status is queued after that write so the caller's drain sends it. A failed create sets error on this row so a later drain does not send it as a status push.
  * github_result is not an entity and not an Event. It keeps the last update and the last signed notice.
  */
 
@@ -337,7 +337,7 @@ export function openedIssueReason(url: string): string {
 
 export type OpenedIssue = { url: string; labelError: string | null } | { error: string };
 
-/** Open one issue. The caller writes the URL onto the work item after this returns. A failure has no URL. */
+/** Open one issue. The caller writes the URL onto the work item after this returns. A failure of the create has no URL. A label failure still returns the URL. */
 export async function createGitHubIssue(db: DatabaseSync, workItemId: string, repo: string): Promise<OpenedIssue> {
   const item = read(db, "work_item", workItemId);
   if (item === undefined) return { error: `no work item ${workItemId}` };
@@ -359,8 +359,12 @@ export async function createGitHubIssue(db: DatabaseSync, workItemId: string, re
     const url = createdIssueUrl(created.body);
     const parsed = url === undefined ? null : ISSUE_URL.exec(url);
     if (url === undefined || parsed === null) return { error: `GitHub answered 201 for POST ${path} without an issue URL.` };
-    const labelError = await ensureLabel(ready.config, issued.token, match[1], match[2], `/repos/${match[1]}/${match[2]}/issues/${parsed[3]}`, status);
-    return { url, labelError };
+    try {
+      const labelError = await ensureLabel(ready.config, issued.token, match[1], match[2], `/repos/${match[1]}/${match[2]}/issues/${parsed[3]}`, status);
+      return { url, labelError };
+    } catch {
+      return { url, labelError: "GitHub could not be reached." };
+    }
   } catch {
     return { error: "GitHub could not be reached." };
   }

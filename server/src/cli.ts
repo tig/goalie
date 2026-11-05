@@ -46,7 +46,14 @@ async function run(db: DatabaseSync, args: string[]): Promise<number> {
       if (result.ok) {
         const repo = commandGitHubRepo(filed);
         const id = result.entity.id;
-        if (repo !== undefined && typeof id === "string") await fileGitHubIssue(db, rest[1], id, repo, day);
+        if (repo !== undefined && typeof id === "string") {
+          await fileGitHubIssue(db, rest[1], id, repo, day);
+          // The link is a second write. Print that row, or the next update is stale.
+          if (isKind(filed.kind)) {
+            const current = read(db, filed.kind, id);
+            if (current !== undefined) result.entity = current;
+          }
+        }
         await drainGitHub(db);
       }
       print(result);
