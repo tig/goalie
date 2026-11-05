@@ -10,7 +10,7 @@ import type { Row } from "./rules.ts";
  * The repository must be in the owner setting github_repos and on the work item's goal.
  * github_push is not an entity and not an Event. The row is written in the work item's transaction.
  * The call to GitHub runs after that transaction commits. A failure stays on the row and shows on the work item.
- * Add as Github Issue creates the issue after the work item commits, then the link write records the issue URL. The current status is queued after that write so the caller's drain sends it. A failed create sets error on this row so a later drain does not send it as a status push.
+ * Add as Github Issue creates the issue after the work item commits, then the link write records the issue URL. The current status is queued after that write so the caller's drain sends it. That push includes the work item's current title. A failed create sets error on this row so a later drain does not send it as a status push.
  * github_result is not an entity and not an Event. It keeps the last update and the last signed notice.
  */
 
@@ -87,7 +87,7 @@ export async function drainGitHub(db: DatabaseSync): Promise<void> {
     }
     let error: string | null;
     try {
-      error = ready.ok ? await push(ready.config, row) : ready.error;
+      error = ready.ok ? await push(db, ready.config, row) : ready.error;
     } catch {
       error = "GitHub could not be reached.";
     }
@@ -276,8 +276,8 @@ function configuredGitHub(): Ready {
   };
 }
 
-/** Push one issue. Null when GitHub accepted it. */
-async function push(config: GitHubConfig, row: PushRow): Promise<string | null> {
+/** Push one issue. Null when GitHub accepted it. The title on the PATCH is the work item's title at that call. */
+async function push(db: DatabaseSync, config: GitHubConfig, row: PushRow): Promise<string | null> {
   const parsed = ISSUE_URL.exec(row.issue);
   if (parsed === null) return "The linked issue is not a GitHub issue URL.";
   try {
@@ -306,6 +306,8 @@ async function push(config: GitHubConfig, row: PushRow): Promise<string | null> 
       patch.state = "closed";
       patch.state_reason = row.status === "Completed" ? "completed" : "not_planned";
     }
+    const title = read(db, "work_item", row.work_item)?.title;
+    if (typeof title === "string") patch.title = title;
     const saved = await call(config, token, "PATCH", path, patch);
     if (saved.status !== 200) return refused(saved.status, `PATCH ${path}`, saved.body);
     return null;

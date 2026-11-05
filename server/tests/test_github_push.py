@@ -113,7 +113,7 @@ class Handler(BaseHTTPRequestHandler):
             self.server.opened = {"title": body.get("title"), "body": body.get("body"), "url": url}
             self.server.issue_url = url
             self.server.opened_path = f"{path}/140"
-            self.server.opened_issue = {"body": body.get("body"), "state": "open", "state_reason": None, "labels": []}
+            self.server.opened_issue = {"title": body.get("title"), "body": body.get("body"), "state": "open", "state_reason": None, "labels": []}
             self._send(201, {"html_url": url, "number": 140, "title": body.get("title")})
             return
         if path == f"/repos/{REPO}/labels":
@@ -147,6 +147,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def _patch(self, issue: dict[str, Any]) -> None:
         body = self._body()
+        if "title" in body:
+            issue["title"] = body["title"]
         if "body" in body:
             issue["body"] = body["body"]
         if "state" in body:
@@ -577,7 +579,7 @@ class GitHubPushTests(unittest.TestCase, PushTests):
     def test_a_failed_create_stays_visible_after_a_status_change(self) -> None:
         """GitHub rejects the create. A later status change keeps that failure on the work item and does not patch an issue."""
         self.github.fail_issue = True
-        item = "WI-9075"
+        item = "WI-9076"
         command = create("work_item", item, {"goal": GOAL, "title": "Ship the issue", "owner": "tig", "status": "Backlog"}, "Filed")
         command["github_repo"] = "tig/goalie"
         filed = self.write(command)
@@ -618,6 +620,31 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertEqual(self.github.opened_issue["state_reason"], "completed")
         self.assertEqual(self.github.opened_issue["labels"], ["Completed"])
         self.assertIsNone(self.error(item))
+        self.assertIn("POST /repos/tig/goalie/issues", self.github.calls)
+
+    def test_a_rename_during_create_sets_the_opened_issue_title(self) -> None:
+        """A rename during the issue POST is not the created title. The push after the link writes the current title."""
+        item = "WI-9075"
+
+        def rename() -> None:
+            row = self.store.read("work_item", item)
+            wrote = self.store.run("write", "--as", "tig", stdin=update("work_item", item, row["version"], {"title": "Renamed while opening"}, "Clearer"), env=self.env)[1]
+            if not wrote["ok"]:
+                raise AssertionError(wrote)
+
+        self.github.before_issue = rename
+        try:
+            command = create("work_item", item, {"goal": GOAL, "title": "Ship the issue", "owner": "tig", "status": "Backlog"}, "Filed")
+            command["github_repo"] = "tig/goalie"
+            result = self.write(command)
+        finally:
+            self.github.before_issue = None
+        self.assertTrue(result["ok"], result)
+        stored = self.store.read("work_item", item)
+        self.assertEqual(stored["title"], "Renamed while opening")
+        self.assertEqual(self.github.opened["title"], "Ship the issue")
+        self.assertEqual(self.github.opened_issue["title"], "Renamed while opening")
+        self.assertIn(self.github.issue_url, stored["links"])
         self.assertIn("POST /repos/tig/goalie/issues", self.github.calls)
 
     def test_filing_completed_closes_the_opened_issue(self) -> None:
