@@ -76,6 +76,13 @@ export function moveWords(spot: Spot, names: { goal: (id: string) => string; pri
   return spot.priority ? `Move it to ${names.priority(spot.priority)}` : "Move it to No priority";
 }
 
+/** What a saved move did, said after the goal's name: "is now a sub-goal of …", "is now in Priority 2 …", "now has no priority". */
+export function movedWords(spot: Spot, names: { goal: (id: string) => string; priority: (id: string) => string }): string {
+  if (spot.kind === "into") return `is now a sub-goal of ${names.goal(spot.goal)}.`;
+  if (spot.kind === "beside") return `is now a sub-goal of ${names.goal(spot.parent)}.`;
+  return spot.priority ? `is now in ${names.priority(spot.priority)}.` : "now has no priority.";
+}
+
 /** Arrow up or down on a top goal's grip: the next group, Priorities in rank order then No priority. At an end it stays. */
 export function nextGroup(groups: (string | null)[], from: string | null, by: -1 | 1): string | null {
   const at = groups.indexOf(from);

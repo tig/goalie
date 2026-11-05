@@ -851,6 +851,8 @@ main.newgoal{padding-bottom:84px}
 .ggrip:hover,.ggrip:focus-visible{background:var(--green-bg);color:var(--ink)}
 .ggrip svg{fill:currentColor}
 .row.moving{opacity:.55}
+.row.justmoved,.row.justmoved>.left{animation:justmoved 2.4s ease-out}
+@keyframes justmoved{0%,40%{background:var(--green-bg)}100%{background:transparent}}
 .row.dropinto{box-shadow:inset 0 0 0 2px var(--brand);border-radius:10px;background:var(--green-bg)}
 .row.dropinto>.left{background:var(--green-bg)}
 .group.droptop{box-shadow:inset 0 0 0 2px var(--brand);border-radius:12px}
@@ -859,15 +861,23 @@ main.newgoal{padding-bottom:84px}
 .row.dropbefore::before{top:-2px}
 .row.dropafter::after{bottom:-2px}
 .row.dropparent>.left{background:var(--green-bg)}
-.dragghost{position:fixed;z-index:50;max-width:420px;padding:6px 10px;border-radius:10px;background:var(--ink);color:#fff;font-size:12px;line-height:1.35;box-shadow:0 6px 18px rgba(31,45,38,.22);pointer-events:none}
-.dragghost b{font-weight:700}
+.movenote.dragghost{background:var(--ink);color:#fff;border-color:var(--ink);pointer-events:none}
+.movetext{flex:1 1 240px;min-width:0;line-height:1.4}
 .ggrip.off{opacity:.2;cursor:not-allowed}
 .row:hover .ggrip.off{opacity:.35}
-.nonegroup .nonehead .title{font-weight:700}
+/* Rule 10b: a Priority's header row: its number and title on a light tint, above its goals. */
+.row.phead{background:var(--green-tint);cursor:default}
+.row.phead>.left{background:var(--green-tint)}
+.row.phead .title{font-weight:800;color:var(--ink)}
+.row.phead .rnum{color:var(--ink);font-weight:700}
+.nonegroup .row.phead,.nonegroup .row.phead>.left{background:var(--card)}
+.dotgap{display:inline-block;width:10px;flex:none}
 .nonegroup{margin-top:4px}
-.movenote{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:40;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;max-width:min(680px,calc(100vw - 32px));box-sizing:border-box;padding:10px 14px;border-radius:14px;background:var(--card);border:1px solid var(--line);box-shadow:0 8px 24px rgba(31,45,38,.16);font-size:13px}
+.movenote{position:fixed;left:20px;bottom:20px;z-index:40;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;max-width:min(680px,calc(100vw - 32px));box-sizing:border-box;padding:10px 14px;border-radius:14px;background:var(--card);border:1px solid var(--line);box-shadow:0 8px 24px rgba(31,45,38,.16);font-size:13px}
 .movenote .moveitem{font-weight:700}
 .movenote.bad{border-color:var(--red-bg)}
+.movenote .ferror{margin:0;flex-basis:100%}
+.movenote .linkbtn{margin-left:auto}
 .movenote .btn{min-height:30px;padding:0 12px}
 @media (pointer:coarse){.ggrip{opacity:1;width:32px;height:40px}}
 

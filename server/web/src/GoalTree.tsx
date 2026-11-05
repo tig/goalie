@@ -3,7 +3,7 @@ import type { ActorRef, Health } from "../../src/api.ts";
 import { isLit, type GoalRow, type PriorityRow } from "./model/filter.ts";
 import { dateLabel, listDates, slipLabel } from "./model/labels.ts";
 import { focusAfterMove, moveIn, moveTo } from "./model/commands.ts";
-import { canMove, changes, edgeOf, moveFields, moveWords, nextGroup, spotAt, zoneOf, type Spot } from "./model/arrange.ts";
+import { canMove, changes, edgeOf, movedWords, moveFields, moveWords, nextGroup, spotAt, zoneOf, type Spot } from "./model/arrange.ts";
 import { nameHover } from "./model/goalpage.ts";
 import { goalPath } from "./model/route.ts";
 import { Link, navigate } from "./router.tsx";
@@ -97,7 +97,7 @@ export function GoalTree(props: TreeProps) {
     return (
       <div key={g.id} className="goal" data-focus={encodeFocus({ kind: "goal", id: g.id, label: g.summary })}>
         <div
-          className={`row d${Math.min(g.depth, 2)}${g.match ? "" : " ctx"}${lit ? " lit" : ""}${kids ? " parent" : ""}${over?.zone === "in" && target(over.spot) === g.id ? " dropinto" : ""}${over?.zone === "edge" && over.row === g.id ? ` drop${over.edge}` : ""}${over?.zone === "edge" && over.spot.kind === "beside" && over.spot.parent === g.id ? " dropparent" : ""}${moving === g.id ? " moving" : ""}`}
+          className={`row d${Math.min(g.depth, 2)}${g.match ? "" : " ctx"}${lit ? " lit" : ""}${kids ? " parent" : ""}${over?.zone === "in" && target(over.spot) === g.id ? " dropinto" : ""}${over?.zone === "edge" && over.row === g.id ? ` drop${over.edge}` : ""}${over?.zone === "edge" && over.spot.kind === "beside" && over.spot.parent === g.id ? " dropparent" : ""}${moving === g.id ? " moving" : ""}${note?.done && note.goal === g.id ? " justmoved" : ""}`}
           data-health={g.health ?? ""}
           data-gid={g.id}
           data-parent={parent ?? undefined}
@@ -114,6 +114,8 @@ export function GoalTree(props: TreeProps) {
             {lead}
             <Rank rank={rank} />
             {props.mark !== false && <HealthDot health={g.health} />}
+            {/* In the List there is no health mark, so a sub-goal keeps its place free: the tree's connector ends there, not on the grip. */}
+            {props.mark === false && g.depth > 0 && props.arrange && !filtering && <span className="dotgap" aria-hidden="true" />}
             {grip(g, parent, group)}
             {/* The title opens the goal page. The count chip alone opens and closes the tree (rule 19). */}
             <Link to={goalPath(g.id)} className="title" tabIndex={-1}>
@@ -149,12 +151,15 @@ export function GoalTree(props: TreeProps) {
   const [over, setOver] = useState<{ spot: Spot; row?: string; zone?: "in" | "edge"; edge?: "before" | "after"; x: number; y: number } | null>(null);
   type Place = { priority: string | null; parent: string | null };
   const [keyed, setKeyed] = useState<{ goal: string; from: Place; spot: Spot } | null>(null);
-  const [note, setNote] = useState<{ goal: string; what: string; done: boolean; error?: string; undo?: { from: Place; spot: Spot } } | null>(null);
+  const [note, setNote] = useState<{ goal: string; what: string; spot?: Spot; done: boolean; error?: string; undo?: { from: Place; spot: Spot } } | null>(null);
   const trees = [...funded, ...backlog].flatMap((p) => p.goals).concat(props.none ?? []);
   const summaries = new Map<string, string>();
   const index = (list: GoalRow[]) => list.forEach((g) => (summaries.set(g.id, g.summary), index(g.children)));
   index(trees);
-  const titles = new Map([...funded, ...backlog].map((p) => [p.id, `Priority ${p.rank} ${p.title}`]));
+  const mayIds = new Set<string>();
+  const mark = (list: GoalRow[]) => list.forEach((g) => (props.arrange?.may(g) && mayIds.add(g.id), mark(g.children)));
+  mark(trees);
+  const titles = new Map([...funded, ...backlog].map((p) => [p.id, `Priority ${p.rank}: ${p.title}`]));
   const names = { goal: (id: string) => summaries.get(id) ?? id, priority: (id: string) => titles.get(id) ?? id };
   const groups: (string | null)[] = [...[...funded, ...backlog].map((p) => p.id), null];
   /** The row a spot marks: the new parent for a sub-goal. A move to a Priority marks its group instead. */
@@ -166,7 +171,11 @@ export function GoalTree(props: TreeProps) {
       const r = row.getBoundingClientRect();
       const group = row.dataset.group === "none" ? null : (row.dataset.group ?? null);
       const zone = zoneOf(y, r.top, r.height);
-      return { spot: spotAt({ goal: row.dataset.gid as string, parent: row.dataset.parent ?? null, group }, zone), row: row.dataset.gid, zone, edge: edgeOf(y, r.top, r.height) };
+      const spot = spotAt({ goal: row.dataset.gid as string, parent: row.dataset.parent ?? null, group }, zone);
+      // A goal goes under another only when the actor may change that one too; else the top goal's row offers its Priority instead.
+      const under = spot.kind === "into" ? spot.goal : spot.kind === "beside" ? spot.parent : null;
+      if (under && !mayIds.has(under)) return row.dataset.parent ? null : { spot: { kind: "top", priority: group }, row: row.dataset.gid, zone: "edge", edge: edgeOf(y, r.top, r.height) };
+      return { spot, row: row.dataset.gid, zone, edge: edgeOf(y, r.top, r.height) };
     }
     const box = el?.closest<HTMLElement>(".group[data-gpid]");
     if (box && !row) return { spot: { kind: "top", priority: box.dataset.gpid === "none" ? null : (box.dataset.gpid as string) } };
@@ -180,7 +189,7 @@ export function GoalTree(props: TreeProps) {
     const what = moveWords(spot, names);
     setNote({ goal, what, done: false });
     const failed = await props.arrange.save(goal, spot, `Moved on Home. ${what}.`);
-    setNote(failed ? { goal, what, done: false, error: failed } : { goal, what, done: true, undo: { from: moveFields(spot), spot: back(from) } });
+    setNote(failed ? { goal, what, done: false, error: failed } : { goal, what, spot, done: true, undo: { from: moveFields(spot), spot: back(from) } });
   };
   const grip = (g: GoalRow, parent: string | null, group: string | null) => {
     if (!props.arrange || filtering) return null;
@@ -210,6 +219,7 @@ export function GoalTree(props: TreeProps) {
           }
           setMoving(g.id);
           setOver(null);
+          setNote(null);
         }}
         onPointerMove={(e) => {
           if (moving !== g.id) return;
@@ -251,15 +261,19 @@ export function GoalTree(props: TreeProps) {
     if (keyed)
       return (
         <div className="movenote" role="status">
-          <span className="moveitem">{names.goal(keyed.goal)}:</span> <span className="movewhat">{moveWords(keyed.spot, names)}</span> <span className="small">Enter moves it. Escape lets it be.</span>
+          <span className="movetext">
+            <span className="moveitem">{names.goal(keyed.goal)}</span> <span className="movewhat">{moveWords(keyed.spot, names)}</span> <span className="small">Enter moves it. Escape lets it be.</span>
+          </span>
         </div>
       );
     if (!note) return null;
     return (
       <div className={`movenote${note.error ? " bad" : ""}`} role="status">
-        <span className="moveitem">{note.done ? `Moved ${names.goal(note.goal)}.` : `${names.goal(note.goal)}:`}</span> <span className="movewhat">{note.what}</span>
+        <span className="movetext">
+          <span className="moveitem">{names.goal(note.goal)}</span> <span className="movewhat">{note.done && note.spot ? movedWords(note.spot, names) : note.what}</span>
+        </span>
         {!note.done && !note.error && <span className="small"> Saving…</span>}
-        {note.error && <span className="ferror">{note.error}</span>}
+        {note.error && <span className="ferror">Not moved. {note.error.replace(/^[a-z0-9_-]+: /, "")}</span>}
         {note.undo && (
           <button type="button" className="btn" onClick={() => note.undo && void commit(note.goal, note.undo.from, note.undo.spot)}>
             Undo
@@ -356,21 +370,18 @@ export function GoalTree(props: TreeProps) {
   const group = (p: PriorityRow) => (
     <div className={`group${drag?.id === p.id ? " dragging" : ""}${over && !over.row && over.spot.kind === "top" && over.spot.priority === p.id ? " droptop" : ""}`} key={p.id} data-pid={props.rank ? p.id : undefined} data-gpid={p.id} data-focus={encodeFocus({ kind: "priority", id: p.id, label: p.title })}>
       {drag && drag.at === order.indexOf(p.id) && <div className="dropline" aria-hidden="true" />}
-      {p.goals.length ? (
-        // Every top goal of a Priority shows its number, so each goal reads as part of one Priority (rule 10b).
-        p.goals.map((g, i) => goal(g, pending ? order.indexOf(p.id) + 1 : p.rank, undefined, undefined, i === 0 ? handle(p) : undefined, null, p.id))
-      ) : (
-        <div className="row d0" style={{ "--depth": 0 } as CSSProperties}>
-          <div className="left">
-            {handle(p)}
-            <Rank rank={pending ? order.indexOf(p.id) + 1 : p.rank} />
-            <HealthDot health={null} word={false} />
-            <span className="title muted">{p.title}</span>
-            <span className="slot" />
-          </div>
-          {blank}
+      {/* Rule 10b: each Priority is a header row, its number and title. Its top goals sit under it with no number. */}
+      <div className="row d0 phead" style={{ "--depth": 0 } as CSSProperties}>
+        <div className="left">
+          {handle(p)}
+          <Rank rank={pending ? order.indexOf(p.id) + 1 : p.rank} />
+          <span className="title">{p.title}</span>
+          <span className="slot" />
         </div>
-      )}
+        {blank}
+      </div>
+      {p.goals.map((g) => goal(g, undefined, undefined, undefined, undefined, null, p.id))}
+      {!p.goals.length && <Note text={props.arrange ? "No goals yet. Drag a goal here." : "No goals yet."} blank={blank} />}
     </div>
   );
 
@@ -399,15 +410,18 @@ export function GoalTree(props: TreeProps) {
       </div>
       {shownBacklog.length ? rows(shownBacklog) : !filtering && <Note text="No Priorities below the cut line." blank={blank} />}
       {drag && drag.at === order.length && <div className="dropline" aria-hidden="true" />}
-      {moveNote()}
+      {!(moving && over) && moveNote()}
       {moving && over && (
-        <div className="dragghost" style={{ left: over.x + 16, top: over.y + 14 }} aria-hidden="true">
-          <b>{names.goal(moving)}</b> → {moveWords(over.spot, names)}
+        // While dragging, what the drop will do shows where the saved note shows, so it covers nothing on the board.
+        <div className="movenote dragghost" aria-hidden="true">
+          <span className="movetext">
+            <b>{names.goal(moving)}</b> → {moveWords(over.spot, names)}
+          </span>
         </div>
       )}
       {props.none && (props.none.length > 0 || !filtering) && (
         <div className={`group nonegroup${over && !over.row && over.spot.kind === "top" && over.spot.priority === null ? " droptop" : ""}`} data-gpid="none" data-focus={encodeFocus({ kind: "section", id: "No priority", label: "No priority" })}>
-          <div className="row d0 nonehead" style={{ "--depth": 0 } as CSSProperties}>
+          <div className="row d0 phead nonehead" style={{ "--depth": 0 } as CSSProperties}>
             <div className="left">
               <Rank />
               <span className="title">No priority</span>

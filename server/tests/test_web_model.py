@@ -1058,6 +1058,11 @@ class ArrangeTests(unittest.TestCase):
             "Move it to No priority",
         ])
 
+    def test_a_saved_move_reads_as_a_sentence_after_the_goal_name(self) -> None:
+        got = run("""const names = { goal: (id) => id, priority: (id) => ({ "PRI-2": "Priority 2 Grow the XW team" })[id] };
+          return [arrange.movedWords({ kind: "into", goal: "XW-0003" }, names), arrange.movedWords({ kind: "top", priority: "PRI-2" }, names), arrange.movedWords({ kind: "top", priority: null }, names)];""")
+        self.assertEqual(got, ["is now a sub-goal of XW-0003.", "is now in Priority 2 Grow the XW team.", "now has no priority."])
+
     def test_arrow_keys_move_a_top_goal_one_group_and_stop_at_the_ends(self) -> None:
         got = run("""const groups = ["PRI-1", "PRI-2", "PRI-3", null];
           return [arrange.nextGroup(groups, "PRI-2", -1), arrange.nextGroup(groups, "PRI-3", 1), arrange.nextGroup(groups, null, 1), arrange.nextGroup(groups, "PRI-1", -1)];""")

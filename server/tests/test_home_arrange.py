@@ -53,15 +53,21 @@ BACK = """(async () => {
   const ev = (type, p) => g.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 9, button: 0, pointerType: 'mouse', ...p }));
   ev('pointerdown', from); await sleep(30); ev('pointermove', edge); await sleep(80);
   const line = { before: row('XW-0001').classList.contains('dropbefore'), ghost: document.querySelector('.dragghost')?.textContent.replace(/\s+/g, ' ').trim() ?? null };
+  // Over the middle of Tig's goal: Chelsea may not put a goal under it, so it does not turn green; the drop would join its Priority instead.
+  const mid = point(row('XW-0002'), 0.5);
+  ev('pointermove', mid); await sleep(80);
+  const locked = { green: row('XW-0002').classList.contains('dropinto'), ghost: document.querySelector('.dragghost')?.textContent.replace(/\s+/g, ' ').trim() ?? null };
   ev('pointercancel', edge); await sleep(60);
   const gone = !document.querySelector('.dragghost') && !document.querySelector('.dropbefore');
-  // Dropped on the edge of XW-0003, it joins Priority 3 beside it, and both rows carry the number 3.
+  // Dropped on the edge of XW-0003, it joins Priority 3 beside it. Each Priority is a header row with its number and title; its goals sit under it with no number.
   await drag('XW-0004', row('XW-0003'), 0.1);
   await saved();
-  const ranks = { XW0003: row('XW-0003').querySelector('.rnum').textContent.trim(), XW0004: row('XW-0004').querySelector('.rnum').textContent.trim() };
+  const heads = [...document.querySelectorAll('.phead')].map((h) => [...h.querySelector('.left').children].map((c) => c.textContent.trim()).filter(Boolean).join(' '));
+  const under = [...document.querySelectorAll('.phead')].find((h) => h.textContent.includes('Run Excaliwire on GOALIE')).closest('.group');
+  const ranks = { heads, inThree: [...under.querySelectorAll(':scope > .goal > .row')].map((r) => r.dataset.gid), goalNumbers: [row('XW-0003'), row('XW-0004')].map((r) => r.querySelector('.rnum')?.textContent.trim() ?? '') };
   const shown = await drag('XW-0004', row('XW-0003'), 0.5);
   const note = await saved();
-  return { before, line, gone, ranks, shown, words: note?.words, none: noneIds() };
+  return { before, line, locked, gone, ranks, shown, words: note?.words, none: noneIds() };
 })()"""
 
 KEYS = """(async () => {
@@ -96,27 +102,31 @@ class HomeArrange(unittest.TestCase):
         self.assertNotIn("XW-0001", out["grips"])
         self.assertNotIn("XW-0002", out["grips"])
         self.assertTrue(out["header"].startswith("No priority"), out["header"])
-        self.assertEqual(out["note"], {"item": "Moved Run the MLP prototype at goalie.excaliwire.com with Excaliwire's real goals loaded.", "words": "Move it to No priority", "input": 0, "undo": True})
+        self.assertEqual(out["note"], {"item": "Run the MLP prototype at goalie.excaliwire.com with Excaliwire's real goals loaded", "words": "now has no priority.", "input": 0, "undo": True})
         self.assertEqual((after_out["parent"], after_out["priority"]), (None, None))
         self.assertIn("XW-0004", out["none"])
         self.assertEqual(back["before"], ["XW-0004"])
-        self.assertEqual(back["ranks"], {"XW0003": "3", "XW0004": "3"}, "every top goal of a Priority shows its number")
+        self.assertEqual(back["ranks"]["heads"], ["1 Regenerate the E28 canon", "2 Grow the XW team", "3 Run Excaliwire on GOALIE", "No priority"])
+        self.assertEqual(sorted(back["ranks"]["inThree"]), ["XW-0003", "XW-0004"])
+        self.assertEqual(back["ranks"]["goalNumbers"], ["", ""], "a goal row carries no number; its Priority's header does")
         self.assertTrue(back["shown"]["into"], "the row under the pointer is marked as the new parent")
         # Between goals: a line above the row, and a label at the pointer that says what the drop does.
         self.assertTrue(back["line"]["before"])
-        self.assertEqual(back["line"]["ghost"], "Run the MLP prototype at goalie.excaliwire.com with Excaliwire's real goals loaded → Move it to Priority 1 Regenerate the E28 canon")
+        self.assertEqual(back["line"]["ghost"], "Run the MLP prototype at goalie.excaliwire.com with Excaliwire's real goals loaded → Move it to Priority 1: Regenerate the E28 canon")
         self.assertTrue(back["gone"], "a cancelled drag leaves no line and no label")
+        self.assertFalse(back["locked"]["green"], "a goal Chelsea may not change is not offered as a parent")
+        self.assertTrue(back["locked"]["ghost"].endswith("→ Move it to Priority 2: Grow the XW team"), back["locked"]["ghost"])
         # A goal Chelsea may not move shows a dimmed grip that says who may.
         self.assertEqual(out["locked"], {"XW0001": True, "title": "Only Tig can move this goal."})
-        self.assertTrue(back["words"].startswith("Make it a sub-goal of Tig, Chelsea, and agents use GOALIE"), back["words"])
+        self.assertTrue(back["words"].startswith("is now a sub-goal of Tig, Chelsea, and agents use GOALIE"), back["words"])
         self.assertEqual(after_back["parent"], "XW-0003")
         self.assertEqual(back["none"], [])
         self.assertEqual(keys["waiting"], {"words": "Move it to No priority", "focused": True})
-        self.assertEqual(keys["moved"]["words"], "Move it to No priority")
+        self.assertEqual(keys["moved"]["words"], "now has no priority.")
         self.assertTrue(keys["inNone"])
-        self.assertTrue(keys["undone"]["words"].startswith("Move it to Priority 3"), keys["undone"])
+        self.assertTrue(keys["undone"]["words"].startswith("is now in Priority 3: "), keys["undone"])
         self.assertTrue(keys["back"], "Undo puts the goal back on its Priority")
-        self.assertEqual(reason, "Moved on Home. Move it to Priority 3 Run Excaliwire on GOALIE.")
+        self.assertEqual(reason, "Moved on Home. Move it to Priority 3: Run Excaliwire on GOALIE.")
         self.assertGreater(phone["grips"], 0)
         self.assertLessEqual(phone["sideways"], 0)
 
