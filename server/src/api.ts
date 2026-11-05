@@ -215,9 +215,10 @@ export type GoalPageResponse = {
   events: ApiEvent[];
   /** Null when `events` is the whole history. Otherwise the sequence of the oldest Event sent: GET /api/goals/:id/events?before=<it> sends the next page. */
   olderEvents: number | null;
-  /** How many Events and how many comments the whole history holds, paged or not. */
+  /** How many Events the whole history holds, paged or not. */
   eventCount: number;
-  commentCount: number;
+  /** How many Activity rows each chip shows for the whole history, paged or not: a comment is one row, and one write's changes are one row (QA 4). */
+  activityCount: { All: number; Comments: number; Changes: number };
   /** What waits on the signed-in actor here (G3a). */
   needsYou: { lateWorkItems: string[]; missingPtg: boolean };
   /** Lints: flagged, never blocked (SPEC.md §8.1). The app shows the text as a muted hint at the field. */

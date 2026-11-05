@@ -59,7 +59,7 @@ class HistoryPagingTests(unittest.TestCase):
     def test_the_tab_counts_are_for_the_whole_history(self) -> None:
         # The Frontend Engineer: "History 100" would be wrong past 1,000.
         self.assertEqual(self.page["eventCount"], len(self.expected()))
-        self.assertEqual(self.page["commentCount"], COMMENTS)
+        self.assertEqual(self.page["activityCount"]["Comments"], COMMENTS)
 
     def test_the_page_is_small(self) -> None:
         # Codebase QA measured 4,327 KB here before paging.
