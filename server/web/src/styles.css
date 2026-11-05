@@ -865,7 +865,9 @@ main.newgoal{padding-bottom:84px}
 .row:hover .ggrip.off{opacity:.35}
 .nonegroup .nonehead .title{font-weight:700}
 .nonegroup{margin-top:4px}
-.movereason{flex-wrap:wrap}
-.movereason .moveitem{font-weight:700}
+.movenote{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:40;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;max-width:min(680px,calc(100vw - 32px));box-sizing:border-box;padding:10px 14px;border-radius:14px;background:var(--card);border:1px solid var(--line);box-shadow:0 8px 24px rgba(31,45,38,.16);font-size:13px}
+.movenote .moveitem{font-weight:700}
+.movenote.bad{border-color:var(--red-bg)}
+.movenote .btn{min-height:30px;padding:0 12px}
 @media (pointer:coarse){.ggrip{opacity:1;width:32px;height:40px}}
 

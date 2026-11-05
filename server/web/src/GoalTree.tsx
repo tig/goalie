@@ -3,7 +3,7 @@ import type { ActorRef, Health } from "../../src/api.ts";
 import { isLit, type GoalRow, type PriorityRow } from "./model/filter.ts";
 import { dateLabel, listDates, slipLabel } from "./model/labels.ts";
 import { focusAfterMove, moveIn, moveTo } from "./model/commands.ts";
-import { canMove, changes, edgeOf, moveWords, nextGroup, spotAt, zoneOf, type Spot } from "./model/arrange.ts";
+import { canMove, changes, edgeOf, moveFields, moveWords, nextGroup, spotAt, zoneOf, type Spot } from "./model/arrange.ts";
 import { nameHover } from "./model/goalpage.ts";
 import { goalPath } from "./model/route.ts";
 import { Link, navigate } from "./router.tsx";
@@ -137,19 +137,19 @@ export function GoalTree(props: TreeProps) {
           )} />
           {props.cells(g)}
         </div>
-        {move && target(move.spot) === g.id && ask2()}
         {open && <div className="kids">{g.children.map((c, i) => goal(c, undefined, childRails, i === kids - 1, undefined, g.id, group))}</div>}
       </div>
     );
   };
 
-  // Rule 35b: arranging goals. `moving` is the goal being dragged, `over` the spot under the pointer, `move` the drop that waits for its reason.
+  // Rule 35b: arranging goals. `moving` is the goal being dragged, `over` the spot under the pointer, `keyed` a keyboard move waiting for Enter,
+  // and `note` the line at the bottom that says what was saved, with Undo. A drop saves at once; the app writes the reason.
   const [moving, setMoving] = useState<string | null>(null);
   /** The spot under the pointer, the row it is on (none for a Priority or No priority with no row), the line's side, and where the pointer is. */
   const [over, setOver] = useState<{ spot: Spot; row?: string; zone?: "in" | "edge"; edge?: "before" | "after"; x: number; y: number } | null>(null);
-  const [move, setMove] = useState<{ goal: string; from: { priority: string | null; parent: string | null }; spot: Spot; via: "key" | "pointer" } | null>(null);
-  const [why, setWhy] = useState("");
-  const [moveError, setMoveError] = useState<string>();
+  type Place = { priority: string | null; parent: string | null };
+  const [keyed, setKeyed] = useState<{ goal: string; from: Place; spot: Spot } | null>(null);
+  const [note, setNote] = useState<{ goal: string; what: string; done: boolean; error?: string; undo?: { from: Place; spot: Spot } } | null>(null);
   const trees = [...funded, ...backlog].flatMap((p) => p.goals).concat(props.none ?? []);
   const summaries = new Map<string, string>();
   const index = (list: GoalRow[]) => list.forEach((g) => (summaries.set(g.id, g.summary), index(g.children)));
@@ -172,10 +172,15 @@ export function GoalTree(props: TreeProps) {
     if (box && !row) return { spot: { kind: "top", priority: box.dataset.gpid === "none" ? null : (box.dataset.gpid as string) } };
     return null;
   };
-  const begin = (g: GoalRow, from: { priority: string | null; parent: string | null }, spot: Spot, via: "key" | "pointer") => {
-    setMoveError(undefined);
-    if (!changes(from, spot) || !canMove(trees, g.id, spot)) return setMove(null);
-    setMove({ goal: g.id, from, spot, via });
+  /** Where a goal was, as a spot, so Undo can put it back. */
+  const back = (from: Place): Spot => (from.parent ? { kind: "into", goal: from.parent } : { kind: "top", priority: from.priority });
+  const commit = async (goal: string, from: Place, spot: Spot) => {
+    setKeyed(null);
+    if (!props.arrange || !changes(from, spot) || !canMove(trees, goal, spot)) return;
+    const what = moveWords(spot, names);
+    setNote({ goal, what, done: false });
+    const failed = await props.arrange.save(goal, spot, `Moved on Home. ${what}.`);
+    setNote(failed ? { goal, what, done: false, error: failed } : { goal, what, done: true, undo: { from: moveFields(spot), spot: back(from) } });
   };
   const grip = (g: GoalRow, parent: string | null, group: string | null) => {
     if (!props.arrange || filtering) return null;
@@ -212,7 +217,7 @@ export function GoalTree(props: TreeProps) {
           setOver(at && canMove(trees, g.id, at.spot) ? { ...at, x: e.clientX, y: e.clientY } : null);
         }}
         onPointerUp={() => {
-          if (moving === g.id && over) begin(g, from, over.spot, "pointer");
+          if (moving === g.id && over) void commit(g.id, from, over.spot);
           setMoving(null);
           setOver(null);
         }}
@@ -221,10 +226,18 @@ export function GoalTree(props: TreeProps) {
           setOver(null);
         }}
         onKeyDown={(e) => {
+          // Arrow up or down picks the next Priority; Enter moves it there and Escape lets it be.
+          if (e.key === "Enter" && keyed?.goal === g.id) {
+            e.preventDefault();
+            return void commit(g.id, keyed.from, keyed.spot);
+          }
+          if (e.key === "Escape" && keyed) return setKeyed(null);
           if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
           e.preventDefault();
-          const at = move?.goal === g.id && move.spot.kind === "top" ? move.spot.priority : group;
-          begin(g, from, { kind: "top", priority: nextGroup(groups, at, e.key === "ArrowUp" ? -1 : 1) }, "key");
+          const at = keyed?.goal === g.id && keyed.spot.kind === "top" ? keyed.spot.priority : group;
+          const spot: Spot = { kind: "top", priority: nextGroup(groups, at, e.key === "ArrowUp" ? -1 : 1) };
+          setNote(null);
+          setKeyed(changes(from, spot) ? { goal: g.id, from, spot } : null);
         }}
       >
         <svg width="10" height="14" viewBox="0 0 10 14" aria-hidden="true">
@@ -233,35 +246,31 @@ export function GoalTree(props: TreeProps) {
       </button>
     );
   };
-  const saveMove = async () => {
-    if (!move || !props.arrange) return;
-    const failed = await props.arrange.save(move.goal, move.spot, why);
-    if (failed) return setMoveError(failed);
-    setMove(null);
-    setWhy("");
-  };
-  const ask2 = () =>
-    move && (
-      <div className="rankreason movereason">
-        <span className="moveitem">{names.goal(move.goal)}:</span> <span className="movewhat">{moveWords(move.spot, names)}</span>
-        <input value={why} placeholder="Reason" aria-label="Reason for the move" autoFocus={move.via === "pointer"} onChange={(e) => setWhy(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveMove()} />
-        <button type="button" className="btn primary" onClick={saveMove}>
-          Save
+  /** The line at the bottom: a keyboard move waiting for Enter, a save in progress, what was saved with Undo, or the server's refusal. */
+  const moveNote = () => {
+    if (keyed)
+      return (
+        <div className="movenote" role="status">
+          <span className="moveitem">{names.goal(keyed.goal)}:</span> <span className="movewhat">{moveWords(keyed.spot, names)}</span> <span className="small">Enter moves it. Escape lets it be.</span>
+        </div>
+      );
+    if (!note) return null;
+    return (
+      <div className={`movenote${note.error ? " bad" : ""}`} role="status">
+        <span className="moveitem">{note.done ? `Moved ${names.goal(note.goal)}.` : `${names.goal(note.goal)}:`}</span> <span className="movewhat">{note.what}</span>
+        {!note.done && !note.error && <span className="small"> Saving…</span>}
+        {note.error && <span className="ferror">{note.error}</span>}
+        {note.undo && (
+          <button type="button" className="btn" onClick={() => note.undo && void commit(note.goal, note.undo.from, note.undo.spot)}>
+            Undo
+          </button>
+        )}
+        <button type="button" className="linkbtn" aria-label="Close" onClick={() => setNote(null)}>
+          ×
         </button>
-        <button
-          type="button"
-          className="btn"
-          onClick={() => {
-            setMove(null);
-            setWhy("");
-            setMoveError(undefined);
-          }}
-        >
-          Undo
-        </button>
-        {moveError && <span className="ferror">{moveError}</span>}
       </div>
     );
+  };
 
   // Rule 35: the order on screen, pending a reason after a move; the drag in progress and the drop line it shows.
   const base = [...funded, ...backlog].map((p) => p.id);
@@ -361,7 +370,6 @@ export function GoalTree(props: TreeProps) {
           {blank}
         </div>
       )}
-      {move?.spot.kind === "top" && move.spot.priority === p.id && ask2()}
     </div>
   );
 
@@ -390,6 +398,7 @@ export function GoalTree(props: TreeProps) {
       </div>
       {shownBacklog.length ? rows(shownBacklog) : !filtering && <Note text="No Priorities below the cut line." blank={blank} />}
       {drag && drag.at === order.length && <div className="dropline" aria-hidden="true" />}
+      {moveNote()}
       {moving && over && (
         <div className="dragghost" style={{ left: over.x + 16, top: over.y + 14 }} aria-hidden="true">
           <b>{names.goal(moving)}</b> → {moveWords(over.spot, names)}
@@ -407,7 +416,6 @@ export function GoalTree(props: TreeProps) {
           </div>
           {props.none.map((g) => goal(g, undefined, undefined, undefined, undefined, null, null))}
           {!props.none.length && <Note text={props.arrange ? "Not on Priorities. Drag a goal here to take it off its Priority." : "Every goal is on a Priority."} blank={blank} />}
-          {move?.spot.kind === "top" && move.spot.priority === null && ask2()}
         </div>
       )}
     </>
