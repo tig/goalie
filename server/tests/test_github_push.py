@@ -574,6 +574,25 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertIsNotNone(self.error("WI-9062"))
         self.assertFalse(any(call.startswith("GET /repos/") and "/issues/" in call for call in self.github.calls), self.github.calls)
 
+    def test_a_failed_create_stays_visible_after_a_status_change(self) -> None:
+        """GitHub rejects the create. A later status change keeps that failure on the work item and does not patch an issue."""
+        self.github.fail_issue = True
+        item = "WI-9075"
+        command = create("work_item", item, {"goal": GOAL, "title": "Ship the issue", "owner": "tig", "status": "Backlog"}, "Filed")
+        command["github_repo"] = "tig/goalie"
+        filed = self.write(command)
+        self.assertTrue(filed["ok"], filed)
+        self.assertIn("POST /repos/tig/goalie/issues", self.github.calls)
+        self.github.calls.clear()
+        moved = self.write(update("work_item", item, 1, {"status": "In Progress"}, "Started"))
+        self.assertTrue(moved["ok"], moved)
+        self.assertEqual(self.store.read("work_item", item)["status"], "In Progress")
+        failure = self.error(item)
+        shown = next(row for row in self.goal_page()["workItems"] if row["id"] == item)
+        self.assertEqual(shown.get("github_error"), failure)
+        self.assertIn("422", shown.get("github_error") or "")
+        self.assertFalse(any("PATCH" in call for call in self.github.calls), self.github.calls)
+
     def test_a_status_change_during_create_closes_the_opened_issue(self) -> None:
         """A status write during the issue create sees no link. After the link is saved, that status closes the issue."""
         item = "WI-9070"

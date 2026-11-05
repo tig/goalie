@@ -55,7 +55,7 @@ export function finishGitHubCreate(db: DatabaseSync, id: string, detail: string)
 /**
  * Record the push for a committed status change, in the same transaction as the Event.
  * The linked issue's repository must be in github_repos and on the work item's goal.
- * Anything else clears a pending push.
+ * No linked issue deletes a pending push and a failed status push. A failed create, issue '' and error set, stays.
  */
 export function queueGitHubPush(db: DatabaseSync, after: Row): void {
   const id = after.id;
@@ -63,7 +63,7 @@ export function queueGitHubPush(db: DatabaseSync, after: Row): void {
   const goalRow = typeof after.goal === "string" ? read(db, "goal", after.goal) : undefined;
   const issue = linkedIssue(after.links, githubRepos(db), goalRepos(goalRow?.work_product));
   if (issue === undefined) {
-    db.prepare("DELETE FROM github_push WHERE work_item = ?").run(id);
+    db.prepare("DELETE FROM github_push WHERE work_item = ? AND NOT (issue = '' AND error IS NOT NULL)").run(id);
     return;
   }
   const status = after.status;
