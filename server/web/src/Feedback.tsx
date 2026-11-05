@@ -214,8 +214,11 @@ export function Feedback() {
         onClose={() => {
           mark.set(null);
           setFocus(undefined);
-          if (returnTo.current?.isConnected) returnTo.current.focus();
+          const back = returnTo.current;
           returnTo.current = null;
+          if (back?.isConnected) back.focus();
+          // Github... is gone with the owner menu. The avatar is still there.
+          else if (back?.closest(".usermenu")) document.querySelector<HTMLElement>(".me button.av")?.focus();
         }}
       >
         <form

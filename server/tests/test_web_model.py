@@ -972,6 +972,13 @@ class GitHubPageTests(unittest.TestCase):
         self.assertNotIn('closest(".ctxmenu")', feedback)
         self.assertIn("${FEEDBACK_CHROME}[role=menu]", feedback)
 
+    def test_feedback_about_github_returns_to_the_avatar(self) -> None:
+        """Feedback opened on Github... returns focus to the avatar. That link is gone when the dialog closes."""
+        feedback = (MODEL.parent / "Feedback.tsx").read_text(encoding="utf-8")
+        close = feedback.split("onClose={() => {", 1)[1].split("dialog.current?.close()", 1)[0]
+        self.assertIn('back?.closest(".usermenu")', close)
+        self.assertIn('querySelector<HTMLElement>(".me button.av")', close)
+
     def test_a_missing_key_still_shows_the_repository(self) -> None:
         page = (MODEL.parent / "GitHubPage.tsx").read_text(encoding="utf-8")
         self.assertIn("{data.repository ?? \"none\"}", page)
