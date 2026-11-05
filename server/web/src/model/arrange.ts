@@ -58,6 +58,11 @@ export function zoneOf(y: number, top: number, height: number): "in" | "edge" {
   return at > 0.25 && at < 0.75 ? "in" : "edge";
 }
 
+/** On a row's edge, whether the drop line shows above the row or below it. */
+export function edgeOf(y: number, top: number, height: number): "before" | "after" {
+  return y - top < height / 2 ? "before" : "after";
+}
+
 /** The spot for a row and the zone the pointer is in. Beside a top goal is that group; beside a sub-goal is under the same parent. */
 export function spotAt(row: RowAt, zone: "in" | "edge"): Spot {
   if (zone === "in") return { kind: "into", goal: row.goal };

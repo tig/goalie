@@ -846,7 +846,7 @@ main.newgoal{padding-bottom:84px}
 .rankreason input{flex:1;min-width:160px;max-width:360px;font:600 13px var(--font);border:1px solid var(--cut);border-radius:8px;padding:6px 8px}
 @media (pointer:coarse){.draghandle::after{content:"";position:absolute;left:50%;top:50%;width:44px;height:44px;transform:translate(-50%,-50%)}}
 /* Rule 35b: arranging goals on Home. A grip on each goal its owner may move; the new parent row or the Priority under the pointer is outlined green. */
-.ggrip{display:inline-flex;align-items:center;justify-content:center;flex:none;width:18px;height:24px;margin:0 -4px 0 -2px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--mute);cursor:grab;opacity:0;touch-action:none}
+.ggrip{display:inline-flex;align-items:center;justify-content:center;flex:none;width:18px;height:24px;margin:0 -4px 0 -2px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--mute);cursor:grab;opacity:.45;touch-action:none}
 .row:hover .ggrip,.ggrip:focus-visible,.row.moving .ggrip{opacity:1}
 .ggrip:hover,.ggrip:focus-visible{background:var(--green-bg);color:var(--ink)}
 .ggrip svg{fill:currentColor}
@@ -854,6 +854,15 @@ main.newgoal{padding-bottom:84px}
 .row.dropinto{box-shadow:inset 0 0 0 2px var(--brand);border-radius:10px;background:var(--green-bg)}
 .row.dropinto>.left{background:var(--green-bg)}
 .group.droptop{box-shadow:inset 0 0 0 2px var(--brand);border-radius:12px}
+.row.dropbefore,.row.dropafter{position:relative}
+.row.dropbefore::before,.row.dropafter::after{content:"";position:absolute;left:var(--rank,24px);right:0;height:4px;border-radius:4px;background:var(--green-ink);box-shadow:0 0 0 2px var(--green-bg);z-index:8;pointer-events:none}
+.row.dropbefore::before{top:-2px}
+.row.dropafter::after{bottom:-2px}
+.row.dropparent>.left{background:var(--green-bg)}
+.dragghost{position:fixed;z-index:50;max-width:420px;padding:6px 10px;border-radius:10px;background:var(--ink);color:#fff;font-size:12px;line-height:1.35;box-shadow:0 6px 18px rgba(31,45,38,.22);pointer-events:none}
+.dragghost b{font-weight:700}
+.ggrip.off{opacity:.2;cursor:not-allowed}
+.row:hover .ggrip.off{opacity:.35}
 .nonegroup .nonehead .title{font-weight:700}
 .nonegroup{margin-top:4px}
 .movereason{flex-wrap:wrap}

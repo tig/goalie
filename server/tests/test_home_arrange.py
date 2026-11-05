@@ -43,20 +43,27 @@ HELPERS = """
 OUT = """(async () => {
   if (!document.querySelector('.row[data-gid="XW-0004"]')) return null;
   """ + HELPERS + """
-  const grips = [...document.querySelectorAll('.ggrip')].map((g) => g.closest('.row').dataset.gid);
+  const grips = [...document.querySelectorAll('.ggrip:not(.off)')].map((g) => g.closest('.row').dataset.gid);
+  const locked = { XW0001: grip('XW-0001')?.classList.contains('off') ?? false, title: grip('XW-0001')?.title ?? null };
   const header = document.querySelector('.group[data-gpid="none"] .nonehead')?.textContent.trim() ?? null;
   await drag('XW-0004', document.querySelector('.group[data-gpid="none"] .nonehead'), 0.5);
   const words = await save('It stands on its own now');
-  return { grips, header, words, none: noneIds() };
+  return { grips, locked, header, words, none: noneIds() };
 })()"""
 
 BACK = """(async () => {
   if (!document.querySelector('.row[data-gid="XW-0004"]')) return null;
   """ + HELPERS + """
   const before = noneIds();
+  const g = grip('XW-0004'); const from = point(g); const edge = point(row('XW-0001'), 0.1);
+  const ev = (type, p) => g.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 9, button: 0, pointerType: 'mouse', ...p }));
+  ev('pointerdown', from); await sleep(30); ev('pointermove', edge); await sleep(80);
+  const line = { before: row('XW-0001').classList.contains('dropbefore'), ghost: document.querySelector('.dragghost')?.textContent.replace(/\s+/g, ' ').trim() ?? null };
+  ev('pointercancel', edge); await sleep(60);
+  const gone = !document.querySelector('.dragghost') && !document.querySelector('.dropbefore');
   const shown = await drag('XW-0004', row('XW-0003'), 0.5);
   const words = await save('It is part of XW-0003 again');
-  return { before, shown, words, none: noneIds() };
+  return { before, line, gone, shown, words, none: noneIds() };
 })()"""
 
 KEYS = """(async () => {
@@ -89,6 +96,12 @@ class HomeArrange(unittest.TestCase):
         self.assertIn("XW-0004", out["none"])
         self.assertEqual(back["before"], ["XW-0004"])
         self.assertTrue(back["shown"]["into"], "the row under the pointer is marked as the new parent")
+        # Between goals: a line above the row, and a label at the pointer that says what the drop does.
+        self.assertTrue(back["line"]["before"])
+        self.assertEqual(back["line"]["ghost"], "Run the MLP prototype at goalie.excaliwire.com with Excaliwire's real goals loaded → Move it to Priority 1 Regenerate the E28 canon")
+        self.assertTrue(back["gone"], "a cancelled drag leaves no line and no label")
+        # A goal Chelsea may not move shows a dimmed grip that says who may.
+        self.assertEqual(out["locked"], {"XW0001": True, "title": "Only Tig can move this goal."})
         self.assertTrue(back["words"].startswith("Make it a sub-goal of Tig, Chelsea, and agents use GOALIE"), back["words"])
         self.assertEqual(after_back["parent"], "XW-0003")
         self.assertEqual(back["none"], [])

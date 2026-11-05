@@ -1031,6 +1031,9 @@ class ArrangeTests(unittest.TestCase):
     def test_the_middle_of_a_row_nests_and_its_edges_place_beside(self) -> None:
         self.assertEqual(run("return [arrange.zoneOf(10, 0, 40), arrange.zoneOf(20, 0, 40), arrange.zoneOf(35, 0, 40)];"), ["edge", "in", "edge"])
 
+    def test_an_edge_says_whether_the_line_goes_above_or_below_the_row(self) -> None:
+        self.assertEqual(run("return [arrange.edgeOf(5, 0, 40), arrange.edgeOf(35, 0, 40)];"), ["before", "after"])
+
     def test_the_spot_for_a_row_and_zone(self) -> None:
         got = run("""return [
           arrange.spotAt({ goal: "XW-0002", parent: null, group: "PRI-2" }, "in"),
