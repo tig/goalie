@@ -8,6 +8,7 @@ import type { Row } from "./rules.ts";
 
 /**
  * Push a work item's status to one linked GitHub issue (issue #72, ADR 0012).
+ * A committed change of due_date queues that same push. The push sets the issue's Target date from the work item's due_date, read after the issue PATCH. due_date is not stored on the push row. A null due_date does not set a date. A missing field list does not fail the push. A field list that fails does, and the work item stays committed. Start date stays unset. A pull request is not dated.
  * The repository must be in the owner setting github_repos and on the work item's goal.
  * github_push is not an entity and not an Event. The row is written in the work item's transaction.
  * The call to GitHub runs after that transaction commits. A failure stays on the row and shows on the work item.
@@ -18,6 +19,8 @@ import type { Row } from "./rules.ts";
  */
 
 const STATUS_LABELS = ["Backlog", "In Progress", "Completed", "Deleted"] as const;
+const ISSUE_API = "2022-11-28";
+const FIELD_API = "2026-03-10";
 const CONFIG_NAMES = ["GOALIE_GITHUB_APP_ID", "GOALIE_GITHUB_INSTALLATION_ID", "GOALIE_GITHUB_PRIVATE_KEY_FILE", "GOALIE_PUBLIC_URL"] as const;
 const ISSUE_URL = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)\/?$/;
 const PULL_URL = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)\/?$/;
@@ -69,7 +72,7 @@ export function queueGitHubCreate(db: DatabaseSync, after: Row, repo: string, ac
 }
 
 /**
- * Record the push for a committed status change, in the same transaction as the Event.
+ * Record the push for a committed status or due_date change, in the same transaction as the Event.
  * The linked issue's repository must be in github_repos and on the work item's goal.
  * No linked issue deletes a row whose issue is not empty. An empty issue stays: a create request, or a failed create.
  * A linked issue replaces the row and clears the error. That push leaves repo and actor empty.
@@ -540,7 +543,7 @@ function configuredGitHub(): Ready {
   };
 }
 
-/** Push one issue. Null when GitHub accepted it. The title on the PATCH is the work item's title at that call. */
+/** Push one issue. Null when GitHub accepted it. The title on the PATCH is the work item's title at that call. The Target date is the work item's due_date, read after that PATCH. */
 async function push(db: DatabaseSync, config: GitHubConfig, row: PushRow): Promise<string | null> {
   const parsed = ISSUE_URL.exec(row.issue);
   if (parsed === null) return "The linked issue is not a GitHub issue URL.";
@@ -574,10 +577,39 @@ async function push(db: DatabaseSync, config: GitHubConfig, row: PushRow): Promi
     if (typeof title === "string") patch.title = title;
     const saved = await call(config, token, "PATCH", path, patch);
     if (saved.status !== 200) return refused(saved.status, `PATCH ${path}`, saved.body);
-    return null;
+    return await pushTargetDate(db, config, token, parsed[1], path, row.work_item);
   } catch {
     return "GitHub could not be reached.";
   }
+}
+
+/** The issue's Target date. A null due_date sets nothing. A 404 or 403 list sets nothing: a user-owned repository has no org field list, and failing that would leave the status push failed. Issue calls stay on ISSUE_API. These two calls use FIELD_API. */
+async function pushTargetDate(db: DatabaseSync, config: GitHubConfig, token: string, owner: string, issuePath: string, workItem: string): Promise<string | null> {
+  const due = read(db, "work_item", workItem)?.due_date;
+  if (typeof due !== "string") return null;
+  const listPath = `/orgs/${owner}/issue-fields?per_page=100`;
+  const listed = await call(config, token, "GET", listPath, undefined, FIELD_API);
+  if (listed.status === 404 || listed.status === 403) return null;
+  if (listed.status !== 200) return refused(listed.status, `GET ${listPath}`, listed.body);
+  const field = targetDateId(listed.body);
+  if (field === undefined) return null;
+  const setPath = `${issuePath}/issue-field-values`;
+  const posted = await call(config, token, "POST", setPath, { issue_field_values: [{ field_id: field, value: due }] }, FIELD_API);
+  return posted.status === 200 || posted.status === 201 ? null : refused(posted.status, `POST ${setPath}`, posted.body);
+}
+
+/** The first date field named Target date, or none. Start date is not it. Another data_type is not it. */
+function targetDateId(body: unknown): number | undefined {
+  if (!Array.isArray(body)) return undefined;
+  for (const field of body) {
+    if (typeof field !== "object" || field === null) continue;
+    const row = field as { id?: unknown; name?: unknown; data_type?: unknown };
+    if (typeof row.name !== "string" || row.name.trim().toLowerCase() !== "target date") continue;
+    if (row.data_type !== "date") continue;
+    if (typeof row.id !== "number" || !Number.isInteger(row.id)) continue;
+    return row.id;
+  }
+  return undefined;
 }
 
 async function ensureLabel(config: GitHubConfig, token: string, owner: string, repo: string, issuePath: string, name: string): Promise<string | null> {
@@ -684,14 +716,14 @@ function signJwt(appId: string, privateKey: string, iat: number, exp: number): s
 
 type Reply = { status: number; body: unknown };
 
-async function call(config: GitHubConfig, token: string, method: string, path: string, body?: unknown): Promise<Reply> {
+async function call(config: GitHubConfig, token: string, method: string, path: string, body?: unknown, version = ISSUE_API): Promise<Reply> {
   const response = await fetch(`${config.api}${path}`, {
     method,
     headers: {
       authorization: `Bearer ${token}`,
       accept: "application/vnd.github+json",
       "user-agent": "goalie",
-      "x-github-api-version": "2022-11-28",
+      "x-github-api-version": version,
       ...(body !== undefined ? { "content-type": "application/json" } : {}),
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
