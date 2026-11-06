@@ -583,13 +583,13 @@ async function push(db: DatabaseSync, config: GitHubConfig, row: PushRow): Promi
   }
 }
 
-/** The issue's Target date. A null due_date sets nothing. A 404 or 403 list sets nothing: a user-owned repository has no org field list, and failing that would leave the status push failed. Issue calls stay on ISSUE_API. These two calls use FIELD_API. */
+/** The issue's Target date. A null due_date sets nothing. A 404 list sets nothing. Any other status fails the push. The work item stays committed. Issue calls stay on ISSUE_API. These two calls use FIELD_API. */
 async function pushTargetDate(db: DatabaseSync, config: GitHubConfig, token: string, owner: string, issuePath: string, workItem: string): Promise<string | null> {
   const due = read(db, "work_item", workItem)?.due_date;
   if (typeof due !== "string") return null;
   const listPath = `/orgs/${owner}/issue-fields?per_page=100`;
   const listed = await call(config, token, "GET", listPath, undefined, FIELD_API);
-  if (listed.status === 404 || listed.status === 403) return null;
+  if (listed.status === 404) return null;
   if (listed.status !== 200) return refused(listed.status, `GET ${listPath}`, listed.body);
   const field = targetDateId(listed.body);
   if (field === undefined) return null;

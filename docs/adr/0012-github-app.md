@@ -18,7 +18,7 @@
 
 **Amended:** 2026-11-05. An update that adds an issue URL in `github_repos` and on that goal, when that URL was not already in the work item's links, updates that issue the same way as a status change, at the work item's current status. An update that adds only a pull request does not. A work item list shows each pull request named in links, and that link keeps its `/pull/` URL.
 
-**Amended:** 2026-11-06. A work item's due_date is the linked issue's Target date. The update sets that field when the repository owner lists a date field named Target date. When that list is missing or has no such field, the status update still succeeds and no date is set. When that list fails, the update fails and the work item stays committed. A null due_date does not set a date. Start date stays unset. A pull request is not dated.
+**Amended:** 2026-11-06. A work item's due_date is the linked issue's Target date. The update sets that field when the repository owner lists a date field named Target date. A 404 list, or a list with no Target date field, still succeeds and sets no date. Any other answer fails the update and the work item stays committed. A null due_date does not set a date. Start date stays unset. A pull request is not dated.
 
 ## Context
 
@@ -41,8 +41,8 @@ A committed change of a work item's status, when its links name an issue in a re
 The update sets one status label, keeps a body trailer that links back to the work item, closes the issue as completed when the status is Completed, and closes it as not planned when the status is Deleted.
 A work item's due_date is the linked issue's Target date.
 The update sets that field when the repository owner lists a date field named Target date.
-When that list is missing or has no such field, the status update still succeeds and no date is set.
-When that list fails, the update fails and the work item stays committed.
+A 404 list, or a list with no Target date field, still succeeds and sets no date.
+Any other answer fails the update and the work item stays committed.
 A null due_date does not set a date.
 Start date stays unset.
 A pull request is not dated.

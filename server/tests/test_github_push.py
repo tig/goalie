@@ -102,6 +102,7 @@ class GitHub(ThreadingHTTPServer):
         self.queries: list[str] = []
         self.issue_fields: list[dict[str, Any]] | None = None
         self.fail_issue_fields = False
+        self.forbid_issue_fields = False
         self.field_values: list[dict[str, Any]] = []
 
 
@@ -133,6 +134,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/orgs/tig/issue-fields":
             if self.server.fail_issue_fields:
                 self._send(500, {"message": "no"})
+                return
+            if self.server.forbid_issue_fields:
+                self._send(403, {"message": "no"})
                 return
             if self.server.issue_fields is not None:
                 self._send(200, self.server.issue_fields)
@@ -392,6 +396,7 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.github.queries = []
         self.github.issue_fields = None
         self.github.fail_issue_fields = False
+        self.github.forbid_issue_fields = False
         self.github.field_values = []
         self.github.issue = {"body": "Keep this.", "state": "open", "state_reason": None, "labels": ["pinned"]}
         set_scope(self.store, ["tig/goalie"], [{"repo": "github.com/tig/goalie"}])
@@ -1328,6 +1333,21 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertIn("GitHub answered 500", shown.get("github_error") or "")
         self.assertEqual(self.github.field_values, [])
         self.assertFalse(any("issue-field-values" in call for call in self.github.calls), self.github.calls)
+
+    def test_a_forbidden_field_list_shows_the_failure(self) -> None:
+        """A field list that answers 403 leaves the work item committed and does not set a date."""
+        self.github.forbid_issue_fields = True
+        item = "WI-9148"
+        created = self.write(create("work_item", item, {**self.item([ISSUE]), "due_date": "2027-03-31"}, "Filed"))
+        self.assertTrue(created["ok"], created)
+        stored = self.store.read("work_item", item)
+        self.assertEqual(stored["status"], "Backlog")
+        self.assertEqual(stored["due_date"], "2027-03-31")
+        self.assertIn("GitHub answered 403", self.error(item) or "")
+        shown = next(row for row in self.goal_page()["workItems"] if row["id"] == item)
+        self.assertIn("GitHub answered 403", shown.get("github_error") or "")
+        self.assertEqual(self.github.field_values, [])
+        self.assertFalse(any(call.startswith("POST ") and "issue-field-values" in call for call in self.github.calls), self.github.calls)
 
     def test_a_missing_field_list_does_not_fail_the_push(self) -> None:
         """A 404 field list still sets the label. No date is set."""
