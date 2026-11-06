@@ -389,6 +389,15 @@ export function issueUrlRepo(link: string): string | undefined {
   return `${match[1]}/${match[2]}`;
 }
 
+/** `owner/repo` from a GitHub issue URL or a pull request URL. Any other link is undefined. A trailing slash is the same link. */
+export function linkUrlRepo(link: string): string | undefined {
+  const issue = issueUrlRepo(link);
+  if (issue !== undefined) return issue;
+  const match = PULL_URL.exec(link);
+  if (match === null) return undefined;
+  return `${match[1]}/${match[2]}`;
+}
+
 /** The pull request URL in canonical form, or undefined when link is not one. A trailing slash is the same pull request. */
 function canonicalPullUrl(link: string): string | undefined {
   const match = PULL_URL.exec(link);

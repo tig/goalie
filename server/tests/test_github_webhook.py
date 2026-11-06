@@ -117,8 +117,10 @@ class GitHubWebhookTests(unittest.TestCase):
         self.file("WI-9101", 101)
         self.file("WI-9102", 101, slash=True)
         self.file("WI-9103", 199)
+        set_scope(self.store, ["tig/goalie", "evil/nope"], [{"repo": "github.com/tig/goalie"}, {"repo": "github.com/evil/nope"}])
         evil = self.store.run("write", "--as", "tig", stdin=create("work_item", "WI-9104", {**item(101), "title": "Wrong url", "links": [EVIL]}, "Filed"), env=QUIET)[1]
         self.assertTrue(evil["ok"], evil)
+        set_scope(self.store, ["tig/goalie"], [{"repo": "github.com/tig/goalie"}])
         last = self.store.events()[-1]["sequence"]
         reply = self.deliver(notice(101))
         self.assertEqual(reply.status, 200, reply.body)
@@ -174,12 +176,14 @@ class GitHubWebhookTests(unittest.TestCase):
         self.file("WI-9108", 108, status="Completed")
         self.file("WI-9109", 109)
         self.file("WI-9110", 110)
+        set_scope(self.store, ["tig/goalie", OTHER], [{"repo": "github.com/tig/goalie"}, {"repo": f"github.com/{OTHER}"}])
         other = self.store.run(
             "write", "--as", "tig",
             stdin=create("work_item", "WI-9111", {**item(3), "links": [f"https://github.com/{OTHER}/issues/3"]}, "Filed"),
             env=QUIET,
         )[1]
         self.assertTrue(other["ok"], other)
+        set_scope(self.store, ["tig/goalie"], [{"repo": "github.com/tig/goalie"}])
         last = self.store.events()[-1]["sequence"]
         raw = notice(109)
         bad = self.deliver(raw[:-1] + b" ", signature=sign(SECRET, raw))
@@ -218,9 +222,10 @@ class GitHubRepoScopeTests(unittest.TestCase):
         self.assertEqual(code, 0, result)
         actor = store.run("write", "--as", "tig", stdin=create("actor", ACTOR, {"kind": "agent", "display_name": "GitHub", "operator": "tig"}), env=QUIET)[1]
         self.assertTrue(actor["ok"], actor)
-        set_scope(store, ["tig/goalie"], [{"url": "https://github.com/tig/goalie"}])
+        set_scope(store, ["tig/goalie"], [{"repo": "github.com/tig/goalie"}])
         filed = store.run("write", "--as", "tig", stdin=create("work_item", "WI-9601", item(601), "Filed"), env=QUIET)[1]
         self.assertTrue(filed["ok"], filed)
+        set_scope(store, ["tig/goalie"], [{"url": "https://github.com/tig/goalie"}])
         last = store.events()[-1]["sequence"]
         body = notice(601)
         with running_server(store.path, {**QUIET, "GOALIE_GITHUB_WEBHOOK_SECRET": SECRET, "GOALIE_GITHUB_ACTOR": ACTOR}) as (proc, port):
@@ -282,9 +287,10 @@ class GitHubWebhookConfigTests(unittest.TestCase):
         self.assertEqual(code, 0, result)
         made = store.run("write", "--as", "tig", stdin=create("actor", ACTOR, {"kind": "agent", "display_name": "GitHub", "operator": "tig"}), env=QUIET)[1]
         self.assertTrue(made["ok"], made)
-        set_scope(store, ["excaliwire/factory"], [{"repo": "github.com/tig/goalie"}])
+        set_scope(store, ["tig/goalie", "excaliwire/factory"], [{"repo": "github.com/tig/goalie"}])
         filed = store.run("write", "--as", "tig", stdin=create("work_item", "WI-9121", item(121), "Filed"), env=QUIET)[1]
         self.assertTrue(filed["ok"], filed)
+        set_scope(store, ["excaliwire/factory"], [{"repo": "github.com/tig/goalie"}])
         last = store.events()[-1]["sequence"]
         body = notice(121)
         with running_server(store.path, {**QUIET, "GOALIE_GITHUB_WEBHOOK_SECRET": SECRET, "GOALIE_GITHUB_ACTOR": ACTOR}) as (proc, port):

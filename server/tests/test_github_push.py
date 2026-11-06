@@ -440,7 +440,10 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertTrue(retitled["ok"], retitled)
         self.assertEqual(self.github.calls, [])
         other = self.write(create("work_item", "WI-9005", self.item([OTHER]), "Filed"))
-        self.assertTrue(other["ok"], other)
+        self.assertFalse(other["ok"])
+        self.assertEqual(other["error"], "invalid")
+        self.assertIn("excaliwire/factory", other["violations"][0]["message"])
+        self.assertIsNone(self.store.read("work_item", "WI-9005"))
         self.assertEqual(self.github.calls, [])
 
     def test_missing_configuration_shows_on_the_work_item(self) -> None:
@@ -534,7 +537,10 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         env = dict(self.env)
         env["GOALIE_GITHUB_REPO"] = "tig/goalie"
         created = self.store.run("write", "--as", "tig", stdin=create("work_item", "WI-9056", self.item([ISSUE]), "Filed"), env=env)[1]
-        self.assertTrue(created["ok"], created)
+        self.assertFalse(created["ok"])
+        self.assertEqual(created["error"], "invalid")
+        self.assertIn("tig/goalie", created["violations"][0]["message"])
+        self.assertIsNone(self.store.read("work_item", "WI-9056"))
         self.assertEqual(self.github.calls, [])
 
     def test_excaliwire_wildcard_matches_factory_not_tig_goalie(self) -> None:
@@ -545,9 +551,11 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertTrue(any(call.startswith("GET /repos/excaliwire/factory/") for call in self.github.calls), self.github.calls)
         self.github.calls.clear()
         other = self.store.run("write", "--as", "tig", stdin=create("work_item", "WI-9032", self.item([ISSUE]), "Filed"), env=env)[1]
-        self.assertTrue(other["ok"], other)
+        self.assertFalse(other["ok"])
+        self.assertEqual(other["error"], "invalid")
+        self.assertIn("tig/goalie", other["violations"][0]["message"])
+        self.assertIsNone(self.store.read("work_item", "WI-9032"))
         self.assertEqual(self.github.calls, [])
-        self.assertIsNone(self.error("WI-9032"))
 
     def test_a_push_uses_the_installation_on_that_repository(self) -> None:
         set_scope(self.store, ["excaliwire/*"], [{"repo": "https://github.com/excaliwire/factory"}])
@@ -589,10 +597,11 @@ class GitHubPushTests(unittest.TestCase, PushTests):
     def test_a_goal_without_the_repository_does_not_push(self) -> None:
         set_scope(self.store, ["tig/goalie"], [{"url": "https://github.com/tig/goalie"}])
         created = self.store.run("write", "--as", "tig", stdin=create("work_item", "WI-9033", self.item([ISSUE]), "Filed"), env=self.env_without_repo())[1]
-        self.assertTrue(created["ok"], created)
-        self.assertEqual(self.store.read("work_item", "WI-9033")["status"], "Backlog")
+        self.assertFalse(created["ok"])
+        self.assertEqual(created["error"], "invalid")
+        self.assertIn("tig/goalie", created["violations"][0]["message"])
+        self.assertIsNone(self.store.read("work_item", "WI-9033"))
         self.assertEqual(self.github.calls, [])
-        self.assertIsNone(self.error("WI-9033"))
 
     def test_status_json_has_repositories_not_repository(self) -> None:
         set_scope(self.store, ["tig/goalie"], [{"repo": "github.com/tig/goalie"}])
@@ -642,6 +651,42 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertIn("excaliwire/factory", result["violations"][0]["message"])
         self.assertEqual(self.github.calls, [])
         self.assertIsNone(self.store.read("work_item", "WI-9061"))
+
+    def test_a_selected_issue_outside_the_goal_is_not_saved(self) -> None:
+        """A selected issue whose repository is no longer on the goal is not stored."""
+        item = "WI-9094"
+        created = self.write(create("work_item", item, {"goal": GOAL, "title": "Ship the push", "owner": "tig", "status": "Backlog"}, "Filed"))
+        self.assertTrue(created["ok"], created)
+        self.assertIsNone(self.store.read("work_item", item)["links"])
+        set_scope(self.store, ["tig/goalie"], [])
+        self.github.calls.clear()
+        chosen = self.write(update("work_item", item, 1, {"links": [ISSUE]}, "Attach"))
+        self.assertFalse(chosen["ok"], chosen)
+        self.assertEqual(chosen["error"], "invalid")
+        self.assertEqual(chosen["violations"][0]["rule"], "github-repo")
+        self.assertEqual(chosen["violations"][0]["field"], "links")
+        self.assertIn("tig/goalie", chosen["violations"][0]["message"])
+        self.assertIsNone(self.store.read("work_item", item)["links"])
+        self.assertFalse(any("PATCH" in call for call in self.github.calls), self.github.calls)
+
+    def test_a_selected_pull_request_outside_github_repos_is_not_saved(self) -> None:
+        """A selected pull request is not stored when github_repos is empty. An empty list does not fall back."""
+        set_scope(self.store, [], [{"repo": "github.com/tig/goalie"}])
+        env = dict(self.env)
+        env["GOALIE_GITHUB_REPO"] = "tig/goalie"
+        self.github.calls.clear()
+        result = self.store.run(
+            "write", "--as", "tig",
+            stdin=create("work_item", "WI-9095", self.item(["https://github.com/tig/goalie/pull/72"]), "Filed"),
+            env=env,
+        )[1]
+        self.assertFalse(result["ok"], result)
+        self.assertEqual(result["error"], "invalid")
+        self.assertEqual(result["violations"][0]["rule"], "github-repo")
+        self.assertEqual(result["violations"][0]["field"], "links")
+        self.assertIn("tig/goalie", result["violations"][0]["message"])
+        self.assertIsNone(self.store.read("work_item", "WI-9095"))
+        self.assertEqual(self.github.calls, [])
 
     def test_a_failed_issue_create_leaves_the_work_item_and_shows_the_failure(self) -> None:
         """GitHub rejects the create. The work item stays, with no issue link, and the failure shows. It is not drained as a status push."""
