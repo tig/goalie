@@ -12,7 +12,7 @@ import type { Row } from "./rules.ts";
  * github_push is not an entity and not an Event. The row is written in the work item's transaction.
  * The call to GitHub runs after that transaction commits. A failure stays on the row and shows on the work item.
  * Add as Github Issue writes the request in the work item's transaction: an empty issue, the repository, and the actor. drain opens the issue after that transaction commits, then the link write records the issue URL. The current status is queued after that write so this drain sends it. That push includes the work item's current title. A failed create sets error on this row so a later drain does not send it as a status push.
- * Attach writes a row in that same transaction when a create or a title update has a # and no issue URL. drain searches after the commit, appends the first issue, and queues the current status for this drain. A pull request is not that issue. The search does not run inside the transaction, and a later status change does not search. A title whose # query changed during the search is not linked and is not queued. A repository that leaves github_repos or the goal during the search is not linked and is not queued. A failed create keeps its error until an issue is attached. The failure is written back only when the work item still has no issue link and no newer push row exists. A search that does not complete records that failure and does not put the request back. A later status change does not clear that failure.
+ * Attach writes a row in that same transaction when a create or a title update has a # and no issue URL. drain searches after the commit, appends the first issue, and queues the current status for this drain. A pull request is not that issue. The search does not run inside the transaction, and a later status change does not search. A title whose # query changed during the search is not linked and is not queued. A repository that leaves github_repos or the goal during the search is not linked and is not queued. A failed create keeps its error until an issue is attached. The failure is written back only when the work item still has no issue link and no newer push row exists. A search that does not complete records that failure and does not put the request back. A missing GitHub setting records that failure and does not attach. A later status change does not clear that failure.
  * A work-item update that adds an issue URL in github_repos and on the goal, when that URL was not in the previous links, queues the current status on that URL. A pull request does not. That queue is the status push.
  * github_result is not an entity and not an Event. It keeps the last update and the last signed notice.
  */
@@ -408,19 +408,21 @@ function canonicalPullUrl(link: string): string | undefined {
 /**
  * Issues and pull requests in the repositories this goal names that github_repos covers.
  * One installation token per repository. It does not fall back to GOALIE_GITHUB_INSTALLATION_ID.
- * Empty q returns nothing and does not call GitHub. A repository outside that set contributes nothing.
+ * Empty q returns nothing and does not call GitHub. A goal with no repository completes with no items and no error.
+ * A missing setting returns that error and does not call GitHub. A repository outside that set contributes nothing.
  * A token error or a throw is "GitHub could not be reached." A non-200 is that answer. The first repository that does not complete supplies error. Items from repositories that complete are still returned.
- * Empty q and a goal with no repository complete with no items and no error.
  */
 export async function searchGitHub(db: DatabaseSync, goalId: string, q: string): Promise<{ items: GitHubSearchItem[]; error: string | null }> {
   const text = q.trim();
   if (text === "") return { items: [], error: null };
+  const repos = reposOnGoal(db, goalId);
+  if (repos.length === 0) return { items: [], error: null };
   const ready = configuredGitHub();
-  if (!ready.ok) return { items: [], error: null };
+  if (!ready.ok) return { items: [], error: ready.error };
   const items: GitHubSearchItem[] = [];
   const seen = new Set<string>();
   let error: string | null = null;
-  for (const repo of reposOnGoal(db, goalId)) {
+  for (const repo of repos) {
     const match = SCOPE_ENTRY.exec(repo);
     if (match === null || match[2] === "*") continue;
     try {

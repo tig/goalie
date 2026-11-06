@@ -1003,6 +1003,22 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertEqual(linked[0]["actor"], "tig")
         self.assertEqual(linked[0]["reason"], "Attached")
 
+    def test_an_unconfigured_attach_shows_the_failure(self) -> None:
+        """A create titled Ship #72, when GOALIE_GITHUB_APP_ID is unset, stores no link and shows that GitHub is not configured."""
+        bare = dict(self.env)
+        bare.pop("GOALIE_GITHUB_APP_ID")
+        item = "WI-9098"
+        created = self.store.run(
+            "write", "--as", "tig",
+            stdin=create("work_item", item, {"goal": GOAL, "title": "Ship #72", "owner": "tig", "status": "Backlog"}, "Filed"),
+            env=bare,
+        )[1]
+        self.assertTrue(created["ok"], created)
+        stored = self.store.read("work_item", item)
+        self.assertIsNone(stored["links"])
+        shown = next(row for row in self.goal_page()["workItems"] if row["id"] == item)
+        self.assertIn("GitHub is not configured. Missing GOALIE_GITHUB_APP_ID.", shown.get("github_error") or "")
+
     def test_a_search_that_does_not_complete_shows_the_failure(self) -> None:
         """A search that answers 500 does not attach. The failure stays, and a later status change does not search or clear it."""
         self.github.fail_search = True
