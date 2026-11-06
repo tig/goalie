@@ -724,6 +724,43 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertIsNone(self.error(item))
         self.assertIn("Backlog", self.github.issue["labels"])
 
+    def test_a_link_saved_during_a_missed_attach_gets_the_current_status(self) -> None:
+        """GitHub rejects the create. A link saved during the empty search stays, and that issue gets the current status."""
+        self.github.fail_issue = True
+        item = "WI-9090"
+        command = create("work_item", item, {"goal": GOAL, "title": "Ship the issue", "owner": "tig", "status": "Backlog"}, "Filed")
+        command["github_repo"] = "tig/goalie"
+        filed = self.write(command)
+        self.assertTrue(filed["ok"], filed)
+        shown = next(row for row in self.goal_page()["workItems"] if row["id"] == item)
+        self.assertEqual(shown["github_error"], self.error(item))
+        self.assertIn("422", shown["github_error"])
+        self.assertIsNone(self.store.read("work_item", item)["links"])
+        self.github.fail_issue = False
+        self.github.search = []
+        self.github.calls.clear()
+
+        def link() -> None:
+            self.github.during_search = None
+            row = self.store.read("work_item", item)
+            wrote = self.store.run("write", "--as", "tig", stdin=update("work_item", item, row["version"], {"links": [ISSUE]}, "Attach"), env=self.env)[1]
+            if not wrote["ok"]:
+                raise AssertionError(wrote)
+
+        self.github.during_search = link
+        try:
+            retitled = self.write(update("work_item", item, 1, {"title": "Ship #72"}, "Clearer"))
+        finally:
+            self.github.during_search = None
+        self.assertTrue(retitled["ok"], retitled)
+        stored = self.store.read("work_item", item)
+        self.assertEqual(stored["links"], [ISSUE])
+        self.assertIsNone(self.error(item))
+        shown = next(row for row in self.goal_page()["workItems"] if row["id"] == item)
+        self.assertIsNone(shown.get("github_error"))
+        self.assertIn("PATCH /repos/tig/goalie/issues/72", self.github.calls)
+        self.assertIn("Backlog", self.github.issue["labels"])
+
     def test_a_status_change_during_create_closes_the_opened_issue(self) -> None:
         """A status write during the issue create sees no link. After the link is saved, that status closes the issue."""
         item = "WI-9070"

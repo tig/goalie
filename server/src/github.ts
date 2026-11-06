@@ -12,7 +12,7 @@ import type { Row } from "./rules.ts";
  * github_push is not an entity and not an Event. The row is written in the work item's transaction.
  * The call to GitHub runs after that transaction commits. A failure stays on the row and shows on the work item.
  * Add as Github Issue writes the request in the work item's transaction: an empty issue, the repository, and the actor. drain opens the issue after that transaction commits, then the link write records the issue URL. The current status is queued after that write so this drain sends it. That push includes the work item's current title. A failed create sets error on this row so a later drain does not send it as a status push.
- * Attach writes a row in that same transaction when a create or a title update has a # and no issue URL. drain searches after the commit, appends the first issue, and queues the current status for this drain. A pull request is not that issue. The search does not run inside the transaction, and a later status change does not search. A title whose # query changed during the search is not linked and is not queued. A failed create keeps its error until an issue is attached. A search that attaches none writes that error back.
+ * Attach writes a row in that same transaction when a create or a title update has a # and no issue URL. drain searches after the commit, appends the first issue, and queues the current status for this drain. A pull request is not that issue. The search does not run inside the transaction, and a later status change does not search. A title whose # query changed during the search is not linked and is not queued. A failed create keeps its error until an issue is attached. The failure is written back only when the work item still has no issue link and no newer push row exists.
  * A work-item update that adds an issue URL in github_repos and on the goal, when that URL was not in the previous links, queues the current status on that URL. A pull request does not. That queue is the status push.
  * github_result is not an entity and not an Event. It keeps the last update and the last signed notice.
  */
@@ -139,7 +139,7 @@ export function hasIssueUrl(links: unknown): boolean {
 /**
  * Ask drain to attach the first issue for this title. The row is an empty issue with an actor and no repository, so it is not a create request and not a status push.
  * An issue URL already in links, a title with no #, or a create request for this work item writes nothing.
- * A failed create keeps its error until an issue is attached. A search that attaches none writes that error back.
+ * A failed create keeps its error until an issue is attached. The failure is written back only when the work item still has no issue link and no newer push row exists.
  */
 export function queueGitHubAttach(db: DatabaseSync, after: Row, actor: string): void {
   const id = after.id;
