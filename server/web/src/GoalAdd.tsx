@@ -189,8 +189,15 @@ function hashQuery(title: string): string | undefined {
   return /#(\S+)/.exec(title)?.[1];
 }
 
+/** The first query is sent at once. A changed query waits until 300 ms pass with no further change. */
 function GitHubAttachMenu({ goal, query, onPick }: { goal: string; query: string; onPick: (item: GitHubHit) => void }) {
-  const [loaded] = useJson<GitHubSearchResponse>(`/api/github/search?goal=${encodeURIComponent(goal)}&q=${encodeURIComponent(query)}`);
+  const [settled, setSettled] = useState(query);
+  useEffect(() => {
+    if (settled === query) return;
+    const timer = setTimeout(() => setSettled(query), 300);
+    return () => clearTimeout(timer);
+  }, [query, settled]);
+  const [loaded] = useJson<GitHubSearchResponse>(`/api/github/search?goal=${encodeURIComponent(goal)}&q=${encodeURIComponent(settled)}`);
   if (loaded.state !== "ok" || loaded.data.items.length === 0) return null;
   return (
     <div className="slist ghit" role="menu" aria-label="Attach" onKeyDown={(e) => e.key === "Enter" && e.stopPropagation()}>

@@ -811,6 +811,16 @@ process.stdout.write(JSON.stringify([a.body.message, b.body.message]));"""
         self.assertIn("#(\\S+)", menu)
         self.assertIn('onKeyDown={(e) => e.key === "Enter" && e.stopPropagation()}', menu)
 
+    def test_the_search_menu_waits_before_a_new_query(self) -> None:
+        """The first query is sent at once. A changed query waits 300 ms with no further change."""
+        src = (MODEL.parent / "GoalAdd.tsx").read_text(encoding="utf-8")
+        menu = src.split("function GitHubAttachMenu", 1)[1].split("export function AddWorkItem", 1)[0]
+        call = menu.split("useJson", 1)[1].split(");", 1)[0]
+        self.assertNotIn("encodeURIComponent(query)", call)
+        self.assertIn("encodeURIComponent(settled)", call)
+        self.assertIn("300", menu)
+        self.assertIn("clearTimeout", menu)
+
 
 class RouteTests(unittest.TestCase):
     def test_each_path_opens_its_page(self) -> None:
