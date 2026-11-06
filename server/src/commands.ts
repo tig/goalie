@@ -224,7 +224,7 @@ export async function fileGitHubIssue(db: DatabaseSync, actor: string, id: strin
   if (current !== undefined) queueGitHubPush(db, current);
 }
 
-/** After the commit, append the first issue for each attach request. The search is not inside a transaction. A pull request is not that issue. When the title's # query is no longer the one searched, the link is not written and the status is not queued. When the issue's repository is not in github_repos and on the goal, the link is not written and the status is not queued. The current status is queued for the caller's drain when the link is written. The failure is written back only when the work item still has no issue link and no newer push row exists. A failed link write keeps the new error. */
+/** After the commit, append the first issue for each attach request. The search is not inside a transaction. A pull request is not that issue. When the title's # query is no longer the one searched, the link is not written and the status is not queued. When the issue's repository is not in github_repos and on the goal, the link is not written and the status is not queued. The current status is queued for the caller's drain when the link is written. The failure is written back only when the work item still has no issue link and no newer push row exists. A failed link write keeps the new error. A search that does not complete records that failure and does not attach. The request is not put back. */
 export async function attachGitHubIssues(db: DatabaseSync, today: string): Promise<void> {
   const rows = db.prepare(
     "SELECT work_item FROM github_push WHERE issue = '' AND (repo IS NULL OR repo = '') AND actor IS NOT NULL AND actor <> ''",
@@ -234,13 +234,15 @@ export async function attachGitHubIssues(db: DatabaseSync, today: string): Promi
     if (claimed === undefined) continue;
     const kept = claimed.error;
     // The failure is written back only when the work item still has no issue link and no newer push row exists.
-    const restore = (): void => {
-      if (kept === null) return;
+    const showFailure = (detail: string): void => {
       const saved = read(db, "work_item", row.work_item);
       if (saved !== undefined && hasIssueUrl(saved.links)) return;
       const newer = db.prepare("SELECT work_item FROM github_push WHERE work_item = ?").get(row.work_item);
       if (newer !== undefined) return;
-      rememberGitHubFailure(db, row.work_item, kept);
+      rememberGitHubFailure(db, row.work_item, detail);
+    };
+    const restore = (): void => {
+      if (kept !== null) showFailure(kept);
     };
     const item = read(db, "work_item", row.work_item);
     const query = item === undefined || typeof item.title !== "string" || typeof item.goal !== "string" ? undefined : hashQuery(item.title);
@@ -248,9 +250,11 @@ export async function attachGitHubIssues(db: DatabaseSync, today: string): Promi
       restore();
       continue;
     }
-    const issue = (await searchGitHub(db, item.goal, query)).find((hit) => hit.kind === "issue");
+    const found = await searchGitHub(db, item.goal, query);
+    const issue = found.items.find((hit) => hit.kind === "issue");
     if (issue === undefined) {
-      restore();
+      if (found.error !== null) showFailure(found.error);
+      else restore();
       continue;
     }
     const current = read(db, "work_item", row.work_item);

@@ -115,7 +115,8 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
   app.get("/api/github/search", async (c) => {
     const goal = c.req.query("goal") ?? "";
     if (read(db, "goal", goal) === undefined) return refuse(c, 404, "not_found", `no goal ${goal}`);
-    return c.json<GitHubSearchResponse>({ items: await searchGitHub(db, goal, c.req.query("q") ?? "") });
+    const found = await searchGitHub(db, goal, c.req.query("q") ?? "");
+    return c.json<GitHubSearchResponse>({ items: found.items });
   });
   app.get("/api/goals/:id", (c) => {
     const page = goalPage(db, c.req.param("id"), c.get("actor").id, ...todayAndZone(db));

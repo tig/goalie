@@ -83,6 +83,7 @@ class GitHub(ThreadingHTTPServer):
         self.calls: list[str] = []
         self.fail_token = False
         self.fail_issue = False
+        self.fail_search = False
         self.installation_id = 77
         self.token = "ghs_test"
         self.opened: dict[str, Any] | None = None
@@ -202,6 +203,9 @@ class Handler(BaseHTTPRequestHandler):
         params = parse_qs(urlparse(self.path).query)
         text = params.get("q", [""])[0]
         self.server.queries.append(text)
+        if self.server.fail_search:
+            self._send(500, {"message": "no"})
+            return
         repos = [part.lower() for part in re.findall(r"repo:(\S+)", text)]
         items = []
         for hit in self.server.search:
@@ -351,6 +355,7 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.github.calls.clear()
         self.github.fail_token = False
         self.github.fail_issue = False
+        self.github.fail_search = False
         self.github.installation_id = 77
         self.github.opened = None
         self.github.issue_url = None
@@ -946,6 +951,32 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertEqual(len(linked), 1)
         self.assertEqual(linked[0]["actor"], "tig")
         self.assertEqual(linked[0]["reason"], "Attached")
+
+    def test_a_search_that_does_not_complete_shows_the_failure(self) -> None:
+        """A search that answers 500 does not attach. The failure stays, and a later status change does not search or clear it."""
+        self.github.fail_search = True
+        item = "WI-9093"
+        created = self.write(create("work_item", item, {"goal": GOAL, "title": "Ship #72", "owner": "tig", "status": "Backlog"}, "Filed"))
+        self.assertTrue(created["ok"], created)
+        stored = self.store.read("work_item", item)
+        self.assertIsNone(stored["links"])
+        shown = next(row for row in self.goal_page()["workItems"] if row["id"] == item)
+        self.assertIn("GitHub answered 500", shown.get("github_error") or "")
+        self.assertFalse(any("PATCH" in call for call in self.github.calls), self.github.calls)
+        failure = shown["github_error"]
+        self.github.calls.clear()
+        self.github.queries.clear()
+        moved = self.write(update("work_item", item, stored["version"], {"status": "In Progress"}, "Started"))
+        self.assertTrue(moved["ok"], moved)
+        stored = self.store.read("work_item", item)
+        self.assertEqual(stored["status"], "In Progress")
+        self.assertIsNone(stored["links"])
+        shown = next(row for row in self.goal_page()["workItems"] if row["id"] == item)
+        self.assertEqual(shown.get("github_error"), failure)
+        self.assertEqual(self.error(item), failure)
+        self.assertEqual(self.github.queries, [])
+        self.assertFalse(any("/search/issues" in call for call in self.github.calls), self.github.calls)
+        self.assertFalse(any("PATCH" in call for call in self.github.calls), self.github.calls)
 
     def test_a_changed_hash_is_not_attached(self) -> None:
         """A search for #72 that finishes after the title is Ship #99 does not store that issue."""
