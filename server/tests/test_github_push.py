@@ -91,6 +91,7 @@ class GitHub(ThreadingHTTPServer):
         self.opened_path: str | None = None
         self.label_body: dict[str, Any] | None = None
         self.before_issue: Callable[[], None] | None = None
+        self.during_search: Callable[[], None] | None = None
         self.fail_label = False
         self.drop_label = False
         self.search: list[dict[str, Any]] = []
@@ -201,6 +202,9 @@ class Handler(BaseHTTPRequestHandler):
             if repos and not any(f"github.com/{repo}/" in url for repo in repos):
                 continue
             items.append(hit)
+        hook = self.server.during_search
+        if hook is not None:
+            hook()
         self._send(200, {"items": items})
 
     def _issue(self, issue: dict[str, Any]) -> None:
@@ -340,6 +344,7 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.github.opened_path = None
         self.github.label_body = None
         self.github.before_issue = None
+        self.github.during_search = None
         self.github.fail_label = False
         self.github.drop_label = False
         self.github.search = []
@@ -843,6 +848,29 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertEqual(len(linked), 1)
         self.assertEqual(linked[0]["actor"], "tig")
         self.assertEqual(linked[0]["reason"], "Attached")
+
+    def test_a_changed_hash_is_not_attached(self) -> None:
+        """A search for #72 that finishes after the title is Ship #99 does not store that issue."""
+        item = "WI-9085"
+        self.github.search = [{"html_url": ISSUE, "title": "Enable Github integration"}]
+
+        def retitle() -> None:
+            self.github.during_search = None
+            self.github.search = []
+            row = self.store.read("work_item", item)
+            wrote = self.store.write("tig", update("work_item", item, row["version"], {"title": "Ship #99"}, "Clearer"))
+            if not wrote["ok"]:
+                raise AssertionError(wrote)
+
+        self.github.during_search = retitle
+        try:
+            created = self.write(create("work_item", item, {"goal": GOAL, "title": "Ship #72", "owner": "tig", "status": "Backlog"}, "Filed"))
+        finally:
+            self.github.during_search = None
+        self.assertTrue(created["ok"], created)
+        stored = self.store.read("work_item", item)
+        self.assertEqual(stored["title"], "Ship #99")
+        self.assertNotIn(ISSUE, stored["links"] or [])
 
     def test_a_retitle_keeps_the_linked_issue(self) -> None:
         """A work item that already links an issue, retitled to include #99, keeps that issue URL."""

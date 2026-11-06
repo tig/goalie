@@ -224,7 +224,7 @@ export async function fileGitHubIssue(db: DatabaseSync, actor: string, id: strin
   if (current !== undefined) queueGitHubPush(db, current);
 }
 
-/** After the commit, append the first issue for each attach request. The search is not inside a transaction. A pull request is not that issue. The current status is queued for the caller's drain. */
+/** After the commit, append the first issue for each attach request. The search is not inside a transaction. A pull request is not that issue. When the title's # query is no longer the one searched, the link is not written and the status is not queued. The current status is queued for the caller's drain when the link is written. */
 export async function attachGitHubIssues(db: DatabaseSync, today: string): Promise<void> {
   const rows = db.prepare(
     "SELECT work_item FROM github_push WHERE error IS NULL AND issue = '' AND (repo IS NULL OR repo = '') AND actor IS NOT NULL AND actor <> ''",
@@ -238,7 +238,7 @@ export async function attachGitHubIssues(db: DatabaseSync, today: string): Promi
     const issue = (await searchGitHub(db, item.goal, query)).find((hit) => hit.kind === "issue");
     if (issue === undefined) continue;
     const current = read(db, "work_item", row.work_item);
-    if (current === undefined || typeof current.version !== "number" || hasIssueUrl(current.links)) continue;
+    if (current === undefined || typeof current.version !== "number" || typeof current.title !== "string" || hashQuery(current.title) !== query || hasIssueUrl(current.links)) continue;
     const prior = Array.isArray(current.links) ? current.links.filter((link): link is string => typeof link === "string") : [];
     const result = write(db, claimed.actor, { op: "update", kind: "work_item", id: row.work_item, base_version: current.version, fields: { links: [...prior, issue.url] }, reason: "Attached" }, today);
     if (!result.ok) {

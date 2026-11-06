@@ -799,7 +799,7 @@ process.stdout.write(JSON.stringify([a.body.message, b.body.message]));"""
         self.assertLess(form.index("repos.length === 0 ? null"), form.index("Add as Github Issue"))
 
     def test_the_add_form_and_the_edit_form_render_the_search_menu_from_a_hash(self) -> None:
-        """Add and edit render the search menu when the title has # and a query."""
+        """Add and edit render the search menu when the title has # and a query. Enter on that menu does not reach the section save."""
         src = (MODEL.parent / "GoalAdd.tsx").read_text(encoding="utf-8")
         add = src.split("export function AddWorkItem", 1)[1].split("export function EditWorkItem", 1)[0]
         edit = src.split("export function EditWorkItem", 1)[1].split("const STATUSES", 1)[0]
@@ -809,6 +809,7 @@ process.stdout.write(JSON.stringify([a.body.message, b.body.message]));"""
         self.assertIn("/api/github/search", menu)
         self.assertIn('role="menu"', menu)
         self.assertIn("#(\\S+)", menu)
+        self.assertIn('onKeyDown={(e) => e.key === "Enter" && e.stopPropagation()}', menu)
 
 
 class RouteTests(unittest.TestCase):

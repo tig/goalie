@@ -193,7 +193,7 @@ function GitHubAttachMenu({ goal, query, onPick }: { goal: string; query: string
   const [loaded] = useJson<GitHubSearchResponse>(`/api/github/search?goal=${encodeURIComponent(goal)}&q=${encodeURIComponent(query)}`);
   if (loaded.state !== "ok" || loaded.data.items.length === 0) return null;
   return (
-    <div className="slist ghit" role="menu" aria-label="Attach">
+    <div className="slist ghit" role="menu" aria-label="Attach" onKeyDown={(e) => e.key === "Enter" && e.stopPropagation()}>
       {loaded.data.items.map((item) => (
         <button key={item.url} type="button" role="menuitem" onClick={() => onPick(item)}>
           <span className="muted">{item.kind === "pull" ? "Pull request" : "Issue"}</span>
