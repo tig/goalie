@@ -13,7 +13,7 @@ import type { Row } from "./rules.ts";
  * The call to GitHub runs after that transaction commits. A failure stays on the row and shows on the work item.
  * Add as Github Issue writes the request in the work item's transaction: an empty issue, the repository, and the actor. drain opens the issue after that transaction commits, then the link write records the issue URL. The current status is queued after that write so this drain sends it. That push includes the work item's current title. A failed create sets error on this row so a later drain does not send it as a status push.
  * Attach writes a row in that same transaction when a create or a title update has a # and no issue URL. drain searches after the commit, appends the first issue, and queues the current status for this drain. A pull request is not that issue. The search does not run inside the transaction, and a later status change does not search. A title whose # query changed during the search is not linked and is not queued. A repository that leaves github_repos or the goal during the search is not linked and is not queued. A failed create keeps its error until an issue is attached. The failure is written back only when the work item still has no issue link and no newer push row exists. A search that does not complete records that failure and does not put the request back. A missing GitHub setting records that failure and does not attach. A later status change does not clear that failure.
- * A work-item update that adds an issue URL in github_repos and on the goal, when that URL was not in the previous links, queues the current status on that URL. A pull request does not. That queue is the status push.
+ * A work-item update that adds an issue URL in github_repos and on the goal, when that URL was not in the previous links, queues the current status on that URL. A pull request does not. That queue is the status push. A write that adds more than one new in-scope issue is refused before it is stored. A URL already in the previous links does not count. On create, every link is new.
  * github_result is not an entity and not an Event. It keeps the last update and the last signed notice.
  */
 
@@ -106,24 +106,39 @@ function issueUrls(links: unknown): string[] {
 }
 
 /**
- * A work-item update that adds an issue URL in github_repos and on the goal queues the current status.
- * That URL was not in the previous links. A pull request does not. The row's issue is that URL.
+ * New in-scope issue URLs this write adds, in link order.
+ * A pull request is not one. A URL already in the previous links is not one. On create, every link is new.
  */
-export function queueGitHubIssueLink(db: DatabaseSync, before: Row | undefined, after: Row): void {
-  if (before === undefined) return;
-  const previous = new Set(issueUrls(before.links).map((url) => url.toLowerCase()));
+export function addedInScopeIssues(db: DatabaseSync, before: Row | undefined, after: Row): string[] {
+  const previous = new Set(issueUrls(before?.links).map((url) => url.toLowerCase()));
   const goalRow = typeof after.goal === "string" ? read(db, "goal", after.goal) : undefined;
   const scopes = githubRepos(db);
   const onGoal = goalRepos(goalRow?.work_product);
+  const added: string[] = [];
+  const seen = new Set<string>();
   for (const url of issueUrls(after.links)) {
-    if (previous.has(url.toLowerCase())) continue;
+    const key = url.toLowerCase();
+    if (previous.has(key) || seen.has(key)) continue;
     const match = ISSUE_URL.exec(url);
     if (match === null) continue;
     const repo = `${match[1]}/${match[2]}`;
     if (!onGoal.has(repo.toLowerCase()) || !repoInScope(repo, scopes)) continue;
-    queueGitHubPush(db, after, url);
-    return;
+    seen.add(key);
+    added.push(url);
   }
+  return added;
+}
+
+/**
+ * A work-item update that adds an issue URL in github_repos and on the goal queues the current status.
+ * That URL was not in the previous links. A pull request does not. The row's issue is that URL.
+ * It returns after the first new in-scope issue. A refused write never reaches it.
+ */
+export function queueGitHubIssueLink(db: DatabaseSync, before: Row | undefined, after: Row): void {
+  if (before === undefined) return;
+  const url = addedInScopeIssues(db, before, after)[0];
+  if (url === undefined) return;
+  queueGitHubPush(db, after, url);
 }
 
 /** The text of the first # in title, up to whitespace. Undefined when there is no such token. */

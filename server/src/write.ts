@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { ENTITIES, encode, goalieOwner, isKind, lookup, memoryLookup, read, readAll, readEvents, type EventRow, type Kind } from "./read.ts";
-import { issueRepoAllowed, linkUrlRepo, queueGitHubAttach, queueGitHubCreate, queueGitHubIssueLink, queueGitHubPush } from "./github.ts";
+import { addedInScopeIssues, issueRepoAllowed, linkUrlRepo, queueGitHubAttach, queueGitHubCreate, queueGitHubIssueLink, queueGitHubPush } from "./github.ts";
 import { DEFAULT_VISIBILITY, isOpen } from "./goal.ts";
 import { checkAuthor, checkTransition, checkWrite, goalLints, REASONED_KINDS, SYSTEM_FIELDS, type Row, type Violation } from "./rules.ts";
 
@@ -174,6 +174,8 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
   }
   const linkViolation = rejectedGitHubLink(db, kind, before, after);
   if (linkViolation !== undefined) return { ok: false, error: "invalid", violations: [...violations, linkViolation] };
+  const issueViolation = rejectedExtraIssue(db, kind, before, after);
+  if (issueViolation !== undefined) return { ok: false, error: "invalid", violations: [...violations, issueViolation] };
   const repoViolation = rejectedGitHubRepo(db, kind, command, fields.goal);
   if (repoViolation !== undefined) return { ok: false, error: "invalid", violations: [repoViolation] };
 
@@ -224,6 +226,12 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
 /** A create, or an update whose fields set title. A later status change does not. The search itself waits until drain. */
 function setsTitle(command: Command): boolean {
   return command.op === "create" || (command.op === "update" && Object.hasOwn(command.fields, "title"));
+}
+
+/** A write adds at most one new in-scope issue. A pull request is not an issue. A URL already stored does not count. On create, every link is new. */
+function rejectedExtraIssue(db: DatabaseSync, kind: Kind, before: Row | undefined, after: Row): Violation | undefined {
+  if (kind !== "work_item" || addedInScopeIssues(db, before, after).length < 2) return undefined;
+  return { rule: "one-issue", message: "One update adds one issue.", field: "links" };
 }
 
 /** A newly added issue or pull request URL must be in github_repos and on the goal. A URL already stored is not checked again. Any other link is not checked. */

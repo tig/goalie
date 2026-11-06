@@ -1188,6 +1188,22 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertEqual(self.github.issue["state"], "closed")
         self.assertEqual(self.github.issue["state_reason"], "completed")
 
+    def test_one_update_adds_one_issue(self) -> None:
+        """An update that adds two in-scope issues is refused. The stored links stay empty, and there is no PATCH."""
+        item = "WI-9099"
+        second = f"https://github.com/{REPO}/issues/81"
+        created = self.write(create("work_item", item, self.item([]), "Filed"))
+        self.assertTrue(created["ok"], created)
+        self.assertEqual(self.store.read("work_item", item)["links"], [])
+        self.github.calls.clear()
+        refused = self.write(update("work_item", item, 1, {"links": [ISSUE, second]}, "Attach"))
+        self.assertFalse(refused["ok"], refused)
+        self.assertEqual(refused["error"], "invalid")
+        self.assertEqual(refused["violations"][0]["message"], "One update adds one issue.")
+        self.assertEqual(refused["violations"][0]["field"], "links")
+        self.assertEqual(self.store.read("work_item", item)["links"], [])
+        self.assertFalse(any("PATCH" in call for call in self.github.calls), self.github.calls)
+
     def test_a_newly_added_issue_gets_the_current_status(self) -> None:
         """A work item that already links issue 72, then gains a second in-scope issue and does not change status, patches that issue with the current status."""
         item = "WI-9087"
