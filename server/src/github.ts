@@ -12,7 +12,7 @@ import type { Row } from "./rules.ts";
  * github_push is not an entity and not an Event. The row is written in the work item's transaction.
  * The call to GitHub runs after that transaction commits. A failure stays on the row and shows on the work item.
  * Add as Github Issue writes the request in the work item's transaction: an empty issue, the repository, and the actor. drain opens the issue after that transaction commits, then the link write records the issue URL. The current status is queued after that write so this drain sends it. That push includes the work item's current title. A failed create sets error on this row so a later drain does not send it as a status push.
- * Attach writes a row in that same transaction when a create or a title update has a # and no issue URL. drain searches after the commit, appends the first issue, and queues the current status for this drain. A pull request is not that issue. The search does not run inside the transaction, and a later status change does not search. A title whose # query changed during the search is not linked and is not queued.
+ * Attach writes a row in that same transaction when a create or a title update has a # and no issue URL. drain searches after the commit, appends the first issue, and queues the current status for this drain. A pull request is not that issue. The search does not run inside the transaction, and a later status change does not search. A title whose # query changed during the search is not linked and is not queued. A failed create keeps its error until an issue is attached. A search that attaches none writes that error back.
  * A work-item update that adds an issue URL in github_repos and on the goal, when that URL was not in the previous links, queues the current status on that URL. A pull request does not. That queue is the status push.
  * github_result is not an entity and not an Event. It keeps the last update and the last signed notice.
  */
@@ -139,6 +139,7 @@ export function hasIssueUrl(links: unknown): boolean {
 /**
  * Ask drain to attach the first issue for this title. The row is an empty issue with an actor and no repository, so it is not a create request and not a status push.
  * An issue URL already in links, a title with no #, or a create request for this work item writes nothing.
+ * A failed create keeps its error until an issue is attached. A search that attaches none writes that error back.
  */
 export function queueGitHubAttach(db: DatabaseSync, after: Row, actor: string): void {
   const id = after.id;
@@ -151,31 +152,31 @@ export function queueGitHubAttach(db: DatabaseSync, after: Row, actor: string): 
   if (pending !== undefined && pending.issue === "" && typeof pending.repo === "string" && pending.repo !== "") return;
   db.prepare(
     `INSERT INTO github_push (work_item, issue, status, goal, error, repo, actor) VALUES (?, '', ?, ?, NULL, NULL, ?)
-     ON CONFLICT(work_item) DO UPDATE SET issue = '', status = excluded.status, goal = excluded.goal, error = NULL, repo = NULL, actor = excluded.actor`,
+     ON CONFLICT(work_item) DO UPDATE SET issue = '', status = excluded.status, goal = excluded.goal, repo = NULL, actor = excluded.actor`,
   ).run(id, status, goal, actor);
 }
 
-/** Take one attach request. Undefined when another drain took it, or it is no longer an attach request. */
-export function claimGitHubAttach(db: DatabaseSync, workItem: string): { actor: string } | undefined {
+/** Take one attach request, including a failed create that still shows. Undefined when another drain took it, or it is no longer an attach request. The error is that failure, or null. */
+export function claimGitHubAttach(db: DatabaseSync, workItem: string): { actor: string; error: string | null } | undefined {
   db.exec("BEGIN IMMEDIATE");
   try {
     const row = db.prepare(
-      "SELECT actor FROM github_push WHERE work_item = ? AND issue = '' AND error IS NULL AND (repo IS NULL OR repo = '') AND actor IS NOT NULL AND actor <> ''",
-    ).get(workItem) as { actor: string } | undefined;
+      "SELECT actor, error FROM github_push WHERE work_item = ? AND issue = '' AND (repo IS NULL OR repo = '') AND actor IS NOT NULL AND actor <> ''",
+    ).get(workItem) as { actor: string; error: string | null } | undefined;
     if (row === undefined) {
       db.exec("COMMIT");
       return undefined;
     }
-    db.prepare("DELETE FROM github_push WHERE work_item = ? AND issue = '' AND error IS NULL AND (repo IS NULL OR repo = '')").run(workItem);
+    db.prepare("DELETE FROM github_push WHERE work_item = ? AND issue = '' AND (repo IS NULL OR repo = '')").run(workItem);
     db.exec("COMMIT");
-    return { actor: row.actor };
+    return { actor: row.actor, error: row.error ?? null };
   } catch (error) {
     if (db.isTransaction) db.exec("ROLLBACK");
     throw error;
   }
 }
 
-/** Send every pending push. Call this only after the work item transaction has committed. Attach runs first: the search is outside any transaction, then the link write queues the status this drain sends. A create request has an empty issue, no error, and a repository: open it here, and do not delete it as out of scope. Then send status pushes, including one the create or the attach just queued. A status row whose repository is not in github_repos and on the work item's current goal is deleted and not sent. A failed create has an empty issue and an error: leave it, and do not send it. */
+/** Send every pending push. Call this only after the work item transaction has committed. Attach runs first: the search is outside any transaction, then the link write queues the status this drain sends. A create request has an empty issue, no error, and a repository: open it here, and do not delete it as out of scope. Then send status pushes, including one the create or the attach just queued. A status row whose repository is not in github_repos and on the work item's current goal is deleted and not sent. A failed create has an empty issue and an error: do not send it. An attach request keeps that error until an issue is attached. */
 export async function drainGitHub(db: DatabaseSync): Promise<void> {
   const { attachGitHubIssues } = await import("./commands.ts");
   await attachGitHubIssues(db, configuredToday(configuredTimeZone(db)));

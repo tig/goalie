@@ -679,6 +679,51 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertIn("422", shown.get("github_error") or "")
         self.assertFalse(any("PATCH" in call for call in self.github.calls), self.github.calls)
 
+    def test_a_failed_create_stays_visible_when_no_issue_attaches(self) -> None:
+        """GitHub rejects the create. A retitle to Ship #72 with an empty search keeps that failure and does not add a link."""
+        self.github.fail_issue = True
+        item = "WI-9088"
+        command = create("work_item", item, {"goal": GOAL, "title": "Ship the issue", "owner": "tig", "status": "Backlog"}, "Filed")
+        command["github_repo"] = "tig/goalie"
+        filed = self.write(command)
+        self.assertTrue(filed["ok"], filed)
+        shown = next(row for row in self.goal_page()["workItems"] if row["id"] == item)
+        self.assertEqual(shown["github_error"], self.error(item))
+        self.assertIn("422", shown["github_error"])
+        self.github.fail_issue = False
+        self.github.search = []
+        self.github.calls.clear()
+        self.github.queries.clear()
+        retitled = self.write(update("work_item", item, 1, {"title": "Ship #72"}, "Clearer"))
+        self.assertTrue(retitled["ok"], retitled)
+        stored = self.store.read("work_item", item)
+        self.assertIsNone(stored["links"])
+        failure = self.error(item)
+        shown = next(row for row in self.goal_page()["workItems"] if row["id"] == item)
+        self.assertEqual(shown.get("github_error"), failure)
+        self.assertIn("422", shown.get("github_error") or "")
+        self.assertNotIn("links", [event["field"] for event in self.store.events() if event["entity"] == item])
+        self.assertIn(f"repo:{REPO} 72", self.github.queries)
+
+    def test_a_failed_create_clears_when_an_issue_attaches(self) -> None:
+        """GitHub rejects the create. A retitle to Ship #72 attaches the issue the search returns and clears the failure."""
+        self.github.fail_issue = True
+        item = "WI-9089"
+        command = create("work_item", item, {"goal": GOAL, "title": "Ship the issue", "owner": "tig", "status": "Backlog"}, "Filed")
+        command["github_repo"] = "tig/goalie"
+        filed = self.write(command)
+        self.assertTrue(filed["ok"], filed)
+        self.assertIn("422", self.error(item) or "")
+        self.github.fail_issue = False
+        self.github.search = [{"html_url": ISSUE, "title": "Enable Github integration"}]
+        self.github.calls.clear()
+        retitled = self.write(update("work_item", item, 1, {"title": "Ship #72"}, "Clearer"))
+        self.assertTrue(retitled["ok"], retitled)
+        stored = self.store.read("work_item", item)
+        self.assertEqual(stored["links"], [ISSUE])
+        self.assertIsNone(self.error(item))
+        self.assertIn("Backlog", self.github.issue["labels"])
+
     def test_a_status_change_during_create_closes_the_opened_issue(self) -> None:
         """A status write during the issue create sees no link. After the link is saved, that status closes the issue."""
         item = "WI-9070"
