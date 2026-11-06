@@ -22,6 +22,7 @@
       "version": 1,
       "rank": 1,
       "title": "Regenerate the E28 canon",
+      "cutLine": false,
       "goals": [
         {
           "id": "XW-0001",
@@ -58,6 +59,7 @@
       "version": 1,
       "rank": 2,
       "title": "Grow the XW team",
+      "cutLine": false,
       "goals": [
         {
           "id": "XW-0002",
@@ -93,6 +95,7 @@
       "version": 1,
       "rank": 3,
       "title": "Run Excaliwire on GOALIE",
+      "cutLine": true,
       "goals": [
         {
           "id": "XW-0003",
@@ -241,6 +244,7 @@
   ],
   "backlog": [],
   "unprioritized": [],
+  "period": "2026-Q4",
   "summary": {
     "counts": {
       "RED": 1,

@@ -14,6 +14,8 @@ export const DEFAULTS: Partial<Record<Kind, Row>> = {
   // A new goal starts at Backlog (NF8, N-F3). SPEC.md names no default plan maturity; the least firm is the honest start.
   goal: { description: "", visibility: DEFAULT_VISIBILITY, type: "Milestone (Launch)", severity: "sev2", state: "Backlog", origination: "New", plan_maturity: "Watercolor" },
   user_settings: { favorite_views: [], appearance: "light" },
+  // A Priority made for a goal on Home is on the list now (rule 35b, SPEC.md §6.3).
+  priority: { status: "Current", description: null, cut_line: null },
 };
 
 export type Command =

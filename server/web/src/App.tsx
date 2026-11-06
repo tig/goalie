@@ -6,8 +6,7 @@ import { calendarMonth } from "./model/calendar.ts";
 import { filterPriorities, isFiltering } from "./model/filter.ts";
 import { ZOOM_ORDER, type View } from "./model/query.ts";
 import { moveFrom, timelineWindow } from "./model/timeline.ts";
-import { fieldsBatch, rankBatch } from "./model/commands.ts";
-import { moveFields, type Spot } from "./model/arrange.ts";
+import { moveBatch, slotsOf, type Mover, type Spot } from "./model/arrange.ts";
 import { getJson, postCommands } from "./data.ts";
 import { Cards, HealthCounts } from "./Cards.tsx";
 import { CalendarView } from "./CalendarView.tsx";
@@ -222,39 +221,38 @@ function Home({ data, reload }: { data: PrioritiesResponse; reload: () => void }
   const view: View = phone && screen.view === "timeline" ? "list" : screen.view;
 
   const search = <Search q={screen.q} health={screen.health} onSearch={(q) => change({ q }, Boolean(screen.q) === Boolean(q.trim()))} onClear={() => change({ health: undefined, q: undefined })} />;
-  // Rule 35: drag to reorder Priorities, only for an actor who may (mayRank) and with no filter on. One batch of the ranks that changed.
-  const rank =
-    data.mayRank && !filtering
-      ? {
-          save: async (order: string[], reason: string) => {
-            const { body } = await postCommands(rankBatch([...data.funded, ...data.backlog], order, reason));
+  // Rule 35b: goals with no Priority show last, as No priority. Unfiltered, a goal its owner may change is dragged to arrange it.
+  const none = useMemo(() => filterPriorities([{ id: "none", version: 0, rank: 0, title: "No priority", cutLine: false, goals: data.unprioritized ?? [] }], { health: screen.health, q: screen.q })[0]?.goals ?? [], [data, screen.health, screen.q]);
+  // Rule 35b: one ranked list of goals. Unfiltered, a ranker drags a goal to a new number or below the Backlog line, and a goal's owner nests it.
+  const slots = useMemo(() => slotsOf(data.funded, data.backlog), [data]);
+  const arrange = filtering
+    ? undefined
+    : (() => {
+        const listed = [...data.funded, ...data.backlog].map((p) => ({ id: p.id, version: p.version, rank: p.rank, cutLine: p.cutLine }));
+        const ctx = { orgUnit: data.org.id, period: data.period };
+        const plan = (goal: Mover, spot: Spot, reason = "") => moveBatch(slots, listed, goal, spot, ctx, reason);
+        return {
+          may: (g: { owner: { id: string } }) => g.owner.id === data.me.id || data.goalieOwner,
+          mayRank: data.mayRank,
+          slots,
+          plan,
+          save: async (goal: string, spot: Spot, reason: string) => {
+            // The Home tree holds no goal versions, so the move reads the goal first and writes on that version.
+            const page = await getJson<GoalPageResponse>(`/api/goals/${encodeURIComponent(goal)}`);
+            if (page.state !== "ok") return page.state === "refused" ? page.reason : "Try again.";
+            const g = page.data.goal;
+            const batch = plan({ id: g.id, version: g.version, summary: g.summary, priority: g.priority ?? null, parent: g.parent ?? null }, spot, reason);
+            if (!batch) return "Nothing to move.";
+            const { body } = await postCommands(batch);
             if (body.ok) {
               reload();
               return undefined;
             }
-            return body.error === "invalid" ? body.violations.map((v) => v.message).join(" ") : body.error === "stale" ? "Someone changed the Priorities after you opened the page. Reload and try again." : body.message;
+            return body.error === "invalid" ? body.violations.map((v) => v.message).join(" ") : body.error === "stale" ? "Someone changed the list after you opened the page. Reload and try again." : body.message;
           },
-        }
-      : undefined;
-  // Rule 35b: goals with no Priority show last, as No priority. Unfiltered, a goal its owner may change is dragged to arrange it.
-  const none = useMemo(() => filterPriorities([{ id: "none", version: 0, rank: 0, title: "No priority", goals: data.unprioritized ?? [] }], { health: screen.health, q: screen.q })[0]?.goals ?? [], [data, screen.health, screen.q]);
-  const arrange = filtering
-    ? undefined
-    : {
-        may: (g: { owner: { id: string } }) => g.owner.id === data.me.id || data.goalieOwner,
-        save: async (goal: string, spot: Spot, reason: string) => {
-          // The Home tree holds no versions, so the move reads the goal first and writes on that version.
-          const page = await getJson<GoalPageResponse>(`/api/goals/${encodeURIComponent(goal)}`);
-          if (page.state !== "ok") return page.state === "refused" ? page.reason : "Try again.";
-          const { body } = await postCommands(fieldsBatch(page.data.goal, moveFields(spot), reason));
-          if (body.ok) {
-            reload();
-            return undefined;
-          }
-          return body.error === "invalid" ? body.violations.map((v) => v.message).join(" ") : body.error === "stale" ? "Someone changed this goal after you opened the page. Reload and try again." : body.message;
-        },
-      };
-  const tree = { funded, backlog, me: data.me, today: data.today, filtering, selected: screen.health, hot, rank, none, arrange };
+        };
+      })();
+  const tree = { funded, backlog, me: data.me, today: data.today, filtering, selected: screen.health, hot, none, arrange };
   const zoomAt = ZOOM_ORDER.indexOf(screen.zoom);
   const zoomStep = (to: number, label: string, sign: string) => {
     const zoom = ZOOM_ORDER[to];

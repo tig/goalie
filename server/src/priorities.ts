@@ -29,6 +29,11 @@ export function isCurrentPeriod(period: string, todayIso: string): boolean {
   return period === year || period === `${year}-Q${quarter}`;
 }
 
+/** The calendar quarter of a day, as "2026-Q4". */
+function currentQuarter(todayIso: string): string {
+  return `${todayIso.slice(0, 4)}-Q${Math.floor((Number(todayIso.slice(5, 7)) - 1) / 3) + 1}`;
+}
+
 function all(db: DatabaseSync, sql: string, ...params: string[]): Row[] {
   return db.prepare(sql).all(...params) as Row[];
 }
@@ -123,7 +128,7 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, todayIso: stri
 
   const cut = priorities.findIndex((p) => p.cut_line === true);
   const built = tops.map((list, i) => list.map((g) => goalOf(g, cut === -1 || i <= cut)));
-  const rows: ApiPriority[] = priorities.map((p, i) => ({ id: p.id as string, version: p.version as number, rank: p.rank as number, title: p.title as string, goals: built[i] }));
+  const rows: ApiPriority[] = priorities.map((p, i) => ({ id: p.id as string, version: p.version as number, rank: p.rank as number, title: p.title as string, cutLine: p.cut_line === true, goals: built[i] }));
   const funded = cut === -1 ? rows : rows.slice(0, cut + 1);
   const backlog = cut === -1 ? [] : rows.slice(cut + 1);
   // Rule 35b: an open top goal with no Priority, with its tree. Home shows these as No priority, so a new goal is there to drag.
@@ -156,6 +161,7 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, todayIso: stri
     funded,
     backlog,
     unprioritized,
+    period: (priorities[0]?.period as string | undefined) ?? currentQuarter(todayIso),
     summary: {
       counts: { RED: count("RED"), YELLOW: count("YELLOW"), GREEN: count("GREEN") },
       healths: top.map((g) => g.health),

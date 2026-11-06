@@ -37,8 +37,8 @@ export type ApiGoal = {
   children: ApiGoal[];
 };
 
-/** `version` is the base_version a re-rank sends. */
-export type ApiPriority = { id: string; version: number; rank: number; title: string; goals: ApiGoal[] };
+/** `version` is the base_version a re-rank sends. `cutLine` is true on the Priority that holds the cut line (SPEC.md §6.3). */
+export type ApiPriority = { id: string; version: number; rank: number; title: string; cutLine: boolean; goals: ApiGoal[] };
 
 export type ApiSummary = {
   counts: { RED: number; YELLOW: number; GREEN: number };
@@ -66,6 +66,8 @@ export type PrioritiesResponse = {
   backlog: ApiPriority[];
   /** Open top goals of this view with no Priority, each with its tree. Home shows them as No priority (rule 35b). */
   unprioritized: ApiGoal[];
+  /** The plan period a Priority made on Home takes: the period of this list, else the current quarter (rule 35b). */
+  period: string;
   summary: ApiSummary;
 };
 
@@ -130,6 +132,9 @@ export type GoalFields = {
 
 /** A goal as stored: its key, its version, the fields the system sets, and its writable fields. */
 /** A Priority row as stored (SPEC.md §6.3). A stale re-rank answers it as `current`. */
+/** The fields a Priority made through the API takes. Its status starts Current. */
+export type PriorityFields = { org_unit: string; period: string; rank: number; title: string; cut_line?: boolean };
+
 export type StoredPriority = { id: string; version: number; org_unit: string; period: string; rank: number; title: string; description: string | null; cut_line: boolean | null; status: "Current" | "Retired" };
 
 export type StoredGoal = GoalFields & {
@@ -255,8 +260,10 @@ export type ApiCommand =
   | { op: "create"; kind: "work_item"; ref?: Ref; fields: Partial<WorkItemFields>; reason: string }
   | { op: "update"; kind: "goal"; id: string | Ref; base_version: number; fields: Partial<GoalFields>; reason?: string }
   | { op: "update"; kind: "work_item"; id: string | Ref; base_version: number; fields: Partial<WorkItemFields>; reason?: string }
-  /** Drag to reorder on Home: one per moved Priority, in one batch. Its rank only (SPEC.md §6.3). */
-  | { op: "update"; kind: "priority"; id: string; base_version: number; fields: { rank: number }; reason: string }
+  /** Rule 35b: a goal dropped into the ranked list on Home becomes its own Priority there. */
+  | { op: "create"; kind: "priority"; ref?: Ref; fields: PriorityFields; reason: string }
+  /** Rule 35b: a drag on Home re-ranks, moves the cut line, or retires a Priority its goal left (SPEC.md §6.3). */
+  | { op: "update"; kind: "priority"; id: string; base_version: number; fields: Partial<Pick<StoredPriority, "rank" | "cut_line" | "status">>; reason: string }
   | { op: "comment"; kind: "goal" | "work_item"; id: string; text: string };
 
 /**

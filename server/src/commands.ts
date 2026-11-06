@@ -12,12 +12,15 @@ import { DEFAULTS, inTransaction, write, type Command, type WriteResult } from "
  * The MCP route will call runCommands too.
  */
 
-/** Only goals and work items are written through the API in the MLP (E-10), and a Priority's rank, for drag to reorder on Home. */
+/** Only goals and work items are written through the API in the MLP (E-10), and a Priority's place in its list, for drag on Home (rule 35b). */
 // The contract names an update for every kind the API writes, so the app can send it (f55879d left priority out).
 const API_KINDS = ["goal", "work_item", "priority"] as const satisfies readonly Extract<ApiCommand, { op: "update" }>["kind"][];
 
 /** The fields that hold a goal key, so a ref may stand there. A ref anywhere else is plain text. */
-const KEY_FIELDS: Record<(typeof API_KINDS)[number], readonly string[]> = { goal: ["promotion_milestone", "parent"], work_item: ["goal"], priority: [] };
+const KEY_FIELDS: Record<(typeof API_KINDS)[number], readonly string[]> = { goal: ["promotion_milestone", "parent", "priority"], work_item: ["goal"], priority: [] };
+
+/** Rule 35b: through the API a Priority is made for a goal on Home, and is re-ranked, takes the cut line, or retires. Its title and description are not written here. */
+const PRIORITY_FIELDS = { create: ["org_unit", "period", "rank", "title", "cut_line"], update: ["rank", "cut_line", "status"] } as const;
 
 /** A re-rank swaps ranks one command at a time, so a tie is checked once the batch ends (checkRanks). */
 const DEFERRED: Partial<Record<string, readonly string[]>> = { priority: ["no-rank-ties"] };
@@ -174,8 +177,12 @@ function resolve(at: number, raw: unknown, ids: Record<Ref, string>, refused: Se
     if (!(value in ids)) throw bad(at, `unknown-ref: ${value} is used before the command that creates it`);
     return ids[value];
   };
-  if (kind === "priority" && (raw.op !== "update" || !isObject(raw.fields) || Object.keys(raw.fields).join() !== "rank")) {
-    throw bad(at, "api-kind: through the API a Priority takes only an update of its rank");
+  if (kind === "priority") {
+    const allowed: readonly string[] = raw.op === "create" ? PRIORITY_FIELDS.create : raw.op === "update" ? PRIORITY_FIELDS.update : [];
+    const named = isObject(raw.fields) ? Object.keys(raw.fields) : [];
+    if (!allowed.length || !named.length || !named.every((f) => allowed.includes(f))) {
+      throw bad(at, "api-kind: through the API a Priority is made with org_unit, period, rank, title, and cut_line, and changes only its rank, cut_line, and status");
+    }
   }
   if (raw.op === "comment") return { op: "comment", kind, id: key(raw.id) as string, text: raw.text as string };
   if (raw.op === "create" && raw.ref !== undefined && (!isRef(raw.ref) || raw.ref in ids || refused.has(raw.ref))) throw bad(at, `ref ${String(raw.ref)} must be "$" and a word, used once`);

@@ -837,14 +837,6 @@ main.newgoal{padding-bottom:84px}
 .todayplus:hover{filter:brightness(1.1)}
 @media (pointer:coarse){.todayplus::after{content:"";position:absolute;left:50%;top:50%;width:44px;height:44px;transform:translate(-50%,-50%)}}
 /* Rule 35: drag to reorder Priorities. */
-.draghandle{display:inline-flex;align-items:center;justify-content:center;width:16px;height:24px;margin-right:2px;padding:0;border:0;background:none;color:var(--mute);cursor:grab;touch-action:none;position:relative}
-.draghandle svg{fill:currentColor}
-.draghandle:hover,.draghandle:focus-visible{color:var(--ink)}
-.group.dragging{opacity:.55}
-.dropline{height:0;border-top:2px solid var(--link);margin:-1px 0;position:relative;z-index:8}
-.rankreason{position:sticky;left:0;z-index:7;display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:min(620px,100%);box-sizing:border-box;padding:8px 12px 10px 28px;background:var(--hover);border-radius:0 0 10px 0}
-.rankreason input{flex:1;min-width:160px;max-width:360px;font:600 13px var(--font);border:1px solid var(--cut);border-radius:8px;padding:6px 8px}
-@media (pointer:coarse){.draghandle::after{content:"";position:absolute;left:50%;top:50%;width:44px;height:44px;transform:translate(-50%,-50%)}}
 /* Rule 35b: arranging goals on Home. A grip on each goal its owner may move; the new parent row or the Priority under the pointer is outlined green. */
 .ggrip{display:inline-flex;align-items:center;justify-content:center;flex:none;width:18px;height:24px;margin:0 -4px 0 -2px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--mute);cursor:grab;opacity:.45;touch-action:none}
 .row:hover .ggrip,.ggrip:focus-visible,.row.moving .ggrip{opacity:1}
@@ -856,10 +848,13 @@ main.newgoal{padding-bottom:84px}
 .row.dropinto{box-shadow:inset 0 0 0 2px var(--brand);border-radius:10px;background:var(--green-bg)}
 .row.dropinto>.left{background:var(--green-bg)}
 .group.droptop{box-shadow:inset 0 0 0 2px var(--brand);border-radius:12px}
-.row.dropbefore,.row.dropafter{position:relative}
-.row.dropbefore::before,.row.dropafter::after{content:"";position:absolute;left:var(--rank,24px);right:0;height:4px;border-radius:4px;background:var(--green-ink);box-shadow:0 0 0 2px var(--green-bg);z-index:8;pointer-events:none}
+/* Rule 35b: a goal held over the Backlog line goes to the top of Backlog; the line turns the link green. */
+.cut.droptop{color:var(--link)}
+.cut.droptop::before,.cut.droptop::after{border-top:2px solid var(--link)}
+.row.dropbefore,.row.dropafter,.goal.dropafter{position:relative}
+.row.dropbefore::before,.row.dropafter::after,.goal.dropafter::after{content:"";position:absolute;left:var(--rank,24px);right:0;height:4px;border-radius:4px;background:var(--green-ink);box-shadow:0 0 0 2px var(--green-bg);z-index:8;pointer-events:none}
 .row.dropbefore::before{top:-2px}
-.row.dropafter::after{bottom:-2px}
+.row.dropafter::after,.goal.dropafter::after{bottom:-2px}
 .row.dropparent>.left{background:var(--green-bg)}
 .movenote.dragghost{background:var(--ink);color:#fff;border-color:var(--ink);pointer-events:none}
 .movetext{flex:1 1 240px;min-width:0;line-height:1.4}

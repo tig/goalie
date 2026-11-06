@@ -89,10 +89,53 @@ class PriorityRankTests(unittest.TestCase):
         self.assertEqual(status, 422, body)
         self.assertIn("reason-required", self.rules(body))
 
-    def test_the_api_changes_only_a_priority_rank(self) -> None:
+    def view(self, who: str = "tig") -> Any:
+        return json.loads(get(self.proc, self.port, "/api/priorities", self.auth[who]).body)
+
+    def test_a_goal_gets_its_own_priority_in_one_batch(self) -> None:
+        # Rule 35b: a goal dropped into the ranked list becomes its own Priority there. XW-0004 is a sub-goal in the seed.
+        goal = self.store.read("goal", "XW-0004")
+        status, body = self.send("tig", [
+            {"op": "create", "kind": "priority", "ref": "$p", "fields": {"org_unit": "excaliwire", "period": "2026-Q4", "rank": 4, "title": "Run the MLP prototype"}, "reason": "Moved on Home."},
+            {"op": "update", "kind": "goal", "id": "XW-0004", "base_version": goal["version"], "fields": {"priority": "$p", "parent": None}, "reason": "Moved on Home."},
+        ])
+        self.assertEqual(status, 200, body)
+        made = body["ids"]["$p"]
+        self.assertEqual(self.store.read("goal", "XW-0004")["priority"], made)
+        self.assertEqual((self.store.read("priority", made)["status"], self.store.read("priority", made)["rank"]), ("Current", 4))
+        view = self.view()
+        self.assertEqual([p["id"] for p in view["backlog"]], [made], "PRI-3 holds the cut line, so rank 4 is below it")
+
+    def test_the_cut_line_moves_in_one_batch(self) -> None:
+        status, body = self.send("tig", [
+            {"op": "update", "kind": "priority", "id": "PRI-3", "base_version": 1, "fields": {"cut_line": False}, "reason": "Moved on Home."},
+            {"op": "update", "kind": "priority", "id": "PRI-2", "base_version": 1, "fields": {"cut_line": True}, "reason": "Moved on Home."},
+        ])
+        self.assertEqual(status, 200, body)
+        view = self.view()
+        self.assertEqual(([p["id"] for p in view["funded"]], [p["id"] for p in view["backlog"]]), (["PRI-1", "PRI-2"], ["PRI-3"]))
+        self.assertEqual([p["cutLine"] for p in view["funded"]], [False, True])
+
+    def test_a_retired_priority_leaves_the_list_and_the_rest_close_the_gap(self) -> None:
+        status, body = self.send("tig", [
+            {"op": "update", "kind": "priority", "id": "PRI-2", "base_version": 1, "fields": {"status": "Retired"}, "reason": "Moved on Home."},
+            {"op": "update", "kind": "priority", "id": "PRI-3", "base_version": 1, "fields": {"rank": 2}, "reason": "Moved on Home."},
+        ])
+        self.assertEqual(status, 200, body)
+        self.assertEqual([p["id"] for p in self.view()["funded"]], ["PRI-1", "PRI-3"])
+
+    def test_the_view_names_the_period_a_new_priority_takes(self) -> None:
+        self.assertEqual(self.view()["period"], "2026-Q4")
+
+    def test_only_a_ranker_creates_a_priority(self) -> None:
+        status, body = self.send("chelsea", [{"op": "create", "kind": "priority", "fields": {"org_unit": "excaliwire", "period": "2026-Q4", "rank": 4, "title": "Mine first"}, "reason": "Moved on Home."}])
+        self.assertEqual(status, 422, body)
+        self.assertIn("owner-ranks-priorities", self.rules(body))
+
+    def test_the_api_writes_only_a_priority_rank_cut_line_and_status(self) -> None:
         status, body = self.send("tig", [{"op": "update", "kind": "priority", "id": "PRI-1", "base_version": 1, "fields": {"title": "Renamed"}, "reason": "No"}])
         self.assertEqual(status, 400, body)
-        status, body = self.send("tig", [{"op": "create", "kind": "priority", "fields": {"rank": 4}, "reason": "No"}])
+        status, body = self.send("tig", [{"op": "create", "kind": "priority", "fields": {"org_unit": "excaliwire", "period": "2026-Q4", "rank": 4, "title": "T", "description": "No"}, "reason": "No"}])
         self.assertEqual(status, 400, body)
         with sqlite3.connect(self.store.path) as db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM priority").fetchone()[0], 3)
