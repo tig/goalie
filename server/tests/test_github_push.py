@@ -970,6 +970,46 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertEqual(stored["title"], "Ship #99")
         self.assertNotIn(ISSUE, stored["links"] or [])
 
+    def test_a_repository_removed_from_the_goal_during_search_is_not_attached(self) -> None:
+        """A search for #72 that finishes after the goal no longer names the repository does not store that issue."""
+        item = "WI-9091"
+        self.github.search = [{"html_url": ISSUE, "title": "Enable Github integration"}]
+
+        def drop_goal() -> None:
+            self.github.during_search = None
+            set_scope(self.store, ["tig/goalie"], [])
+
+        self.github.during_search = drop_goal
+        try:
+            created = self.write(create("work_item", item, {"goal": GOAL, "title": "Ship #72", "owner": "tig", "status": "Backlog"}, "Filed"))
+        finally:
+            self.github.during_search = None
+        self.assertTrue(created["ok"], created)
+        stored = self.store.read("work_item", item)
+        self.assertNotIn(ISSUE, stored["links"] or [])
+        self.assertNotIn("links", [event["field"] for event in self.store.events() if event["entity"] == item])
+        self.assertNotIn("PATCH /repos/tig/goalie/issues/72", self.github.calls)
+
+    def test_a_repository_removed_from_github_repos_during_search_is_not_attached(self) -> None:
+        """A search for #72 that finishes after github_repos is empty does not store that issue. An empty list is the scope."""
+        item = "WI-9092"
+        self.github.search = [{"html_url": ISSUE, "title": "Enable Github integration"}]
+
+        def drop_repos() -> None:
+            self.github.during_search = None
+            set_scope(self.store, [], [{"repo": "github.com/tig/goalie"}])
+
+        self.github.during_search = drop_repos
+        try:
+            created = self.write(create("work_item", item, {"goal": GOAL, "title": "Ship #72", "owner": "tig", "status": "Backlog"}, "Filed"))
+        finally:
+            self.github.during_search = None
+        self.assertTrue(created["ok"], created)
+        stored = self.store.read("work_item", item)
+        self.assertNotIn(ISSUE, stored["links"] or [])
+        self.assertNotIn("links", [event["field"] for event in self.store.events() if event["entity"] == item])
+        self.assertNotIn("PATCH /repos/tig/goalie/issues/72", self.github.calls)
+
     def test_a_retitle_keeps_the_linked_issue(self) -> None:
         """A work item that already links an issue, retitled to include #99, keeps that issue URL."""
         created = self.write(create("work_item", "WI-9083", self.item([ISSUE]), "Filed"))
