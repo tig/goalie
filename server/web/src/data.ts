@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { ApiError, CommandsRequest, CommandsResponse } from "../../src/api.ts";
+import type { ApiError, CommandsRequest, CommandsResponse, GitHubStatusResponse } from "../../src/api.ts";
 import { commandsAnswer } from "./model/commands.ts";
 import { FEEDBACK_PATH, feedbackAnswer, feedbackBody, type FeedbackAnswer, type FeedbackFocus } from "./model/feedback.ts";
 
@@ -37,6 +37,18 @@ export function useJson<T>(url: string): [Loaded<T>, () => void] {
   }, [url, round]);
   const reload = useCallback(() => setRound((n) => n + 1), []);
   return [loaded, reload];
+}
+
+/** POST /api/github/status. The private key is sent once and is not in the answer. */
+export async function postGitHubSettings(body: { appId: string; installationId: string; publicUrl: string; privateKey: string }): Promise<{ ok: true; data: GitHubStatusResponse } | { ok: false; reason: string }> {
+  try {
+    const reply = await fetch("/api/github/status", { method: "POST", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify(body) });
+    const json = (await reply.json().catch(() => ({ reason: `The server could not take the save (${reply.status}). Try again.` }))) as Partial<GitHubStatusResponse & ApiError>;
+    if (!reply.ok) return { ok: false, reason: json.reason ?? "The server could not take the save." };
+    return { ok: true, data: json as GitHubStatusResponse };
+  } catch {
+    return { ok: false, reason: "GOALIE could not reach the server. Try again." };
+  }
 }
 
 /** POST /api/commands: one batch, every command stored or none. The answer carries its HTTP status. */

@@ -29,6 +29,13 @@ ISSUE = f"https://github.com/{REPO}/issues/72"
 PULL = f"https://github.com/{REPO}/pull/80"
 OTHER = "https://github.com/excaliwire/factory/issues/3"
 PUBLIC = "http://goalie.test"
+BARE = {
+    "GOALIE_GITHUB_APP_ID": "",
+    "GOALIE_GITHUB_INSTALLATION_ID": "",
+    "GOALIE_GITHUB_PRIVATE_KEY_FILE": "",
+    "GOALIE_PUBLIC_URL": "",
+}
+STATUS_KEYS = {"configured", "repositories", "outbound", "inbound", "appId", "installationId", "publicUrl", "privateKeySet"}
 ITEM = "WI-9001"
 GOAL = "XW-0007"
 LATER = "WI-9080"
@@ -408,6 +415,14 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.github.field_values = []
         self.github.issue = {"body": "Keep this.", "state": "open", "state_reason": None, "labels": ["pinned"]}
         set_scope(self.store, ["tig/goalie"], [{"repo": "github.com/tig/goalie"}])
+        db = sqlite3.connect(self.store.path)
+        try:
+            db.execute("DELETE FROM github_config")
+            db.commit()
+        except sqlite3.OperationalError:
+            pass
+        finally:
+            db.close()
 
     def test_a_status_change_sets_the_label_the_trailer_and_the_close(self) -> None:
         created = self.write(create("work_item", ITEM, self.item([ISSUE]), "Filed"))
@@ -504,7 +519,7 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertFalse(body["configured"])
         self.assertEqual(body["repositories"], ["tig/goalie"])
         self.assertNotIn("repository", body)
-        self.assertEqual(set(body), {"configured", "repositories", "outbound", "inbound"})
+        self.assertEqual(set(body), STATUS_KEYS)
         self.assertNotIn("privateKey", body)
         self.assertNotIn("CANARYKEYPATH", raw)
         self.assertNotIn("CANARYKEYTEXT", raw)
@@ -517,7 +532,7 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertEqual(reply.status, 200, reply.body)
         raw = reply.body.decode()
         body = json.loads(raw)
-        self.assertEqual(set(body), {"configured", "repositories", "outbound", "inbound"})
+        self.assertEqual(set(body), STATUS_KEYS)
         self.assertEqual(body["repositories"], ["tig/goalie"])
         self.assertNotIn("repository", body)
         self.assertNotIn("privateKey", body)
@@ -644,7 +659,7 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         reply = self.status_as("tig", "sub-tig", {"GOALIE_GITHUB_REPO": ""})
         self.assertEqual(reply.status, 200, reply.body)
         body = json.loads(reply.body)
-        self.assertEqual(set(body), {"configured", "repositories", "outbound", "inbound"})
+        self.assertEqual(set(body), STATUS_KEYS)
         self.assertNotIn("repository", body)
         self.assertEqual(body["repositories"], ["tig/goalie"])
         self.assertTrue(body["configured"])
@@ -1534,6 +1549,194 @@ class GitHubPushTests(unittest.TestCase, PushTests):
             reply = get(proc, port, f"/api/goals/{GOAL}", {"Authorization": f"Bearer {token}"})
         self.assertEqual(reply.status, 200, reply.body)
         return json.loads(reply.body)
+
+    def pem(self) -> str:
+        with open(self.env["GOALIE_GITHUB_PRIVATE_KEY_FILE"], encoding="utf-8") as handle:
+            return handle.read()
+
+    def save_as(self, actor: str, subject: str, body: dict[str, str], env: dict[str, str] | None = None) -> Reply:
+        row = self.store.read("actor", actor)
+        if row.get("subject") != subject:
+            wrote = self.store.write("tig", update("actor", actor, row["version"], {"subject": subject}))
+            self.assertTrue(wrote["ok"], wrote)
+        token, issuers = signed(subject)
+        with running_server(self.store.path, {**self.env, **issuers, **(env or {})}) as (proc, port):
+            ready = get(proc, port, "/health")
+            self.assertEqual(ready.status, 200, ready.body)
+            return post(proc, port, "/api/github/status", body, {"Authorization": f"Bearer {token}"})
+
+    def config_row(self) -> dict[str, Any] | None:
+        db = sqlite3.connect(self.store.path)
+        db.row_factory = sqlite3.Row
+        try:
+            try:
+                found = db.execute("SELECT app_id, installation_id, public_url, private_key FROM github_config WHERE id = 'config'").fetchone()
+            except sqlite3.OperationalError:
+                return None
+        finally:
+            db.close()
+        return None if found is None else dict(found)
+
+    def event_count(self) -> int:
+        db = sqlite3.connect(self.store.path)
+        try:
+            return int(db.execute("SELECT COUNT(*) FROM event").fetchone()[0])
+        finally:
+            db.close()
+
+    def test_the_owner_saves_the_app_and_a_later_visit_hides_the_key(self) -> None:
+        """The owner stores the four values. A later visit shows them set and does not show the private key. Prediction: POST /api/github/status is 404."""
+        pem = self.pem()
+        row = self.store.read("actor", "tig")
+        if row.get("subject") != "sub-tig":
+            wrote = self.store.write("tig", update("actor", "tig", row["version"], {"subject": "sub-tig"}))
+            self.assertTrue(wrote["ok"], wrote)
+        before = self.event_count()
+        reply = self.save_as("tig", "sub-tig", {
+            "appId": " 5603810 ",
+            "installationId": "178377743",
+            "publicUrl": "https://goalie.excaliwire.com/",
+            "privateKey": pem,
+        }, BARE)
+        self.assertEqual(reply.status, 200, reply.body)
+        raw = reply.body.decode()
+        saved = json.loads(raw)
+        self.assertEqual(set(saved), STATUS_KEYS)
+        self.assertNotIn(pem, raw)
+        self.assertNotIn("BEGIN", raw)
+        self.assertNotIn("privateKey", saved)
+        self.assertTrue(saved["configured"])
+        self.assertEqual(saved["appId"], "5603810")
+        self.assertEqual(saved["installationId"], "178377743")
+        self.assertEqual(saved["publicUrl"], "https://goalie.excaliwire.com")
+        self.assertTrue(saved["privateKeySet"])
+        self.assertEqual(saved["repositories"], ["tig/goalie"])
+        again = self.status_as("tig", "sub-tig", BARE)
+        self.assertEqual(again.status, 200, again.body)
+        later = json.loads(again.body)
+        self.assertEqual(later["appId"], "5603810")
+        self.assertEqual(later["installationId"], "178377743")
+        self.assertEqual(later["publicUrl"], "https://goalie.excaliwire.com")
+        self.assertTrue(later["privateKeySet"])
+        self.assertTrue(later["configured"])
+        self.assertNotIn("BEGIN", again.body.decode())
+        self.assertEqual(self.event_count(), before)
+
+    def test_a_blank_private_key_keeps_the_saved_key(self) -> None:
+        """Saving with an empty private key leaves the saved key. Prediction: the second save answers 404."""
+        pem = self.pem()
+        first = self.save_as("tig", "sub-tig", {
+            "appId": "5603810",
+            "installationId": "178377743",
+            "publicUrl": "https://goalie.excaliwire.com",
+            "privateKey": pem,
+        }, BARE)
+        self.assertEqual(first.status, 200, first.body)
+        second = self.save_as("tig", "sub-tig", {
+            "appId": "5603810",
+            "installationId": "178377743",
+            "publicUrl": "https://goalie.excaliwire.com",
+            "privateKey": "  ",
+        }, BARE)
+        self.assertEqual(second.status, 200, second.body)
+        raw = second.body.decode()
+        saved = json.loads(raw)
+        self.assertTrue(saved["privateKeySet"])
+        self.assertTrue(saved["configured"])
+        self.assertNotIn(pem, raw)
+        self.assertNotIn("BEGIN", raw)
+        self.assertEqual(self.config_row()["private_key"].strip(), pem.strip())
+
+    def test_clearing_a_stored_value_uses_the_process_name(self) -> None:
+        """Clearing the app id removes the stored value. The process name applies again. Prediction: the save answers 404."""
+        pem = self.pem()
+        saved = self.save_as("tig", "sub-tig", {
+            "appId": "999001",
+            "installationId": "178377743",
+            "publicUrl": "https://goalie.excaliwire.com",
+            "privateKey": pem,
+        }, BARE)
+        self.assertEqual(saved.status, 200, saved.body)
+        cleared = self.save_as("tig", "sub-tig", {
+            "appId": "",
+            "installationId": "178377743",
+            "publicUrl": "https://goalie.excaliwire.com",
+            "privateKey": "",
+        })
+        self.assertEqual(cleared.status, 200, cleared.body)
+        body = json.loads(cleared.body)
+        self.assertIsNone(body["appId"])
+        self.assertTrue(body["privateKeySet"])
+        self.assertTrue(body["configured"])
+        bare = self.status_as("tig", "sub-tig", BARE)
+        self.assertFalse(json.loads(bare.body)["configured"])
+        self.github.calls.clear()
+        result = self.store.run("write", "--as", "tig", stdin=create("work_item", "WI-9150", self.item([ISSUE]), "Filed"), env={**self.env, **BARE})[1]
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(self.error("WI-9150"), "GitHub is not configured. Missing GOALIE_GITHUB_APP_ID.")
+        self.assertEqual(self.github.calls, [])
+
+    def test_a_stored_app_pushes_with_no_process_names(self) -> None:
+        """GitHub calls use the stored values when the four process names are unset. Prediction: the push does not call GitHub."""
+        pem = self.pem()
+        saved = self.save_as("tig", "sub-tig", {
+            "appId": "123456",
+            "installationId": "77",
+            "publicUrl": "http://stored.example",
+            "privateKey": pem,
+        }, BARE)
+        self.assertEqual(saved.status, 200, saved.body)
+        self.assertTrue(json.loads(saved.body)["configured"])
+        self.github.calls.clear()
+        created = self.store.run(
+            "write", "--as", "tig",
+            stdin=create("work_item", "WI-9151", self.item([ISSUE]), "Filed"),
+            env={**self.env, **BARE},
+        )[1]
+        self.assertTrue(created["ok"], created)
+        self.assertIsNone(self.error("WI-9151"))
+        self.assertIn("POST /app/installations/77/access_tokens", self.github.calls)
+        self.assertIn("http://stored.example/goals/", self.github.issue["body"])
+        self.assertNotIn(PUBLIC, self.github.issue["body"])
+
+    def test_a_bad_private_key_is_refused_and_not_stored(self) -> None:
+        """A value that is not a PEM private key is refused, and the stored row stays as it was. Prediction: the save answers 404."""
+        before = self.config_row()
+        reply = self.save_as("tig", "sub-tig", {
+            "appId": "5603810",
+            "installationId": "178377743",
+            "publicUrl": "https://goalie.excaliwire.com",
+            "privateKey": "not-a-key",
+        }, BARE)
+        self.assertEqual(reply.status, 400, reply.body)
+        raw = reply.body.decode()
+        self.assertIn("PEM", raw)
+        self.assertNotIn("not-a-key", raw)
+        self.assertEqual(self.config_row(), before)
+        number = self.save_as("tig", "sub-tig", {
+            "appId": "5603810",
+            "installationId": "nope",
+            "publicUrl": "https://goalie.excaliwire.com",
+            "privateKey": "",
+        }, BARE)
+        self.assertEqual(number.status, 400, number.body)
+        self.assertIn("installation id", number.body.decode())
+        self.assertEqual(self.config_row(), before)
+
+    def test_someone_else_cannot_set_github(self) -> None:
+        """A signed-in actor who is not the GOALIE owner cannot store the values. Prediction: the save answers 404."""
+        before = self.config_row()
+        pem = self.pem()
+        reply = self.save_as("chelsea", "sub-chelsea", {
+            "appId": "5603810",
+            "installationId": "178377743",
+            "publicUrl": "https://goalie.excaliwire.com",
+            "privateKey": pem,
+        }, BARE)
+        self.assertEqual(reply.status, 403, reply.body)
+        self.assertNotIn(pem, reply.body.decode())
+        self.assertNotIn("BEGIN", reply.body.decode())
+        self.assertEqual(self.config_row(), before)
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 
 /**
  * The one SQLite file per deployment (ADR 0002). Fields are SPEC.md §6.
- * Every entity table has a version. Only the write path changes an entity table. github_push is not an entity and not an Event. github_result is not an entity and not an Event.
+ * Every entity table has a version. Only the write path changes an entity table. github_push is not an entity and not an Event. github_result is not an entity and not an Event. github_config is not an entity and not an Event.
  */
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS actor (
@@ -91,6 +91,13 @@ CREATE TABLE IF NOT EXISTS github_result (
   kind TEXT PRIMARY KEY CHECK (kind IN ('outbound', 'inbound')),
   ok INTEGER NOT NULL,
   detail TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS github_config (
+  id TEXT PRIMARY KEY CHECK (id = 'config'),
+  app_id TEXT,
+  installation_id TEXT,
+  public_url TEXT,
+  private_key TEXT
 );
 CREATE TABLE IF NOT EXISTS draft (
   id TEXT PRIMARY KEY,

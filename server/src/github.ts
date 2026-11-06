@@ -16,12 +16,12 @@ import type { Row } from "./rules.ts";
  * Attach writes a row in that same transaction when a create or a title update has a # and no issue URL. drain searches after the commit, appends the first issue, and queues the current status for this drain. A pull request is not that issue. The search does not run inside the transaction, and a later status change does not search. A title whose # query changed during the search is not linked and is not queued. A repository that leaves github_repos or the goal during the search is not linked and is not queued. A failed create keeps its error until an issue is attached. The failure is written back only when the work item still has no issue link and no newer push row exists. A search that does not complete records that failure and does not put the request back. A missing GitHub setting records that failure and does not attach. A later status change does not clear that failure.
  * A work-item update that adds an issue URL in github_repos and on the goal, when that URL was not in the previous links, queues the current status on that URL. A pull request does not. That queue is the status push. A write that adds more than one new in-scope issue is refused before it is stored. A URL already in the previous links does not count. On create, every link is new.
  * github_result is not an entity and not an Event. It keeps the last update and the last signed notice.
+ * github_config is not an entity and not an Event. It keeps the app id, the installation id, the private key, and the public URL. A value not stored there uses the process name. The private key stays out of the status view.
  */
 
 const STATUS_LABELS = ["Backlog", "In Progress", "Completed", "Deleted"] as const;
 const ISSUE_API = "2022-11-28";
 const FIELD_API = "2026-03-10";
-const CONFIG_NAMES = ["GOALIE_GITHUB_APP_ID", "GOALIE_GITHUB_INSTALLATION_ID", "GOALIE_GITHUB_PRIVATE_KEY_FILE", "GOALIE_PUBLIC_URL"] as const;
 const ISSUE_URL = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)\/?$/;
 const PULL_URL = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)\/?$/;
 const REF_URL = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/(?:issues|pull)\/(\d+)\/?(?:[?#].*)?$/;
@@ -202,7 +202,7 @@ export async function drainGitHub(db: DatabaseSync): Promise<void> {
   await openPendingIssues(db);
   const pending = db.prepare("SELECT work_item, issue, status, goal FROM github_push WHERE error IS NULL AND issue <> ''").all() as PushRow[];
   if (pending.length === 0) return;
-  const ready = configuredGitHub();
+  const ready = configuredGitHub(db);
   for (const row of pending) {
     if (!pushInScope(db, row)) {
       db.prepare("DELETE FROM github_push WHERE work_item = ?").run(row.work_item);
@@ -285,14 +285,41 @@ function pushInScope(db: DatabaseSync, row: PushRow): boolean {
   return repoInScope(repo, githubRepos(db)) && goalNamesRepo(db, read(db, "work_item", row.work_item)?.goal, repo);
 }
 
-/** The last update and the last signed notice. The private key stays out of this. The list is github_repos. */
+/** The last update and the last signed notice. The stored app id, installation id, and public URL are included. The private key stays out. The list is github_repos. */
 export function githubView(db: DatabaseSync): GitHubStatusResponse {
+  const stored = storedGitHub(db);
   return {
-    configured: configuredGitHub().ok,
+    configured: configuredGitHub(db).ok,
     repositories: githubRepos(db),
     outbound: storedResult(db, "outbound"),
     inbound: storedResult(db, "inbound"),
+    appId: stored.appId,
+    installationId: stored.installationId,
+    publicUrl: stored.publicUrl,
+    privateKeySet: stored.privateKey !== null,
   };
+}
+
+/** Store the four values. A blank private key leaves the stored key. An empty app id, installation id, or public URL removes that stored value. This is not an Event. */
+export function saveGitHubSettings(db: DatabaseSync, body: unknown): { ok: true } | { ok: false; reason: string } {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) return { ok: false, reason: SETTINGS_REASON };
+  const row = body as Record<string, unknown>;
+  if (typeof row.appId !== "string" || typeof row.installationId !== "string" || typeof row.publicUrl !== "string" || typeof row.privateKey !== "string") return { ok: false, reason: SETTINGS_REASON };
+  const appId = cleanId(row.appId);
+  if (appId === "bad") return { ok: false, reason: "The app id is a number." };
+  const installationId = cleanId(row.installationId);
+  if (installationId === "bad") return { ok: false, reason: "The installation id is a number." };
+  const publicUrl = cleanPublicUrl(row.publicUrl);
+  if (publicUrl === "bad") return { ok: false, reason: "The public URL must be an http or https URL." };
+  const privateKey = cleanKey(row.privateKey);
+  if (privateKey === "bad") return { ok: false, reason: "The private key must be a PEM private key." };
+  db.prepare(
+    `INSERT INTO github_config (id, app_id, installation_id, public_url, private_key) VALUES ('config', ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET app_id = excluded.app_id, installation_id = excluded.installation_id, public_url = excluded.public_url,
+       private_key = CASE WHEN ? = 1 THEN github_config.private_key ELSE excluded.private_key END`,
+  ).run(appId, installationId, publicUrl, privateKey === "keep" ? null : privateKey, privateKey === "keep" ? 1 : 0);
+  installationTokens.clear();
+  return { ok: true };
 }
 
 /** Keep the last result of one kind. The last push in a drain is the one that remains. */
@@ -436,7 +463,7 @@ export async function searchGitHub(db: DatabaseSync, goalId: string, q: string):
   if (text === "") return { items: [], error: null };
   const repos = reposOnGoal(db, goalId);
   if (repos.length === 0) return { items: [], error: null };
-  const ready = configuredGitHub();
+  const ready = configuredGitHub(db);
   if (!ready.ok) return { items: [], error: ready.error };
   const items: GitHubSearchItem[] = [];
   const seen = new Set<string>();
@@ -482,7 +509,7 @@ export async function readGitHubRef(db: DatabaseSync, goalId: string, url: strin
   const repo = match[2];
   const number = match[3];
   if (!issueRepoAllowed(db, goalId, `${owner}/${repo}`)) return { status: 404, reason: "that repository is not on this goal" };
-  const ready = configuredGitHub();
+  const ready = configuredGitHub(db);
   if (!ready.ok) return { status: 200, body: { error: ready.error } };
   const path = `/repos/${owner}/${repo}/issues/${number}`;
   try {
@@ -557,22 +584,83 @@ function goalRepos(workProduct: unknown): Set<string> {
   return new Set(reposNamedOnGoal(workProduct).map((repo) => repo.toLowerCase()));
 }
 
-function configuredGitHub(): Ready {
-  const missing = CONFIG_NAMES.filter((name) => !process.env[name]?.trim());
-  if (missing.length > 0) return { ok: false, error: `GitHub is not configured. Missing ${missing.join(", ")}.` };
-  let privateKey: string;
+const SETTINGS_REASON = "GitHub settings are the app id, the installation id, the private key, and the public URL.";
+
+type StoredGitHub = { appId: string | null; installationId: string | null; publicUrl: string | null; privateKey: string | null };
+
+function storedText(value: string | null): string | null {
+  if (value === null || value.trim() === "") return null;
+  return value;
+}
+
+function storedGitHub(db: DatabaseSync): StoredGitHub {
+  const row = db.prepare("SELECT app_id, installation_id, public_url, private_key FROM github_config WHERE id = 'config'").get() as
+    | { app_id: string | null; installation_id: string | null; public_url: string | null; private_key: string | null }
+    | undefined;
+  if (row === undefined) return { appId: null, installationId: null, publicUrl: null, privateKey: null };
+  return { appId: storedText(row.app_id), installationId: storedText(row.installation_id), publicUrl: storedText(row.public_url), privateKey: storedText(row.private_key) };
+}
+
+function cleanId(value: string): string | null | "bad" {
+  const text = value.trim();
+  if (text === "") return null;
+  return /^\d+$/.test(text) ? text : "bad";
+}
+
+function cleanPublicUrl(value: string): string | null | "bad" {
+  const text = value.trim().replace(/\/$/, "");
+  if (text === "") return null;
+  let url: URL;
   try {
-    privateKey = readFileSync(process.env.GOALIE_GITHUB_PRIVATE_KEY_FILE as string, "utf8");
+    url = new URL(text);
   } catch {
-    return { ok: false, error: "GitHub is not configured. The private key file could not be read." };
+    return "bad";
+  }
+  if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username !== "" || url.password !== "" || url.search !== "" || url.hash !== "") return "bad";
+  return text;
+}
+
+function cleanKey(value: string): string | "keep" | "bad" {
+  const text = value.replace(/^\uFEFF/, "").trim();
+  if (text === "") return "keep";
+  if (!/-----BEGIN (?:RSA )?PRIVATE KEY-----/.test(text) || !/-----END (?:RSA )?PRIVATE KEY-----/.test(text)) return "bad";
+  try {
+    const signer = createSign("RSA-SHA256");
+    signer.update("goalie");
+    signer.sign(text);
+  } catch {
+    return "bad";
+  }
+  return text;
+}
+
+function configuredGitHub(db: DatabaseSync): Ready {
+  const stored = storedGitHub(db);
+  const appId = stored.appId ?? process.env.GOALIE_GITHUB_APP_ID?.trim() ?? "";
+  const installationId = stored.installationId ?? process.env.GOALIE_GITHUB_INSTALLATION_ID?.trim() ?? "";
+  const publicUrl = (stored.publicUrl ?? process.env.GOALIE_PUBLIC_URL?.trim() ?? "").replace(/\/$/, "");
+  const missing: string[] = [];
+  if (appId === "") missing.push("GOALIE_GITHUB_APP_ID");
+  if (installationId === "") missing.push("GOALIE_GITHUB_INSTALLATION_ID");
+  const keyFile = process.env.GOALIE_GITHUB_PRIVATE_KEY_FILE?.trim() ?? "";
+  if (stored.privateKey === null && keyFile === "") missing.push("GOALIE_GITHUB_PRIVATE_KEY_FILE");
+  if (publicUrl === "") missing.push("GOALIE_PUBLIC_URL");
+  if (missing.length > 0) return { ok: false, error: `GitHub is not configured. Missing ${missing.join(", ")}.` };
+  let privateKey = stored.privateKey;
+  if (privateKey === null) {
+    try {
+      privateKey = readFileSync(keyFile, "utf8");
+    } catch {
+      return { ok: false, error: "GitHub is not configured. The private key file could not be read." };
+    }
   }
   return {
     ok: true,
     config: {
-      appId: process.env.GOALIE_GITHUB_APP_ID as string,
+      appId,
       privateKey,
       api: (process.env.GOALIE_GITHUB_API?.trim() || "https://api.github.com").replace(/\/$/, ""),
-      publicUrl: (process.env.GOALIE_PUBLIC_URL as string).trim().replace(/\/$/, ""),
+      publicUrl,
     },
   };
 }
@@ -674,7 +762,7 @@ export async function createGitHubIssue(db: DatabaseSync, workItemId: string, re
   const item = read(db, "work_item", workItemId);
   if (item === undefined) return { error: `no work item ${workItemId}` };
   if (!issueRepoAllowed(db, item.goal, repo)) return { error: `${repo} is not in scope on this goal.` };
-  const ready = configuredGitHub();
+  const ready = configuredGitHub(db);
   if (!ready.ok) return { error: ready.error };
   const match = SCOPE_ENTRY.exec(repo);
   if (match === null) return { error: `${repo} is not in scope on this goal.` };

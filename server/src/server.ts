@@ -7,7 +7,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
 import type { ActorRef, ApiError, CommandsResponse, FormOptions, GitHubRefResponse, GitHubSearchResponse, GitHubStatusResponse, GoalEventsResponse, GoalPageResponse, PrioritiesResponse, WorkResponse } from "./api.ts";
 import { runCommands } from "./commands.ts";
-import { drainGitHub, githubView, readGitHubRef, searchGitHub } from "./github.ts";
+import { drainGitHub, githubView, readGitHubRef, saveGitHubSettings, searchGitHub } from "./github.ts";
 import { receiveGitHubWebhook } from "./github_notice.ts";
 import { goalEvents, goalPage } from "./goalpage.ts";
 import { eventStream } from "./live.ts";
@@ -112,6 +112,25 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
     if (c.get("actor").id !== goalieOwner(db)) return refuse(c, 403, "forbidden", "only the GOALIE owner can see GitHub");
     return c.json<GitHubStatusResponse>(githubView(db));
   });
+  app.post(
+    "/api/github/status",
+    async (c, next) => {
+      if (!(c.req.header("Content-Type") ?? "").toLowerCase().startsWith("application/json")) return refuse(c, 415, "bad_command", "a write is sent as application/json");
+      const origin = c.req.header("Origin");
+      const host = c.req.header("X-Forwarded-Host") ?? c.req.header("Host");
+      if (origin !== undefined && origin !== "null" && hostOf(origin) !== host) return refuse(c, 403, "forbidden", `a write from ${origin} is refused`);
+      if (origin === "null") return refuse(c, 403, "forbidden", "a write from an opaque origin is refused");
+      await next();
+    },
+    bodyLimit({ maxSize: MAX_BODY, onError: (c) => refuse(c, 413, "bad_command", `a request body is at most ${MAX_BODY / 1024} KB`) }),
+    async (c) => {
+      if (c.get("actor").id !== goalieOwner(db)) return refuse(c, 403, "forbidden", "only the GOALIE owner can set GitHub");
+      const request: unknown = await c.req.json().catch(() => undefined);
+      const saved = saveGitHubSettings(db, request);
+      if (!saved.ok) return refuse(c, 400, "bad_request", saved.reason);
+      return c.json<GitHubStatusResponse>(githubView(db));
+    },
+  );
   app.get("/api/github/search", async (c) => {
     const goal = c.req.query("goal") ?? "";
     if (read(db, "goal", goal) === undefined) return refuse(c, 404, "not_found", `no goal ${goal}`);

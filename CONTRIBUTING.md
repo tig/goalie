@@ -50,6 +50,10 @@ A deployment's issuer list lives with its host configuration, not in this repo. 
 Tests do not need Entra. `server/tests/sign_token.mjs` signs tokens with a fresh key, and the test sets a test issuer with that key inline in `jwks`.
 Every token is still verified: RS256 signature, issuer, audience, and expiry.
 `GOALIE_GITHUB_APP_ID`, `GOALIE_GITHUB_INSTALLATION_ID`, `GOALIE_GITHUB_PRIVATE_KEY_FILE`, and `GOALIE_PUBLIC_URL` configure the GitHub App ([ADR 0012](docs/adr/0012-github-app.md)).
+The GitHub page stores an app id, an installation id, a private key, and a public URL.
+A stored value is used.
+A value not stored there uses the process name.
+The page shows no private key.
 The owner setting `github_repos` names the repositories in scope. An entry is `owner/repo` or `owner/*`.
 `GOALIE_GITHUB_PRIVATE_KEY_FILE` is a path. The key stays out of this repo.
 `GOALIE_PUBLIC_URL` is the base URL of this deployment, with no trailing slash. The issue body links back through it.

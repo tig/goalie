@@ -22,6 +22,8 @@
 
 **Amended:** 2026-11-06. A GitHub issue or pull request reference in a repository that is in `github_repos` and on that goal shows that issue's title and whether it is open or closed. A bare repository name is a link only when that goal has exactly one such repository of that name. No repository name is assumed. A failed read does not invent open or closed.
 
+**Amended:** 2026-11-06. The GOALIE owner sets the app id, the installation id, the private key, and the public URL on the GitHub page. A value set there is kept in the store. A value not set there uses the process name. Clearing the app id, the installation id, or the public URL removes that stored value. A blank private key leaves the stored private key. Pasting a private key replaces it. The page shows no private key. The save is not an Event.
+
 ## Context
 
 [#72 (Enable Github integration)](https://github.com/tig/goalie/issues/72) pushes a work item's status to one linked GitHub issue.
@@ -34,6 +36,14 @@ The private key must stay off this repo.
 The deployment calls GitHub as a GitHub App.
 Process configuration names the app id, the installation id, the path of the private key, and the public URL of this deployment.
 The private key is a file outside this repo.
+The GOALIE owner sets the app id, the installation id, the private key, and the public URL on the GitHub page.
+A value set there is kept in the store.
+A value not set there uses the process name.
+Clearing the app id, the installation id, or the public URL removes that stored value.
+A blank private key leaves the stored private key.
+Pasting a private key replaces it.
+The page shows no private key.
+The save is not an Event.
 The owner setting `github_repos` names the repositories in scope. An entry is `owner/repo` or `owner/*`.
 When owner settings have no `github_repos` list, the repository named in process configuration is in scope. A written list, including an empty list, is the scope.
 A goal's repositories are the `repo` entries on its work product.
