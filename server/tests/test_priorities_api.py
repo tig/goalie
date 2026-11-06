@@ -197,7 +197,7 @@ class PrioritiesDefinitionTests(unittest.TestCase):
         self.assertTrue(self.goals["XW-0090"]["counted"])
 
     def test_an_empty_priority_is_listed_below_the_cut_line_with_its_rank(self) -> None:
-        self.assertEqual(self.body["backlog"][0], {"id": "PRI-4", "version": 1, "rank": 4, "title": "An empty Priority", "goals": []})
+        self.assertEqual(self.body["backlog"][0], {"id": "PRI-4", "version": 1, "rank": 4, "title": "An empty Priority", "period": "2026-Q4", "goals": []})
 
     def test_an_open_top_goal_with_no_priority_is_listed_under_unprioritized_with_its_tree(self) -> None:
         # Rule 35b: Home shows these in a No priority group, so a new goal is on Home and can be dragged to a Priority.

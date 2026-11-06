@@ -295,7 +295,8 @@ class FeedbackMenuTests(unittest.TestCase):
         with signed_app("seed/build-team.json") as (open_page, api):
             first = api("/api/priorities")["funded"][0]
             goal = first["goals"][0]
-            cls.goal = {"label": goal["summary"], "id": goal["id"], "kind": "goal", "breadcrumb": ["Home", first["title"]]}
+            # Rule 10b: Home shows no Priority title, so a goal on Home sits directly under Home.
+            cls.goal = {"label": goal["summary"], "id": goal["id"], "kind": "goal", "breadcrumb": ["Home"]}
             cls.owner = goal["owner"]
             pages = (RIGHT_CLICK_A_GOAL, keyboard("F10", True), keyboard("ContextMenu", False), ESCAPE, TOP_BAR_BUTTON, TEXT_FIELD, BOTH_MENUS, FOCUS_BACK, OUTSIDE_CLICK, MARK, CHROME, AVATAR)
             cls.picked, cls.shift_f10, cls.menu_key, cls.escape, cls.top_bar, cls.field, cls.both, cls.back, cls.outside, cls.mark, cls.chrome, cls.avatar = (open_page(1280, s) for s in pages)
