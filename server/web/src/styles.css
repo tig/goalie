@@ -133,7 +133,6 @@ h1{font-size:26px;font-weight:800;margin:0 0 20px}
 .fade.after{right:0;background:linear-gradient(to left,var(--card),transparent)}
 .more-before>.fade.before,.more-after>.fade.after{opacity:1}
 .tl{position:relative;width:calc(var(--left) + var(--gap) + var(--weeks) * var(--week))}
-.tlbody>.cut{background:var(--card);z-index:2}
 .row.note{min-height:40px}.row.note .lane{background:none}.row.note .title{font-weight:500;font-size:13px}
 .row>.left,.axis>.corner{position:sticky;left:0;z-index:7;background:var(--card);padding-right:var(--gap);box-shadow:10px 0 10px -10px var(--tip-shadow)}
 .axis{display:grid;grid-template-columns:calc(var(--left) + var(--gap)) calc(var(--weeks) * var(--week));height:52px}
@@ -193,10 +192,6 @@ background-image:repeating-linear-gradient(to right,var(--grid) 0 1px,transparen
 .edge>.ticklbl,.edge>.endlbl{position:static;font-size:inherit;font-weight:inherit}
 .edge.after{transform:translateX(-100%)}
 .edge.Ambition{color:var(--ambition-ink)}.edge.Fantasy{color:var(--fantasy-ink)}
-.cut{position:relative;z-index:6;display:flex;align-items:center;gap:10px;margin:0;padding:12px 0 6px;color:var(--mute);font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
-.cut::before,.cut::after{content:"";flex:1;border-top:1.5px dashed var(--cut)}
-.cut::before{flex:0 0 24px}
-.cut span{position:sticky;left:12px;background:var(--card);padding:0 4px}
 .legend{display:flex;flex-wrap:wrap;gap:6px 20px;justify-content:flex-end;margin-top:12px;font-size:12px;color:var(--mute)}
 .lg{position:relative;display:inline-flex;align-items:center;gap:7px}
 .lg .help{margin-left:0}
@@ -862,9 +857,9 @@ main.newgoal{padding-bottom:84px}
 .row.phead>.left{background:var(--green-tint)}
 .row.phead .title{font-weight:800;color:var(--ink)}
 .row.phead .rnum{color:var(--ink);font-weight:700}
-.nonegroup .row.phead,.nonegroup .row.phead>.left{background:var(--card)}
+.nonegroup .row.phead,.nonegroup .row.phead>.left,.backloggroup .row.phead,.backloggroup .row.phead>.left{background:var(--card)}
 .dotgap{display:inline-block;width:10px;flex:none}
-.nonegroup{margin-top:4px}
+.nonegroup,.backloggroup{margin-top:4px}
 .movenote{position:fixed;left:20px;bottom:20px;z-index:40;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;max-width:min(680px,calc(100vw - 32px));box-sizing:border-box;padding:10px 14px;border-radius:14px;background:var(--card);border:1px solid var(--line);box-shadow:0 8px 24px rgba(31,45,38,.16);font-size:13px}
 .movenote .moveitem{font-weight:700}
 .movenote.bad{border-color:var(--red-bg)}

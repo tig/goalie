@@ -62,6 +62,23 @@ class PriorityRankTests(unittest.TestCase):
         self.assertEqual(status, 200, body)
         self.assertEqual([self.store.read("priority", key)["cut_line"] for key in ("PRI-1", "PRI-2", "PRI-3")], [None, None, True])
 
+    def test_the_list_owner_moves_the_cut_line_in_one_batch(self) -> None:
+        # Rule 35b: Home keeps the Backlog in its place, so a move writes the cut line onto the last Priority above it.
+        def cut(key: str, value: bool, version: int = 1) -> dict[str, Any]:
+            return {"op": "update", "kind": "priority", "id": key, "base_version": version, "fields": {"cut_line": value}, "reason": "Moved on Home."}
+
+        status, body = self.send("chelsea", [cut("PRI-3", False), cut("PRI-2", True)])
+        self.assertEqual(status, 422, body)
+        self.assertIn("owner-ranks-priorities", self.rules(body))
+        status, body = self.send("tig", [cut("PRI-3", False), cut("PRI-2", True)])
+        self.assertEqual(status, 200, body)
+        self.assertEqual([self.store.read("priority", key)["cut_line"] for key in ("PRI-1", "PRI-2", "PRI-3")], [None, True, False])
+        # A new Priority can take the cut line as it is made.
+        new = {"op": "create", "kind": "priority", "fields": {"org_unit": "excaliwire", "period": "2026-Q4", "rank": 4, "title": "X", "cut_line": True}, "reason": "Moved on Home."}
+        status, body = self.send("tig", [cut("PRI-2", False, 2), new])
+        self.assertEqual(status, 200, body)
+        self.assertEqual(self.store.read("priority", "PRI-4")["cut_line"], True)
+
     def test_ranks_end_one_to_n_with_no_gap_and_no_tie(self) -> None:
         status, body = self.send("tig", [rank("PRI-1", 1, 5)])
         self.assertEqual(status, 422, body)
@@ -105,12 +122,12 @@ class PriorityRankTests(unittest.TestCase):
         self.assertEqual(status, 422, body)
         self.assertIn("owner-ranks-priorities", self.rules(body))
 
-    def test_the_api_changes_only_a_priority_rank_or_makes_one_with_its_list_period_rank_and_title(self) -> None:
+    def test_the_api_changes_only_a_priority_rank_or_cut_line_or_makes_one_with_its_list_period_rank_and_title(self) -> None:
         status, body = self.send("tig", [{"op": "update", "kind": "priority", "id": "PRI-1", "base_version": 1, "fields": {"title": "Renamed"}, "reason": "No"}])
         self.assertEqual(status, 400, body)
         status, body = self.send("tig", [{"op": "create", "kind": "priority", "fields": {"rank": 4}, "reason": "No"}])
         self.assertEqual(status, 400, body)
-        status, body = self.send("tig", [{"op": "create", "kind": "priority", "fields": {"org_unit": "excaliwire", "period": "2026-Q4", "rank": 4, "title": "X", "cut_line": True}, "reason": "No"}])
+        status, body = self.send("tig", [{"op": "create", "kind": "priority", "fields": {"org_unit": "excaliwire", "period": "2026-Q4", "rank": 4, "title": "X", "description": "Y"}, "reason": "No"}])
         self.assertEqual(status, 400, body)
         with sqlite3.connect(self.store.path) as db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM priority").fetchone()[0], 3)

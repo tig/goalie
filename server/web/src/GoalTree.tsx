@@ -2,7 +2,7 @@ import { useState, type CSSProperties, type ReactNode } from "react";
 import type { ActorRef, Health } from "../../src/api.ts";
 import { isLit, type GoalRow, type PriorityRow } from "./model/filter.ts";
 import { dateLabel, listDates, slipLabel } from "./model/labels.ts";
-import { canMove, changes, edgeOf, movedWords, moveWords, nextSpot, spotAt, toNumber, zoneOf, type Place, type Spot } from "./model/arrange.ts";
+import { backlogTop, canMove, changes, edgeOf, movedWords, moveWords, nextSpot, spotAt, zoneOf, type Place, type Spot } from "./model/arrange.ts";
 import { nameHover } from "./model/goalpage.ts";
 import { goalPath } from "./model/route.ts";
 import { Link, navigate } from "./router.tsx";
@@ -29,6 +29,8 @@ export type TreeProps = {
   mark?: boolean;
   /** Rule 10b: the top goals on Priorities, in order, unfiltered. A goal's number is its place here. */
   numbered: string[];
+  /** How many of `numbered` are above the cut line (SPEC.md §6.3). The rest show under Backlog. */
+  split: number;
   /** Rule 35b: the open top goals with no Priority, drawn last as No priority. */
   none?: GoalRow[];
   /** Rule 35b: drag a goal to arrange it, for a goal the actor may change and with no filter on. A goal takes a number only when `rank` is true. `save` answers an error to show, or nothing. */
@@ -70,7 +72,7 @@ function When({ goal, today, chip }: { goal: GoalRow; today: string; chip?: Reac
 }
 
 /**
- * The numbered goals above the cut line, the cut line, the ones below it, then No priority. Every row has the same columns: number, health, title, count, owner.
+ * The numbered goals above the cut line, then the ones below it under Backlog when there are any, then No priority. Every row has the same columns: number, health, title, count, owner.
  * A top-level goal starts open, a deeper one closed. A filter opens every level. The List and the Timeline share it.
  */
 export function GoalTree(props: TreeProps) {
@@ -101,6 +103,7 @@ export function GoalTree(props: TreeProps) {
           data-gid={g.id}
           data-parent={parent ?? undefined}
           data-index={parent === null && rank !== undefined ? rank - 1 : undefined}
+          data-backlog={parent === null && rank !== undefined && rank > props.split ? "" : undefined}
           style={{ "--depth": g.depth, "--hc": look(g.health).bar } as CSSProperties}
           // Rule 19: a press anywhere on the row opens the goal, except on the count chip and the controls in it; the end of a pan is swallowed before it gets here (rule 20d).
           role="link"
@@ -168,28 +171,33 @@ export function GoalTree(props: TreeProps) {
     if (row && row.dataset.gid !== self) {
       const r = row.getBoundingClientRect();
       const at = row.dataset.index === undefined ? null : Number(row.dataset.index);
+      const inBacklog = row.dataset.backlog !== undefined;
       const edge = edgeOf(y, r.top, r.height);
       const zone = zoneOf(y, r.top, r.height);
       // A goal goes under another only when the actor may change that one too; else a numbered row offers its place in the list.
-      const spot = spotAt({ goal: row.dataset.gid as string, parent: row.dataset.parent ?? null, index: at }, zone === "in" && !mayIds.has(row.dataset.gid as string) ? "edge" : zone, edge, ids, self);
+      const spot = spotAt({ goal: row.dataset.gid as string, parent: row.dataset.parent ?? null, index: at, backlog: inBacklog }, zone === "in" && !mayIds.has(row.dataset.gid as string) ? "edge" : zone, edge, ids, self);
       const under = target(spot);
       if ((under && !mayIds.has(under)) || (spot.kind === "at" && !ranks)) return null;
       return { spot, row: row.dataset.gid, zone: spot.kind === "into" ? "in" : "edge", edge };
     }
     if (!row && el?.closest(".group[data-gpid=none]")) return { spot: { kind: "none" } };
+    if (!row && ranks && el?.closest(".group[data-gpid=backlog]")) return { spot: backlogTop(ids, props.split, self) };
     return null;
   };
   /** Where a goal was, as a spot from the list as it is now, so Undo puts it back. */
-  const back = (from: Place, goal: string): Spot => (from.parent ? { kind: "into", goal: from.parent } : from.index !== null ? toNumber(ids, goal, from.index + 1) : { kind: "none" });
+  const back = (from: Place): Spot => (from.parent ? { kind: "into", goal: from.parent } : from.index !== null ? { kind: "at", number: from.index + 1, backlog: from.backlog } : { kind: "none" });
   const commit = async (goal: string, from: Place, spot: Spot) => {
     setKeyed(null);
-    if (!props.arrange || !changes(from, spot) || !canMove(trees, goal, spot)) return;
+    if (!props.arrange || !changes(from, spot) || !canMove(trees, goal, spot, ids, props.split)) return;
     const what = moveWords(spot, names);
     setNote({ goal, what, done: false });
     const failed = await props.arrange.save(goal, spot, `Moved on Home. ${what}.`);
     setNote(failed ? { goal, what, done: false, error: failed } : { goal, what, spot, done: true, undo: from });
   };
-  const placeOf = (goal: string, parent: string | null): Place => ({ index: parent === null && ids.includes(goal) ? ids.indexOf(goal) : null, parent });
+  const placeOf = (goal: string, parent: string | null): Place => {
+    const index = parent === null && ids.includes(goal) ? ids.indexOf(goal) : null;
+    return { index, backlog: index !== null && index >= props.split, parent };
+  };
   const grip = (g: GoalRow, parent: string | null, rank?: number) => {
     if (!props.arrange || filtering) return null;
     // A goal this actor may not move shows a dimmed grip that says who may, so a missing grip is never a mystery.
@@ -223,7 +231,7 @@ export function GoalTree(props: TreeProps) {
         onPointerMove={(e) => {
           if (moving !== g.id) return;
           const at = spotUnder(e.clientX, e.clientY, g.id);
-          setOver(at && canMove(trees, g.id, at.spot) && changes(from, at.spot) ? { ...at, x: e.clientX, y: e.clientY } : null);
+          setOver(at && canMove(trees, g.id, at.spot, ids, props.split) && changes(from, at.spot) ? { ...at, x: e.clientX, y: e.clientY } : null);
         }}
         onPointerUp={() => {
           if (moving === g.id && over) void commit(g.id, from, over.spot);
@@ -243,13 +251,11 @@ export function GoalTree(props: TreeProps) {
           if (e.key === "Escape" && keyed) return setKeyed(null);
           if ((e.key !== "ArrowUp" && e.key !== "ArrowDown") || parent || rank === undefined && from.index === null && e.key === "ArrowDown") return;
           e.preventDefault();
-          const now = keyed?.goal === g.id ? keyed.spot : null;
-          const list = now?.kind === "at" ? ids.filter((id) => id !== g.id).toSpliced(now.number - 1, 0, g.id) : now?.kind === "none" ? ids.filter((id) => id !== g.id) : ids;
-          const spot = nextSpot(list, g.id, e.key === "ArrowUp" ? -1 : 1);
-          const real = spot?.kind === "at" ? toNumber(ids, g.id, spot.number) : spot;
+          const now = keyed?.goal === g.id ? keyed.spot : back(from);
+          const spot = nextSpot(ids, props.split, g.id, now, e.key === "ArrowUp" ? -1 : 1);
           setNote(null);
-          if (!real || (real.kind === "at" && !ranks)) return;
-          setKeyed(changes(from, real) ? { goal: g.id, from, spot: real } : null);
+          if (!spot || (spot.kind === "at" && !ranks)) return;
+          setKeyed(changes(from, spot) ? { goal: g.id, from, spot } : null);
         }}
       >
         <svg width="10" height="14" viewBox="0 0 10 14" aria-hidden="true">
@@ -277,7 +283,7 @@ export function GoalTree(props: TreeProps) {
         {!note.done && !note.error && <span className="small"> Saving…</span>}
         {note.error && <span className="ferror">Not moved. {note.error.replace(/^[a-z0-9_-]+: /, "")}</span>}
         {note.undo && (
-          <button type="button" className="btn" onClick={() => note.undo && void commit(note.goal, placeOf(note.goal, note.spot?.kind === "into" ? note.spot.goal : note.spot?.kind === "beside" ? note.spot.parent : null), back(note.undo, note.goal))}>
+          <button type="button" className="btn" onClick={() => note.undo && void commit(note.goal, placeOf(note.goal, note.spot?.kind === "into" ? note.spot.goal : note.spot?.kind === "beside" ? note.spot.parent : null), back(note.undo))}>
             Undo
           </button>
         )}
@@ -296,12 +302,22 @@ export function GoalTree(props: TreeProps) {
     <>
       {numberedRows(funded)}
       {filtering && !hasFunded && !hasBacklog && <Note text="No goals match." blank={blank} />}
-      {!filtering && !hasFunded && <Note text={props.arrange?.rank ? "No numbered goals. Drag a goal here to give it number 1." : "No numbered goals above the cut line."} blank={blank} />}
-      {/* The cut line (SPEC.md §6.3), named once. */}
-      <div className="cut">
-        <span>✂ Cut line</span>
-      </div>
-      {hasBacklog ? numberedRows(backlog) : !filtering && <Note text="No numbered goals below the cut line." blank={blank} />}
+      {!filtering && !hasFunded && <Note text={props.arrange?.rank ? "No numbered goals. Drag a goal here to give it number 1." : "No numbered goals."} blank={blank} />}
+      {/* The numbered goals below the cut line (SPEC.md §6.3) show under Backlog. With none, Backlog shows only while a goal is dragged, as a place to drop it. */}
+      {(hasBacklog || (moving && ranks)) && (
+        <div className={`group backloggroup${over && !over.row && over.spot.kind === "at" && over.spot.backlog ? " droptop" : ""}`} data-gpid="backlog" data-focus={encodeFocus({ kind: "section", id: "Backlog", label: "Backlog" })}>
+          <div className="row d0 phead nonehead" style={{ "--depth": 0 } as CSSProperties}>
+            <div className="left">
+              <Rank />
+              <span className="title">Backlog</span>
+              <span className="slot" />
+            </div>
+            {blank}
+          </div>
+          {numberedRows(backlog)}
+          {!hasBacklog && <Note text="Drag a goal here to move it to the Backlog." blank={blank} />}
+        </div>
+      )}
       {!(moving && over) && moveNote()}
       {moving && over && (
         // While dragging, what the drop will do shows where the saved note shows, so it covers nothing on the board.

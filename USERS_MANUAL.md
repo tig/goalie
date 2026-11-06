@@ -176,6 +176,7 @@ The GOALIE owner inspects these each quarter and changes the configuration, revi
 
 **Re-rank priorities**
 - Do it in the scheduled review. On Home, drag a goal to its new number; GOALIE writes the reason and numbers the list 1 to n.
+- On Home, the entries below the cut line show under **Backlog**. Drag a goal onto Backlog to put it below the line, or beside a goal above it to fund it. Backlog shows only when it holds a goal, or while you drag one.
 - Retire entries that nothing maps to.
 - Keep no more than ‹4› entries above the cut line.
 

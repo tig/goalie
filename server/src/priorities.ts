@@ -124,7 +124,7 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, todayIso: stri
 
   const cut = priorities.findIndex((p) => p.cut_line === true);
   const built = tops.map((list, i) => list.map((g) => goalOf(g, cut === -1 || i <= cut)));
-  const rows: ApiPriority[] = priorities.map((p, i) => ({ id: p.id as string, version: p.version as number, rank: p.rank as number, title: p.title as string, period: p.period as string, goals: built[i] }));
+  const rows: ApiPriority[] = priorities.map((p, i) => ({ id: p.id as string, version: p.version as number, rank: p.rank as number, title: p.title as string, period: p.period as string, cut_line: p.cut_line === true, goals: built[i] }));
   const funded = cut === -1 ? rows : rows.slice(0, cut + 1);
   const backlog = cut === -1 ? [] : rows.slice(cut + 1);
   // Rule 35b: an open top goal with no Priority, with its tree. Home shows these as No priority, so a new goal is there to drag.

@@ -174,10 +174,12 @@ function resolve(at: number, raw: unknown, ids: Record<Ref, string>, refused: Se
     if (!(value in ids)) throw bad(at, `unknown-ref: ${value} is used before the command that creates it`);
     return ids[value];
   };
-  // Rule 35b: on Home each numbered goal is its own Priority. The API ranks a Priority, or makes one with a list, a period, a rank, and a title.
+  // Rule 35b: on Home each numbered goal is its own Priority. The API ranks a Priority and moves the cut line, or makes one with a list, a period, a rank, a title, and the cut line if it has it.
   const priorityFields = isObject(raw.fields) ? Object.keys(raw.fields).sort().join() : "";
-  if (kind === "priority" && !((raw.op === "update" && priorityFields === "rank") || (raw.op === "create" && priorityFields === "org_unit,period,rank,title"))) {
-    throw bad(at, "api-kind: through the API a Priority takes an update of its rank, or a create with org_unit, period, rank, and title");
+  const updates = ["rank", "cut_line", "cut_line,rank"];
+  const creates = ["org_unit,period,rank,title", "cut_line,org_unit,period,rank,title"];
+  if (kind === "priority" && !((raw.op === "update" && updates.includes(priorityFields)) || (raw.op === "create" && creates.includes(priorityFields)))) {
+    throw bad(at, "api-kind: through the API a Priority takes an update of its rank or cut_line, or a create with org_unit, period, rank, title, and an optional cut_line");
   }
   if (raw.op === "comment") return { op: "comment", kind, id: key(raw.id) as string, text: raw.text as string };
   if (raw.op === "create" && raw.ref !== undefined && (!isRef(raw.ref) || raw.ref in ids || refused.has(raw.ref))) throw bad(at, `ref ${String(raw.ref)} must be "$" and a word, used once`);
