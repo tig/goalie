@@ -354,6 +354,7 @@ class GitHubActorTests(unittest.TestCase):
 
 
 # Relink the work item after setStatus has read it and before it writes. The retry must notice.
+# The relink queues the new issue at Backlog. The retry does not write the work item.
 STALE_RETRY = r"""
 import { openStore } from "./src/store.ts";
 import { read } from "./src/read.ts";
@@ -386,7 +387,7 @@ const after = read(db, "work_item", "WI-9301");
 const push = db.prepare("SELECT issue, status FROM github_push WHERE work_item = ?").get("WI-9301");
 const statusEvent = db.prepare("SELECT actor, new FROM event WHERE entity = ? AND field = 'status' AND actor = 'github'").get("WI-9301");
 if (!relinked || after.status !== "Backlog" || after.links[0] !== other || statusEvent) fail({ step: "retry", relinked, status: after.status, links: after.links, push, statusEvent });
-if (push && (push.issue !== issue || push.status !== "Backlog")) fail({ step: "push", push });
+if (!push || push.issue !== other || push.status !== "Backlog") fail({ step: "push", push });
 db.close();
 process.stdout.write("ok");
 """
@@ -511,7 +512,7 @@ class GitHubWebhookLiveTests(unittest.TestCase):
 
 
 class GitHubWebhookRetryTests(unittest.TestCase):
-    """A stale retry writes nothing when the work item no longer names the delivered issue."""
+    """A stale retry writes nothing when the work item no longer names the delivered issue. The relink queues the new issue at the current status."""
 
     def test_a_stale_retry_does_not_write_a_relinked_work_item(self) -> None:
         store = Store()
