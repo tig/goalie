@@ -1111,6 +1111,21 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertEqual(self.github.issue["state"], "closed")
         self.assertEqual(self.github.issue["state_reason"], "completed")
 
+    def test_a_completed_create_with_a_selected_issue_closes_it(self) -> None:
+        """A Completed create that already links an in-scope issue closes that issue as completed."""
+        set_scope(self.store, ["tig/goalie"], [{"repo": "github.com/tig/goalie"}])
+        item = "WI-9096"
+        command = create("work_item", item, self.item([ISSUE], "Completed"), "Filed")
+        self.assertNotIn("github_repo", command)
+        self.github.calls.clear()
+        created = self.write(command)
+        self.assertTrue(created["ok"], created)
+        stored = self.store.read("work_item", item)
+        self.assertEqual(stored["status"], "Completed")
+        self.assertEqual(stored["links"], [ISSUE])
+        self.assertIn("PATCH /repos/tig/goalie/issues/72", self.github.calls)
+        self.assertEqual(self.github.issue["state_reason"], "completed")
+
     def test_a_completed_work_item_that_gains_an_issue_link_closes_it(self) -> None:
         """Choosing an issue on a Completed work item queues that status. The issue closes as completed. A pull request does not."""
         item = "WI-9086"
