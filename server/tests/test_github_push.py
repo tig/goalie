@@ -89,6 +89,8 @@ class GitHub(ThreadingHTTPServer):
         self.issue_url: str | None = None
         self.opened_issue: dict[str, Any] | None = None
         self.opened_path: str | None = None
+        self.added_issue: dict[str, Any] | None = None
+        self.added_path: str | None = None
         self.label_body: dict[str, Any] | None = None
         self.before_issue: Callable[[], None] | None = None
         self.during_search: Callable[[], None] | None = None
@@ -116,8 +118,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/repos/excaliwire/factory/installation":
             self._send(200, {"id": 88})
             return
-        if path == f"/repos/{REPO}/issues/72":
-            self._issue(self.server.issue)
+        tracked = self._tracked(path)
+        if tracked is not None:
+            self._issue(tracked)
             return
         if self.server.opened_issue is not None and path == self.server.opened_path:
             self._issue(self.server.opened_issue)
@@ -133,10 +136,11 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self._send(201, {"token": self.server.token})
             return
-        if path == f"/repos/{REPO}/issues/72/labels":
+        labeled = self._tracked(path[: -len("/labels")]) if path.endswith("/labels") else None
+        if labeled is not None:
             for name in body.get("labels", []):
-                if name not in self.server.issue["labels"]:
-                    self.server.issue["labels"].append(name)
+                if name not in labeled["labels"]:
+                    labeled["labels"].append(name)
             self._send(200, {})
             return
         if path.startswith("/repos/") and path.endswith("/labels") and "/issues/" in path:
@@ -173,8 +177,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_PATCH(self) -> None:
         self._call()
         path = self._path()
-        if path == f"/repos/{REPO}/issues/72":
-            self._patch(self.server.issue)
+        tracked = self._tracked(path)
+        if tracked is not None:
+            self._patch(tracked)
             return
         if self.server.opened_issue is not None and path == self.server.opened_path:
             self._patch(self.server.opened_issue)
@@ -184,8 +189,10 @@ class Handler(BaseHTTPRequestHandler):
     def do_DELETE(self) -> None:
         self._call()
         path = self._path()
-        if self._remove_label(path, f"/repos/{REPO}/issues/72/labels/", self.server.issue):
-            return
+        if "/labels/" in path:
+            owner = self._tracked(path.split("/labels/", 1)[0])
+            if owner is not None and self._remove_label(path, path.split("/labels/", 1)[0] + "/labels/", owner):
+                return
         opened = self.server.opened_issue
         if opened is not None and self.server.opened_path is not None and self._remove_label(path, f"{self.server.opened_path}/labels/", opened):
             return
@@ -206,6 +213,13 @@ class Handler(BaseHTTPRequestHandler):
         if hook is not None:
             hook()
         self._send(200, {"items": items})
+
+    def _tracked(self, path: str) -> dict[str, Any] | None:
+        if path == f"/repos/{REPO}/issues/72":
+            return self.server.issue
+        if self.server.added_issue is not None and path == self.server.added_path:
+            return self.server.added_issue
+        return None
 
     def _issue(self, issue: dict[str, Any]) -> None:
         self._send(200, {"body": issue["body"], "state": issue["state"], "state_reason": issue["state_reason"], "labels": [{"name": name} for name in issue["labels"]]})
@@ -342,6 +356,8 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.github.issue_url = None
         self.github.opened_issue = None
         self.github.opened_path = None
+        self.github.added_issue = None
+        self.github.added_path = None
         self.github.label_body = None
         self.github.before_issue = None
         self.github.during_search = None
@@ -917,6 +933,26 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertEqual(self.github.calls, [])
         self.assertEqual(self.github.issue["state"], "closed")
         self.assertEqual(self.github.issue["state_reason"], "completed")
+
+    def test_a_newly_added_issue_gets_the_current_status(self) -> None:
+        """A work item that already links issue 72, then gains a second in-scope issue and does not change status, patches that issue with the current status."""
+        item = "WI-9087"
+        added = f"https://github.com/{REPO}/issues/81"
+        self.github.added_issue = {"body": "Keep this.", "state": "open", "state_reason": None, "labels": ["pinned"]}
+        self.github.added_path = f"/repos/{REPO}/issues/81"
+        created = self.write(create("work_item", item, self.item([ISSUE], "In Progress"), "Filed"))
+        self.assertTrue(created["ok"], created)
+        self.assertEqual(self.store.read("work_item", item)["status"], "In Progress")
+        self.github.calls.clear()
+        linked = self.write(update("work_item", item, 1, {"links": [ISSUE, added]}, "Attach"))
+        self.assertTrue(linked["ok"], linked)
+        self.assertEqual(self.store.read("work_item", item)["status"], "In Progress")
+        self.assertEqual(self.store.read("work_item", item)["links"], [ISSUE, added])
+        self.assertIn("PATCH /repos/tig/goalie/issues/81", self.github.calls)
+        self.assertNotIn("PATCH /repos/tig/goalie/issues/72", self.github.calls)
+        self.assertEqual(set(self.github.added_issue["labels"]), {"pinned", "In Progress"})
+        self.assertEqual(self.github.added_issue["state"], "open")
+        self.assertIsNone(self.error(item))
 
     def test_search_returns_an_issue_and_a_pull_on_the_goal(self) -> None:
         """Search returns an issue and a pull request in an in-scope repo, and nothing from a repo the goal does not name."""
