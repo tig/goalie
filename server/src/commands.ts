@@ -251,10 +251,14 @@ export async function attachGitHubIssues(db: DatabaseSync, today: string): Promi
       continue;
     }
     const found = await searchGitHub(db, item.goal, query);
+    // An incomplete search does not attach. The search response still lists the hits that completed.
+    if (found.error !== null) {
+      showFailure(found.error);
+      continue;
+    }
     const issue = found.items.find((hit) => hit.kind === "issue");
     if (issue === undefined) {
-      if (found.error !== null) showFailure(found.error);
-      else restore();
+      restore();
       continue;
     }
     const current = read(db, "work_item", row.work_item);

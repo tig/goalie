@@ -84,6 +84,7 @@ class GitHub(ThreadingHTTPServer):
         self.fail_token = False
         self.fail_issue = False
         self.fail_search = False
+        self.fail_search_repos: set[str] = set()
         self.installation_id = 77
         self.token = "ghs_test"
         self.opened: dict[str, Any] | None = None
@@ -207,6 +208,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send(500, {"message": "no"})
             return
         repos = [part.lower() for part in re.findall(r"repo:(\S+)", text)]
+        failed = {name.lower() for name in self.server.fail_search_repos}
+        if any(repo in failed for repo in repos):
+            self._send(500, {"message": "no"})
+            return
         items = []
         for hit in self.server.search:
             url = str(hit.get("html_url", "")).lower()
@@ -356,6 +361,7 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.github.fail_token = False
         self.github.fail_issue = False
         self.github.fail_search = False
+        self.github.fail_search_repos = set()
         self.github.installation_id = 77
         self.github.opened = None
         self.github.issue_url = None
@@ -1022,6 +1028,25 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertEqual(self.github.queries, [])
         self.assertFalse(any("/search/issues" in call for call in self.github.calls), self.github.calls)
         self.assertFalse(any("PATCH" in call for call in self.github.calls), self.github.calls)
+
+    def test_an_incomplete_search_does_not_attach_a_later_issue(self) -> None:
+        """The first repository answers 500. A later repository's issue is not attached. The search response still lists that issue."""
+        failing = "excaliwire/factory"
+        set_scope(self.store, [failing, REPO], [{"repo": f"github.com/{failing}"}, {"repo": f"github.com/{REPO}"}])
+        self.github.fail_search_repos = {failing}
+        self.github.search = [{"html_url": ISSUE, "title": "Enable Github integration"}]
+        item = "WI-9097"
+        created = self.write(create("work_item", item, {"goal": GOAL, "title": "Ship #72", "owner": "tig", "status": "Backlog"}, "Filed"))
+        self.assertTrue(created["ok"], created)
+        self.assertEqual(self.github.queries, [f"repo:{failing} 72", f"repo:{REPO} 72"])
+        stored = self.store.read("work_item", item)
+        self.assertNotIn(ISSUE, stored["links"] or [])
+        shown = next(row for row in self.goal_page()["workItems"] if row["id"] == item)
+        self.assertIn("GitHub answered 500", shown.get("github_error") or "")
+        self.assertFalse(any("PATCH" in call for call in self.github.calls), self.github.calls)
+        reply = self.search_as("chelsea", "sub-chelsea", GOAL, "72")
+        self.assertEqual(reply.status, 200, reply.body)
+        self.assertIn({"kind": "issue", "title": "Enable Github integration", "url": ISSUE}, json.loads(reply.body)["items"])
 
     def test_a_changed_hash_is_not_attached(self) -> None:
         """A search for #72 that finishes after the title is Ship #99 does not store that issue."""
