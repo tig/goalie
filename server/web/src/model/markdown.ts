@@ -27,22 +27,22 @@ function refText(owner: string, repo: string, n: string): string {
   return owner === ownerOf(repo) ? `${repo}#${n}` : `${owner}/${repo}#${n}`;
 }
 
-/** A trailing slash is the same issue. A query or a fragment is the same issue. */
-const ISSUE_URL = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)\/?(?:[?#][^\s]*)?$/;
+/** A trailing slash is the same issue or pull request. A query or a fragment is the same one. The href keeps issues or pull. */
+const GH_URL = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/(issues|pull)\/(\d+)\/?(?:[?#][^\s]*)?$/;
 
-/** Each GitHub issue named in a work item's links, once, in that order. The label is the short name Markdown already uses. */
+/** Each GitHub issue or pull request named in a work item's links, once, in that order. The label is the short name Markdown already uses. A pull request keeps its /pull/ URL. */
 export function githubIssues(links: string[] | null): { href: string; label: string }[] {
   if (!Array.isArray(links)) return [];
   const out: { href: string; label: string }[] = [];
   const seen = new Set<string>();
   for (const link of links) {
     if (typeof link !== "string") continue;
-    const match = ISSUE_URL.exec(link);
+    const match = GH_URL.exec(link);
     if (match === null) continue;
-    const href = `https://github.com/${match[1]}/${match[2]}/issues/${match[3]}`;
+    const href = `https://github.com/${match[1]}/${match[2]}/${match[3]}/${match[4]}`;
     if (seen.has(href)) continue;
     seen.add(href);
-    out.push({ href, label: refText(match[1], match[2], match[3]) });
+    out.push({ href, label: refText(match[1], match[2], match[4]) });
   }
   return out;
 }

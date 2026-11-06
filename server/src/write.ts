@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { ENTITIES, encode, goalieOwner, isKind, lookup, memoryLookup, read, readAll, readEvents, type EventRow, type Kind } from "./read.ts";
-import { issueRepoAllowed, queueGitHubAttach, queueGitHubCreate, queueGitHubPush } from "./github.ts";
+import { issueRepoAllowed, queueGitHubAttach, queueGitHubCreate, queueGitHubIssueLink, queueGitHubPush } from "./github.ts";
 import { DEFAULT_VISIBILITY, isOpen } from "./goal.ts";
 import { checkAuthor, checkTransition, checkWrite, goalLints, REASONED_KINDS, SYSTEM_FIELDS, type Row, type Violation } from "./rules.ts";
 
@@ -212,6 +212,7 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
     if (first === 0) first = Number(lastInsertRowid) - 1;
   }
   if (kind === "work_item" && changed.includes("status")) queueGitHubPush(db, after);
+  if (kind === "work_item" && changed.includes("links")) queueGitHubIssueLink(db, before, after);
   const repo = commandGitHubRepo(command);
   if (kind === "work_item" && repo !== undefined) queueGitHubCreate(db, after, repo, actor);
   if (kind === "work_item" && setsTitle(command)) queueGitHubAttach(db, after, actor);

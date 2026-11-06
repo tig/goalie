@@ -9,7 +9,7 @@ import { githubIssues, markdown, type Inline } from "./model/markdown.ts";
 
 /** The shared parts every view is built from. */
 
-/** Each GitHub issue named in a work item's links. The link opens that issue. */
+/** Each GitHub issue or pull request named in a work item's links. A pull request keeps its /pull/ URL. */
 export function IssueLinks({ links }: { links: string[] | null }) {
   const issues = githubIssues(links);
   if (issues.length === 0) return null;

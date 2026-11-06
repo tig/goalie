@@ -897,6 +897,27 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertEqual(self.github.issue["state"], "closed")
         self.assertEqual(self.github.issue["state_reason"], "completed")
 
+    def test_a_completed_work_item_that_gains_an_issue_link_closes_it(self) -> None:
+        """Choosing an issue on a Completed work item queues that status. The issue closes as completed. A pull request does not."""
+        item = "WI-9086"
+        created = self.write(create("work_item", item, self.item([], "Completed"), "Filed"))
+        self.assertTrue(created["ok"], created)
+        self.assertEqual(self.store.read("work_item", item)["status"], "Completed")
+        self.github.calls.clear()
+        chosen = self.write(update("work_item", item, 1, {"links": [ISSUE]}, "Attach"))
+        self.assertTrue(chosen["ok"], chosen)
+        self.assertEqual(self.store.read("work_item", item)["status"], "Completed")
+        self.assertEqual(self.store.read("work_item", item)["links"], [ISSUE])
+        self.assertEqual(self.github.issue["state"], "closed")
+        self.assertEqual(self.github.issue["state_reason"], "completed")
+        self.assertEqual(set(self.github.issue["labels"]), {"pinned", "Completed"})
+        self.github.calls.clear()
+        pulled = self.write(update("work_item", item, 2, {"links": [ISSUE, PULL]}, "Attach"))
+        self.assertTrue(pulled["ok"], pulled)
+        self.assertEqual(self.github.calls, [])
+        self.assertEqual(self.github.issue["state"], "closed")
+        self.assertEqual(self.github.issue["state_reason"], "completed")
+
     def test_search_returns_an_issue_and_a_pull_on_the_goal(self) -> None:
         """Search returns an issue and a pull request in an in-scope repo, and nothing from a repo the goal does not name."""
         set_scope(self.store, ["tig/*", "excaliwire/factory"], [{"repo": "github.com/tig/goalie"}, {"repo": "github.com/acme/other"}])

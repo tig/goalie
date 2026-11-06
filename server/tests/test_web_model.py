@@ -936,6 +936,7 @@ class MarkdownTests(unittest.TestCase):
         got = run(f"return markdown.githubIssues({json.dumps(links)});")
         self.assertEqual(got, [
             {"href": "https://github.com/tig/goalie/issues/72", "label": "goalie#72"},
+            {"href": "https://github.com/excaliwire/factory/pull/9", "label": "factory#9"},
             {"href": "https://github.com/someone/thing/issues/4", "label": "someone/thing#4"},
         ])
         self.assertEqual(run("return markdown.githubIssues(null);"), [])
@@ -947,7 +948,24 @@ class MarkdownTests(unittest.TestCase):
             "https://github.com/excaliwire/factory/pull/9#discussion_r1",
         ]
         got = run(f"return markdown.githubIssues({json.dumps(links)});")
-        self.assertEqual(got, [{"href": "https://github.com/tig/goalie/issues/72", "label": "goalie#72"}])
+        self.assertEqual(got, [
+            {"href": "https://github.com/tig/goalie/issues/72", "label": "goalie#72"},
+            {"href": "https://github.com/excaliwire/factory/pull/9", "label": "factory#9"},
+        ])
+
+    def test_a_saved_pull_request_stays_in_the_rendered_links(self) -> None:
+        """A saved pull request stays visible. The href is the /pull/ URL. The label is the short name."""
+        links = [
+            "https://github.com/tig/goalie/pull/72",
+            "https://github.com/tig/goalie/pull/72/",
+            "https://github.com/someone/thing/pull/4",
+            "notes",
+        ]
+        got = run(f"return markdown.githubIssues({json.dumps(links)});")
+        self.assertEqual(got, [
+            {"href": "https://github.com/tig/goalie/pull/72", "label": "goalie#72"},
+            {"href": "https://github.com/someone/thing/pull/4", "label": "someone/thing#4"},
+        ])
 
     def test_issue_links_stay_in_the_title_and_answer_a_coarse_tap(self) -> None:
         src = MODEL.parent
