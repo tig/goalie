@@ -14,6 +14,10 @@
 
 **Amended:** 2026-11-05. Add as Github Issue, beside Add, files the work item and opens an issue for it in one repository in `github_repos` and on that goal, with the work item's title, its status as the label, the status trailer as the body, and the issue URL on the work item, using that repository when there is one, asking for a pick when there are several, and hiding the button when there are none.
 
+**Amended:** 2026-11-05. Attach, on add and on edit, adds an existing issue or pull request in a repository that is in `github_repos` and on that goal, `#` in the title searches those repositories, the first issue attaches when the work item has no issue link, a pull request stays a link, and completing the work item closes an attached issue.
+
+**Amended:** 2026-11-05. An update that adds an issue URL in `github_repos` and on that goal, when that URL was not already in the work item's links, updates that issue the same way as a status change, at the work item's current status. An update that adds only a pull request does not. A work item list shows each pull request named in links, and that link keeps its `/pull/` URL.
+
 ## Context
 
 [#72 (Enable Github integration)](https://github.com/tig/goalie/issues/72) pushes a work item's status to one linked GitHub issue.
@@ -30,9 +34,12 @@ The owner setting `github_repos` names the repositories in scope. An entry is `o
 When owner settings have no `github_repos` list, the repository named in process configuration is in scope. A written list, including an empty list, is the scope.
 A goal's repositories are the `repo` entries on its work product.
 Add as Github Issue, beside Add, files the work item and opens an issue for it in one repository in `github_repos` and on that goal, with the work item's title, its status as the label, the status trailer as the body, and the issue URL on the work item, using that repository when there is one, asking for a pick when there are several, and hiding the button when there are none.
+Attach, on add and on edit, adds an existing issue or pull request in a repository that is in `github_repos` and on that goal, `#` in the title searches those repositories, the first issue attaches when the work item has no issue link, a pull request stays a link, and completing the work item closes an attached issue.
 A committed change of a work item's status, when its links name an issue in a repository that is in `github_repos` and on that goal, updates that issue after the commit.
 The update sets one status label, keeps a body trailer that links back to the work item, closes the issue as completed when the status is Completed, and closes it as not planned when the status is Deleted.
 The update is not an Event.
+An update that adds an issue URL in `github_repos` and on that goal, when that URL was not already in the work item's links, updates that issue the same way, at the work item's current status. An update that adds only a pull request does not.
+A work item list shows each pull request named in links, and that link keeps its `/pull/` URL.
 A failed update leaves the work item committed and shows the failure on the work item.
 A later open status does not reopen a closed issue.
 Tests call a stand-in API and hold no real key.

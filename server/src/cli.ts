@@ -47,9 +47,9 @@ async function run(db: DatabaseSync, args: string[]): Promise<number> {
         const repo = commandGitHubRepo(filed);
         const id = result.entity.id;
         // The link is a second write. Print that row, or the next update is stale.
-        if (repo !== undefined && typeof id === "string" && isKind(filed.kind)) {
+        if (typeof id === "string" && isKind(filed.kind)) {
           const current = read(db, filed.kind, id);
-          if (current !== undefined) result.entity = current;
+          if (current !== undefined && (repo !== undefined || current.version !== result.entity.version)) result.entity = current;
         }
       }
       print(result);

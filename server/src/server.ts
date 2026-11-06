@@ -5,9 +5,9 @@ import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
-import type { ActorRef, ApiError, CommandsResponse, FormOptions, GitHubStatusResponse, GoalEventsResponse, GoalPageResponse, PrioritiesResponse, WorkResponse } from "./api.ts";
+import type { ActorRef, ApiError, CommandsResponse, FormOptions, GitHubSearchResponse, GitHubStatusResponse, GoalEventsResponse, GoalPageResponse, PrioritiesResponse, WorkResponse } from "./api.ts";
 import { runCommands } from "./commands.ts";
-import { drainGitHub, githubView } from "./github.ts";
+import { drainGitHub, githubView, searchGitHub } from "./github.ts";
 import { receiveGitHubWebhook } from "./github_notice.ts";
 import { goalEvents, goalPage } from "./goalpage.ts";
 import { eventStream } from "./live.ts";
@@ -111,6 +111,12 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
   app.get("/api/github/status", (c) => {
     if (c.get("actor").id !== goalieOwner(db)) return refuse(c, 403, "forbidden", "only the GOALIE owner can see GitHub");
     return c.json<GitHubStatusResponse>(githubView(db));
+  });
+  app.get("/api/github/search", async (c) => {
+    const goal = c.req.query("goal") ?? "";
+    if (read(db, "goal", goal) === undefined) return refuse(c, 404, "not_found", `no goal ${goal}`);
+    const found = await searchGitHub(db, goal, c.req.query("q") ?? "");
+    return c.json<GitHubSearchResponse>({ items: found.items });
   });
   app.get("/api/goals/:id", (c) => {
     const page = goalPage(db, c.req.param("id"), c.get("actor").id, ...todayAndZone(db));

@@ -1,7 +1,7 @@
 import { createSign } from "node:crypto";
 import { readFileSync } from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
-import type { GitHubStatusResponse } from "./api.ts";
+import type { GitHubSearchItem, GitHubStatusResponse } from "./api.ts";
 import { configuredTimeZone, configuredToday } from "./config.ts";
 import { read } from "./read.ts";
 import type { Row } from "./rules.ts";
@@ -12,12 +12,15 @@ import type { Row } from "./rules.ts";
  * github_push is not an entity and not an Event. The row is written in the work item's transaction.
  * The call to GitHub runs after that transaction commits. A failure stays on the row and shows on the work item.
  * Add as Github Issue writes the request in the work item's transaction: an empty issue, the repository, and the actor. drain opens the issue after that transaction commits, then the link write records the issue URL. The current status is queued after that write so this drain sends it. That push includes the work item's current title. A failed create sets error on this row so a later drain does not send it as a status push.
+ * Attach writes a row in that same transaction when a create or a title update has a # and no issue URL. drain searches after the commit, appends the first issue, and queues the current status for this drain. A pull request is not that issue. The search does not run inside the transaction, and a later status change does not search. A title whose # query changed during the search is not linked and is not queued. A repository that leaves github_repos or the goal during the search is not linked and is not queued. A failed create keeps its error until an issue is attached. The failure is written back only when the work item still has no issue link and no newer push row exists. A search that does not complete records that failure and does not put the request back. A missing GitHub setting records that failure and does not attach. A later status change does not clear that failure.
+ * A work-item update that adds an issue URL in github_repos and on the goal, when that URL was not in the previous links, queues the current status on that URL. A pull request does not. That queue is the status push. A write that adds more than one new in-scope issue is refused before it is stored. A URL already in the previous links does not count. On create, every link is new.
  * github_result is not an entity and not an Event. It keeps the last update and the last signed notice.
  */
 
 const STATUS_LABELS = ["Backlog", "In Progress", "Completed", "Deleted"] as const;
 const CONFIG_NAMES = ["GOALIE_GITHUB_APP_ID", "GOALIE_GITHUB_INSTALLATION_ID", "GOALIE_GITHUB_PRIVATE_KEY_FILE", "GOALIE_PUBLIC_URL"] as const;
 const ISSUE_URL = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)\/?$/;
+const PULL_URL = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)\/?$/;
 const SCOPE_ENTRY = /^([^/\s]+)\/([^/\s]+)$/;
 const GOAL_REPO = /^(?:https:\/\/github\.com\/|github\.com\/)([^/]+)\/([^/]+)\/?$/;
 const TRAILER = /<!-- goalie -->[\s\S]*?<!-- \/goalie -->/;
@@ -70,13 +73,14 @@ export function queueGitHubCreate(db: DatabaseSync, after: Row, repo: string, ac
  * The linked issue's repository must be in github_repos and on the work item's goal.
  * No linked issue deletes a row whose issue is not empty. An empty issue stays: a create request, or a failed create.
  * A linked issue replaces the row and clears the error. That push leaves repo and actor empty.
+ * issue, when passed, is the row's issue. The first linked issue is used only when it is omitted.
  */
-export function queueGitHubPush(db: DatabaseSync, after: Row): void {
+export function queueGitHubPush(db: DatabaseSync, after: Row, issue?: string): void {
   const id = after.id;
   if (typeof id !== "string") return;
   const goalRow = typeof after.goal === "string" ? read(db, "goal", after.goal) : undefined;
-  const issue = linkedIssue(after.links, githubRepos(db), goalRepos(goalRow?.work_product));
-  if (issue === undefined) {
+  const linked = issue ?? linkedIssue(after.links, githubRepos(db), goalRepos(goalRow?.work_product));
+  if (linked === undefined) {
     db.prepare("DELETE FROM github_push WHERE work_item = ? AND issue <> ''").run(id);
     return;
   }
@@ -86,11 +90,111 @@ export function queueGitHubPush(db: DatabaseSync, after: Row): void {
   db.prepare(
     `INSERT INTO github_push (work_item, issue, status, goal, error, repo, actor) VALUES (?, ?, ?, ?, NULL, NULL, NULL)
      ON CONFLICT(work_item) DO UPDATE SET issue = excluded.issue, status = excluded.status, goal = excluded.goal, error = NULL, repo = NULL, actor = NULL`,
-  ).run(id, issue, status, goal);
+  ).run(id, linked, status, goal);
 }
 
-/** Send every pending push. Call this only after the work item transaction has committed. A create request has an empty issue, no error, and a repository: open it here, and do not delete it as out of scope. Then send status pushes, including one the create just queued. A status row whose repository is not in github_repos and on the work item's current goal is deleted and not sent. A failed create has an empty issue and an error: leave it, and do not send it. */
+/** Canonical issue URLs in links, in order. A pull request is not one. */
+function issueUrls(links: unknown): string[] {
+  if (!Array.isArray(links)) return [];
+  const out: string[] = [];
+  for (const link of links) {
+    if (typeof link !== "string") continue;
+    const url = canonicalIssueUrl(link);
+    if (url !== undefined) out.push(url);
+  }
+  return out;
+}
+
+/**
+ * New in-scope issue URLs this write adds, in link order.
+ * A pull request is not one. A URL already in the previous links is not one. On create, every link is new.
+ */
+export function addedInScopeIssues(db: DatabaseSync, before: Row | undefined, after: Row): string[] {
+  const previous = new Set(issueUrls(before?.links).map((url) => url.toLowerCase()));
+  const goalRow = typeof after.goal === "string" ? read(db, "goal", after.goal) : undefined;
+  const scopes = githubRepos(db);
+  const onGoal = goalRepos(goalRow?.work_product);
+  const added: string[] = [];
+  const seen = new Set<string>();
+  for (const url of issueUrls(after.links)) {
+    const key = url.toLowerCase();
+    if (previous.has(key) || seen.has(key)) continue;
+    const match = ISSUE_URL.exec(url);
+    if (match === null) continue;
+    const repo = `${match[1]}/${match[2]}`;
+    if (!onGoal.has(repo.toLowerCase()) || !repoInScope(repo, scopes)) continue;
+    seen.add(key);
+    added.push(url);
+  }
+  return added;
+}
+
+/**
+ * A work-item update that adds an issue URL in github_repos and on the goal queues the current status.
+ * That URL was not in the previous links. A pull request does not. The row's issue is that URL.
+ * It returns after the first new in-scope issue. A refused write never reaches it.
+ */
+export function queueGitHubIssueLink(db: DatabaseSync, before: Row | undefined, after: Row): void {
+  if (before === undefined) return;
+  const url = addedInScopeIssues(db, before, after)[0];
+  if (url === undefined) return;
+  queueGitHubPush(db, after, url);
+}
+
+/** The text of the first # in title, up to whitespace. Undefined when there is no such token. */
+export function hashQuery(title: string): string | undefined {
+  return /#(\S+)/.exec(title)?.[1];
+}
+
+/** True when links already hold a GitHub issue URL. A pull request is not one. */
+export function hasIssueUrl(links: unknown): boolean {
+  return Array.isArray(links) && links.some((link) => typeof link === "string" && canonicalIssueUrl(link) !== undefined);
+}
+
+/**
+ * Ask drain to attach the first issue for this title. The row is an empty issue with an actor and no repository, so it is not a create request and not a status push.
+ * An issue URL already in links, a title with no #, or a create request for this work item writes nothing.
+ * A failed create keeps its error until an issue is attached. The failure is written back only when the work item still has no issue link and no newer push row exists.
+ */
+export function queueGitHubAttach(db: DatabaseSync, after: Row, actor: string): void {
+  const id = after.id;
+  const title = after.title;
+  const status = after.status;
+  const goal = after.goal;
+  if (typeof id !== "string" || typeof title !== "string" || typeof status !== "string" || typeof goal !== "string" || actor === "") return;
+  if (hasIssueUrl(after.links) || hashQuery(title) === undefined) return;
+  const pending = db.prepare("SELECT issue, repo FROM github_push WHERE work_item = ?").get(id) as { issue: string; repo: string | null } | undefined;
+  if (pending !== undefined && pending.issue === "" && typeof pending.repo === "string" && pending.repo !== "") return;
+  db.prepare(
+    `INSERT INTO github_push (work_item, issue, status, goal, error, repo, actor) VALUES (?, '', ?, ?, NULL, NULL, ?)
+     ON CONFLICT(work_item) DO UPDATE SET issue = '', status = excluded.status, goal = excluded.goal, repo = NULL, actor = excluded.actor`,
+  ).run(id, status, goal, actor);
+}
+
+/** Take one attach request, including a failed create that still shows. Undefined when another drain took it, or it is no longer an attach request. The error is that failure, or null. */
+export function claimGitHubAttach(db: DatabaseSync, workItem: string): { actor: string; error: string | null } | undefined {
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const row = db.prepare(
+      "SELECT actor, error FROM github_push WHERE work_item = ? AND issue = '' AND (repo IS NULL OR repo = '') AND actor IS NOT NULL AND actor <> ''",
+    ).get(workItem) as { actor: string; error: string | null } | undefined;
+    if (row === undefined) {
+      db.exec("COMMIT");
+      return undefined;
+    }
+    db.prepare("DELETE FROM github_push WHERE work_item = ? AND issue = '' AND (repo IS NULL OR repo = '')").run(workItem);
+    db.exec("COMMIT");
+    return { actor: row.actor, error: row.error ?? null };
+  } catch (error) {
+    if (db.isTransaction) db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+/** Send every pending push. Call this only after the work item transaction has committed. Attach runs first: the search is outside any transaction, then the link write queues the status this drain sends. A create request has an empty issue, no error, and a repository: open it here, and do not delete it as out of scope. Then send status pushes, including one the create or the attach just queued. A status row whose repository is not in github_repos and on the work item's current goal is deleted and not sent. A failed create has an empty issue and an error: do not send it. An attach request keeps that error until an issue is attached. */
 export async function drainGitHub(db: DatabaseSync): Promise<void> {
+  const { attachGitHubIssues } = await import("./commands.ts");
+  await attachGitHubIssues(db, configuredToday(configuredTimeZone(db)));
   await openPendingIssues(db);
   const pending = db.prepare("SELECT work_item, issue, status, goal FROM github_push WHERE error IS NULL AND issue <> ''").all() as PushRow[];
   if (pending.length === 0) return;
@@ -289,6 +393,95 @@ export function canonicalIssueUrl(link: string): string | undefined {
   const match = ISSUE_URL.exec(link);
   if (match === null) return undefined;
   return `https://github.com/${match[1]}/${match[2]}/issues/${match[3]}`;
+}
+
+/** `owner/repo` from a GitHub issue URL, or undefined when link is not one. A trailing slash is the same issue. */
+export function issueUrlRepo(link: string): string | undefined {
+  const url = canonicalIssueUrl(link);
+  if (url === undefined) return undefined;
+  const match = ISSUE_URL.exec(url);
+  if (match === null) return undefined;
+  return `${match[1]}/${match[2]}`;
+}
+
+/** `owner/repo` from a GitHub issue URL or a pull request URL. Any other link is undefined. A trailing slash is the same link. */
+export function linkUrlRepo(link: string): string | undefined {
+  const issue = issueUrlRepo(link);
+  if (issue !== undefined) return issue;
+  const match = PULL_URL.exec(link);
+  if (match === null) return undefined;
+  return `${match[1]}/${match[2]}`;
+}
+
+/** The pull request URL in canonical form, or undefined when link is not one. A trailing slash is the same pull request. */
+function canonicalPullUrl(link: string): string | undefined {
+  const match = PULL_URL.exec(link);
+  if (match === null) return undefined;
+  return `https://github.com/${match[1]}/${match[2]}/pull/${match[3]}`;
+}
+
+/**
+ * Issues and pull requests in the repositories this goal names that github_repos covers.
+ * One installation token per repository. It does not fall back to GOALIE_GITHUB_INSTALLATION_ID.
+ * Empty q returns nothing and does not call GitHub. A goal with no repository completes with no items and no error.
+ * A missing setting returns that error and does not call GitHub. A repository outside that set contributes nothing.
+ * A token error or a throw is "GitHub could not be reached." A non-200 is that answer. The first repository that does not complete supplies error. Items from repositories that complete are still returned.
+ */
+export async function searchGitHub(db: DatabaseSync, goalId: string, q: string): Promise<{ items: GitHubSearchItem[]; error: string | null }> {
+  const text = q.trim();
+  if (text === "") return { items: [], error: null };
+  const repos = reposOnGoal(db, goalId);
+  if (repos.length === 0) return { items: [], error: null };
+  const ready = configuredGitHub();
+  if (!ready.ok) return { items: [], error: ready.error };
+  const items: GitHubSearchItem[] = [];
+  const seen = new Set<string>();
+  let error: string | null = null;
+  for (const repo of repos) {
+    const match = SCOPE_ENTRY.exec(repo);
+    if (match === null || match[2] === "*") continue;
+    try {
+      const issued = await installationToken(ready.config, match[1], match[2]);
+      if ("error" in issued) {
+        error ??= "GitHub could not be reached.";
+        continue;
+      }
+      const path = `/search/issues?q=${encodeURIComponent(`repo:${match[1]}/${match[2]} ${text}`)}`;
+      const found = await call(ready.config, issued.token, "GET", path);
+      if (found.status !== 200) {
+        error ??= refused(found.status, `GET ${path}`, found.body);
+        continue;
+      }
+      for (const item of searchItems(found.body, `${match[1]}/${match[2]}`)) {
+        if (seen.has(item.url)) continue;
+        seen.add(item.url);
+        items.push(item);
+      }
+    } catch {
+      error ??= "GitHub could not be reached.";
+    }
+  }
+  return { items, error };
+}
+
+/** Search hits whose URL is an issue or a pull request in repo. Other hits are dropped. Order is the order GitHub returned. */
+function searchItems(body: unknown, repo: string): GitHubSearchItem[] {
+  if (typeof body !== "object" || body === null || !("items" in body) || !Array.isArray((body as { items: unknown }).items)) return [];
+  const want = repo.toLowerCase();
+  const out: GitHubSearchItem[] = [];
+  for (const hit of (body as { items: unknown[] }).items) {
+    if (typeof hit !== "object" || hit === null) continue;
+    const row = hit as { html_url?: unknown; title?: unknown };
+    if (typeof row.html_url !== "string" || typeof row.title !== "string") continue;
+    const issue = canonicalIssueUrl(row.html_url);
+    const pull = issue === undefined ? canonicalPullUrl(row.html_url) : undefined;
+    const url = issue ?? pull;
+    if (url === undefined) continue;
+    const parsed = (issue === undefined ? PULL_URL : ISSUE_URL).exec(url);
+    if (parsed === null || `${parsed[1]}/${parsed[2]}`.toLowerCase() !== want) continue;
+    out.push({ kind: issue === undefined ? "pull" : "issue", title: row.title, url });
+  }
+  return out;
 }
 
 /** The first linked issue whose repository is in scope and on the goal. */

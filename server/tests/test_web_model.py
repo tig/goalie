@@ -635,6 +635,16 @@ class GoalPageTests(unittest.TestCase):
         self.assertEqual(b, {"commands": [{"op": "update", "kind": "work_item", "id": "WI-0001", "base_version": 3, "fields": {"title": "Draw the board again", "due_date": "2026-11-20"}, "reason": "Tig asked"}]})
         self.assertIsNone(run(f'return commands.workItemFieldsBatch({item}, {{ title: "Draw the board", owner: "chelsea", due_date: null }}, "No change");'))
 
+    def test_an_edit_can_send_links(self) -> None:
+        """The edit save sends links when a chosen issue or pull request is added."""
+        item = '{ id: "WI-0001", version: 3, title: "Draw the board", owner: "chelsea", due_date: null, links: null }'
+        issued = "https://github.com/tig/goalie/issues/72"
+        pulled = "https://github.com/tig/goalie/pull/80"
+        issue = run(f'return commands.workItemFieldsBatch({item}, {{ title: "Draw the board", owner: "chelsea", due_date: null, links: [{json.dumps(issued)}] }}, "Attach");')
+        pull = run(f'return commands.workItemFieldsBatch({item}, {{ title: "Ship #72", owner: "chelsea", due_date: null, links: [{json.dumps(pulled)}] }}, "Attach");')
+        self.assertEqual(issue["commands"][0]["fields"], {"links": [issued]})  # type: ignore[index]
+        self.assertEqual(pull["commands"][0]["fields"], {"title": "Ship #72", "links": [pulled]})  # type: ignore[index]
+
     def test_a_human_may_edit_any_work_item_and_an_agent_only_its_own(self) -> None:
         # rules.ts: a human writes any work item; an agent writes only the ones it owns (agent-own-work-items).
         got = run("""
@@ -788,6 +798,40 @@ process.stdout.write(JSON.stringify([a.body.message, b.body.message]));"""
         self.assertIn("repos.length === 0 ? null", form)
         self.assertLess(form.index("repos.length === 0 ? null"), form.index("Add as Github Issue"))
 
+    def test_the_add_form_and_the_edit_form_render_the_search_menu_from_a_hash(self) -> None:
+        """Add and edit render the search menu when the title has # and a query. Enter on that menu does not reach the section save."""
+        src = (MODEL.parent / "GoalAdd.tsx").read_text(encoding="utf-8")
+        add = src.split("export function AddWorkItem", 1)[1].split("export function EditWorkItem", 1)[0]
+        edit = src.split("export function EditWorkItem", 1)[1].split("const STATUSES", 1)[0]
+        self.assertIn("<GitHubAttach", add)
+        self.assertIn("<GitHubAttach", edit)
+        menu = src.split("function GitHubAttach", 1)[1].split("export function AddWorkItem", 1)[0]
+        self.assertIn("/api/github/search", menu)
+        self.assertIn('role="menu"', menu)
+        self.assertIn("#(\\S+)", menu)
+        self.assertIn('onKeyDown={(e) => e.key === "Enter" && e.stopPropagation()}', menu)
+
+    def test_the_search_menu_waits_before_a_new_query(self) -> None:
+        """The first query is sent at once. A changed query waits 300 ms with no further change."""
+        src = (MODEL.parent / "GoalAdd.tsx").read_text(encoding="utf-8")
+        menu = src.split("function GitHubAttachMenu", 1)[1].split("export function AddWorkItem", 1)[0]
+        call = menu.split("useJson", 1)[1].split(");", 1)[0]
+        self.assertNotIn("encodeURIComponent(query)", call)
+        self.assertIn("encodeURIComponent(settled)", call)
+        self.assertIn("300", menu)
+        self.assertIn("clearTimeout", menu)
+
+    def test_a_click_keeps_the_hash_that_found_the_hit(self) -> None:
+        """While settled is not the title #, the menu renders no hits. A click stores that settled #, not the live title #."""
+        src = (MODEL.parent / "GoalAdd.tsx").read_text(encoding="utf-8")
+        menu = src.split("function GitHubAttachMenu", 1)[1].split("export function AddWorkItem", 1)[0]
+        shown = menu.split("useJson", 1)[1].split('role="menu"', 1)[0]
+        self.assertIn("if (settled !== query) return null;", shown)
+        self.assertIn("onPick(settled, item)", menu.split('role="menu"', 1)[1])
+        choice = src.split("function useGitHubChoice", 1)[1].split("function GitHubAttach", 1)[0]
+        self.assertIn("(query, item) => setChoice({ query, item })", choice)
+        self.assertNotIn("(item) => { if (query !== undefined) setChoice({ query, item }); }", choice)
+
 
 class RouteTests(unittest.TestCase):
     def test_each_path_opens_its_page(self) -> None:
@@ -913,6 +957,7 @@ class MarkdownTests(unittest.TestCase):
         got = run(f"return markdown.githubIssues({json.dumps(links)});")
         self.assertEqual(got, [
             {"href": "https://github.com/tig/goalie/issues/72", "label": "goalie#72"},
+            {"href": "https://github.com/excaliwire/factory/pull/9", "label": "factory#9"},
             {"href": "https://github.com/someone/thing/issues/4", "label": "someone/thing#4"},
         ])
         self.assertEqual(run("return markdown.githubIssues(null);"), [])
@@ -924,7 +969,24 @@ class MarkdownTests(unittest.TestCase):
             "https://github.com/excaliwire/factory/pull/9#discussion_r1",
         ]
         got = run(f"return markdown.githubIssues({json.dumps(links)});")
-        self.assertEqual(got, [{"href": "https://github.com/tig/goalie/issues/72", "label": "goalie#72"}])
+        self.assertEqual(got, [
+            {"href": "https://github.com/tig/goalie/issues/72", "label": "goalie#72"},
+            {"href": "https://github.com/excaliwire/factory/pull/9", "label": "factory#9"},
+        ])
+
+    def test_a_saved_pull_request_stays_in_the_rendered_links(self) -> None:
+        """A saved pull request stays visible. The href is the /pull/ URL. The label is the short name."""
+        links = [
+            "https://github.com/tig/goalie/pull/72",
+            "https://github.com/tig/goalie/pull/72/",
+            "https://github.com/someone/thing/pull/4",
+            "notes",
+        ]
+        got = run(f"return markdown.githubIssues({json.dumps(links)});")
+        self.assertEqual(got, [
+            {"href": "https://github.com/tig/goalie/pull/72", "label": "goalie#72"},
+            {"href": "https://github.com/someone/thing/pull/4", "label": "someone/thing#4"},
+        ])
 
     def test_issue_links_stay_in_the_title_and_answer_a_coarse_tap(self) -> None:
         src = MODEL.parent
