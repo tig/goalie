@@ -821,6 +821,17 @@ process.stdout.write(JSON.stringify([a.body.message, b.body.message]));"""
         self.assertIn("300", menu)
         self.assertIn("clearTimeout", menu)
 
+    def test_a_click_keeps_the_hash_that_found_the_hit(self) -> None:
+        """While settled is not the title #, the menu renders no hits. A click stores that settled #, not the live title #."""
+        src = (MODEL.parent / "GoalAdd.tsx").read_text(encoding="utf-8")
+        menu = src.split("function GitHubAttachMenu", 1)[1].split("export function AddWorkItem", 1)[0]
+        shown = menu.split("useJson", 1)[1].split('role="menu"', 1)[0]
+        self.assertIn("if (settled !== query) return null;", shown)
+        self.assertIn("onPick(settled, item)", menu.split('role="menu"', 1)[1])
+        choice = src.split("function useGitHubChoice", 1)[1].split("function GitHubAttach", 1)[0]
+        self.assertIn("(query, item) => setChoice({ query, item })", choice)
+        self.assertNotIn("(item) => { if (query !== undefined) setChoice({ query, item }); }", choice)
+
 
 class RouteTests(unittest.TestCase):
     def test_each_path_opens_its_page(self) -> None:

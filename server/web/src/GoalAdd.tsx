@@ -170,15 +170,15 @@ function chosenLinks(links: string[] | null | undefined, hit: GitHubHit | null):
 }
 
 /** The choice stays with the # query that found it. A different query drops it. */
-function useGitHubChoice(title: string): [GitHubHit | null, (item: GitHubHit) => void] {
-  const query = hashQuery(title);
+function useGitHubChoice(title: string): [GitHubHit | null, (query: string, item: GitHubHit) => void] {
+  const current = hashQuery(title);
   const [choice, setChoice] = useState<{ query: string; item: GitHubHit } | null>(null);
-  const picked = choice !== null && query !== undefined && choice.query === query ? choice.item : null;
-  return [picked, (item) => { if (query !== undefined) setChoice({ query, item }); }];
+  const picked = choice !== null && current !== undefined && choice.query === current ? choice.item : null;
+  return [picked, (query, item) => setChoice({ query, item })];
 }
 
 /** The search menu for a # in the title. It lists issues and pull requests on this goal. */
-function GitHubAttach({ goal, title, onPick }: { goal: string; title: string; onPick: (item: GitHubHit) => void }) {
+function GitHubAttach({ goal, title, onPick }: { goal: string; title: string; onPick: (query: string, item: GitHubHit) => void }) {
   const query = hashQuery(title);
   if (query === undefined) return null;
   return <GitHubAttachMenu goal={goal} query={query} onPick={onPick} />;
@@ -190,7 +190,7 @@ function hashQuery(title: string): string | undefined {
 }
 
 /** The first query is sent at once. A changed query waits until 300 ms pass with no further change. */
-function GitHubAttachMenu({ goal, query, onPick }: { goal: string; query: string; onPick: (item: GitHubHit) => void }) {
+function GitHubAttachMenu({ goal, query, onPick }: { goal: string; query: string; onPick: (query: string, item: GitHubHit) => void }) {
   const [settled, setSettled] = useState(query);
   useEffect(() => {
     if (settled === query) return;
@@ -198,11 +198,12 @@ function GitHubAttachMenu({ goal, query, onPick }: { goal: string; query: string
     return () => clearTimeout(timer);
   }, [query, settled]);
   const [loaded] = useJson<GitHubSearchResponse>(`/api/github/search?goal=${encodeURIComponent(goal)}&q=${encodeURIComponent(settled)}`);
+  if (settled !== query) return null;
   if (loaded.state !== "ok" || loaded.data.items.length === 0) return null;
   return (
     <div className="slist ghit" role="menu" aria-label="Attach" onKeyDown={(e) => e.key === "Enter" && e.stopPropagation()}>
       {loaded.data.items.map((item) => (
-        <button key={item.url} type="button" role="menuitem" onClick={() => onPick(item)}>
+        <button key={item.url} type="button" role="menuitem" onClick={() => onPick(settled, item)}>
           <span className="muted">{item.kind === "pull" ? "Pull request" : "Issue"}</span>
           {item.title}
         </button>
