@@ -100,6 +100,9 @@ class GitHub(ThreadingHTTPServer):
         self.drop_label = False
         self.search: list[dict[str, Any]] = []
         self.queries: list[str] = []
+        self.issue_fields: list[dict[str, Any]] | None = None
+        self.fail_issue_fields = False
+        self.field_values: list[dict[str, Any]] = []
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -127,6 +130,13 @@ class Handler(BaseHTTPRequestHandler):
         if self.server.opened_issue is not None and path == self.server.opened_path:
             self._issue(self.server.opened_issue)
             return
+        if path == "/orgs/tig/issue-fields":
+            if self.server.fail_issue_fields:
+                self._send(500, {"message": "no"})
+                return
+            if self.server.issue_fields is not None:
+                self._send(200, self.server.issue_fields)
+                return
         self._send(404, {"message": "not found"})
 
     def do_POST(self) -> None:
@@ -173,6 +183,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == f"/repos/{REPO}/labels":
             self._send(201, {"name": body.get("name")})
+            return
+        if "/issues/" in path and path.endswith("/issue-field-values"):
+            self.server.field_values.append({"path": path, "body": body})
+            self._send(200, {})
             return
         self._send(404, {"message": "not found"})
 
@@ -278,7 +292,7 @@ class Handler(BaseHTTPRequestHandler):
         raw = self.rfile.read(int(self.headers.get("Content-Length", "0")))
         return json.loads(raw) if raw else {}
 
-    def _send(self, status: int, payload: dict[str, Any]) -> None:
+    def _send(self, status: int, payload: dict[str, Any] | list[Any]) -> None:
         data = json.dumps(payload).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
@@ -376,6 +390,9 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.github.drop_label = False
         self.github.search = []
         self.github.queries = []
+        self.github.issue_fields = None
+        self.github.fail_issue_fields = False
+        self.github.field_values = []
         self.github.issue = {"body": "Keep this.", "state": "open", "state_reason": None, "labels": ["pinned"]}
         set_scope(self.store, ["tig/goalie"], [{"repo": "github.com/tig/goalie"}])
 
@@ -1259,6 +1276,111 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         reply = self.status_as("chelsea", "sub-chelsea")
         self.assertEqual(reply.status, 403, reply.body)
         self.assertEqual(json.loads(reply.body)["error"], "forbidden")
+
+    def test_a_due_date_sets_the_target_date(self) -> None:
+        """A linked issue's Target date is the work item's due_date. Start date is not written."""
+        self.github.issue_fields = [
+            {"id": 4, "name": "Start date", "data_type": "date"},
+            {"id": 9, "name": "Target date", "data_type": "date"},
+        ]
+        item = "WI-9141"
+        created = self.write(create("work_item", item, {**self.item([ISSUE]), "due_date": "2027-03-31"}, "Filed"))
+        self.assertTrue(created["ok"], created)
+        self.assertEqual(self.github.field_values, [{
+            "path": f"/repos/{REPO}/issues/72/issue-field-values",
+            "body": {"issue_field_values": [{"field_id": 9, "value": "2027-03-31"}]},
+        }])
+        self.assertNotIn(4, [entry.get("field_id") for body in self.github.field_values for entry in body["body"].get("issue_field_values", [])])
+        self.assertEqual(set(self.github.issue["labels"]), {"pinned", "Backlog"})
+
+    def test_a_due_date_change_sets_the_target_date(self) -> None:
+        """A due_date change, with status left at Backlog, queues the same push and sets Target date."""
+        self.github.issue_fields = [
+            {"id": 4, "name": "Start date", "data_type": "date"},
+            {"id": 9, "name": "Target date", "data_type": "date"},
+        ]
+        item = "WI-9142"
+        created = self.write(create("work_item", item, self.item([ISSUE]), "Filed"))
+        self.assertTrue(created["ok"], created)
+        self.assertIsNone(self.store.read("work_item", item)["due_date"])
+        self.github.calls.clear()
+        self.github.field_values.clear()
+        moved = self.write(update("work_item", item, 1, {"due_date": "2027-04-02"}, "Dated"))
+        self.assertTrue(moved["ok"], moved)
+        self.assertEqual(self.store.read("work_item", item)["status"], "Backlog")
+        self.assertEqual(self.github.field_values, [{
+            "path": f"/repos/{REPO}/issues/72/issue-field-values",
+            "body": {"issue_field_values": [{"field_id": 9, "value": "2027-04-02"}]},
+        }])
+        self.assertIn("PATCH /repos/tig/goalie/issues/72", self.github.calls)
+
+    def test_a_field_list_error_shows_the_failure(self) -> None:
+        """A field list that answers 500 leaves the work item committed and does not set a date."""
+        self.github.fail_issue_fields = True
+        item = "WI-9143"
+        created = self.write(create("work_item", item, {**self.item([ISSUE]), "due_date": "2027-03-31"}, "Filed"))
+        self.assertTrue(created["ok"], created)
+        stored = self.store.read("work_item", item)
+        self.assertEqual(stored["status"], "Backlog")
+        self.assertEqual(stored["due_date"], "2027-03-31")
+        self.assertIn("GitHub answered 500", self.error(item) or "")
+        shown = next(row for row in self.goal_page()["workItems"] if row["id"] == item)
+        self.assertIn("GitHub answered 500", shown.get("github_error") or "")
+        self.assertEqual(self.github.field_values, [])
+        self.assertFalse(any("issue-field-values" in call for call in self.github.calls), self.github.calls)
+
+    def test_a_missing_field_list_does_not_fail_the_push(self) -> None:
+        """A 404 field list still sets the label. No date is set."""
+        item = "WI-9144"
+        created = self.write(create("work_item", item, {**self.item([ISSUE]), "due_date": "2027-03-31"}, "Filed"))
+        self.assertTrue(created["ok"], created)
+        self.assertEqual(set(self.github.issue["labels"]), {"pinned", "Backlog"})
+        self.assertIsNone(self.error(item))
+        shown = next(row for row in self.goal_page()["workItems"] if row["id"] == item)
+        self.assertIsNone(shown.get("github_error"))
+        self.assertEqual(self.github.field_values, [])
+        self.assertFalse(any("issue-field-values" in call for call in self.github.calls), self.github.calls)
+
+    def test_a_missing_target_date_does_not_fail_the_push(self) -> None:
+        """A field list with only Start date still completes the status push. No date is set."""
+        self.github.issue_fields = [{"id": 4, "name": "Start date", "data_type": "date"}]
+        item = "WI-9145"
+        created = self.write(create("work_item", item, {**self.item([ISSUE]), "due_date": "2027-03-31"}, "Filed"))
+        self.assertTrue(created["ok"], created)
+        self.assertEqual(set(self.github.issue["labels"]), {"pinned", "Backlog"})
+        self.assertIsNone(self.error(item))
+        self.assertEqual(self.github.field_values, [])
+        self.assertFalse(any("issue-field-values" in call for call in self.github.calls), self.github.calls)
+
+    def test_a_null_due_date_does_not_call_the_field(self) -> None:
+        """A null due_date does not read or set issue fields. The status label is still set."""
+        self.github.issue_fields = [{"id": 9, "name": "Target date", "data_type": "date"}]
+        item = "WI-9146"
+        created = self.write(create("work_item", item, {**self.item([ISSUE]), "due_date": None}, "Filed"))
+        self.assertTrue(created["ok"], created)
+        self.github.calls.clear()
+        self.github.field_values.clear()
+        moved = self.write(update("work_item", item, 1, {"status": "In Progress"}, "Started"))
+        self.assertTrue(moved["ok"], moved)
+        self.assertIsNone(self.store.read("work_item", item)["due_date"])
+        self.assertEqual(set(self.github.issue["labels"]), {"pinned", "In Progress"})
+        self.assertFalse(any(call.startswith("GET /orgs/") for call in self.github.calls), self.github.calls)
+        self.assertEqual(self.github.field_values, [])
+        self.assertFalse(any("issue-field-values" in call for call in self.github.calls), self.github.calls)
+
+    def test_a_pull_request_is_not_dated(self) -> None:
+        """A pull request is not an issue. A due_date on that work item does not set a field."""
+        self.github.issue_fields = [
+            {"id": 4, "name": "Start date", "data_type": "date"},
+            {"id": 9, "name": "Target date", "data_type": "date"},
+        ]
+        item = "WI-9147"
+        created = self.write(create("work_item", item, {**self.item([PULL]), "due_date": "2027-03-31"}, "Filed"))
+        self.assertTrue(created["ok"], created)
+        self.assertEqual(self.store.read("work_item", item)["links"], [PULL])
+        self.assertFalse(any("issue-field-values" in call or call.startswith("GET /orgs/") for call in self.github.calls), self.github.calls)
+        self.assertEqual(self.github.field_values, [])
+        self.assertFalse(any("/pull/" in call for call in self.github.calls), self.github.calls)
 
     def search_as(self, actor: str, subject: str, goal: str, q: str) -> Reply:
         row = self.store.read("actor", actor)

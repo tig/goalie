@@ -215,7 +215,7 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
     );
     if (first === 0) first = Number(lastInsertRowid) - 1;
   }
-  if (kind === "work_item" && changed.includes("status")) queueGitHubPush(db, after);
+  if (kind === "work_item" && (changed.includes("status") || changed.includes("due_date"))) queueGitHubPush(db, after);
   if (kind === "work_item" && changed.includes("links")) queueGitHubIssueLink(db, before, after);
   const repo = commandGitHubRepo(command);
   if (kind === "work_item" && repo !== undefined) queueGitHubCreate(db, after, repo, actor);
