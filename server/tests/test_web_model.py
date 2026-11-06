@@ -909,13 +909,24 @@ if __name__ == "__main__":
 class MarkdownTests(unittest.TestCase):
     """Issue #61: multi-line text is Markdown, and a GitHub issue or pull request reference is a link (GL8)."""
 
+    def test_a_bare_name_with_no_associated_repo_stays_text(self) -> None:
+        """A bare repo#N with no associated repository, or an empty list, stays text. It is not a link."""
+        for call in (
+            'markdown.markdown("See factory#172 now")',
+            'markdown.markdown("See factory#172 now", [])',
+        ):
+            got = run(f"return {call};")
+            self.assertEqual(got, [{"t": "p", "c": [{"t": "text", "v": "See factory#172 now"}]}])
+            self.assertNotIn("link", json.dumps(got))
+
     def test_tig_s_example_links_to_the_factory_issue(self) -> None:
-        got = run('return markdown.markdown("See factory/issues/172 now");')
+        got = run('return markdown.markdown("See factory/issues/172 now", ["excaliwire/factory"]);')
         self.assertEqual(got, [{"t": "p", "c": [{"t": "text", "v": "See "}, {"t": "link", "href": "https://github.com/excaliwire/factory/issues/172", "c": [{"t": "text", "v": "factory#172"}]}, {"t": "text", "v": " now"}]}])
 
     def test_every_reference_form_links_with_a_short_name(self) -> None:
+        repos = ["excaliwire/factory", "excaliwire/web", "excaliwire/operations", "tig/goalie"]
         src = "factory#3 web/pull/9 excaliwire/operations#179 tig/goalie#56 goalie#57 someone/thing/issues/4 https://github.com/excaliwire/factory/pull/3192"
-        got = run(f"return markdown.markdown({json.dumps(src)})[0].c.filter((x) => x.t === 'link').map((x) => [x.href, x.c[0].v]);")
+        got = run(f"return markdown.markdown({json.dumps(src)}, {json.dumps(repos)})[0].c.filter((x) => x.t === 'link').map((x) => [x.href, x.c[0].v]);")
         self.assertEqual(got, [
             ["https://github.com/excaliwire/factory/issues/3", "factory#3"],
             ["https://github.com/excaliwire/web/pull/9", "web#9"],
@@ -925,6 +936,20 @@ class MarkdownTests(unittest.TestCase):
             ["https://github.com/someone/thing/issues/4", "someone/thing#4"],
             ["https://github.com/excaliwire/factory/pull/3192", "factory#3192"],
         ])
+        written = run('return markdown.markdown("See excaliwire/factory#172 now")[0].c.filter((x) => x.t === "link").map((x) => [x.href, x.c[0].v]);')
+        self.assertEqual(written, [["https://github.com/excaliwire/factory/issues/172", "excaliwire/factory#172"]])
+
+    def test_a_bare_name_uses_the_one_associated_repo(self) -> None:
+        got = run('return markdown.markdown("factory#172", ["excaliwire/factory"])[0].c;')
+        self.assertEqual(got, [{"t": "link", "href": "https://github.com/excaliwire/factory/issues/172", "c": [{"t": "text", "v": "factory#172"}]}])
+
+    def test_two_associated_repos_with_one_name_stay_text(self) -> None:
+        got = run('return markdown.markdown("factory#172", ["excaliwire/factory", "acme/factory"]);')
+        self.assertEqual(got, [{"t": "p", "c": [{"t": "text", "v": "factory#172"}]}])
+
+    def test_a_ref_label_names_the_title_and_the_state(self) -> None:
+        got = run('return [markdown.refLabel("factory#172", { title: "Ship the gate", state: "open" }), markdown.refLabel("factory#172", null), markdown.refLabel("factory#172", { title: "Ship the gate", state: "closed" })];')
+        self.assertEqual(got, ["factory#172 Ship the gate open", "factory#172", "factory#172 Ship the gate closed"])
 
     def test_a_number_alone_is_not_a_reference(self) -> None:
         got = run('return markdown.markdown("Priority #1 and C# and a/b").flatMap((b) => b.c).map((x) => x.t);')
@@ -956,6 +981,12 @@ class MarkdownTests(unittest.TestCase):
         ]
         got = run(f"return markdown.githubIssues({json.dumps(links)});")
         self.assertEqual(got, [
+            {"href": "https://github.com/tig/goalie/issues/72", "label": "tig/goalie#72"},
+            {"href": "https://github.com/excaliwire/factory/pull/9", "label": "excaliwire/factory#9"},
+            {"href": "https://github.com/someone/thing/issues/4", "label": "someone/thing#4"},
+        ])
+        short = run(f"return markdown.githubIssues({json.dumps(links)}, {json.dumps(['tig/goalie', 'excaliwire/factory'])});")
+        self.assertEqual(short, [
             {"href": "https://github.com/tig/goalie/issues/72", "label": "goalie#72"},
             {"href": "https://github.com/excaliwire/factory/pull/9", "label": "factory#9"},
             {"href": "https://github.com/someone/thing/issues/4", "label": "someone/thing#4"},
@@ -970,8 +1001,8 @@ class MarkdownTests(unittest.TestCase):
         ]
         got = run(f"return markdown.githubIssues({json.dumps(links)});")
         self.assertEqual(got, [
-            {"href": "https://github.com/tig/goalie/issues/72", "label": "goalie#72"},
-            {"href": "https://github.com/excaliwire/factory/pull/9", "label": "factory#9"},
+            {"href": "https://github.com/tig/goalie/issues/72", "label": "tig/goalie#72"},
+            {"href": "https://github.com/excaliwire/factory/pull/9", "label": "excaliwire/factory#9"},
         ])
 
     def test_a_saved_pull_request_stays_in_the_rendered_links(self) -> None:
@@ -984,7 +1015,7 @@ class MarkdownTests(unittest.TestCase):
         ]
         got = run(f"return markdown.githubIssues({json.dumps(links)});")
         self.assertEqual(got, [
-            {"href": "https://github.com/tig/goalie/pull/72", "label": "goalie#72"},
+            {"href": "https://github.com/tig/goalie/pull/72", "label": "tig/goalie#72"},
             {"href": "https://github.com/someone/thing/pull/4", "label": "someone/thing#4"},
         ])
 

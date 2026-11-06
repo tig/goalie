@@ -1,23 +1,106 @@
 import { healthWord } from "./model/labels.ts";
-import { useCallback, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { ActorRef, Health } from "../../src/api.ts";
+import type { ActorRef, GitHubRefResponse, Health } from "../../src/api.ts";
 import { placePopover, popoverWidth } from "./model/popover.ts";
 import { useDismiss } from "./useScreen.ts";
 import { encodeFocus } from "./model/feedback.ts";
-import { githubIssues, markdown, type Inline } from "./model/markdown.ts";
+import { githubIssues, markdown, refLabel, type Block, type Inline } from "./model/markdown.ts";
+import { getJson } from "./data.ts";
 
 /** The shared parts every view is built from. */
 
-/** Each GitHub issue or pull request named in a work item's links. A pull request keeps its /pull/ URL. */
-export function IssueLinks({ links }: { links: string[] | null }) {
-  const issues = githubIssues(links);
+const GH_REF = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/(?:issues|pull)\/\d+\/?(?:[?#][^\s]*)?$/i;
+
+type RefFound = { title: string; state: "open" | "closed" };
+
+/** A GitHub issue or pull request href whose repository is associated, when that list is passed. With no list, every such href. */
+function inScope(href: string, repos: string[] | undefined): boolean {
+  const match = GH_REF.exec(href);
+  if (match === null || match[1] === undefined || match[2] === undefined) return false;
+  if (repos === undefined) return true;
+  const want = `${match[1]}/${match[2]}`.toLowerCase();
+  return repos.some((repo) => repo.toLowerCase() === want);
+}
+
+/** Each in-scope href once. */
+function once(hrefs: string[], repos: string[] | undefined): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const href of hrefs) {
+    if (seen.has(href) || !inScope(href, repos)) continue;
+    seen.add(href);
+    out.push(href);
+  }
+  return out;
+}
+
+function linkHrefs(nodes: Inline[], out: string[]): void {
+  for (const node of nodes) {
+    if (node.t === "link") {
+      out.push(node.href);
+      linkHrefs(node.c, out);
+    } else if (node.t === "strong" || node.t === "em") linkHrefs(node.c, out);
+  }
+}
+
+function blockHrefs(blocks: Block[]): string[] {
+  const out: string[] = [];
+  for (const block of blocks) {
+    if (block.t === "ul" || block.t === "ol") for (const item of block.items) linkHrefs(item, out);
+    else if (block.t === "p" || block.t === "quote" || block.t === "h") linkHrefs(block.c, out);
+  }
+  return out;
+}
+
+function inlineText(nodes: Inline[]): string {
+  let text = "";
+  for (const node of nodes) {
+    if (node.t === "text" || node.t === "code") text += node.v;
+    else if (node.t === "strong" || node.t === "em" || node.t === "link") text += inlineText(node.c);
+  }
+  return text;
+}
+
+/** One read per in-scope href, from GOALIE. An error, or an answer without both title and state, stays absent. */
+function useRefTitles(goal: string | undefined, hrefs: string[]): ReadonlyMap<string, RefFound> {
+  const listKey = hrefs.join("\0");
+  const seenKey = `${goal ?? ""}\0${listKey}`;
+  const [slot, setSlot] = useState<{ key: string; found: Map<string, RefFound> }>({ key: "", found: new Map() });
+  const found = slot.key === seenKey ? slot.found : new Map<string, RefFound>();
+  useEffect(() => {
+    if (goal === undefined || listKey === "") return;
+    let live = true;
+    for (const href of listKey.split("\0")) {
+      void getJson<GitHubRefResponse>(`/api/github/ref?goal=${encodeURIComponent(goal)}&url=${encodeURIComponent(href)}`).then((result) => {
+        if (!live || result.state !== "ok" || !("title" in result.data)) return;
+        const { title, state } = result.data;
+        if (title === "" || (state !== "open" && state !== "closed")) return;
+        setSlot((prev) => {
+          const base = prev.key === seenKey ? prev.found : new Map<string, RefFound>();
+          const next = new Map(base);
+          next.set(href, { title, state });
+          return { key: seenKey, found: next };
+        });
+      });
+    }
+    return () => {
+      live = false;
+    };
+  }, [goal, listKey, seenKey]);
+  return found;
+}
+
+/** Each GitHub issue or pull request named in a work item's links. A pull request keeps its /pull/ URL. goal asks GOALIE for each in-scope title. */
+export function IssueLinks({ links, goal, repos }: { links: string[] | null; goal?: string; repos?: string[] }) {
+  const issues = githubIssues(links, repos);
+  const titles = useRefTitles(goal, once(issues.map((issue) => issue.href), repos));
   if (issues.length === 0) return null;
   return (
     <span className="wissues">
       {issues.map((issue) => (
         <a key={issue.href} className="wissue" href={issue.href} target="_blank" rel="noopener noreferrer">
-          {issue.label}
+          {refLabel(issue.label, titles.get(issue.href) ?? null)}
         </a>
       ))}
     </span>
@@ -222,11 +305,12 @@ export function Legend({ kind, help }: { kind: keyof typeof LEGEND; help?: Parti
   );
 }
 
-/** Markdown text, drawn from the model's tree (GL8). Nothing here reads HTML. A link opens in a new tab. */
-export function Markdown({ text, inline }: { text: string; inline?: boolean }) {
-  const blocks = markdown(text);
+/** Markdown text, drawn from the model's tree (GL8). Nothing here reads HTML. A link opens in a new tab. goal asks GOALIE for each in-scope title. */
+export function Markdown({ text, inline, goal, repos }: { text: string; inline?: boolean; goal?: string; repos?: string[] }) {
+  const blocks = markdown(text, repos);
+  const titles = useRefTitles(goal, once(blockHrefs(blocks), repos));
   // Text inside a sentence (a Path to Green criterion) stays in the sentence when it is one paragraph.
-  if (inline && blocks.length === 1 && blocks[0].t === "p") return <Spans of={blocks[0].c} />;
+  if (inline && blocks.length === 1 && blocks[0].t === "p") return <Spans of={blocks[0].c} titles={titles} />;
   return (
     <div className="md">
       {blocks.map((b, k) => {
@@ -234,20 +318,20 @@ export function Markdown({ text, inline }: { text: string; inline?: boolean }) {
           case "p":
             return (
               <p key={k}>
-                <Spans of={b.c} />
+                <Spans of={b.c} titles={titles} />
               </p>
             );
           case "quote":
             return (
               <blockquote key={k}>
-                <Spans of={b.c} />
+                <Spans of={b.c} titles={titles} />
               </blockquote>
             );
           case "h": {
             const H = b.level === 1 ? "h3" : "h4";
             return (
               <H key={k}>
-                <Spans of={b.c} />
+                <Spans of={b.c} titles={titles} />
               </H>
             );
           }
@@ -258,7 +342,7 @@ export function Markdown({ text, inline }: { text: string; inline?: boolean }) {
               <List key={k}>
                 {b.items.map((item, j) => (
                   <li key={j}>
-                    <Spans of={item} />
+                    <Spans of={item} titles={titles} />
                   </li>
                 ))}
               </List>
@@ -276,7 +360,7 @@ export function Markdown({ text, inline }: { text: string; inline?: boolean }) {
   );
 }
 
-function Spans({ of }: { of: Inline[] }) {
+function Spans({ of, titles }: { of: Inline[]; titles: ReadonlyMap<string, RefFound> }) {
   return of.map((x, k) => {
     switch (x.t) {
       case "text":
@@ -288,21 +372,23 @@ function Spans({ of }: { of: Inline[] }) {
       case "strong":
         return (
           <strong key={k}>
-            <Spans of={x.c} />
+            <Spans of={x.c} titles={titles} />
           </strong>
         );
       case "em":
         return (
           <em key={k}>
-            <Spans of={x.c} />
+            <Spans of={x.c} titles={titles} />
           </em>
         );
-      case "link":
+      case "link": {
+        const found = titles.get(x.href) ?? null;
         return (
           <a key={k} href={x.href} target="_blank" rel="noopener noreferrer">
-            <Spans of={x.c} />
+            {found ? refLabel(inlineText(x.c), found) : <Spans of={x.c} titles={titles} />}
           </a>
         );
+      }
     }
   });
 }

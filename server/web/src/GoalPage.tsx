@@ -142,7 +142,7 @@ function Goal({ data, reload, status, setStatus }: { data: GoalPageResponse; rel
                 Description
                 {may && <Pencil label="Edit Description" onClick={() => setPanel({ name: "description" })} />}
               </h2>
-              {goal.description ? <Markdown text={goal.description} /> : <p className="muted">No description yet.</p>}
+              {goal.description ? <Markdown text={goal.description} goal={goal.id} repos={data.githubRepos} /> : <p className="muted">No description yet.</p>}
               {/* GP2-5: the missing parts, for owners only, plain muted text. */}
               {may && data.hints.some((h) => h.field === "description") && <p className="hint">{data.hints.filter((h) => h.field === "description").map((h) => h.text).join(" · ")}</p>}
             </section>
@@ -172,11 +172,11 @@ function Goal({ data, reload, status, setStatus }: { data: GoalPageResponse; rel
                 </tbody>
               </table>
               <p className="note">
-                <b>When it is On track again</b> {goal.path_to_green.criteria ? <Markdown text={goal.path_to_green.criteria} inline /> : <span className="muted">None</span>}
+                <b>When it is On track again</b> {goal.path_to_green.criteria ? <Markdown text={goal.path_to_green.criteria} inline goal={goal.id} repos={data.githubRepos} /> : <span className="muted">None</span>}
               </p>
               {goal.health === "YELLOW" && (
                 <p className="note">
-                  <b>What makes it Off track</b> {goal.path_to_green.trigger ? <Markdown text={goal.path_to_green.trigger} inline /> : <span className="muted">None</span>}
+                  <b>What makes it Off track</b> {goal.path_to_green.trigger ? <Markdown text={goal.path_to_green.trigger} inline goal={goal.id} repos={data.githubRepos} /> : <span className="muted">None</span>}
                 </p>
               )}
             </section>
@@ -362,7 +362,7 @@ function WorkItems({ items, data, adding, onAdd, onDone, reload, status }: { ite
             <div key={i.id} id={`work-item-${i.id}`} className={`wrow2${i.status === "Completed" ? " done" : ""}`} data-focus={encodeFocus({ kind: "work item", id: i.id, label: i.title })}>
               <span className="wtitle">
                 <span className="wname" title={nameHover(i.id)}>{i.title}</span>
-                <IssueLinks links={i.links} />
+                <IssueLinks links={i.links} goal={data.goal.id} repos={data.githubRepos} />
                 {mayEditWorkItem(data.me, i) && <Pencil label={`Edit ${i.title}`} onClick={() => setEditing(editing === i.id ? null : i.id)} />}
               </span>
               <span className="wwho">
@@ -430,7 +430,7 @@ function EventRow({ group, data }: { group: EventGroup; data: GoalPageResponse }
           {group.events.every((x) => x.entity !== data.goal.id) && <span className="muted"> · {e.entity}</span>}
         </p>
         {e.field === "comment" ? (
-          <Markdown text={String(e.new)} />
+          <Markdown text={String(e.new)} goal={data.goal.id} repos={data.githubRepos} />
         ) : group.created ? (
           <details className="created">
             <summary>

@@ -20,6 +20,8 @@
 
 **Amended:** 2026-11-06. A work item's due_date is the linked issue's Target date. The update sets that field when the repository owner lists a date field named Target date. A 404 list, or a list with no Target date field, still succeeds and sets no date. Any other answer fails the update and the work item stays committed. A null due_date does not set a date. Start date stays unset. A pull request is not dated.
 
+**Amended:** 2026-11-06. A GitHub issue or pull request reference in a repository that is in `github_repos` and on that goal shows that issue's title and whether it is open or closed. A bare repository name is a link only when that goal has exactly one such repository of that name. No repository name is assumed. A failed read does not invent open or closed.
+
 ## Context
 
 [#72 (Enable Github integration)](https://github.com/tig/goalie/issues/72) pushes a work item's status to one linked GitHub issue.
@@ -64,6 +66,10 @@ The reason names the GitHub login.
 That agent may change status on a work item it does not own. It changes no other field.
 When status is already that value, the notice writes nothing.
 A notice whose signature does not verify is refused and writes nothing.
+A GitHub issue or pull request reference in a repository that is in `github_repos` and on that goal shows that issue's title and whether it is open or closed.
+A bare repository name is a link only when that goal has exactly one such repository of that name.
+No repository name is assumed.
+A failed read does not invent open or closed.
 
 ## Consequences
 

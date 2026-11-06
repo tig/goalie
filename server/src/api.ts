@@ -73,6 +73,9 @@ export type GitHubSearchItem = { kind: "issue" | "pull"; title: string; url: str
 /** The issues and pull requests the search found, in repository order. */
 export type GitHubSearchResponse = { items: GitHubSearchItem[] };
 
+/** GET /api/github/ref?goal=<id>&url=<one url>. A signed-in actor. A missing goal is 404, the same words as the goal page. A URL that is not an issue or pull request in github_repos and on that goal is 404 and does not call GitHub. state is open or closed. */
+export type GitHubRefResponse = { title: string; state: "open" | "closed" } | { error: string };
+
 /** GET /api/github/status. The GOALIE owner sees the repositories in github_repos, whether GitHub is configured, the last update, and the last signed notice. */
 export type GitHubStatusResponse = {
   configured: boolean;
