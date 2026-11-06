@@ -31,7 +31,7 @@ Taken on my recommendation, under Chelsea's standing rule.
 | E-7 | D2 is stored as null `due_date` and `date_type` on a sub-goal. goal.ts resolves a goal's date, Date Type, Promotion Milestone, and plan from the nearest ancestor that has them. rules.ts and every view read that one function. | One home. A parent's slip or promotion reaches its sub-goals with no second write. |
 | E-8 | The Path to Green is stored as `PathToGreen` (steps, criteria, trigger). Home's `ApiGoal.ptg` stays the first step, read from it. | D6. Home does not change shape. |
 | E-9 | The server sets `counted` on each `ApiGoal` (the goals the Committed dates card counts). The app's `filter.ts` reads it and keeps no rule of its own. | The blocks finding from the 973b8ca check. It is fixed first, because the goal page's sub-goal cards reuse Home's parts. |
-| E-10 | The API writes only goals and work items in the MLP, and two Priority commands for Home (rule 35b): an update of a rank, a cut_line, or both, and a create with exactly org_unit, period, rank, and title, and an optional cut_line. Any other kind or Priority field in `POST /api/commands` answers 400. | Smallest surface. Actors, org units, and settings stay seed and CLI writes. |
+| E-10 | The API writes only goals and work items in the MLP, and two Priority commands for Home (rule 35b): an update of a rank, a cut_line, or both, a retire (status Retired, with cut_line), and a create with exactly org_unit, period, rank, and title, and an optional cut_line. Any other kind or Priority field in `POST /api/commands` answers 400. | Smallest surface. Actors, org units, and settings stay seed and CLI writes. |
 | E-11 | Drafts are not in this Feature (product spec §5 item 2). The goal page reserves the slot only. | Scope. |
 
 ## The contract
@@ -131,7 +131,7 @@ New rules:
 | `reason-required` | Extended: a work item change to `status`, `owner`, or `due_date` needs a reason (`REASONED.work_item`). A create sends "Filed". | §6.6 |
 | `agent-own-work-items` | An agent writing a work item that it does not own before and after the write. An agent may file a work item for itself. | §6.7, story 29 |
 | `comment-text` | A comment with no text. | §6.6 |
-| `api-kind` (bad_command) | A command for a kind other than goal or work_item, or a Priority command other than a rank or cut_line update or a create (E-10). | E-10 |
+| `api-kind` (bad_command) | A command for a kind other than goal or work_item, or a Priority command other than a rank or cut_line update, a retire, or a create (E-10). | E-10 |
 | `unknown-ref` (bad_command) | A ref used before the command that creates it. | E-2 |
 
 Lints, flagged and never blocked, come back in `GoalPageResponse.hints`: the summary lint, a description missing a §6.1 part (a) to (d), a YELLOW with no trigger, a PTG step with no owner or date when the goal has since returned to GREEN, and a missing Work Product on an in-progress `Milestone (Launch)`.

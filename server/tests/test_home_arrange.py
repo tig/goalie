@@ -104,6 +104,7 @@ class HomeArrange(unittest.TestCase):
         with signed_app(ranks=True) as (open_page, api):
             got = open_page(1280, RANKER, "/?view=list")
             moved = api("/api/goals/XW-0004")["goal"]
+            listed = api("/api/priorities")
             events = [(e.get("field"), e.get("new"), e.get("reason")) for e in api("/api/goals/XW-0004")["events"] if e.get("field") == "priority"]
             phone = open_page(390, "(() => document.querySelector('.group[data-gpid=\"none\"]') ? { grips: document.querySelectorAll('.ggrip').length, sideways: document.documentElement.scrollWidth - document.documentElement.clientWidth } : null)()", "/")
         # No Priority title: the only header is No priority. Each top goal shows its number; a sub-goal shows none.
@@ -144,6 +145,8 @@ class HomeArrange(unittest.TestCase):
         self.assertTrue(got["into"]["note"]["words"].startswith("is now a sub-goal of "), got["into"]["note"])
         self.assertEqual(got["into"]["none"], [])
         self.assertEqual((moved["parent"], moved["priority"]), ("XW-0003", None))
+        # Each Priority XW-0004 held alone retired when it left, so no empty Priority is left on the list.
+        self.assertEqual([p["id"] for p in listed["funded"] + listed["backlog"] if not p["goals"]], [])
         # The app writes each reason: the new Priority and the move to it.
         self.assertIn(("priority", "PRI-4", "Moved on Home. Make it number 1."), events)
         self.assertGreater(phone["grips"], 0)

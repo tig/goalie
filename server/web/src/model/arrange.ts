@@ -130,39 +130,42 @@ export function movedWords(spot: Spot, names: { goal: (id: string) => string }):
   return "now has no priority.";
 }
 
-type ListPriority = { id: string; version: number; rank: number; cut_line: boolean; goals: { id: string; version: number; summary: string }[] };
+type ListPriority = { id: string; version: number; rank: number; cut_line: boolean; status?: string; goals: { id: string; version: number; summary: string }[] };
 
 /**
- * One batch that gives `goal` the number of `spot` and numbers the list 1 to n (SPEC.md §6.3: ranks 1 to n, no tie).
+ * One batch that moves `goal` to `spot` and numbers the list 1 to n (SPEC.md §6.3: ranks 1 to n, no tie).
  * `priorities` is every current Priority of the list in rank order, with its top goals; `split` is how many numbered goals are above the cut line now.
  * Each numbered goal keeps its Priority when it is that Priority's first goal; any other gets a new Priority titled with its summary.
- * A Priority with no goal keeps a rank after the numbered goals, so no rank is skipped. The cut line is on the Priority of the last goal above it, and on none when the Backlog is empty.
+ * A Priority that the moved goal held alone, and leaves, retires. Any other Priority with no goal keeps a rank after the numbered goals, so no rank is skipped.
+ * The cut line is on the Priority of the last goal above it, and on none when the Backlog is empty.
  */
 export function arrangeBatch(
   priorities: ListPriority[],
   goal: { id: string; version: number; summary: string },
-  spot: { number: number; backlog: boolean },
+  spot: Spot,
   split: number,
   list: { org_unit: string; period: string },
   reason: string,
 ): CommandsRequest {
   const entries = priorities.flatMap((p) => p.goals.map((g) => ({ goal: g, priority: p })));
   const ids = entries.map((e) => e.goal.id);
-  const order = ids.filter((id) => id !== goal.id).toSpliced(spot.number - 1, 0, goal.id);
-  const funded = above(ids, split, goal.id) + (spot.backlog ? 0 : 1);
-  const cutAt = funded < order.length ? funded - 1 : -1;
+  const rest = ids.filter((id) => id !== goal.id);
+  const order = spot.kind === "at" ? rest.toSpliced(spot.number - 1, 0, goal.id) : rest;
+  const funded = above(ids, split, goal.id) + (spot.kind === "at" && !spot.backlog ? 1 : 0);
+  const cutAt = funded > 0 && funded < order.length ? funded - 1 : -1;
+  const own = entries.find((e) => e.goal.id === goal.id)?.priority;
   const claimed = new Set<string>();
   const ranks: CommandsRequest["commands"] = [];
   const made: CommandsRequest["commands"] = [];
-  const update = (p: ListPriority, rank: number, cut: boolean) => {
-    const fields = { ...(p.rank !== rank ? { rank } : {}), ...(p.cut_line !== cut ? { cut_line: cut } : {}) };
-    if (Object.keys(fields).length) ranks.push({ op: "update", kind: "priority", id: p.id, base_version: p.version, fields, reason });
+  const update = (p: ListPriority, fields: { rank?: number; cut_line?: boolean; status?: "Retired" }) => {
+    const changed = Object.fromEntries(Object.entries(fields).filter(([k, v]) => p[k as keyof ListPriority] !== v));
+    if (Object.keys(changed).length) ranks.push({ op: "update", kind: "priority", id: p.id, base_version: p.version, fields: changed, reason });
   };
   order.forEach((id, i) => {
     const entry = entries.find((e) => e.goal.id === id);
     if (entry && !claimed.has(entry.priority.id)) {
       claimed.add(entry.priority.id);
-      update(entry.priority, i + 1, i === cutAt);
+      update(entry.priority, { rank: i + 1, cut_line: i === cutAt });
       return;
     }
     const g = entry?.goal ?? goal;
@@ -170,8 +173,12 @@ export function arrangeBatch(
     made.push({ op: "create", kind: "priority", ref, fields: { ...list, rank: i + 1, title: g.summary, ...(i === cutAt ? { cut_line: true } : {}) }, reason });
     made.push({ op: "update", kind: "goal", id: g.id, base_version: g.version, fields: { priority: ref, parent: null }, reason });
   });
-  priorities.filter((p) => !claimed.has(p.id)).forEach((p, i) => update(p, order.length + i + 1, false));
-  return { commands: [...ranks, ...made] };
+  const left = priorities.filter((p) => !claimed.has(p.id));
+  left.filter((p) => p.id !== own?.id).forEach((p, i) => update(p, { rank: order.length + i + 1, cut_line: false }));
+  if (own && !claimed.has(own.id)) update(own, { status: "Retired", cut_line: false });
+  // A move off the list writes the goal first, so its Priority is empty when it retires.
+  const moved: CommandsRequest["commands"] = spot.kind === "at" ? [] : [{ op: "update", kind: "goal", id: goal.id, base_version: goal.version, fields: moveFields(spot), reason }];
+  return { commands: [...moved, ...ranks, ...made] };
 }
 
 /** The plan period of a day, as the seed writes it: "2026-Q4". A new Priority takes the list's period, or this one when the list is empty. */

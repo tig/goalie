@@ -269,7 +269,7 @@ export type ApiCommand =
   | { op: "update"; kind: "goal"; id: string | Ref; base_version: number; fields: Partial<GoalFields>; reason?: string }
   | { op: "update"; kind: "work_item"; id: string | Ref; base_version: number; fields: Partial<WorkItemFields>; reason?: string }
   /** Drag to reorder on Home: one per moved Priority, in one batch. Its rank only (SPEC.md §6.3). */
-  | { op: "update"; kind: "priority"; id: string; base_version: number; fields: { rank?: number; cut_line?: boolean }; reason: string }
+  | { op: "update"; kind: "priority"; id: string; base_version: number; fields: { rank?: number; cut_line?: boolean; status?: "Retired" }; reason: string }
   /** Rule 35b: a goal placed among the numbered goals on Home gets its own Priority, titled with the goal's summary. */
   | { op: "create"; kind: "priority"; ref?: Ref; fields: { org_unit: string; period: string; rank: number; title: string; cut_line?: boolean }; reason: string }
   | { op: "comment"; kind: "goal" | "work_item"; id: string; text: string };

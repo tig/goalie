@@ -1264,8 +1264,8 @@ class ArrangeTests(unittest.TestCase):
           const list = { org_unit: "excaliwire", period: "2026-Q4" };
           const lists = [p("PRI-1", 1, ["A"]), p("PRI-2", 2, ["B", "C"]), p("PRI-3", 3, []), p("PRI-4", 4, ["D"])];
           return [
-            arrange.arrangeBatch(lists, { id: "N", version: 5, summary: "New goal" }, { number: 1, backlog: false }, 4, list, "Moved").commands,
-            arrange.arrangeBatch(lists, { id: "D", version: 2, summary: "Goal D" }, { number: 2, backlog: false }, 4, list, "Moved").commands,
+            arrange.arrangeBatch(lists, { id: "N", version: 5, summary: "New goal" }, { kind: "at", number: 1, backlog: false }, 4, list, "Moved").commands,
+            arrange.arrangeBatch(lists, { id: "D", version: 2, summary: "Goal D" }, { kind: "at", number: 2, backlog: false }, 4, list, "Moved").commands,
           ];""")
         new, up = got
         # N takes number 1 with a new Priority; A, B, D move down one. C shares B's Priority, so it gets its own. The empty PRI-3 ranks last.
@@ -1282,6 +1282,33 @@ class ArrangeTests(unittest.TestCase):
         self.assertTrue(all(c["reason"] == "Moved" for c in new))
         self.assertEqual([(c["id"], c["fields"]) for c in up if c["kind"] == "priority" and c["op"] == "update"], [("PRI-4", {"rank": 2}), ("PRI-2", {"rank": 3}), ("PRI-3", {"rank": 5})])
 
+    def test_a_goal_leaving_a_priority_it_held_alone_retires_it_and_the_rest_close_up(self) -> None:
+        # Ported from #94: a Priority emptied by a move retires, so empty Priorities do not pile up after the list. An empty Priority the move did not empty stays.
+        got = run("""const p = (id, rank, goals, cut_line = false) => ({ id, version: 1, rank, cut_line, goals: goals.map((g) => ({ id: g, version: 2, summary: "Goal " + g })) });
+          const list = { org_unit: "excaliwire", period: "2026-Q4" };
+          const lists = [p("PRI-1", 1, ["A"]), p("PRI-2", 2, ["B"], true), p("PRI-3", 3, ["C"]), p("PRI-4", 4, [])];
+          const fields = (batch) => batch.commands.map((c) => [c.kind, c.id ?? c.ref, c.fields]);
+          return [
+            fields(arrange.arrangeBatch(lists, { id: "A", version: 2, summary: "Goal A" }, { kind: "none" }, 2, list, "Moved")),
+            fields(arrange.arrangeBatch(lists, { id: "B", version: 2, summary: "Goal B" }, { kind: "into", goal: "C" }, 2, list, "Moved")),
+          ];""")
+        none, into = got
+        self.assertEqual(none, [
+            ["goal", "A", {"priority": None, "parent": None}],
+            ["priority", "PRI-2", {"rank": 1}],
+            ["priority", "PRI-3", {"rank": 2}],
+            ["priority", "PRI-4", {"rank": 3}],
+            ["priority", "PRI-1", {"status": "Retired"}],
+        ])
+        # B held the cut line: A is now the last goal above it, and B's Priority retires.
+        self.assertEqual(into, [
+            ["goal", "B", {"priority": None, "parent": "C"}],
+            ["priority", "PRI-1", {"cut_line": True}],
+            ["priority", "PRI-3", {"rank": 2}],
+            ["priority", "PRI-4", {"rank": 3}],
+            ["priority", "PRI-2", {"status": "Retired", "cut_line": False}],
+        ])
+
     def test_a_move_inside_one_part_keeps_the_backlog_where_it_is(self) -> None:
         # Chelsea, 2026-11-06: moving the last goal above the cut line up put the goal after it under the line. The line now stays after the third goal.
         got = run("""const p = (id, rank, goals, cut_line = false) => ({ id, version: 1, rank, cut_line, goals: goals.map((g) => ({ id: g, version: 2, summary: "Goal " + g })) });
@@ -1289,10 +1316,10 @@ class ArrangeTests(unittest.TestCase):
           const lists = [p("PRI-1", 1, ["A"]), p("PRI-2", 2, ["B"]), p("PRI-3", 3, ["C"], true), p("PRI-4", 4, ["D"])];
           const fields = (batch) => batch.commands.map((c) => [c.id ?? c.ref, c.fields]);
           return [
-            fields(arrange.arrangeBatch(lists, { id: "C", version: 2, summary: "Goal C" }, { number: 1, backlog: false }, 3, list, "Moved")),
-            fields(arrange.arrangeBatch(lists, { id: "D", version: 2, summary: "Goal D" }, { number: 4, backlog: false }, 3, list, "Moved")),
-            fields(arrange.arrangeBatch(lists, { id: "B", version: 2, summary: "Goal B" }, { number: 3, backlog: true }, 3, list, "Moved")),
-            fields(arrange.arrangeBatch(lists, { id: "N", version: 1, summary: "Goal N" }, { number: 4, backlog: true }, 3, list, "Moved")),
+            fields(arrange.arrangeBatch(lists, { id: "C", version: 2, summary: "Goal C" }, { kind: "at", number: 1, backlog: false }, 3, list, "Moved")),
+            fields(arrange.arrangeBatch(lists, { id: "D", version: 2, summary: "Goal D" }, { kind: "at", number: 4, backlog: false }, 3, list, "Moved")),
+            fields(arrange.arrangeBatch(lists, { id: "B", version: 2, summary: "Goal B" }, { kind: "at", number: 3, backlog: true }, 3, list, "Moved")),
+            fields(arrange.arrangeBatch(lists, { id: "N", version: 1, summary: "Goal N" }, { kind: "at", number: 4, backlog: true }, 3, list, "Moved")),
           ];""")
         up, out, down, joined = got
         self.assertEqual(up, [["PRI-3", {"rank": 1, "cut_line": False}], ["PRI-1", {"rank": 2}], ["PRI-2", {"rank": 3, "cut_line": True}]])

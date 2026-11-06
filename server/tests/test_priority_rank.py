@@ -79,6 +79,18 @@ class PriorityRankTests(unittest.TestCase):
         self.assertEqual(status, 200, body)
         self.assertEqual(self.store.read("priority", "PRI-4")["cut_line"], True)
 
+    def test_a_priority_retires_through_the_api_and_takes_no_other_status(self) -> None:
+        # Ported from #94: a Priority its only goal leaves on Home retires, so ranks still run 1 to n.
+        retire = {"op": "update", "kind": "priority", "id": "PRI-3", "base_version": 1, "fields": {"status": "Retired", "cut_line": False}, "reason": "Moved on Home."}
+        status, body = self.send("tig", [{**retire, "fields": {"status": "Current"}}])
+        self.assertEqual(status, 400, body)
+        status, body = self.send("chelsea", [retire])
+        self.assertEqual(status, 422, body)
+        self.assertIn("owner-ranks-priorities", self.rules(body))
+        status, body = self.send("tig", [retire])
+        self.assertEqual(status, 200, body)
+        self.assertEqual(self.store.read("priority", "PRI-3")["status"], "Retired")
+
     def test_ranks_end_one_to_n_with_no_gap_and_no_tie(self) -> None:
         status, body = self.send("tig", [rank("PRI-1", 1, 5)])
         self.assertEqual(status, 422, body)

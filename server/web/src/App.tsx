@@ -226,6 +226,8 @@ function Home({ data, reload }: { data: PrioritiesResponse; reload: () => void }
   const search = <Search q={screen.q} health={screen.health} onSearch={(q) => change({ q }, Boolean(screen.q) === Boolean(q.trim()))} onClear={() => change({ health: undefined, q: undefined })} />;
   // Rule 35b: goals with no Priority show last, as No priority. Unfiltered, a goal its owner may change is dragged to arrange it.
   const none = useMemo(() => filterPriorities([{ id: "none", version: 0, rank: 0, title: "No priority", period: "", cut_line: false, goals: data.unprioritized ?? [] }], { health: screen.health, q: screen.q })[0]?.goals ?? [], [data, screen.health, screen.q]);
+  // Rule 10b: each top goal on a Priority shows its number, its place in the whole list, even while a filter hides some. `split` is how many are above the cut line.
+  const numbered = useMemo(() => [...data.funded, ...data.backlog].flatMap((p) => p.goals.map((g) => g.id)), [data]);
   // The numbered goals above the cut line (SPEC.md §6.3); the rest show under Backlog.
   const split = data.funded.flatMap((p) => p.goals).length;
   const arrange = filtering
@@ -235,8 +237,9 @@ function Home({ data, reload }: { data: PrioritiesResponse; reload: () => void }
         // A goal takes a number only for an actor who may rank the list's Priorities (SPEC.md §6.3).
         rank: data.mayRank,
         save: async (goal: string, spot: Spot, reason: string) => {
-          if (spot.kind === "at") {
-            const lists = [...data.funded, ...data.backlog];
+          // A number, or a numbered goal leaving the list for a ranker, is one batch over the whole list, so the numbers close up and an emptied Priority retires.
+          const lists = [...data.funded, ...data.backlog];
+          if (spot.kind === "at" || (data.mayRank && numbered.includes(goal))) {
             const find = (list: ApiGoal[]): ApiGoal | undefined => list.reduce<ApiGoal | undefined>((hit, g) => hit ?? (g.id === goal ? g : find(g.children)), undefined);
             const moving = find([...lists.flatMap((p) => p.goals), ...(data.unprioritized ?? [])]);
             if (!moving) return "Reload and try again.";
@@ -258,8 +261,6 @@ function Home({ data, reload }: { data: PrioritiesResponse; reload: () => void }
           return body.error === "invalid" ? body.violations.map((v) => v.message).join(" ") : body.error === "stale" ? "Someone changed this goal after you opened the page. Reload and try again." : body.message;
         },
       };
-  // Rule 10b: each top goal on a Priority shows its number, its place in the whole list, even while a filter hides some. `split` is how many are above the cut line.
-  const numbered = useMemo(() => [...data.funded, ...data.backlog].flatMap((p) => p.goals.map((g) => g.id)), [data]);
   const tree = { funded, backlog, numbered, split, me: data.me, today: data.today, filtering, selected: screen.health, hot, none, arrange };
   const zoomAt = ZOOM_ORDER.indexOf(screen.zoom);
   const zoomStep = (to: number, label: string, sign: string) => {

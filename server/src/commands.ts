@@ -177,11 +177,13 @@ function resolve(at: number, raw: unknown, ids: Record<Ref, string>, refused: Se
   };
   // Rule 35b: on Home each numbered goal is its own Priority. The API ranks a Priority and moves the cut line, or makes one with a list, a period, a rank, a title, and the cut line if it has it.
   const priorityFields = isObject(raw.fields) ? Object.keys(raw.fields).sort().join() : "";
-  const updates = ["rank", "cut_line", "cut_line,rank"];
+  // A Priority its only goal leaves on Home retires, and takes the cut line with it.
+  const updates = ["rank", "cut_line", "cut_line,rank", "status", "cut_line,status"];
   const creates = ["org_unit,period,rank,title", "cut_line,org_unit,period,rank,title"];
   if (kind === "priority" && !((raw.op === "update" && updates.includes(priorityFields)) || (raw.op === "create" && creates.includes(priorityFields)))) {
-    throw bad(at, "api-kind: through the API a Priority takes an update of its rank or cut_line, or a create with org_unit, period, rank, title, and an optional cut_line");
+    throw bad(at, "api-kind: through the API a Priority takes an update of its rank or cut_line, a retire, or a create with org_unit, period, rank, title, and an optional cut_line");
   }
+  if (kind === "priority" && raw.op === "update" && isObject(raw.fields) && "status" in raw.fields && raw.fields.status !== "Retired") throw bad(at, "api-kind: through the API a Priority's status changes only to Retired");
   if (raw.op === "comment") return { op: "comment", kind, id: key(raw.id) as string, text: raw.text as string };
   if (raw.op === "create" && raw.ref !== undefined && (!isRef(raw.ref) || raw.ref in ids || refused.has(raw.ref))) throw bad(at, `ref ${String(raw.ref)} must be "$" and a word, used once`);
   if (raw.fields !== undefined && !isObject(raw.fields)) throw bad(at, "fields is a JSON object");
