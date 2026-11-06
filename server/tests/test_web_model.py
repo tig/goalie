@@ -993,21 +993,11 @@ class GitHubPageTests(unittest.TestCase):
 
 
 class ArrangeTests(unittest.TestCase):
-    """Rule 35b: on Home a goal is dragged into a goal (a sub-goal), beside a sub-goal, onto a Priority, or to No priority."""
+    """Rule 35b: on Home each top goal on a Priority shows a number. A goal is dragged between numbered goals, into a goal, beside a sub-goal, or to No priority."""
 
-    def test_each_spot_writes_its_priority_and_parent(self) -> None:
-        got = run("""return [
-          arrange.moveFields({ kind: "into", goal: "XW-0002" }),
-          arrange.moveFields({ kind: "beside", parent: "XW-0003" }),
-          arrange.moveFields({ kind: "top", priority: "PRI-1" }),
-          arrange.moveFields({ kind: "top", priority: null }),
-        ];""")
-        self.assertEqual(got, [
-            {"priority": None, "parent": "XW-0002"},
-            {"priority": None, "parent": "XW-0003"},
-            {"priority": "PRI-1", "parent": None},
-            {"priority": None, "parent": None},
-        ])
+    def test_a_move_off_the_list_writes_its_parent_and_no_priority(self) -> None:
+        got = run("""return [arrange.moveFields({ kind: "into", goal: "XW-0002" }), arrange.moveFields({ kind: "beside", parent: "XW-0003" }), arrange.moveFields({ kind: "none" })];""")
+        self.assertEqual(got, [{"priority": None, "parent": "XW-0002"}, {"priority": None, "parent": "XW-0003"}, {"priority": None, "parent": None}])
 
     def test_a_goal_never_goes_into_itself_or_its_own_tree(self) -> None:
         got = run("""const trees = api.funded.flatMap((p) => p.goals);
@@ -1016,55 +1006,77 @@ class ArrangeTests(unittest.TestCase):
             arrange.canMove(trees, "XW-0003", { kind: "into", goal: "XW-0004" }),
             arrange.canMove(trees, "XW-0003", { kind: "beside", parent: "XW-0004" }),
             arrange.canMove(trees, "XW-0004", { kind: "into", goal: "XW-0002" }),
-            arrange.canMove(trees, "XW-0002", { kind: "top", priority: "PRI-3" }),
+            arrange.canMove(trees, "XW-0002", { kind: "at", index: 0, number: 1 }),
           ];""")
         self.assertEqual(got, [False, False, False, True, True])
 
+    def test_the_list_after_a_move_and_the_spot_for_a_number(self) -> None:
+        got = run("""const ids = ["a", "b", "c"];
+          return [arrange.placed(ids, "a", 3), arrange.placed(ids, "c", 0), arrange.placed(ids, "x", 1), arrange.toNumber(ids, "a", 3), arrange.toNumber(ids, "c", 1), arrange.toNumber(ids, "x", 2)];""")
+        self.assertEqual(got, [["b", "c", "a"], ["c", "a", "b"], ["a", "x", "b", "c"], {"kind": "at", "index": 3, "number": 3}, {"kind": "at", "index": 0, "number": 1}, {"kind": "at", "index": 1, "number": 2}])
+
     def test_a_drop_where_the_goal_already_is_is_no_move(self) -> None:
         got = run("""return [
-          arrange.changes({ priority: "PRI-2", parent: null }, { kind: "top", priority: "PRI-2" }),
-          arrange.changes({ priority: null, parent: "XW-0003" }, { kind: "into", goal: "XW-0003" }),
-          arrange.changes({ priority: "PRI-2", parent: null }, { kind: "top", priority: "PRI-1" }),
+          arrange.changes({ index: 1, parent: null }, { kind: "at", index: 1, number: 2 }),
+          arrange.changes({ index: 1, parent: null }, { kind: "at", index: 2, number: 2 }),
+          arrange.changes({ index: 1, parent: null }, { kind: "at", index: 0, number: 1 }),
+          arrange.changes({ index: null, parent: "XW-0003" }, { kind: "into", goal: "XW-0003" }),
+          arrange.changes({ index: null, parent: null }, { kind: "none" }),
+          arrange.changes({ index: 2, parent: null }, { kind: "none" }),
         ];""")
-        self.assertEqual(got, [False, False, True])
+        self.assertEqual(got, [False, False, True, False, False, True])
 
     def test_the_middle_of_a_row_nests_and_its_edges_place_beside(self) -> None:
         self.assertEqual(run("return [arrange.zoneOf(10, 0, 40), arrange.zoneOf(20, 0, 40), arrange.zoneOf(35, 0, 40)];"), ["edge", "in", "edge"])
-
-    def test_an_edge_says_whether_the_line_goes_above_or_below_the_row(self) -> None:
         self.assertEqual(run("return [arrange.edgeOf(5, 0, 40), arrange.edgeOf(35, 0, 40)];"), ["before", "after"])
 
-    def test_the_spot_for_a_row_and_zone(self) -> None:
-        got = run("""return [
-          arrange.spotAt({ goal: "XW-0002", parent: null, group: "PRI-2" }, "in"),
-          arrange.spotAt({ goal: "XW-0002", parent: null, group: "PRI-2" }, "edge"),
-          arrange.spotAt({ goal: "XW-0004", parent: "XW-0003", group: "PRI-3" }, "edge"),
-          arrange.spotAt({ goal: "XW-0095", parent: null, group: null }, "edge"),
-        ];""")
-        self.assertEqual(got, [{"kind": "into", "goal": "XW-0002"}, {"kind": "top", "priority": "PRI-2"}, {"kind": "beside", "parent": "XW-0003"}, {"kind": "top", "priority": None}])
+    def test_the_spot_for_a_row_zone_and_edge(self) -> None:
+        got = run("""const ids = ["XW-0001", "XW-0002", "XW-0003"];
+          return [
+            arrange.spotAt({ goal: "XW-0002", parent: null, index: 1 }, "in", "before", ids, "XW-0095"),
+            arrange.spotAt({ goal: "XW-0002", parent: null, index: 1 }, "edge", "before", ids, "XW-0095"),
+            arrange.spotAt({ goal: "XW-0001", parent: null, index: 0 }, "edge", "after", ids, "XW-0003"),
+            arrange.spotAt({ goal: "XW-0004", parent: "XW-0003", index: null }, "edge", "after", ids, "XW-0095"),
+            arrange.spotAt({ goal: "XW-0095", parent: null, index: null }, "edge", "before", ids, "XW-0003"),
+          ];""")
+        self.assertEqual(got, [{"kind": "into", "goal": "XW-0002"}, {"kind": "at", "index": 1, "number": 2}, {"kind": "at", "index": 1, "number": 2}, {"kind": "beside", "parent": "XW-0003"}, {"kind": "none"}])
 
     def test_the_move_says_what_it_does_in_words(self) -> None:
-        got = run("""const names = { goal: (id) => ({ "XW-0002": "Add two more humans to XW by Nov 15" })[id] ?? id, priority: (id) => ({ "PRI-1": "Priority 1 Regenerate the E28 canon" })[id] ?? id };
+        got = run("""const names = { goal: (id) => ({ "XW-0002": "Add two more humans to XW by Nov 15" })[id] ?? id };
           return [
             arrange.moveWords({ kind: "into", goal: "XW-0002" }, names),
-            arrange.moveWords({ kind: "beside", parent: "XW-0002" }, names),
-            arrange.moveWords({ kind: "top", priority: "PRI-1" }, names),
-            arrange.moveWords({ kind: "top", priority: null }, names),
+            arrange.moveWords({ kind: "at", index: 0, number: 1 }, names),
+            arrange.moveWords({ kind: "none" }, names),
+            arrange.movedWords({ kind: "at", index: 3, number: 3 }, names),
+            arrange.movedWords({ kind: "beside", parent: "XW-0002" }, names),
+            arrange.movedWords({ kind: "none" }, names),
           ];""")
-        self.assertEqual(got, [
-            "Make it a sub-goal of Add two more humans to XW by Nov 15",
-            "Make it a sub-goal of Add two more humans to XW by Nov 15",
-            "Move it to Priority 1 Regenerate the E28 canon",
-            "Move it to No priority",
+        self.assertEqual(got, ["Make it a sub-goal of Add two more humans to XW by Nov 15", "Make it number 1", "Move it to No priority", "is now number 3.", "is now a sub-goal of Add two more humans to XW by Nov 15.", "now has no priority."])
+
+    def test_arrow_keys_change_the_number_and_go_on_to_no_priority(self) -> None:
+        got = run("""const ids = ["a", "b", "c"];
+          return [arrange.nextSpot(ids, "b", -1), arrange.nextSpot(ids, "b", 1), arrange.nextSpot(ids, "a", -1), arrange.nextSpot(ids, "c", 1), arrange.nextSpot(ids, "x", -1), arrange.nextSpot(ids, "x", 1)];""")
+        self.assertEqual(got, [{"kind": "at", "index": 0, "number": 1}, {"kind": "at", "index": 3, "number": 3}, None, {"kind": "none"}, {"kind": "at", "index": 3, "number": 4}, None])
+
+    def test_a_goal_placed_among_the_numbers_gets_its_own_priority_and_the_list_numbers_one_to_n(self) -> None:
+        got = run("""const p = (id, rank, goals) => ({ id, version: 1, rank, goals: goals.map((g) => ({ id: g, version: 2, summary: "Goal " + g })) });
+          const list = { org_unit: "excaliwire", period: "2026-Q4" };
+          const lists = [p("PRI-1", 1, ["A"]), p("PRI-2", 2, ["B", "C"]), p("PRI-3", 3, []), p("PRI-4", 4, ["D"])];
+          return [
+            arrange.arrangeBatch(lists, { id: "N", version: 5, summary: "New goal" }, 0, list, "Moved").commands,
+            arrange.arrangeBatch(lists, { id: "D", version: 2, summary: "Goal D" }, 1, list, "Moved").commands,
+          ];""")
+        new, up = got
+        # N takes number 1 with a new Priority; A, B, D move down one. C shares B's Priority, so it gets its own. The empty PRI-3 ranks last.
+        self.assertEqual([(c["op"], c["kind"], c.get("id", c.get("ref")), c["fields"]) for c in new], [
+            ("update", "priority", "PRI-1", {"rank": 2}),
+            ("update", "priority", "PRI-2", {"rank": 3}),
+            ("update", "priority", "PRI-4", {"rank": 5}),
+            ("update", "priority", "PRI-3", {"rank": 6}),
+            ("create", "priority", "$p1", {"org_unit": "excaliwire", "period": "2026-Q4", "rank": 1, "title": "New goal"}),
+            ("update", "goal", "N", {"priority": "$p1", "parent": None}),
+            ("create", "priority", "$p4", {"org_unit": "excaliwire", "period": "2026-Q4", "rank": 4, "title": "Goal C"}),
+            ("update", "goal", "C", {"priority": "$p4", "parent": None}),
         ])
-
-    def test_a_saved_move_reads_as_a_sentence_after_the_goal_name(self) -> None:
-        got = run("""const names = { goal: (id) => id, priority: (id) => ({ "PRI-2": "Priority 2 Grow the XW team" })[id] };
-          return [arrange.movedWords({ kind: "into", goal: "XW-0003" }, names), arrange.movedWords({ kind: "top", priority: "PRI-2" }, names), arrange.movedWords({ kind: "top", priority: null }, names)];""")
-        self.assertEqual(got, ["is now a sub-goal of XW-0003.", "is now in Priority 2 Grow the XW team.", "now has no priority."])
-
-    def test_arrow_keys_move_a_top_goal_one_group_and_stop_at_the_ends(self) -> None:
-        got = run("""const groups = ["PRI-1", "PRI-2", "PRI-3", null];
-          return [arrange.nextGroup(groups, "PRI-2", -1), arrange.nextGroup(groups, "PRI-3", 1), arrange.nextGroup(groups, null, 1), arrange.nextGroup(groups, "PRI-1", -1)];""")
-        self.assertEqual(got, ["PRI-1", None, None, "PRI-1"])
-
+        self.assertTrue(all(c["reason"] == "Moved" for c in new))
+        self.assertEqual([(c["id"], c["fields"]) for c in up if c["kind"] == "priority" and c["op"] == "update"], [("PRI-4", {"rank": 2}), ("PRI-2", {"rank": 3}), ("PRI-3", {"rank": 5})])

@@ -22,9 +22,11 @@
       "version": 1,
       "rank": 1,
       "title": "Regenerate the E28 canon",
+      "period": "2026-Q4",
       "goals": [
         {
           "id": "XW-0001",
+          "version": 1,
           "summary": "Regenerate the E28 canon by Oct 1",
           "owner": {
             "id": "tig",
@@ -58,9 +60,11 @@
       "version": 1,
       "rank": 2,
       "title": "Grow the XW team",
+      "period": "2026-Q4",
       "goals": [
         {
           "id": "XW-0002",
+          "version": 1,
           "summary": "Add two more humans to XW by Nov 15",
           "owner": {
             "id": "tig",
@@ -93,9 +97,11 @@
       "version": 1,
       "rank": 3,
       "title": "Run Excaliwire on GOALIE",
+      "period": "2026-Q4",
       "goals": [
         {
           "id": "XW-0003",
+          "version": 1,
           "summary": "Tig, Chelsea, and agents use GOALIE to drive Excaliwire execution",
           "owner": {
             "id": "chelsea",
@@ -118,6 +124,7 @@
           "children": [
             {
               "id": "XW-0004",
+              "version": 2,
               "summary": "Run the MLP prototype at goalie.excaliwire.com with Excaliwire's real goals loaded",
               "owner": {
                 "id": "chelsea",
@@ -136,6 +143,7 @@
               "children": [
                 {
                   "id": "XW-0005",
+                  "version": 1,
                   "summary": "Stand up the spine: store, rules, sign-in, event log",
                   "owner": {
                     "id": "chelsea",
@@ -150,6 +158,7 @@
                 },
                 {
                   "id": "XW-0006",
+                  "version": 1,
                   "summary": "Show Priorities as Home, on a timeline",
                   "owner": {
                     "id": "chelsea",
@@ -164,6 +173,7 @@
                 },
                 {
                   "id": "XW-0007",
+                  "version": 1,
                   "summary": "Open a goal and keep it true",
                   "owner": {
                     "id": "chelsea",
@@ -178,6 +188,7 @@
                 },
                 {
                   "id": "XW-0008",
+                  "version": 1,
                   "summary": "Create a goal or a sub-goal",
                   "owner": {
                     "id": "chelsea",
@@ -192,6 +203,7 @@
                 },
                 {
                   "id": "XW-0009",
+                  "version": 1,
                   "summary": "Let an agent work in GOALIE: API, MCP, Drafts",
                   "owner": {
                     "id": "chelsea",
@@ -206,6 +218,7 @@
                 },
                 {
                   "id": "XW-0010",
+                  "version": 1,
                   "summary": "Draft health from GitHub with the evidence",
                   "owner": {
                     "id": "chelsea",
@@ -220,6 +233,7 @@
                 },
                 {
                   "id": "XW-0011",
+                  "version": 1,
                   "summary": "Load Excaliwire's goals and release",
                   "owner": {
                     "id": "chelsea",

@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ApiError, GoalPageResponse, Health, PrioritiesResponse } from "../../src/api.ts";
+import type { ApiError, ApiGoal, GoalPageResponse, Health, PrioritiesResponse } from "../../src/api.ts";
 import { monthYear } from "../../src/dates.ts";
 import { labelSizers, rangeLabel } from "./model/labels.ts";
 import { calendarMonth } from "./model/calendar.ts";
 import { filterPriorities, isFiltering } from "./model/filter.ts";
 import { ZOOM_ORDER, type View } from "./model/query.ts";
 import { moveFrom, timelineWindow } from "./model/timeline.ts";
-import { fieldsBatch, rankBatch } from "./model/commands.ts";
-import { moveFields, type Spot } from "./model/arrange.ts";
+import { fieldsBatch } from "./model/commands.ts";
+import { arrangeBatch, moveFields, quarterOf, type Spot } from "./model/arrange.ts";
 import { getJson, postCommands } from "./data.ts";
 import { Cards, HealthCounts } from "./Cards.tsx";
 import { CalendarView } from "./CalendarView.tsx";
@@ -222,27 +222,27 @@ function Home({ data, reload }: { data: PrioritiesResponse; reload: () => void }
   const view: View = phone && screen.view === "timeline" ? "list" : screen.view;
 
   const search = <Search q={screen.q} health={screen.health} onSearch={(q) => change({ q }, Boolean(screen.q) === Boolean(q.trim()))} onClear={() => change({ health: undefined, q: undefined })} />;
-  // Rule 35: drag to reorder Priorities, only for an actor who may (mayRank) and with no filter on. One batch of the ranks that changed.
-  const rank =
-    data.mayRank && !filtering
-      ? {
-          save: async (order: string[], reason: string) => {
-            const { body } = await postCommands(rankBatch([...data.funded, ...data.backlog], order, reason));
-            if (body.ok) {
-              reload();
-              return undefined;
-            }
-            return body.error === "invalid" ? body.violations.map((v) => v.message).join(" ") : body.error === "stale" ? "Someone changed the Priorities after you opened the page. Reload and try again." : body.message;
-          },
-        }
-      : undefined;
   // Rule 35b: goals with no Priority show last, as No priority. Unfiltered, a goal its owner may change is dragged to arrange it.
-  const none = useMemo(() => filterPriorities([{ id: "none", version: 0, rank: 0, title: "No priority", goals: data.unprioritized ?? [] }], { health: screen.health, q: screen.q })[0]?.goals ?? [], [data, screen.health, screen.q]);
+  const none = useMemo(() => filterPriorities([{ id: "none", version: 0, rank: 0, title: "No priority", period: "", goals: data.unprioritized ?? [] }], { health: screen.health, q: screen.q })[0]?.goals ?? [], [data, screen.health, screen.q]);
   const arrange = filtering
     ? undefined
     : {
         may: (g: { owner: { id: string } }) => g.owner.id === data.me.id || data.goalieOwner,
+        // A goal takes a number only for an actor who may rank the list's Priorities (SPEC.md §6.3).
+        rank: data.mayRank,
         save: async (goal: string, spot: Spot, reason: string) => {
+          if (spot.kind === "at") {
+            const lists = [...data.funded, ...data.backlog];
+            const find = (list: ApiGoal[]): ApiGoal | undefined => list.reduce<ApiGoal | undefined>((hit, g) => hit ?? (g.id === goal ? g : find(g.children)), undefined);
+            const moving = find([...lists.flatMap((p) => p.goals), ...(data.unprioritized ?? [])]);
+            if (!moving) return "Reload and try again.";
+            const { body } = await postCommands(arrangeBatch(lists, moving, spot.index, { org_unit: data.org.id, period: lists[0]?.period ?? quarterOf(data.today) }, reason));
+            if (body.ok) {
+              reload();
+              return undefined;
+            }
+            return body.error === "invalid" ? body.violations.map((v) => v.message).join(" ") : body.error === "stale" ? "Someone changed the goals after you opened the page. Reload and try again." : body.message;
+          }
           // The Home tree holds no versions, so the move reads the goal first and writes on that version.
           const page = await getJson<GoalPageResponse>(`/api/goals/${encodeURIComponent(goal)}`);
           if (page.state !== "ok") return page.state === "refused" ? page.reason : "Try again.";
@@ -254,7 +254,9 @@ function Home({ data, reload }: { data: PrioritiesResponse; reload: () => void }
           return body.error === "invalid" ? body.violations.map((v) => v.message).join(" ") : body.error === "stale" ? "Someone changed this goal after you opened the page. Reload and try again." : body.message;
         },
       };
-  const tree = { funded, backlog, me: data.me, today: data.today, filtering, selected: screen.health, hot, rank, none, arrange };
+  // Rule 10b: each top goal on a Priority shows its number, its place in the whole list, even while a filter hides some.
+  const numbered = useMemo(() => [...data.funded, ...data.backlog].flatMap((p) => p.goals.map((g) => g.id)), [data]);
+  const tree = { funded, backlog, numbered, me: data.me, today: data.today, filtering, selected: screen.health, hot, none, arrange };
   const zoomAt = ZOOM_ORDER.indexOf(screen.zoom);
   const zoomStep = (to: number, label: string, sign: string) => {
     const zoom = ZOOM_ORDER[to];

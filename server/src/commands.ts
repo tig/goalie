@@ -12,12 +12,12 @@ import { DEFAULTS, inTransaction, write, type Command, type WriteResult } from "
  * The MCP route will call runCommands too.
  */
 
-/** Only goals and work items are written through the API in the MLP (E-10), and a Priority's rank, for drag to reorder on Home. */
+/** Only goals and work items are written through the API in the MLP (E-10), and, for arranging on Home, a Priority's rank and a new Priority for one goal (rule 35b). */
 // The contract names an update for every kind the API writes, so the app can send it (f55879d left priority out).
 const API_KINDS = ["goal", "work_item", "priority"] as const satisfies readonly Extract<ApiCommand, { op: "update" }>["kind"][];
 
 /** The fields that hold a goal key, so a ref may stand there. A ref anywhere else is plain text. */
-const KEY_FIELDS: Record<(typeof API_KINDS)[number], readonly string[]> = { goal: ["promotion_milestone", "parent"], work_item: ["goal"], priority: [] };
+const KEY_FIELDS: Record<(typeof API_KINDS)[number], readonly string[]> = { goal: ["promotion_milestone", "parent", "priority"], work_item: ["goal"], priority: [] };
 
 /** A re-rank swaps ranks one command at a time, so a tie is checked once the batch ends (checkRanks). */
 const DEFERRED: Partial<Record<string, readonly string[]>> = { priority: ["no-rank-ties"] };
@@ -174,8 +174,10 @@ function resolve(at: number, raw: unknown, ids: Record<Ref, string>, refused: Se
     if (!(value in ids)) throw bad(at, `unknown-ref: ${value} is used before the command that creates it`);
     return ids[value];
   };
-  if (kind === "priority" && (raw.op !== "update" || !isObject(raw.fields) || Object.keys(raw.fields).join() !== "rank")) {
-    throw bad(at, "api-kind: through the API a Priority takes only an update of its rank");
+  // Rule 35b: on Home each numbered goal is its own Priority. The API ranks a Priority, or makes one with a list, a period, a rank, and a title.
+  const priorityFields = isObject(raw.fields) ? Object.keys(raw.fields).sort().join() : "";
+  if (kind === "priority" && !((raw.op === "update" && priorityFields === "rank") || (raw.op === "create" && priorityFields === "org_unit,period,rank,title"))) {
+    throw bad(at, "api-kind: through the API a Priority takes an update of its rank, or a create with org_unit, period, rank, and title");
   }
   if (raw.op === "comment") return { op: "comment", kind, id: key(raw.id) as string, text: raw.text as string };
   if (raw.op === "create" && raw.ref !== undefined && (!isRef(raw.ref) || raw.ref in ids || refused.has(raw.ref))) throw bad(at, `ref ${String(raw.ref)} must be "$" and a word, used once`);
@@ -183,7 +185,7 @@ function resolve(at: number, raw: unknown, ids: Record<Ref, string>, refused: Se
   const fields: Row = { ...(raw.fields as Row | undefined) };
   for (const field of KEY_FIELDS[kind]) if (field in fields) fields[field] = key(fields[field]);
   const reason = typeof raw.reason === "string" ? raw.reason : undefined;
-  if (raw.op === "create") return { op: "create", kind, fields, reason };
+  if (raw.op === "create") return { op: "create", kind, fields: kind === "priority" ? { ...fields, status: "Current" } : fields, reason };
   if (raw.op === "update") return { op: "update", kind, id: key(raw.id) as string, base_version: raw.base_version as number, fields, reason };
   throw bad(at, "op is create, update, or comment");
 }

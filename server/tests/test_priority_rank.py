@@ -89,10 +89,28 @@ class PriorityRankTests(unittest.TestCase):
         self.assertEqual(status, 422, body)
         self.assertIn("reason-required", self.rules(body))
 
-    def test_the_api_changes_only_a_priority_rank(self) -> None:
+    def test_a_goal_placed_first_on_home_gets_its_own_priority_in_one_batch(self) -> None:
+        # Rule 35b: XW-0004 is a sub-goal. Dropped above number 1, it gets a new Priority at rank 1 and the others move down one.
+        goal = self.store.read("goal", "XW-0004")
+        new = {"op": "create", "kind": "priority", "ref": "$p1", "fields": {"org_unit": "excaliwire", "period": "2026-Q4", "rank": 1, "title": goal["summary"]}, "reason": "Moved on Home. Make it number 1."}
+        moved = {"op": "update", "kind": "goal", "id": "XW-0004", "base_version": goal["version"], "fields": {"priority": "$p1", "parent": None}, "reason": "Moved on Home. Make it number 1."}
+        status, body = self.send("tig", [rank("PRI-1", 1, 2), rank("PRI-2", 1, 3), rank("PRI-3", 1, 4), new, moved])
+        self.assertEqual(status, 200, body)
+        made = self.store.read("priority", "PRI-4")
+        self.assertEqual((made["rank"], made["title"], made["status"]), (1, goal["summary"], "Current"))
+        self.assertEqual((self.store.read("goal", "XW-0004")["priority"], self.store.read("goal", "XW-0004")["parent"]), ("PRI-4", None))
+        self.assertEqual(self.ranks(), {"PRI-1": 2, "PRI-2": 3, "PRI-3": 4})
+        # Only the list's owner makes a Priority.
+        status, body = self.send("chelsea", [{**new, "fields": {**new["fields"], "rank": 5}}])
+        self.assertEqual(status, 422, body)
+        self.assertIn("owner-ranks-priorities", self.rules(body))
+
+    def test_the_api_changes_only_a_priority_rank_or_makes_one_with_its_list_period_rank_and_title(self) -> None:
         status, body = self.send("tig", [{"op": "update", "kind": "priority", "id": "PRI-1", "base_version": 1, "fields": {"title": "Renamed"}, "reason": "No"}])
         self.assertEqual(status, 400, body)
         status, body = self.send("tig", [{"op": "create", "kind": "priority", "fields": {"rank": 4}, "reason": "No"}])
+        self.assertEqual(status, 400, body)
+        status, body = self.send("tig", [{"op": "create", "kind": "priority", "fields": {"org_unit": "excaliwire", "period": "2026-Q4", "rank": 4, "title": "X", "cut_line": True}, "reason": "No"}])
         self.assertEqual(status, 400, body)
         with sqlite3.connect(self.store.path) as db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM priority").fetchone()[0], 3)
