@@ -1433,6 +1433,36 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertEqual(reply.status, 200, reply.body)
         self.assertEqual(json.loads(reply.body), {"error": "GitHub answered 500 for GET /repos/tig/goalie/issues/72. no"})
 
+    def test_two_ref_reads_share_one_installation_token(self) -> None:
+        """Two issues in one repository use one installation token. Each read is 200."""
+        self.github.issue["title"] = "Ship the gate"
+        self.github.issue["state"] = "open"
+        self.github.added_path = f"/repos/{REPO}/issues/73"
+        self.github.added_issue = {"body": "Keep this.", "title": "The next gate", "state": "open", "state_reason": None, "labels": ["pinned"]}
+        db = sqlite3.connect(self.store.path)
+        db.execute("DELETE FROM github_push WHERE error IS NULL OR issue = ''")
+        db.commit()
+        db.close()
+        row = self.store.read("actor", "tig")
+        if row.get("subject") != "sub-tig":
+            wrote = self.store.write("tig", update("actor", "tig", row["version"], {"subject": "sub-tig"}))
+            self.assertTrue(wrote["ok"], wrote)
+        token, issuers = signed("sub-tig")
+        headers = {"Authorization": f"Bearer {token}"}
+        other = f"https://github.com/{REPO}/issues/73"
+        with running_server(self.store.path, {**self.env, **issuers}) as (proc, port):
+            ready = get(proc, port, "/health")
+            self.assertEqual(ready.status, 200, ready.body)
+            self.github.calls.clear()
+            first = get(proc, port, "/api/github/ref?" + urlencode({"goal": GOAL, "url": ISSUE}), headers)
+            second = get(proc, port, "/api/github/ref?" + urlencode({"goal": GOAL, "url": other}), headers)
+        self.assertEqual(first.status, 200, first.body)
+        self.assertEqual(second.status, 200, second.body)
+        self.assertEqual(json.loads(first.body), {"title": "Ship the gate", "state": "open"})
+        self.assertEqual(json.loads(second.body), {"title": "The next gate", "state": "open"})
+        posts = [call for call in self.github.calls if call.startswith("POST /app/installations/") and call.endswith("/access_tokens")]
+        self.assertEqual(posts, ["POST /app/installations/77/access_tokens"])
+
     def search_as(self, actor: str, subject: str, goal: str, q: str) -> Reply:
         row = self.store.read("actor", actor)
         if row.get("subject") != subject:

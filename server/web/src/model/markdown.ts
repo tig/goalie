@@ -68,6 +68,48 @@ export function refLabel(label: string, found: { title: string; state: "open" | 
   return `${label} ${found.title} ${found.state}`;
 }
 
+export type RefFound = { title: string; state: "open" | "closed" };
+
+/** An http or https github.com issue or pull URL, as https, with no query, fragment, or trailing slash. Anything else is null. */
+const CANONICAL_REF = /^https?:\/\/github\.com\/([^/?#]+)\/([^/?#]+)\/(issues|pull)\/(\d+)\/?(?:[?#][^\s]*)?$/i;
+
+export function canonicalRefUrl(href: string): string | null {
+  const match = CANONICAL_REF.exec(href);
+  if (match === null || match[1] === undefined || match[2] === undefined || match[3] === undefined || match[4] === undefined) return null;
+  return `https://github.com/${match[1]}/${match[2]}/${match[3].toLowerCase()}/${match[4]}`;
+}
+
+/** One read per goal, canonical URL, and revision. Two callers share that promise. A title stays until the revision changes. A miss does not. */
+const refReads = new Map<string, Promise<RefFound | null>>();
+
+export function refTitle(goal: string, href: string, revision: number, load: (path: string) => Promise<RefFound | null>): Promise<RefFound | null> {
+  const url = canonicalRefUrl(href);
+  if (url === null) return Promise.resolve(null);
+  const mark = `\0${goal}\0${url}`;
+  const key = `${revision}${mark}`;
+  for (const old of refReads.keys()) {
+    const cut = old.indexOf("\0");
+    if (cut > 0 && old.slice(cut) === mark && old.slice(0, cut) !== String(revision)) refReads.delete(old);
+  }
+  const hit = refReads.get(key);
+  if (hit !== undefined) return hit;
+  const path = `/api/github/ref?goal=${encodeURIComponent(goal)}&url=${encodeURIComponent(url)}`;
+  const pending = Promise.resolve()
+    .then(() => load(path))
+    .then(
+      (found) => {
+        if (found === null) refReads.delete(key);
+        return found;
+      },
+      (error: unknown) => {
+        refReads.delete(key);
+        throw error;
+      },
+    );
+  refReads.set(key, pending);
+  return pending;
+}
+
 /** A trailing slash is the same issue or pull request. A query or a fragment is the same one. The href keeps issues or pull. */
 const GH_URL = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/(issues|pull)\/(\d+)\/?(?:[?#][^\s]*)?$/;
 

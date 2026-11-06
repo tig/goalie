@@ -5,20 +5,18 @@ import type { ActorRef, GitHubRefResponse, Health } from "../../src/api.ts";
 import { placePopover, popoverWidth } from "./model/popover.ts";
 import { useDismiss } from "./useScreen.ts";
 import { encodeFocus } from "./model/feedback.ts";
-import { githubIssues, markdown, refLabel, type Block, type Inline } from "./model/markdown.ts";
+import { canonicalRefUrl, githubIssues, markdown, refLabel, refTitle, type Block, type Inline, type RefFound } from "./model/markdown.ts";
 import { getJson } from "./data.ts";
 
 /** The shared parts every view is built from. */
 
-const GH_REF = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/(?:issues|pull)\/\d+\/?(?:[?#][^\s]*)?$/i;
-
-type RefFound = { title: string; state: "open" | "closed" };
-
-/** A GitHub issue or pull request href whose repository is associated, when that list is passed. With no list, every such href. */
+/** A GitHub issue or pull request href whose repository is associated, when that list is passed. With no list, every such href. An http address is the same issue as https. */
 function inScope(href: string, repos: string[] | undefined): boolean {
-  const match = GH_REF.exec(href);
-  if (match === null || match[1] === undefined || match[2] === undefined) return false;
+  const url = canonicalRefUrl(href);
+  if (url === null) return false;
   if (repos === undefined) return true;
+  const match = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\//.exec(url);
+  if (match === null || match[1] === undefined || match[2] === undefined) return false;
   const want = `${match[1]}/${match[2]}`.toLowerCase();
   return repos.some((repo) => repo.toLowerCase() === want);
 }
@@ -53,33 +51,33 @@ function blockHrefs(blocks: Block[]): string[] {
   return out;
 }
 
-function inlineText(nodes: Inline[]): string {
-  let text = "";
-  for (const node of nodes) {
-    if (node.t === "text" || node.t === "code") text += node.v;
-    else if (node.t === "strong" || node.t === "em" || node.t === "link") text += inlineText(node.c);
-  }
-  return text;
+function requestRef(path: string): Promise<RefFound | null> {
+  return getJson<GitHubRefResponse>(path).then((result) => {
+    if (result.state !== "ok" || !("title" in result.data)) return null;
+    const { title, state } = result.data;
+    if (title === "" || (state !== "open" && state !== "closed")) return null;
+    return { title, state };
+  });
 }
 
-/** One read per in-scope href, from GOALIE. An error, or an answer without both title and state, stays absent. */
-function useRefTitles(goal: string | undefined, hrefs: string[]): ReadonlyMap<string, RefFound> {
+/** One read per in-scope href, from GOALIE. An error, or an answer without both title and state, stays absent. A new revision reads again. */
+function useRefTitles(goal: string | undefined, hrefs: string[], revision: number): ReadonlyMap<string, RefFound> {
   const listKey = hrefs.join("\0");
-  const seenKey = `${goal ?? ""}\0${listKey}`;
+  const seenKey = `${revision}\0${goal ?? ""}\0${listKey}`;
   const [slot, setSlot] = useState<{ key: string; found: Map<string, RefFound> }>({ key: "", found: new Map() });
   const found = slot.key === seenKey ? slot.found : new Map<string, RefFound>();
   useEffect(() => {
     if (goal === undefined || listKey === "") return;
     let live = true;
     for (const href of listKey.split("\0")) {
-      void getJson<GitHubRefResponse>(`/api/github/ref?goal=${encodeURIComponent(goal)}&url=${encodeURIComponent(href)}`).then((result) => {
-        if (!live || result.state !== "ok" || !("title" in result.data)) return;
-        const { title, state } = result.data;
-        if (title === "" || (state !== "open" && state !== "closed")) return;
+      const url = canonicalRefUrl(href);
+      if (url === null) continue;
+      void refTitle(goal, url, revision, requestRef).then((hit) => {
+        if (!live || hit === null) return;
         setSlot((prev) => {
           const base = prev.key === seenKey ? prev.found : new Map<string, RefFound>();
           const next = new Map(base);
-          next.set(href, { title, state });
+          next.set(href, hit);
           return { key: seenKey, found: next };
         });
       });
@@ -87,14 +85,14 @@ function useRefTitles(goal: string | undefined, hrefs: string[]): ReadonlyMap<st
     return () => {
       live = false;
     };
-  }, [goal, listKey, seenKey]);
+  }, [goal, listKey, seenKey, revision]);
   return found;
 }
 
-/** Each GitHub issue or pull request named in a work item's links. A pull request keeps its /pull/ URL. goal asks GOALIE for each in-scope title. */
-export function IssueLinks({ links, goal, repos }: { links: string[] | null; goal?: string; repos?: string[] }) {
+/** Each GitHub issue or pull request named in a work item's links. A pull request keeps its /pull/ URL. goal asks GOALIE for each in-scope title. revision reads those titles again. */
+export function IssueLinks({ links, goal, repos, revision = 0 }: { links: string[] | null; goal?: string; repos?: string[]; revision?: number }) {
   const issues = githubIssues(links, repos);
-  const titles = useRefTitles(goal, once(issues.map((issue) => issue.href), repos));
+  const titles = useRefTitles(goal, once(issues.map((issue) => canonicalRefUrl(issue.href) ?? issue.href), repos), revision);
   if (issues.length === 0) return null;
   return (
     <span className="wissues">
@@ -305,10 +303,10 @@ export function Legend({ kind, help }: { kind: keyof typeof LEGEND; help?: Parti
   );
 }
 
-/** Markdown text, drawn from the model's tree (GL8). Nothing here reads HTML. A link opens in a new tab. goal asks GOALIE for each in-scope title. */
-export function Markdown({ text, inline, goal, repos }: { text: string; inline?: boolean; goal?: string; repos?: string[] }) {
+/** Markdown text, drawn from the model's tree (GL8). Nothing here reads HTML. A link opens in a new tab. goal asks GOALIE for each in-scope title. revision reads those titles again. */
+export function Markdown({ text, inline, goal, repos, revision = 0 }: { text: string; inline?: boolean; goal?: string; repos?: string[]; revision?: number }) {
   const blocks = markdown(text, repos);
-  const titles = useRefTitles(goal, once(blockHrefs(blocks), repos));
+  const titles = useRefTitles(goal, once(blockHrefs(blocks), repos), revision);
   // Text inside a sentence (a Path to Green criterion) stays in the sentence when it is one paragraph.
   if (inline && blocks.length === 1 && blocks[0].t === "p") return <Spans of={blocks[0].c} titles={titles} />;
   return (
@@ -385,7 +383,8 @@ function Spans({ of, titles }: { of: Inline[]; titles: ReadonlyMap<string, RefFo
         const found = titles.get(x.href) ?? null;
         return (
           <a key={k} href={x.href} target="_blank" rel="noopener noreferrer">
-            {found ? refLabel(inlineText(x.c), found) : <Spans of={x.c} titles={titles} />}
+            <Spans of={x.c} titles={titles} />
+            {found ? ` ${found.title} ${found.state}` : null}
           </a>
         );
       }

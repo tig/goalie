@@ -1028,6 +1028,42 @@ class MarkdownTests(unittest.TestCase):
         self.assertIn(".wissue{min-width:0;font-weight:700;text-decoration:none;overflow-wrap:anywhere}", css)
         self.assertIn("@media (pointer:coarse){.wissue{display:inline-flex;align-items:center;box-sizing:border-box;min-width:44px;min-height:44px}}", css)
 
+    def test_a_milestone_comment_uses_its_own_goal(self) -> None:
+        """A comment on another entity reads that entity and no repository list. A comment on this goal, or on one of its work items, reads this goal and its repositories."""
+        got = run('return [goalpage.commentScope("XW-0002", "XW-0001", ["WI-0001"]), goalpage.commentScope("XW-0001", "XW-0001", ["WI-0001"]), goalpage.commentScope("WI-0001", "XW-0001", ["WI-0001"])];')
+        self.assertEqual(got, [
+            {"goal": "XW-0002", "repos": False},
+            {"goal": "XW-0001", "repos": True},
+            {"goal": "XW-0001", "repos": True},
+        ])
+
+    def test_an_http_ref_is_read_over_https(self) -> None:
+        """An http GitHub issue or pull URL is read as https. A query, a fragment, and a trailing slash are not part of that URL. Any other address is not one."""
+        got = run('return [markdown.canonicalRefUrl("http://github.com/tig/goalie/issues/72"), markdown.canonicalRefUrl("https://github.com/tig/goalie/pull/95/"), markdown.canonicalRefUrl("https://example.com/issues/1")];')
+        self.assertEqual(got, ["https://github.com/tig/goalie/issues/72", "https://github.com/tig/goalie/pull/95", None])
+
+    def test_a_new_event_rereads_a_ref(self) -> None:
+        """A new Event changes the revision the goal page passes, and the title read depends on that revision."""
+        src = MODEL.parent
+        page = (src / "GoalPage.tsx").read_text(encoding="utf-8")
+        parts = (src / "parts.tsx").read_text(encoding="utf-8")
+        comment = page.split('e.field === "comment"', 1)[1].split("group.created", 1)[0]
+        self.assertIn("revision={data.eventCount}", comment)
+        hook = parts.split("function useRefTitles", 1)[1].split("export function IssueLinks", 1)[0]
+        effect = hook.split("useEffect(", 1)[1]
+        self.assertRegex(effect, r"\[[^\]\n]*\brevision\b[^\]\n]*\]")
+
+    def test_a_formatted_link_keeps_its_children(self) -> None:
+        """A formatted link keeps its child spans. The title and the state follow them. A work item's links stay plain."""
+        parts = (MODEL.parent / "parts.tsx").read_text(encoding="utf-8")
+        branch = parts.split('case "link":', 1)[1]
+        self.assertNotIn("refLabel", branch)
+        self.assertIn("<Spans of={x.c} titles={titles} />", branch)
+        self.assertIn("found.title", branch)
+        self.assertIn("found.state", branch)
+        issues = parts.split("export function IssueLinks", 1)[1].split("export const BRAND", 1)[0]
+        self.assertIn("refLabel(", issues)
+
 
 class HoverTests(unittest.TestCase):
     def test_a_name_hover_shows_the_id_and_keeps_a_full_name(self) -> None:

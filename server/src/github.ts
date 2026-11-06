@@ -715,6 +715,10 @@ function bodyWithTrailer(body: string, line: string): string {
   return `${base}${base ? "\n\n" : ""}${block}\n`;
 }
 
+/** Kept per installation id until 50 minutes after it was issued. A different repository still looks up its own installation. A new server process starts empty. */
+const installationTokens = new Map<string, { token: string; until: number }>();
+const TOKEN_FOR_MS = 50 * 60 * 1000;
+
 /** The installation GitHub reports for this repository. A non-200 lookup is the push failure. It must not fall back to GOALIE_GITHUB_INSTALLATION_ID. */
 async function installationToken(config: GitHubConfig, owner: string, repo: string): Promise<{ token: string } | { error: string }> {
   const now = Math.floor(Date.now() / 1000);
@@ -724,11 +728,14 @@ async function installationToken(config: GitHubConfig, owner: string, repo: stri
   if (found.status !== 200) return { error: refused(found.status, `GET ${lookup}`, found.body) };
   const id = reportedInstallation(found.body);
   if (id === undefined) return { error: `GitHub answered ${found.status} for GET ${lookup} without an installation.` };
+  const cached = installationTokens.get(id);
+  if (cached !== undefined && Date.now() < cached.until) return { token: cached.token };
   const path = `/app/installations/${id}/access_tokens`;
   const response = await call(config, appToken, "POST", path);
   if (response.status !== 201 && response.status !== 200) return { error: refused(response.status, `POST ${path}`, response.body) };
   const issued = (response.body as { token?: unknown }).token;
   if (typeof issued !== "string" || issued === "") return { error: `GitHub answered ${response.status} for POST ${path} without a token.` };
+  installationTokens.set(id, { token: issued, until: Date.now() + TOKEN_FOR_MS });
   return { token: issued };
 }
 
