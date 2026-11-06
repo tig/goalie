@@ -82,7 +82,7 @@ export function canonicalRefUrl(href: string): string | null {
 /** One read per goal, canonical URL, and revision. Two callers share that promise. A title stays until the revision changes. A miss does not. */
 const refReads = new Map<string, Promise<RefFound | null>>();
 
-export function refTitle(goal: string, href: string, revision: number, load: (path: string) => Promise<RefFound | null>): Promise<RefFound | null> {
+export function refTitle(goal: string, href: string, revision: string | number, load: (path: string) => Promise<RefFound | null>): Promise<RefFound | null> {
   const url = canonicalRefUrl(href);
   if (url === null) return Promise.resolve(null);
   const mark = `\0${goal}\0${url}`;

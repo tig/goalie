@@ -210,6 +210,11 @@ export function keepOrder(first: string[] | null, now: string[]): string[] {
   return [...first.filter((id) => now.includes(id)), ...now.filter((id) => !first.includes(id))];
 }
 
+/** The work queue's revision. Each item is id:status, in the order given. A status change changes it. The same statuses do not. */
+export function workRefRevision(items: { id: string; status: string }[]): string {
+  return items.map((item) => `${item.id}:${item.status}`).join("\n");
+}
+
 /** The team view (plan F6): one queue per owner, people with work In Progress first; each queue by status. Deleted items are left out. */
 export function queues<T extends Pick<ApiWorkItem, "owner" | "status">>(items: T[], actors: Record<string, ApiActor>, me: string) {
   const owners = [...new Set(items.filter((i) => i.status !== "Deleted").map((i) => i.owner))];

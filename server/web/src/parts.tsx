@@ -61,7 +61,7 @@ function requestRef(path: string): Promise<RefFound | null> {
 }
 
 /** One read per in-scope href, from GOALIE. An error, or an answer without both title and state, stays absent. A new revision reads again. */
-function useRefTitles(goal: string | undefined, hrefs: string[], revision: number): ReadonlyMap<string, RefFound> {
+function useRefTitles(goal: string | undefined, hrefs: string[], revision: string | number): ReadonlyMap<string, RefFound> {
   const listKey = hrefs.join("\0");
   const seenKey = `${revision}\0${goal ?? ""}\0${listKey}`;
   const [slot, setSlot] = useState<{ key: string; found: Map<string, RefFound> }>({ key: "", found: new Map() });
@@ -90,7 +90,7 @@ function useRefTitles(goal: string | undefined, hrefs: string[], revision: numbe
 }
 
 /** Each GitHub issue or pull request named in a work item's links. A pull request keeps its /pull/ URL. goal asks GOALIE for each in-scope title. revision reads those titles again. */
-export function IssueLinks({ links, goal, repos, revision = 0 }: { links: string[] | null; goal?: string; repos?: string[]; revision?: number }) {
+export function IssueLinks({ links, goal, repos, revision = 0 }: { links: string[] | null; goal?: string; repos?: string[]; revision?: string | number }) {
   const issues = githubIssues(links, repos);
   const titles = useRefTitles(goal, once(issues.map((issue) => canonicalRefUrl(issue.href) ?? issue.href), repos), revision);
   if (issues.length === 0) return null;

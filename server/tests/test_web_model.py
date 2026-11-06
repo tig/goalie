@@ -1053,6 +1053,14 @@ class MarkdownTests(unittest.TestCase):
         effect = hook.split("useEffect(", 1)[1]
         self.assertRegex(effect, r"\[[^\]\n]*\brevision\b[^\]\n]*\]")
 
+    def test_a_work_queue_rereads_a_ref_when_status_changes(self) -> None:
+        """A status change changes the revision the work queue passes. The same statuses do not."""
+        got = run('return [goalpage.workRefRevision([{ id: "WI-0001", status: "Backlog" }]), goalpage.workRefRevision([{ id: "WI-0001", status: "Completed" }])];')
+        self.assertEqual(got[0], "WI-0001:Backlog")
+        self.assertNotEqual(got[1], got[0])
+        work = (MODEL.parent / "WorkPage.tsx").read_text(encoding="utf-8")
+        self.assertIn("<IssueLinks links={i.links} goal={i.goal} revision={workRefRevision(work.items)} />", work)
+
     def test_a_formatted_link_keeps_its_children(self) -> None:
         """A formatted link keeps its child spans. The title and the state follow them. A work item's links stay plain."""
         parts = (MODEL.parent / "parts.tsx").read_text(encoding="utf-8")
