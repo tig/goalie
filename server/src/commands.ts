@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { ApiCommand, ApiEvent, ApiViolation, BatchHint, CommandsResponse, Ref, StoredGoal, StoredPriority } from "./api.ts";
+import { claimGitHubAttach, createGitHubIssue, finishGitHubCreate, hashQuery, hasIssueUrl, issueRepoAllowed, issueUrlRepo, openedIssueReason, queueGitHubPush, rememberGitHubFailure, searchGitHub } from "./github.ts";
 import { publish, toApiEvent } from "./live.ts";
 import { toApiWorkItem } from "./work.ts";
 import { lookup, read } from "./read.ts";
@@ -187,9 +188,105 @@ function resolve(at: number, raw: unknown, ids: Record<Ref, string>, refused: Se
   const fields: Row = { ...(raw.fields as Row | undefined) };
   for (const field of KEY_FIELDS[kind]) if (field in fields) fields[field] = key(fields[field]);
   const reason = typeof raw.reason === "string" ? raw.reason : undefined;
-  if (raw.op === "create") return { op: "create", kind, fields: kind === "priority" ? { ...fields, status: "Current" } : fields, reason };
+  if (raw.op === "create") {
+    // A concrete id is kept. A ref is not an id. github_repo stays on the command. It is not a field of the work item.
+    const id = typeof raw.id === "string" && !isRef(raw.id) ? raw.id : undefined;
+    const create = { op: "create" as const, kind, fields: kind === "priority" ? { ...fields, status: "Current" } : fields, reason, ...(id !== undefined ? { id } : {}) };
+    if (kind === "work_item" && Object.hasOwn(raw, "github_repo")) return { ...create, github_repo: raw.github_repo };
+    return create;
+  }
   if (raw.op === "update") return { op: "update", kind, id: key(raw.id) as string, base_version: raw.base_version as number, fields, reason };
   throw bad(at, "op is create, update, or comment");
+}
+
+/** After the batch commits, open the issue and write its URL onto the work item. The actor is the one who filed it. The current status is queued for the caller's drain. */
+export async function fileGitHubIssue(db: DatabaseSync, actor: string, id: string, repo: string, today: string): Promise<void> {
+  const opened = await createGitHubIssue(db, id, repo);
+  if ("error" in opened) {
+    rememberGitHubFailure(db, id, opened.error);
+    return;
+  }
+  const item = read(db, "work_item", id);
+  if (item === undefined || typeof item.version !== "number") return;
+  const prior = Array.isArray(item.links) ? item.links.filter((link): link is string => typeof link === "string") : [];
+  const reason = openedIssueReason(opened.url);
+  const result = write(db, actor, { op: "update", kind: "work_item", id, base_version: item.version, fields: { links: [...prior, opened.url] }, reason }, today);
+  if (!result.ok) {
+    const detail = result.error === "invalid" ? result.violations.map((v) => v.message).join(" ") : result.error === "stale" ? "The work item changed before the issue link was saved." : result.message;
+    rememberGitHubFailure(db, id, detail);
+    return;
+  }
+  if (result.events.length > 0) publish(result.events.map(toApiEvent));
+  // A label failure stays on the work item. A later push would clear it.
+  if (opened.labelError !== null) {
+    rememberGitHubFailure(db, id, opened.labelError);
+    return;
+  }
+  finishGitHubCreate(db, id, reason);
+  // The link write does not change status, so it does not queue a push. The caller's drain sends this row.
+  const current = read(db, "work_item", id);
+  if (current !== undefined) queueGitHubPush(db, current);
+}
+
+/** After the commit, append the first issue for each attach request. The search is not inside a transaction. A pull request is not that issue. When the title's # query is no longer the one searched, the link is not written and the status is not queued. When the issue's repository is not in github_repos and on the goal, the link is not written and the status is not queued. The current status is queued for the caller's drain when the link is written. The failure is written back only when the work item still has no issue link and no newer push row exists. A failed link write keeps the new error. A search that does not complete records that failure and does not attach. The request is not put back. */
+export async function attachGitHubIssues(db: DatabaseSync, today: string): Promise<void> {
+  const rows = db.prepare(
+    "SELECT work_item FROM github_push WHERE issue = '' AND (repo IS NULL OR repo = '') AND actor IS NOT NULL AND actor <> ''",
+  ).all() as { work_item: string }[];
+  for (const row of rows) {
+    const claimed = claimGitHubAttach(db, row.work_item);
+    if (claimed === undefined) continue;
+    const kept = claimed.error;
+    // The failure is written back only when the work item still has no issue link and no newer push row exists.
+    const showFailure = (detail: string): void => {
+      const saved = read(db, "work_item", row.work_item);
+      if (saved !== undefined && hasIssueUrl(saved.links)) return;
+      const newer = db.prepare("SELECT work_item FROM github_push WHERE work_item = ?").get(row.work_item);
+      if (newer !== undefined) return;
+      rememberGitHubFailure(db, row.work_item, detail);
+    };
+    const restore = (): void => {
+      if (kept !== null) showFailure(kept);
+    };
+    const item = read(db, "work_item", row.work_item);
+    const query = item === undefined || typeof item.title !== "string" || typeof item.goal !== "string" ? undefined : hashQuery(item.title);
+    if (item === undefined || query === undefined || hasIssueUrl(item.links) || typeof item.goal !== "string") {
+      restore();
+      continue;
+    }
+    const found = await searchGitHub(db, item.goal, query);
+    // An incomplete search does not attach. The search response still lists the hits that completed.
+    if (found.error !== null) {
+      showFailure(found.error);
+      continue;
+    }
+    const issue = found.items.find((hit) => hit.kind === "issue");
+    if (issue === undefined) {
+      restore();
+      continue;
+    }
+    const current = read(db, "work_item", row.work_item);
+    if (current === undefined || typeof current.version !== "number" || typeof current.title !== "string" || hashQuery(current.title) !== query || hasIssueUrl(current.links)) {
+      restore();
+      continue;
+    }
+    const repo = issueUrlRepo(issue.url);
+    // The repository is read again from github_repos and the goal before the link is written.
+    if (repo === undefined || !issueRepoAllowed(db, current.goal, repo)) {
+      restore();
+      continue;
+    }
+    const prior = Array.isArray(current.links) ? current.links.filter((link): link is string => typeof link === "string") : [];
+    const result = write(db, claimed.actor, { op: "update", kind: "work_item", id: row.work_item, base_version: current.version, fields: { links: [...prior, issue.url] }, reason: "Attached" }, today);
+    if (!result.ok) {
+      const detail = result.error === "invalid" ? result.violations.map((v) => v.message).join(" ") : result.error === "stale" ? "The work item changed before the issue link was saved." : result.message;
+      rememberGitHubFailure(db, row.work_item, detail);
+      continue;
+    }
+    if (result.events.length > 0) publish(result.events.map(toApiEvent));
+    const linked = read(db, "work_item", row.work_item);
+    if (linked !== undefined) queueGitHubPush(db, linked);
+  }
 }
 
 function failure(db: DatabaseSync, at: number, kind: string, result: Exclude<WriteResult, { ok: true }>, today: string): CommandsAnswer {

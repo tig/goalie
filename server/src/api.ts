@@ -71,6 +71,15 @@ export type PrioritiesResponse = {
   summary: ApiSummary;
 };
 
+/** GET /api/github/search?goal=<id>&q=<text>. A signed-in actor. A missing goal is 404, the same words as the goal page. Empty q returns no items. */
+export type GitHubSearchItem = { kind: "issue" | "pull"; title: string; url: string };
+
+/** The issues and pull requests the search found, in repository order. */
+export type GitHubSearchResponse = { items: GitHubSearchItem[] };
+
+/** GET /api/github/ref?goal=<id>&url=<one url>. A signed-in actor. A missing goal is 404, the same words as the goal page. A URL that is not an issue or pull request in github_repos and on that goal is 404 and does not call GitHub. state is open or closed. */
+export type GitHubRefResponse = { title: string; state: "open" | "closed" } | { error: string };
+
 /** GET /api/github/status. The GOALIE owner sees the repositories in github_repos, whether GitHub is configured, the last update, and the last signed notice. */
 export type GitHubStatusResponse = {
   configured: boolean;
@@ -227,6 +236,8 @@ export type GoalPageResponse = {
   /** Lints: flagged, never blocked (SPEC.md §8.1). The app shows the text as a muted hint at the field. */
   hints: { field: string; text: string }[];
   actors: Record<string, ApiActor>;
+  /** Repositories this goal names that github_repos covers, in that order. Add as Github Issue uses them. */
+  githubRepos: string[];
 };
 
 /** GET /api/options. What the New goal form, + Sub-goal, and + Work item offer, with the defaults the server writes. */
@@ -254,7 +265,7 @@ export type Ref = `$${string}`;
 /** One command of POST /api/commands. Only goals and work items are written through the API in the MLP. */
 export type ApiCommand =
   | { op: "create"; kind: "goal"; ref?: Ref; fields: Partial<GoalFields>; reason: string }
-  | { op: "create"; kind: "work_item"; ref?: Ref; fields: Partial<WorkItemFields>; reason: string }
+  | { op: "create"; kind: "work_item"; ref?: Ref; fields: Partial<WorkItemFields>; reason: string; github_repo?: string }
   | { op: "update"; kind: "goal"; id: string | Ref; base_version: number; fields: Partial<GoalFields>; reason?: string }
   | { op: "update"; kind: "work_item"; id: string | Ref; base_version: number; fields: Partial<WorkItemFields>; reason?: string }
   /** Drag to reorder on Home: one per moved Priority, in one batch. Its rank only (SPEC.md §6.3). */

@@ -453,6 +453,10 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 .ferror{margin:4px 0 8px;font-size:12px;font-weight:700;color:var(--red-ink)}
 .fcurrent{margin:2px 0 0;font-size:12px;color:var(--mute)}
 .field{display:flex;flex-direction:column;gap:4px;margin:0 0 10px}
+.attach{position:relative}
+.ghit{left:0;right:auto;min-width:220px;max-width:320px}
+.ghit button{display:flex;gap:8px;width:100%;border:0;background:none;font:600 13px var(--font);color:var(--ink);text-align:left;padding:8px 10px;border-radius:10px;cursor:pointer}
+.ghit button:hover,.ghit button:focus-visible{background:var(--hover);outline:none}
 .flabel{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
 .panel input,.panel select,.panel textarea,.commentbox textarea{font:500 13px var(--font);color:var(--ink);background:var(--card);border:1px solid var(--cut);border-radius:10px;padding:7px 10px;box-sizing:border-box;width:100%}
 .panel input:focus,.panel select:focus,.panel textarea:focus,.commentbox textarea:focus{outline:2px solid var(--focus);outline-offset:0}
