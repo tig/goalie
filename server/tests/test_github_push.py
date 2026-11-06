@@ -103,6 +103,7 @@ class GitHub(ThreadingHTTPServer):
         self.issue_fields: list[dict[str, Any]] | None = None
         self.fail_issue_fields = False
         self.forbid_issue_fields = False
+        self.fail_issue_get = False
         self.field_values: list[dict[str, Any]] = []
 
 
@@ -249,7 +250,13 @@ class Handler(BaseHTTPRequestHandler):
         return None
 
     def _issue(self, issue: dict[str, Any]) -> None:
-        self._send(200, {"body": issue["body"], "state": issue["state"], "state_reason": issue["state_reason"], "labels": [{"name": name} for name in issue["labels"]]})
+        if self.server.fail_issue_get:
+            self._send(500, {"message": "no"})
+            return
+        payload: dict[str, Any] = {"body": issue["body"], "state": issue["state"], "state_reason": issue["state_reason"], "labels": [{"name": name} for name in issue["labels"]]}
+        if "title" in issue:
+            payload["title"] = issue["title"]
+        self._send(200, payload)
 
     def _patch(self, issue: dict[str, Any]) -> None:
         body = self._body()
@@ -397,6 +404,7 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.github.issue_fields = None
         self.github.fail_issue_fields = False
         self.github.forbid_issue_fields = False
+        self.github.fail_issue_get = False
         self.github.field_values = []
         self.github.issue = {"body": "Keep this.", "state": "open", "state_reason": None, "labels": ["pinned"]}
         set_scope(self.store, ["tig/goalie"], [{"repo": "github.com/tig/goalie"}])
@@ -1402,6 +1410,59 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertEqual(self.github.field_values, [])
         self.assertFalse(any("/pull/" in call for call in self.github.calls), self.github.calls)
 
+    def test_a_ref_in_scope_returns_the_title_and_the_state(self) -> None:
+        """The goal's scope is tig/goalie. GET the ref for issue 72. The fake issue title is Ship the gate and the state is open."""
+        self.github.issue["title"] = "Ship the gate"
+        self.github.issue["state"] = "open"
+        reply = self.ref_as("tig", "sub-tig", GOAL, ISSUE)
+        self.assertEqual(reply.status, 200, reply.body)
+        self.assertEqual(json.loads(reply.body), {"title": "Ship the gate", "state": "open"})
+
+    def test_a_ref_outside_the_goal_is_not_read(self) -> None:
+        """A factory issue is not read when the goal's only associated repository is tig/goalie. The fake records no call."""
+        self.github.calls.clear()
+        reply = self.ref_as("tig", "sub-tig", GOAL, OTHER)
+        self.assertEqual(reply.status, 404, reply.body)
+        self.assertEqual(self.github.calls, [])
+        self.assertNotIn(b"state", reply.body)
+
+    def test_a_failed_ref_read_sets_no_state(self) -> None:
+        """An issue GET that answers 500 returns the error sentence and no state."""
+        self.github.fail_issue_get = True
+        reply = self.ref_as("tig", "sub-tig", GOAL, ISSUE)
+        self.assertEqual(reply.status, 200, reply.body)
+        self.assertEqual(json.loads(reply.body), {"error": "GitHub answered 500 for GET /repos/tig/goalie/issues/72. no"})
+
+    def test_two_ref_reads_share_one_installation_token(self) -> None:
+        """Two issues in one repository use one installation token. Each read is 200."""
+        self.github.issue["title"] = "Ship the gate"
+        self.github.issue["state"] = "open"
+        self.github.added_path = f"/repos/{REPO}/issues/73"
+        self.github.added_issue = {"body": "Keep this.", "title": "The next gate", "state": "open", "state_reason": None, "labels": ["pinned"]}
+        db = sqlite3.connect(self.store.path)
+        db.execute("DELETE FROM github_push WHERE error IS NULL OR issue = ''")
+        db.commit()
+        db.close()
+        row = self.store.read("actor", "tig")
+        if row.get("subject") != "sub-tig":
+            wrote = self.store.write("tig", update("actor", "tig", row["version"], {"subject": "sub-tig"}))
+            self.assertTrue(wrote["ok"], wrote)
+        token, issuers = signed("sub-tig")
+        headers = {"Authorization": f"Bearer {token}"}
+        other = f"https://github.com/{REPO}/issues/73"
+        with running_server(self.store.path, {**self.env, **issuers}) as (proc, port):
+            ready = get(proc, port, "/health")
+            self.assertEqual(ready.status, 200, ready.body)
+            self.github.calls.clear()
+            first = get(proc, port, "/api/github/ref?" + urlencode({"goal": GOAL, "url": ISSUE}), headers)
+            second = get(proc, port, "/api/github/ref?" + urlencode({"goal": GOAL, "url": other}), headers)
+        self.assertEqual(first.status, 200, first.body)
+        self.assertEqual(second.status, 200, second.body)
+        self.assertEqual(json.loads(first.body), {"title": "Ship the gate", "state": "open"})
+        self.assertEqual(json.loads(second.body), {"title": "The next gate", "state": "open"})
+        posts = [call for call in self.github.calls if call.startswith("POST /app/installations/") and call.endswith("/access_tokens")]
+        self.assertEqual(posts, ["POST /app/installations/77/access_tokens"])
+
     def search_as(self, actor: str, subject: str, goal: str, q: str) -> Reply:
         row = self.store.read("actor", actor)
         if row.get("subject") != subject:
@@ -1409,6 +1470,16 @@ class GitHubPushTests(unittest.TestCase, PushTests):
             self.assertTrue(wrote["ok"], wrote)
         token, issuers = signed(subject)
         path = "/api/github/search?" + urlencode({"goal": goal, "q": q})
+        with running_server(self.store.path, {**self.env, **issuers}) as (proc, port):
+            return get(proc, port, path, {"Authorization": f"Bearer {token}"})
+
+    def ref_as(self, actor: str, subject: str, goal: str, url: str) -> Reply:
+        row = self.store.read("actor", actor)
+        if row.get("subject") != subject:
+            wrote = self.store.write("tig", update("actor", actor, row["version"], {"subject": subject}))
+            self.assertTrue(wrote["ok"], wrote)
+        token, issuers = signed(subject)
+        path = "/api/github/ref?" + urlencode({"goal": goal, "url": url})
         with running_server(self.store.path, {**self.env, **issuers}) as (proc, port):
             return get(proc, port, path, {"Authorization": f"Bearer {token}"})
 

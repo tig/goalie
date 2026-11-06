@@ -909,13 +909,24 @@ if __name__ == "__main__":
 class MarkdownTests(unittest.TestCase):
     """Issue #61: multi-line text is Markdown, and a GitHub issue or pull request reference is a link (GL8)."""
 
+    def test_a_bare_name_with_no_associated_repo_stays_text(self) -> None:
+        """A bare repo#N with no associated repository, or an empty list, stays text. It is not a link."""
+        for call in (
+            'markdown.markdown("See factory#172 now")',
+            'markdown.markdown("See factory#172 now", [])',
+        ):
+            got = run(f"return {call};")
+            self.assertEqual(got, [{"t": "p", "c": [{"t": "text", "v": "See factory#172 now"}]}])
+            self.assertNotIn("link", json.dumps(got))
+
     def test_tig_s_example_links_to_the_factory_issue(self) -> None:
-        got = run('return markdown.markdown("See factory/issues/172 now");')
+        got = run('return markdown.markdown("See factory/issues/172 now", ["excaliwire/factory"]);')
         self.assertEqual(got, [{"t": "p", "c": [{"t": "text", "v": "See "}, {"t": "link", "href": "https://github.com/excaliwire/factory/issues/172", "c": [{"t": "text", "v": "factory#172"}]}, {"t": "text", "v": " now"}]}])
 
     def test_every_reference_form_links_with_a_short_name(self) -> None:
+        repos = ["excaliwire/factory", "excaliwire/web", "excaliwire/operations", "tig/goalie"]
         src = "factory#3 web/pull/9 excaliwire/operations#179 tig/goalie#56 goalie#57 someone/thing/issues/4 https://github.com/excaliwire/factory/pull/3192"
-        got = run(f"return markdown.markdown({json.dumps(src)})[0].c.filter((x) => x.t === 'link').map((x) => [x.href, x.c[0].v]);")
+        got = run(f"return markdown.markdown({json.dumps(src)}, {json.dumps(repos)})[0].c.filter((x) => x.t === 'link').map((x) => [x.href, x.c[0].v]);")
         self.assertEqual(got, [
             ["https://github.com/excaliwire/factory/issues/3", "factory#3"],
             ["https://github.com/excaliwire/web/pull/9", "web#9"],
@@ -925,6 +936,20 @@ class MarkdownTests(unittest.TestCase):
             ["https://github.com/someone/thing/issues/4", "someone/thing#4"],
             ["https://github.com/excaliwire/factory/pull/3192", "factory#3192"],
         ])
+        written = run('return markdown.markdown("See excaliwire/factory#172 now")[0].c.filter((x) => x.t === "link").map((x) => [x.href, x.c[0].v]);')
+        self.assertEqual(written, [["https://github.com/excaliwire/factory/issues/172", "excaliwire/factory#172"]])
+
+    def test_a_bare_name_uses_the_one_associated_repo(self) -> None:
+        got = run('return markdown.markdown("factory#172", ["excaliwire/factory"])[0].c;')
+        self.assertEqual(got, [{"t": "link", "href": "https://github.com/excaliwire/factory/issues/172", "c": [{"t": "text", "v": "factory#172"}]}])
+
+    def test_two_associated_repos_with_one_name_stay_text(self) -> None:
+        got = run('return markdown.markdown("factory#172", ["excaliwire/factory", "acme/factory"]);')
+        self.assertEqual(got, [{"t": "p", "c": [{"t": "text", "v": "factory#172"}]}])
+
+    def test_a_ref_label_names_the_title_and_the_state(self) -> None:
+        got = run('return [markdown.refLabel("factory#172", { title: "Ship the gate", state: "open" }), markdown.refLabel("factory#172", null), markdown.refLabel("factory#172", { title: "Ship the gate", state: "closed" })];')
+        self.assertEqual(got, ["factory#172 Ship the gate open", "factory#172", "factory#172 Ship the gate closed"])
 
     def test_a_number_alone_is_not_a_reference(self) -> None:
         got = run('return markdown.markdown("Priority #1 and C# and a/b").flatMap((b) => b.c).map((x) => x.t);')
@@ -956,6 +981,12 @@ class MarkdownTests(unittest.TestCase):
         ]
         got = run(f"return markdown.githubIssues({json.dumps(links)});")
         self.assertEqual(got, [
+            {"href": "https://github.com/tig/goalie/issues/72", "label": "tig/goalie#72"},
+            {"href": "https://github.com/excaliwire/factory/pull/9", "label": "excaliwire/factory#9"},
+            {"href": "https://github.com/someone/thing/issues/4", "label": "someone/thing#4"},
+        ])
+        short = run(f"return markdown.githubIssues({json.dumps(links)}, {json.dumps(['tig/goalie', 'excaliwire/factory'])});")
+        self.assertEqual(short, [
             {"href": "https://github.com/tig/goalie/issues/72", "label": "goalie#72"},
             {"href": "https://github.com/excaliwire/factory/pull/9", "label": "factory#9"},
             {"href": "https://github.com/someone/thing/issues/4", "label": "someone/thing#4"},
@@ -970,8 +1001,8 @@ class MarkdownTests(unittest.TestCase):
         ]
         got = run(f"return markdown.githubIssues({json.dumps(links)});")
         self.assertEqual(got, [
-            {"href": "https://github.com/tig/goalie/issues/72", "label": "goalie#72"},
-            {"href": "https://github.com/excaliwire/factory/pull/9", "label": "factory#9"},
+            {"href": "https://github.com/tig/goalie/issues/72", "label": "tig/goalie#72"},
+            {"href": "https://github.com/excaliwire/factory/pull/9", "label": "excaliwire/factory#9"},
         ])
 
     def test_a_saved_pull_request_stays_in_the_rendered_links(self) -> None:
@@ -984,7 +1015,7 @@ class MarkdownTests(unittest.TestCase):
         ]
         got = run(f"return markdown.githubIssues({json.dumps(links)});")
         self.assertEqual(got, [
-            {"href": "https://github.com/tig/goalie/pull/72", "label": "goalie#72"},
+            {"href": "https://github.com/tig/goalie/pull/72", "label": "tig/goalie#72"},
             {"href": "https://github.com/someone/thing/pull/4", "label": "someone/thing#4"},
         ])
 
@@ -996,6 +1027,50 @@ class MarkdownTests(unittest.TestCase):
         self.assertIn(".wissues{display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px;min-width:0;flex:1 1 8em;margin-left:8px}", css)
         self.assertIn(".wissue{min-width:0;font-weight:700;text-decoration:none;overflow-wrap:anywhere}", css)
         self.assertIn("@media (pointer:coarse){.wissue{display:inline-flex;align-items:center;box-sizing:border-box;min-width:44px;min-height:44px}}", css)
+
+    def test_a_milestone_comment_uses_its_own_goal(self) -> None:
+        """A comment on another entity reads that entity and no repository list. A comment on this goal, or on one of its work items, reads this goal and its repositories."""
+        got = run('return [goalpage.commentScope("XW-0002", "XW-0001", ["WI-0001"]), goalpage.commentScope("XW-0001", "XW-0001", ["WI-0001"]), goalpage.commentScope("WI-0001", "XW-0001", ["WI-0001"])];')
+        self.assertEqual(got, [
+            {"goal": "XW-0002", "repos": False},
+            {"goal": "XW-0001", "repos": True},
+            {"goal": "XW-0001", "repos": True},
+        ])
+
+    def test_an_http_ref_is_read_over_https(self) -> None:
+        """An http GitHub issue or pull URL is read as https. A query, a fragment, and a trailing slash are not part of that URL. Any other address is not one."""
+        got = run('return [markdown.canonicalRefUrl("http://github.com/tig/goalie/issues/72"), markdown.canonicalRefUrl("https://github.com/tig/goalie/pull/95/"), markdown.canonicalRefUrl("https://example.com/issues/1")];')
+        self.assertEqual(got, ["https://github.com/tig/goalie/issues/72", "https://github.com/tig/goalie/pull/95", None])
+
+    def test_a_new_event_rereads_a_ref(self) -> None:
+        """A new Event changes the revision the goal page passes, and the title read depends on that revision."""
+        src = MODEL.parent
+        page = (src / "GoalPage.tsx").read_text(encoding="utf-8")
+        parts = (src / "parts.tsx").read_text(encoding="utf-8")
+        comment = page.split('e.field === "comment"', 1)[1].split("group.created", 1)[0]
+        self.assertIn("revision={data.eventCount}", comment)
+        hook = parts.split("function useRefTitles", 1)[1].split("export function IssueLinks", 1)[0]
+        effect = hook.split("useEffect(", 1)[1]
+        self.assertRegex(effect, r"\[[^\]\n]*\brevision\b[^\]\n]*\]")
+
+    def test_a_work_queue_rereads_a_ref_when_status_changes(self) -> None:
+        """A status change changes the revision the work queue passes. The same statuses do not."""
+        got = run('return [goalpage.workRefRevision([{ id: "WI-0001", status: "Backlog" }]), goalpage.workRefRevision([{ id: "WI-0001", status: "Completed" }])];')
+        self.assertEqual(got[0], "WI-0001:Backlog")
+        self.assertNotEqual(got[1], got[0])
+        work = (MODEL.parent / "WorkPage.tsx").read_text(encoding="utf-8")
+        self.assertIn("<IssueLinks links={i.links} goal={i.goal} revision={workRefRevision(work.items)} />", work)
+
+    def test_a_formatted_link_keeps_its_children(self) -> None:
+        """A formatted link keeps its child spans. The title and the state follow them. A work item's links stay plain."""
+        parts = (MODEL.parent / "parts.tsx").read_text(encoding="utf-8")
+        branch = parts.split('case "link":', 1)[1]
+        self.assertNotIn("refLabel", branch)
+        self.assertIn("<Spans of={x.c} titles={titles} />", branch)
+        self.assertIn("found.title", branch)
+        self.assertIn("found.state", branch)
+        issues = parts.split("export function IssueLinks", 1)[1].split("export const BRAND", 1)[0]
+        self.assertIn("refLabel(", issues)
 
 
 class HoverTests(unittest.TestCase):

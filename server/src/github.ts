@@ -1,7 +1,7 @@
 import { createSign } from "node:crypto";
 import { readFileSync } from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
-import type { GitHubSearchItem, GitHubStatusResponse } from "./api.ts";
+import type { GitHubRefResponse, GitHubSearchItem, GitHubStatusResponse } from "./api.ts";
 import { configuredTimeZone, configuredToday } from "./config.ts";
 import { read } from "./read.ts";
 import type { Row } from "./rules.ts";
@@ -24,6 +24,7 @@ const FIELD_API = "2026-03-10";
 const CONFIG_NAMES = ["GOALIE_GITHUB_APP_ID", "GOALIE_GITHUB_INSTALLATION_ID", "GOALIE_GITHUB_PRIVATE_KEY_FILE", "GOALIE_PUBLIC_URL"] as const;
 const ISSUE_URL = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)\/?$/;
 const PULL_URL = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)\/?$/;
+const REF_URL = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/(?:issues|pull)\/(\d+)\/?(?:[?#].*)?$/;
 const SCOPE_ENTRY = /^([^/\s]+)\/([^/\s]+)$/;
 const GOAL_REPO = /^(?:https:\/\/github\.com\/|github\.com\/)([^/]+)\/([^/]+)\/?$/;
 const TRAILER = /<!-- goalie -->[\s\S]*?<!-- \/goalie -->/;
@@ -467,6 +468,39 @@ export async function searchGitHub(db: DatabaseSync, goalId: string, q: string):
   return { items, error };
 }
 
+export type GitHubRefResult = { status: 200; body: GitHubRefResponse } | { status: 404; reason: string };
+
+/**
+ * The title and state of one issue or pull request. GET /repos/{owner}/{repo}/issues/{n} returns a pull request too.
+ * A URL that is not an issue or pull request in github_repos and on that goal is 404 and does not call GitHub.
+ * This read is not stored on the work item and does not write github_push. A failed read does not invent open or closed.
+ */
+export async function readGitHubRef(db: DatabaseSync, goalId: string, url: string): Promise<GitHubRefResult> {
+  const match = REF_URL.exec(url.trim());
+  if (match === null || match[1] === undefined || match[2] === undefined || match[3] === undefined) return { status: 404, reason: "that URL is not a GitHub issue or pull request" };
+  const owner = match[1];
+  const repo = match[2];
+  const number = match[3];
+  if (!issueRepoAllowed(db, goalId, `${owner}/${repo}`)) return { status: 404, reason: "that repository is not on this goal" };
+  const ready = configuredGitHub();
+  if (!ready.ok) return { status: 200, body: { error: ready.error } };
+  const path = `/repos/${owner}/${repo}/issues/${number}`;
+  try {
+    const issued = await installationToken(ready.config, owner, repo);
+    if ("error" in issued) return { status: 200, body: { error: issued.error } };
+    const found = await call(ready.config, issued.token, "GET", path);
+    if (found.status === 404) return { status: 404, reason: "GitHub has no such issue" };
+    if (found.status !== 200) return { status: 200, body: { error: refused(found.status, `GET ${path}`, found.body) } };
+    const row = found.body as { title?: unknown; state?: unknown };
+    if (typeof row.title !== "string" || row.title === "" || (row.state !== "open" && row.state !== "closed")) {
+      return { status: 200, body: { error: refused(found.status, `GET ${path}`, found.body) } };
+    }
+    return { status: 200, body: { title: row.title, state: row.state } };
+  } catch {
+    return { status: 200, body: { error: "GitHub could not be reached." } };
+  }
+}
+
 /** Search hits whose URL is an issue or a pull request in repo. Other hits are dropped. Order is the order GitHub returned. */
 function searchItems(body: unknown, repo: string): GitHubSearchItem[] {
   if (typeof body !== "object" || body === null || !("items" in body) || !Array.isArray((body as { items: unknown }).items)) return [];
@@ -681,6 +715,10 @@ function bodyWithTrailer(body: string, line: string): string {
   return `${base}${base ? "\n\n" : ""}${block}\n`;
 }
 
+/** Kept per installation id until 50 minutes after it was issued. A different repository still looks up its own installation. A new server process starts empty. */
+const installationTokens = new Map<string, { token: string; until: number }>();
+const TOKEN_FOR_MS = 50 * 60 * 1000;
+
 /** The installation GitHub reports for this repository. A non-200 lookup is the push failure. It must not fall back to GOALIE_GITHUB_INSTALLATION_ID. */
 async function installationToken(config: GitHubConfig, owner: string, repo: string): Promise<{ token: string } | { error: string }> {
   const now = Math.floor(Date.now() / 1000);
@@ -690,11 +728,14 @@ async function installationToken(config: GitHubConfig, owner: string, repo: stri
   if (found.status !== 200) return { error: refused(found.status, `GET ${lookup}`, found.body) };
   const id = reportedInstallation(found.body);
   if (id === undefined) return { error: `GitHub answered ${found.status} for GET ${lookup} without an installation.` };
+  const cached = installationTokens.get(id);
+  if (cached !== undefined && Date.now() < cached.until) return { token: cached.token };
   const path = `/app/installations/${id}/access_tokens`;
   const response = await call(config, appToken, "POST", path);
   if (response.status !== 201 && response.status !== 200) return { error: refused(response.status, `POST ${path}`, response.body) };
   const issued = (response.body as { token?: unknown }).token;
   if (typeof issued !== "string" || issued === "") return { error: `GitHub answered ${response.status} for POST ${path} without a token.` };
+  installationTokens.set(id, { token: issued, until: Date.now() + TOKEN_FOR_MS });
   return { token: issued };
 }
 
