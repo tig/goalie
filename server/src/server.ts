@@ -121,7 +121,7 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
     const q = (c.req.query("q") ?? "").replace(/\s+/g, " ").trim();
     if (!q) return refuse(c, 400, "bad_request", "q is the text to search for: not blank");
     return c.json<GoalsResponse>(searchGoals(db, q.slice(0, 100)));
-    });
+  });
   app.get("/api/github/search", async (c) => {
     const goal = c.req.query("goal") ?? "";
     if (read(db, "goal", goal) === undefined) return refuse(c, 404, "not_found", `no goal ${goal}`);
