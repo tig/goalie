@@ -133,11 +133,12 @@ export function movedWords(spot: Spot, names: { goal: (id: string) => string }):
 type ListPriority = { id: string; version: number; rank: number; cut_line: boolean; status?: string; goals: { id: string; version: number; summary: string }[] };
 
 /**
- * One batch that moves `goal` to `spot` and numbers the list 1 to n (SPEC.md §6.3: ranks 1 to n, no tie).
+ * One batch that moves `goal` to `spot` and ranks the list 1 to n (SPEC.md §6.3: ranks 1 to n, no tie).
  * `priorities` is every current Priority of the list in rank order, with its top goals; `split` is how many numbered goals are above the cut line now.
- * Each numbered goal keeps its Priority when it is that Priority's first goal; any other gets a new Priority titled with its summary.
+ * The batch writes no goal but the moved one, since the list's owner may not change another owner's goal (owners-change-goal).
+ * So the goals of one Priority move as one block: a goal dropped inside a block lands after it. The moved goal keeps its Priority when it held it alone, else gets a new one titled with its summary.
  * A Priority that the moved goal held alone, and leaves, retires. Any other Priority with no goal keeps a rank after the numbered goals, so no rank is skipped.
- * The cut line is on the Priority of the last goal above it, and on none when the Backlog is empty.
+ * The cut line is on the Priority of the last block above it, and on none when the Backlog is empty.
  */
 export function arrangeBatch(
   priorities: ListPriority[],
@@ -147,38 +148,44 @@ export function arrangeBatch(
   list: { org_unit: string; period: string },
   reason: string,
 ): CommandsRequest {
-  const entries = priorities.flatMap((p) => p.goals.map((g) => ({ goal: g, priority: p })));
-  const ids = entries.map((e) => e.goal.id);
-  const rest = ids.filter((id) => id !== goal.id);
-  const order = spot.kind === "at" ? rest.toSpliced(spot.number - 1, 0, goal.id) : rest;
-  const funded = above(ids, split, goal.id) + (spot.kind === "at" && !spot.backlog ? 1 : 0);
-  const cutAt = funded > 0 && funded < order.length ? funded - 1 : -1;
-  const own = entries.find((e) => e.goal.id === goal.id)?.priority;
-  const claimed = new Set<string>();
+  const ids = priorities.flatMap((p) => p.goals.map((g) => g.id));
+  const above = new Set(ids.slice(0, split));
+  const own = priorities.find((p) => p.goals.some((g) => g.id === goal.id));
+  const alone = own !== undefined && own.goals.length === 1;
+  type Block = { p: ListPriority | null; funded: boolean; size: number };
+  const blocks: Block[] = priorities
+    .map((p) => ({ p, funded: p.goals.some((g) => above.has(g.id)), size: p.goals.filter((g) => g.id !== goal.id).length }))
+    .filter((b) => b.size > 0);
+  if (spot.kind === "at") {
+    const moved: Block = { p: alone ? own : null, funded: !spot.backlog, size: 1 };
+    // The first block boundary at or after the place the goal was dropped, kept inside its part of the list.
+    let at = 0;
+    for (let seen = 0; at < blocks.length && seen < spot.number - 1; at++) seen += blocks[at].size;
+    const firstBelow = blocks.findIndex((b) => !b.funded);
+    const line = firstBelow < 0 ? blocks.length : firstBelow;
+    at = spot.backlog ? Math.max(at, line) : Math.min(at, line);
+    blocks.splice(at, 0, moved);
+  }
+  const lastAbove = blocks.map((b) => b.funded).lastIndexOf(true);
+  const cutAt = lastAbove >= 0 && lastAbove < blocks.length - 1 ? lastAbove : -1;
   const ranks: CommandsRequest["commands"] = [];
   const made: CommandsRequest["commands"] = [];
   const update = (p: ListPriority, fields: { rank?: number; cut_line?: boolean; status?: "Retired" }) => {
     const changed = Object.fromEntries(Object.entries(fields).filter(([k, v]) => p[k as keyof ListPriority] !== v));
     if (Object.keys(changed).length) ranks.push({ op: "update", kind: "priority", id: p.id, base_version: p.version, fields: changed, reason });
   };
-  order.forEach((id, i) => {
-    const entry = entries.find((e) => e.goal.id === id);
-    if (entry && !claimed.has(entry.priority.id)) {
-      claimed.add(entry.priority.id);
-      update(entry.priority, { rank: i + 1, cut_line: i === cutAt });
-      return;
-    }
-    const g = entry?.goal ?? goal;
+  blocks.forEach((b, i) => {
+    if (b.p) return update(b.p, { rank: i + 1, cut_line: i === cutAt });
     const ref = `$p${i + 1}` as const;
-    made.push({ op: "create", kind: "priority", ref, fields: { ...list, rank: i + 1, title: g.summary, ...(i === cutAt ? { cut_line: true } : {}) }, reason });
-    made.push({ op: "update", kind: "goal", id: g.id, base_version: g.version, fields: { priority: ref, parent: null }, reason });
+    made.push({ op: "create", kind: "priority", ref, fields: { ...list, rank: i + 1, title: goal.summary, ...(i === cutAt ? { cut_line: true } : {}) }, reason });
+    made.push({ op: "update", kind: "goal", id: goal.id, base_version: goal.version, fields: { priority: ref, parent: null }, reason });
   });
-  const left = priorities.filter((p) => !claimed.has(p.id));
-  left.filter((p) => p.id !== own?.id).forEach((p, i) => update(p, { rank: order.length + i + 1, cut_line: false }));
-  if (own && !claimed.has(own.id)) update(own, { status: "Retired", cut_line: false });
+  const placed = new Set(blocks.flatMap((b) => (b.p ? [b.p.id] : [])));
+  priorities.filter((p) => !placed.has(p.id) && !(alone && p.id === own.id)).forEach((p, i) => update(p, { rank: blocks.length + i + 1, cut_line: false }));
+  if (alone && !placed.has(own.id)) update(own, { status: "Retired", cut_line: false });
   // A move off the list writes the goal first, so its Priority is empty when it retires.
-  const moved: CommandsRequest["commands"] = spot.kind === "at" ? [] : [{ op: "update", kind: "goal", id: goal.id, base_version: goal.version, fields: moveFields(spot), reason }];
-  return { commands: [...moved, ...ranks, ...made] };
+  const off: CommandsRequest["commands"] = spot.kind === "at" ? [] : [{ op: "update", kind: "goal", id: goal.id, base_version: goal.version, fields: moveFields(spot), reason }];
+  return { commands: [...off, ...ranks, ...made] };
 }
 
 /** The plan period of a day, as the seed writes it: "2026-Q4". A new Priority takes the list's period, or this one when the list is empty. */

@@ -128,7 +128,9 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, todayIso: stri
   const funded = cut === -1 ? rows : rows.slice(0, cut + 1);
   const backlog = cut === -1 ? [] : rows.slice(cut + 1);
   // Rule 35b: an open top goal with no Priority, with its tree. Home shows these as No priority, so a new goal is there to drag.
-  const unprioritized = [...goals.values()].filter((g) => g.priority == null && g.parent == null && shown(g)).map((g) => goalOf(g, false));
+  // A goal whose Priority is Retired or of another period is on no list here, so it shows as No priority too, where it can be moved.
+  const listed = new Set(priorities.map((p) => p.id));
+  const unprioritized = [...goals.values()].filter((g) => !(typeof g.priority === "string" && listed.has(g.priority)) && g.parent == null && shown(g)).map((g) => goalOf(g, false));
 
   const top = funded.flatMap((p) => p.goals).filter((g) => g.counted);
   const slips = top.flatMap((g) => {

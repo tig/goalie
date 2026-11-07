@@ -1266,21 +1266,22 @@ class ArrangeTests(unittest.TestCase):
           return [
             arrange.arrangeBatch(lists, { id: "N", version: 5, summary: "New goal" }, { kind: "at", number: 1, backlog: false }, 4, list, "Moved").commands,
             arrange.arrangeBatch(lists, { id: "D", version: 2, summary: "Goal D" }, { kind: "at", number: 2, backlog: false }, 4, list, "Moved").commands,
+            arrange.arrangeBatch(lists, { id: "N", version: 5, summary: "New goal" }, { kind: "at", number: 3, backlog: false }, 4, list, "Moved").commands,
           ];""")
-        new, up = got
-        # N takes number 1 with a new Priority; A, B, D move down one. C shares B's Priority, so it gets its own. The empty PRI-3 ranks last.
+        new, up, inside = got
+        # N takes number 1 with a new Priority, and the Priorities after it move down one. The empty PRI-3 ranks last.
         self.assertEqual([(c["op"], c["kind"], c.get("id", c.get("ref")), c["fields"]) for c in new], [
             ("update", "priority", "PRI-1", {"rank": 2}),
             ("update", "priority", "PRI-2", {"rank": 3}),
-            ("update", "priority", "PRI-4", {"rank": 5}),
-            ("update", "priority", "PRI-3", {"rank": 6}),
+            ("update", "priority", "PRI-3", {"rank": 5}),
             ("create", "priority", "$p1", {"org_unit": "excaliwire", "period": "2026-Q4", "rank": 1, "title": "New goal"}),
             ("update", "goal", "N", {"priority": "$p1", "parent": None}),
-            ("create", "priority", "$p4", {"org_unit": "excaliwire", "period": "2026-Q4", "rank": 4, "title": "Goal C"}),
-            ("update", "goal", "C", {"priority": "$p4", "parent": None}),
         ])
         self.assertTrue(all(c["reason"] == "Moved" for c in new))
-        self.assertEqual([(c["id"], c["fields"]) for c in up if c["kind"] == "priority" and c["op"] == "update"], [("PRI-4", {"rank": 2}), ("PRI-2", {"rank": 3}), ("PRI-3", {"rank": 5})])
+        self.assertEqual([(c["id"], c["fields"]) for c in up], [("PRI-4", {"rank": 2}), ("PRI-2", {"rank": 3}), ("PRI-3", {"rank": 4})])
+        # Review of #90: the batch writes no goal but the moved one, so B and C keep their shared Priority. A drop between them lands after both.
+        self.assertEqual([c["id"] for c in inside if c["kind"] == "goal"], ["N"])
+        self.assertEqual([c["fields"]["rank"] for c in inside if c["op"] == "create"], [3])
 
     def test_a_goal_leaving_a_priority_it_held_alone_retires_it_and_the_rest_close_up(self) -> None:
         # Ported from #94: a Priority emptied by a move retires, so empty Priorities do not pile up after the list. An empty Priority the move did not empty stays.
