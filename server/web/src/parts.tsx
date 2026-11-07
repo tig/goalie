@@ -93,7 +93,7 @@ function useRefTitles(goal: string | undefined, hrefs: string[], revision: strin
 export function TitleBits({ title, goal, repos, revision = 0, linksOnly = false }: { title: string; goal?: string; repos: string[] | undefined; revision?: string | number; linksOnly?: boolean }) {
   const parts = titleParts(title, repos);
   const shown = linksOnly ? parts.filter((part) => part.t === "link") : parts;
-  const hrefs = shown.flatMap((part) => (part.t === "link" ? [part.href] : []));
+  const hrefs = linksOnly ? shown.flatMap((part) => (part.t === "link" ? [part.href] : [])) : [];
   const titles = useRefTitles(goal, hrefs, revision);
   if (shown.length === 0) return null;
   const bits = shown.map((part, index) =>
@@ -101,7 +101,7 @@ export function TitleBits({ title, goal, repos, revision = 0, linksOnly = false 
       <span key={index}>{part.v}</span>
     ) : (
       <a key={index} className="wissue" href={part.href} target="_blank" rel="noopener noreferrer">
-        {refLabel(part.label, titles.get(part.href) ?? null)}
+        {linksOnly ? refLabel(part.label, titles.get(part.href) ?? null) : part.label}
       </a>
     ),
   );
