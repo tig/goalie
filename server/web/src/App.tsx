@@ -21,7 +21,7 @@ import { WorkPage } from "./WorkPage.tsx";
 import { MyGoalsPage, NotInView } from "./MyGoalsPage.tsx";
 import { GitHubPage } from "./GitHubPage.tsx";
 import { Feedback } from "./Feedback.tsx";
-import { encodeFocus } from "./model/feedback.ts";
+import { encodeFocus, FEEDBACK_CHROME } from "./model/feedback.ts";
 import { backPath, MY_GOALS_PATH, newGoalPath, workPath } from "./model/route.ts";
 import { homeSearch, Link, rememberHome, useRoute } from "./router.tsx";
 
@@ -65,6 +65,8 @@ function OwnerMenu({ actor }: { actor: PrioritiesResponse["me"] }) {
   const box = useRef<HTMLSpanElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const close = useCallback((reason?: "escape" | "pointer") => {
+    // The feedback menu is newer, so its Escape runs after this one. Ignore the key while that menu is open.
+    if (reason === "escape" && document.querySelector(`${FEEDBACK_CHROME}[role=menu]`)) return;
     if (reason === "escape") button.current?.focus();
     setOpen(false);
   }, []);

@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { ENTITIES, encode, goalieOwner, isKind, lookup, memoryLookup, read, readAll, readEvents, type EventRow, type Kind } from "./read.ts";
-import { queueGitHubPush } from "./github.ts";
+import { addedInScopeIssues, issueRepoAllowed, linkUrlRepo, queueGitHubAttach, queueGitHubCreate, queueGitHubIssueLink, queueGitHubPush } from "./github.ts";
 import { DEFAULT_VISIBILITY, isOpen } from "./goal.ts";
 import { checkAuthor, checkTransition, checkWrite, goalLints, REASONED_KINDS, SYSTEM_FIELDS, type Row, type Violation } from "./rules.ts";
 
@@ -17,9 +17,16 @@ export const DEFAULTS: Partial<Record<Kind, Row>> = {
 };
 
 export type Command =
-  | { op: "create"; kind: Kind; id?: string; fields: Row; reason?: string }
+  | { op: "create"; kind: Kind; id?: string; fields: Row; reason?: string; github_repo?: unknown }
   | { op: "update"; kind: Kind; id: string; base_version: number; fields: Row; reason?: string }
   | { op: "comment"; kind: Kind; id: string; text: string };
+
+/** The create's github_repo when it names a repository. It is not a stored field. */
+export function commandGitHubRepo(command: Command): string | undefined {
+  if (command.op !== "create" || !Object.hasOwn(command, "github_repo")) return undefined;
+  const repo = command.github_repo;
+  return typeof repo === "string" && repo !== "" ? repo : undefined;
+}
 
 export type WriteResult =
   | { ok: true; entity: Row; events: EventRow[] }
@@ -165,6 +172,12 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
     const rest = checkWrite(lookup(db), kind, after).filter((v) => v.field === undefined || !missing.includes(v.field));
     return { ok: false, error: "invalid", violations: [...missing.map((f) => ({ rule: "required-field", message: `${fieldWords(f)} is required.`, field: f })), ...violations, ...rest] };
   }
+  const linkViolation = rejectedGitHubLink(db, kind, before, after);
+  if (linkViolation !== undefined) return { ok: false, error: "invalid", violations: [...violations, linkViolation] };
+  const issueViolation = rejectedExtraIssue(db, kind, before, after);
+  if (issueViolation !== undefined) return { ok: false, error: "invalid", violations: [...violations, issueViolation] };
+  const repoViolation = rejectedGitHubRepo(db, kind, command, fields.goal);
+  if (repoViolation !== undefined) return { ok: false, error: "invalid", violations: [repoViolation] };
 
   const columns = ["version", ...spec.fields];
   const values = columns.map((c) => encode(kind, c, after[c]));
@@ -202,8 +215,50 @@ function apply(db: DatabaseSync, actor: string, kind: Kind, command: Command, fi
     );
     if (first === 0) first = Number(lastInsertRowid) - 1;
   }
-  if (kind === "work_item" && changed.includes("status")) queueGitHubPush(db, after);
+  if (kind === "work_item" && (changed.includes("status") || changed.includes("due_date"))) queueGitHubPush(db, after);
+  if (kind === "work_item" && changed.includes("links")) queueGitHubIssueLink(db, before, after);
+  const repo = commandGitHubRepo(command);
+  if (kind === "work_item" && repo !== undefined) queueGitHubCreate(db, after, repo, actor);
+  if (kind === "work_item" && setsTitle(command)) queueGitHubAttach(db, after, actor);
   return { ok: true, entity: read(db, kind, id) as Row, events: readEvents(db, first) };
+}
+
+/** A create, or an update whose fields set title. A later status change does not. The search itself waits until drain. */
+function setsTitle(command: Command): boolean {
+  return command.op === "create" || (command.op === "update" && Object.hasOwn(command.fields, "title"));
+}
+
+/** A write adds at most one new in-scope issue. A pull request is not an issue. A URL already stored does not count. On create, every link is new. */
+function rejectedExtraIssue(db: DatabaseSync, kind: Kind, before: Row | undefined, after: Row): Violation | undefined {
+  if (kind !== "work_item" || addedInScopeIssues(db, before, after).length < 2) return undefined;
+  return { rule: "one-issue", message: "One update adds one issue.", field: "links" };
+}
+
+/** A newly added issue or pull request URL must be in github_repos and on the goal. A URL already stored is not checked again. Any other link is not checked. */
+function rejectedGitHubLink(db: DatabaseSync, kind: Kind, before: Row | undefined, after: Row): Violation | undefined {
+  if (kind !== "work_item") return undefined;
+  const previous = new Set(linkStrings(before?.links));
+  for (const link of linkStrings(after.links)) {
+    if (previous.has(link)) continue;
+    const repo = linkUrlRepo(link);
+    if (repo === undefined || issueRepoAllowed(db, after.goal, repo)) continue;
+    return { rule: "github-repo", message: `${repo} is not in scope on this goal.`, field: "links" };
+  }
+  return undefined;
+}
+
+function linkStrings(links: unknown): string[] {
+  if (!Array.isArray(links)) return [];
+  return links.filter((link): link is string => typeof link === "string");
+}
+
+/** github_repo is not stored. A repository that is not in scope and on the goal refuses the create. */
+function rejectedGitHubRepo(db: DatabaseSync, kind: Kind, command: Command, goalId: unknown): Violation | undefined {
+  if (command.op !== "create" || kind !== "work_item" || !Object.hasOwn(command, "github_repo")) return undefined;
+  const repo = command.github_repo;
+  if (typeof repo === "string" && issueRepoAllowed(db, goalId, repo)) return undefined;
+  const name = typeof repo === "string" && repo !== "" ? repo : "That repository";
+  return { rule: "github-repo", message: `${name} is not in scope on this goal.`, field: "github_repo" };
 }
 
 /** A field key in SPEC.md words, for a message people read: plan_maturity is "Plan Maturity". */

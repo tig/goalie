@@ -144,9 +144,10 @@ export function subGoalBatch(parent: StoredGoal, row: SubGoalRow, types: GoalTyp
   };
 }
 
-/** + Work item (G22): step 5 alone. Its Event's reason is "Filed". */
-export function workItemBatch(goal: string, item: Pick<WorkItemFields, "title" | "owner" | "status" | "due_date">): CommandsRequest {
-  return { commands: [{ op: "create", kind: "work_item", fields: { goal, ...item }, reason: "Filed" }] };
+/** + Work item (G22): step 5 alone. Its Event's reason is "Filed". github_repo is not a stored field. links is set when the add form chose an issue or a pull request. */
+export function workItemBatch(goal: string, item: Pick<WorkItemFields, "title" | "owner" | "status" | "due_date"> & { links?: string[] | null }, githubRepo?: string): CommandsRequest {
+  const command = { op: "create" as const, kind: "work_item" as const, fields: { goal, ...item }, reason: "Filed" };
+  return { commands: [githubRepo === undefined ? command : { ...command, github_repo: githubRepo }] };
 }
 
 /** The work item tick (G24), or any status change: one update with its reason. */
@@ -154,11 +155,12 @@ export function workItemStatusBatch(item: Pick<ApiWorkItem, "id" | "version">, s
   return { commands: [{ op: "update", kind: "work_item", id: item.id, base_version: item.version, fields: { status }, reason }] };
 }
 
-type EditedWorkItem = Pick<WorkItemFields, "title" | "owner" | "due_date">;
+type EditedWorkItem = Pick<WorkItemFields, "title" | "owner" | "due_date"> & { links?: string[] | null };
 
-/** Edit a work item in place (W6): one update of the fields that changed, with its reason. Null when nothing changed. */
+/** Edit a work item in place (W6): one update of the fields that changed, with its reason. Null when nothing changed. links is set when the edit chose an issue or a pull request. */
 export function workItemFieldsBatch(item: Pick<ApiWorkItem, "id" | "version"> & EditedWorkItem, next: EditedWorkItem, reason: string): CommandsRequest | null {
-  const fields = Object.fromEntries((["title", "owner", "due_date"] as const).filter((f) => next[f] !== item[f]).map((f) => [f, next[f]]));
+  const fields: Partial<WorkItemFields> = Object.fromEntries((["title", "owner", "due_date"] as const).filter((f) => next[f] !== item[f]).map((f) => [f, next[f]]));
+  if ("links" in next && JSON.stringify(next.links ?? null) !== JSON.stringify(item.links ?? null)) fields.links = next.links ?? null;
   if (!Object.keys(fields).length) return null;
   return { commands: [{ op: "update", kind: "work_item", id: item.id, base_version: item.version, fields, reason }] };
 }
