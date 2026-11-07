@@ -55,6 +55,11 @@ A stored value is used.
 A value not stored there uses the process name.
 The page shows no private key.
 The owner setting `github_repos` names the repositories in scope. An entry is `owner/repo` or `owner/*`.
+The GitHub page adds and removes those repositories.
+An empty list stays empty.
+A work item title's `#N` is that issue when `github_repos` names exactly one repository.
+The work item editor shows that issue.
+When `github_repos` names more than one repository, or none, a number alone is not a link.
 `GOALIE_GITHUB_PRIVATE_KEY_FILE` is a path. The key stays out of this repo.
 `GOALIE_PUBLIC_URL` is the base URL of this deployment, with no trailing slash. The issue body links back through it.
 `GOALIE_GITHUB_API` overrides the GitHub API base. The default is `https://api.github.com`.

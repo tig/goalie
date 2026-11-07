@@ -336,6 +336,40 @@ function updatedDetail(row: PushRow): string {
   return `Updated ${name} to ${row.status}.`;
 }
 
+/** The one `owner/repo`. A wildcard is not one. Two repositories are not one. */
+export function soleRepo(repos: string[]): string | undefined {
+  const found: string[] = [];
+  const seen = new Set<string>();
+  for (const repo of repos) {
+    if (!SCOPE_ENTRY.test(repo) || repo.endsWith("/*")) continue;
+    const key = repo.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    found.push(repo);
+    if (found.length > 1) return undefined;
+  }
+  return found[0];
+}
+
+/** The repository list on a GitHub save, or absent when the save does not set one. A bad entry is bad. */
+export function reposFromSettings(body: unknown): string[] | "absent" | "bad" {
+  if (typeof body !== "object" || body === null || !Object.hasOwn(body, "repositories")) return "absent";
+  const list = (body as { repositories?: unknown }).repositories;
+  if (!Array.isArray(list)) return "bad";
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of list) {
+    if (typeof entry !== "string") return "bad";
+    const text = entry.trim();
+    if (!SCOPE_ENTRY.test(text)) return "bad";
+    const key = text.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(text);
+  }
+  return out;
+}
+
 /** `owner/repo` and `owner/*` from owner settings. Any other entry is dropped. No list yet uses the deployment repository. An empty list stays empty. */
 export function githubRepos(db: DatabaseSync): string[] {
   const settings = read(db, "owner_settings", "owner")?.settings;
@@ -499,7 +533,7 @@ export type GitHubRefResult = { status: 200; body: GitHubRefResponse } | { statu
 
 /**
  * The title and state of one issue or pull request. GET /repos/{owner}/{repo}/issues/{n} returns a pull request too.
- * A URL that is not an issue or pull request in github_repos and on that goal is 404 and does not call GitHub.
+ * A URL that is not an issue or pull request in github_repos and on that goal is 404 and does not call GitHub. The one repository in github_repos is read when the goal does not name it.
  * This read is not stored on the work item and does not write github_push. A failed read does not invent open or closed.
  */
 export async function readGitHubRef(db: DatabaseSync, goalId: string, url: string): Promise<GitHubRefResult> {
@@ -508,7 +542,8 @@ export async function readGitHubRef(db: DatabaseSync, goalId: string, url: strin
   const owner = match[1];
   const repo = match[2];
   const number = match[3];
-  if (!issueRepoAllowed(db, goalId, `${owner}/${repo}`)) return { status: 404, reason: "that repository is not on this goal" };
+  const named = `${owner}/${repo}`;
+  if (!issueRepoAllowed(db, goalId, named) && soleRepo(githubRepos(db))?.toLowerCase() !== named.toLowerCase()) return { status: 404, reason: "that repository is not on this goal" };
   const ready = configuredGitHub(db);
   if (!ready.ok) return { status: 200, body: { error: ready.error } };
   const path = `/repos/${owner}/${repo}/issues/${number}`;

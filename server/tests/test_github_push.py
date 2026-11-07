@@ -1814,6 +1814,50 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertNotIn(ec, raw)
         self.assertEqual(self.config_row(), before)
 
+    def test_a_sole_repository_is_read_when_the_goal_does_not_name_it(self) -> None:
+        """#96 is tig/goalie when that is the only repository, even when the goal names none. Prediction: the read answers 404."""
+        set_scope(self.store, ["tig/goalie"], [])
+        self.github.added_path = f"/repos/{REPO}/issues/96"
+        self.github.added_issue = {"body": "", "title": "Enable Github integration", "state": "open", "state_reason": None, "labels": []}
+        reply = self.ref_as("tig", "sub-tig", GOAL, "https://github.com/tig/goalie/issues/96")
+        self.assertEqual(reply.status, 200, reply.body)
+        self.assertEqual(json.loads(reply.body), {"title": "Enable Github integration", "state": "open"})
+        set_scope(self.store, ["tig/goalie", "acme/widgets"], [])
+        missed = self.ref_as("tig", "sub-tig", GOAL, "https://github.com/tig/goalie/issues/96")
+        self.assertEqual(missed.status, 404, missed.body)
+        self.assertIn(b"not on this goal", missed.body)
+
+    def test_the_owner_adds_and_removes_a_repository(self) -> None:
+        """The GitHub page stores the repository list. An empty list stays empty. Prediction: the save answers 400."""
+        added = self.save_as("tig", "sub-tig", {
+            "appId": "5603810",
+            "installationId": "178377743",
+            "publicUrl": "https://goalie.excaliwire.com",
+            "privateKey": "",
+            "repositories": ["tig/goalie", "acme/widgets"],
+        })
+        self.assertEqual(added.status, 200, added.body)
+        self.assertEqual(json.loads(added.body)["repositories"], ["tig/goalie", "acme/widgets"])
+        cleared = self.save_as("tig", "sub-tig", {
+            "appId": "5603810",
+            "installationId": "178377743",
+            "publicUrl": "https://goalie.excaliwire.com",
+            "privateKey": "",
+            "repositories": [],
+        }, BARE)
+        self.assertEqual(cleared.status, 200, cleared.body)
+        self.assertEqual(json.loads(cleared.body)["repositories"], [])
+        bad = self.save_as("tig", "sub-tig", {
+            "appId": "5603810",
+            "installationId": "178377743",
+            "publicUrl": "https://goalie.excaliwire.com",
+            "privateKey": "",
+            "repositories": ["nope"],
+        })
+        self.assertEqual(bad.status, 400, bad.body)
+        self.assertIn("repository", bad.body.decode())
+        self.assertEqual(json.loads(self.status_as("tig", "sub-tig").body)["repositories"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

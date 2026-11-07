@@ -54,6 +54,50 @@ function refText(owner: string, repo: string, n: string, repos: string[]): strin
   return `${owner}/${repo}#${n}`;
 }
 
+/** The one `owner/repo` in the list. A wildcard is not one. Two repositories are not one. None is not one. */
+export function soleRepo(repos: string[] | undefined): string | undefined {
+  if (!Array.isArray(repos)) return undefined;
+  const found: string[] = [];
+  const seen = new Set<string>();
+  for (const repo of repos) {
+    if (!/^[^/\s]+\/[^/\s]+$/.test(repo) || repo.endsWith("/*")) continue;
+    const key = repo.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    found.push(repo);
+    if (found.length > 1) return undefined;
+  }
+  return found[0];
+}
+
+export type TitlePart = { t: "text"; v: string } | { t: "link"; href: string; label: string };
+
+/** A work item title. `#N` is the one repository's issue. Any other title is text. */
+export function titleParts(title: string, repos: string[] | undefined): TitlePart[] {
+  const repo = soleRepo(repos);
+  if (repo === undefined) return title === "" ? [] : [{ t: "text", v: title }];
+  const slash = repo.indexOf("/");
+  const name = repo.slice(slash + 1);
+  const owner = repo.slice(0, slash);
+  const out: TitlePart[] = [];
+  const add = (v: string) => {
+    if (v === "") return;
+    const last = out[out.length - 1];
+    if (last !== undefined && last.t === "text") last.v += v;
+    else out.push({ t: "text", v });
+  };
+  const re = /(?<![\w/.#-])#(\d+)\b/g;
+  let at = 0;
+  for (const match of title.matchAll(re)) {
+    add(title.slice(at, match.index));
+    const n = match[1] ?? "";
+    out.push({ t: "link", href: `https://github.com/${owner}/${name}/issues/${n}`, label: `${name}#${n}` });
+    at = (match.index ?? 0) + match[0].length;
+  }
+  add(title.slice(at));
+  return out;
+}
+
 /** The owner and repository of the one associated repository with this name. */
 function resolveBare(name: string, repos: string[]): { owner: string; repo: string } | undefined {
   const hit = oneNamed(name, repos);

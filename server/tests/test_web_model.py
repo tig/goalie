@@ -955,6 +955,32 @@ class MarkdownTests(unittest.TestCase):
         got = run('return markdown.markdown("Priority #1 and C# and a/b").flatMap((b) => b.c).map((x) => x.t);')
         self.assertEqual(got, ["text"])
 
+    def test_a_title_number_links_the_one_repository(self) -> None:
+        """#96 in a work item title is tig/goalie#96 when that is the only repository. Prediction: titleParts is missing."""
+        got = run('return markdown.titleParts("Get issue #96 done", ["tig/goalie"]);')
+        self.assertEqual(got, [
+            {"t": "text", "v": "Get issue "},
+            {"t": "link", "href": "https://github.com/tig/goalie/issues/96", "label": "goalie#96"},
+            {"t": "text", "v": " done"},
+        ])
+
+    def test_a_title_number_stays_text_when_the_repository_is_not_the_only_one(self) -> None:
+        """Two repositories, none, or only a wildcard, leave #96 as text. Prediction: titleParts is missing."""
+        for repos in (["tig/goalie", "acme/other"], [], ["tig/*"]):
+            got = run(f"return markdown.titleParts('Get issue #96 done', {json.dumps(repos)});")
+            self.assertEqual(got, [{"t": "text", "v": "Get issue #96 done"}])
+
+    def test_the_work_item_title_and_editor_draw_the_one_repository(self) -> None:
+        """The work list, the goal list, and the editor draw #N for the one repository. Prediction: the pages still print the title as text."""
+        work = (MODEL.parent / "WorkPage.tsx").read_text(encoding="utf-8")
+        goal = (MODEL.parent / "GoalPage.tsx").read_text(encoding="utf-8")
+        edit = (MODEL.parent / "GoalAdd.tsx").read_text(encoding="utf-8")
+        self.assertIn("<TitleBits", work)
+        self.assertIn("work.githubScope", work)
+        self.assertIn("<TitleBits", goal)
+        self.assertIn("data.githubScope", goal)
+        self.assertIn("<TitleBits", edit)
+
     def test_raw_html_stays_text_and_only_web_links_open(self) -> None:
         got = run('return markdown.markdown("<script>alert(1)</script> [x](javascript:void) [y](https://e.com/a)")[0].c;')
         self.assertEqual(got, [{"t": "text", "v": "<script>alert(1)</script> "}, {"t": "text", "v": "[x](javascript:void)"}, {"t": "text", "v": " "}, {"t": "link", "href": "https://e.com/a", "c": [{"t": "text", "v": "y"}]}])
@@ -1142,3 +1168,5 @@ class GitHubPageTests(unittest.TestCase):
         self.assertIn("privateKeySet", page)
         self.assertNotIn("{data.privateKey}", page)
         self.assertNotIn("value={privateKeySet", page)
+        self.assertIn(">Add<", page)
+        self.assertIn(">Remove<", page)

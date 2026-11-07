@@ -24,6 +24,8 @@
 
 **Amended:** 2026-11-06. The GOALIE owner sets the app id, the installation id, the private key, and the public URL on the GitHub page. A value set there is kept in the store. A value not set there uses the process name. Clearing the app id, the installation id, or the public URL removes that stored value. A blank private key leaves the stored private key. Pasting a private key replaces it. The page shows no private key. The save is not an Event.
 
+**Amended:** 2026-11-06. The GOALIE owner adds and removes the repositories on the GitHub page. An entry is `owner/repo` or `owner/*`. An empty list stays empty. A work item title's `#N` is that issue when `github_repos` names exactly one repository. The work item editor shows that issue. When `github_repos` names more than one repository, or none, a number alone is not a link.
+
 ## Context
 
 [#72 (Enable Github integration)](https://github.com/tig/goalie/issues/72) pushes a work item's status to one linked GitHub issue.
@@ -46,6 +48,10 @@ The page shows no private key.
 The save is not an Event.
 The owner setting `github_repos` names the repositories in scope. An entry is `owner/repo` or `owner/*`.
 When owner settings have no `github_repos` list, the repository named in process configuration is in scope. A written list, including an empty list, is the scope.
+The GOALIE owner adds and removes the repositories on the GitHub page.
+A work item title's `#N` is that issue when `github_repos` names exactly one repository.
+The work item editor shows that issue.
+When `github_repos` names more than one repository, or none, a number alone is not a link.
 A goal's repositories are the `repo` entries on its work product.
 Add as Github Issue, beside Add, files the work item and opens an issue for it in one repository in `github_repos` and on that goal, with the work item's title, its status as the label, the status trailer as the body, and the issue URL on the work item, using that repository when there is one, asking for a pick when there are several, and hiding the button when there are none.
 Attach, on add and on edit, adds an existing issue or pull request in a repository that is in `github_repos` and on that goal, `#` in the title searches those repositories, the first issue attaches when the work item has no issue link, a pull request stays a link, and completing the work item closes an attached issue.

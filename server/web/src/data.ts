@@ -40,7 +40,7 @@ export function useJson<T>(url: string): [Loaded<T>, () => void] {
 }
 
 /** POST /api/github/status. The private key is sent once and is not in the answer. */
-export async function postGitHubSettings(body: { appId: string; installationId: string; publicUrl: string; privateKey: string }): Promise<{ ok: true; data: GitHubStatusResponse } | { ok: false; reason: string }> {
+export async function postGitHubSettings(body: { appId: string; installationId: string; publicUrl: string; privateKey: string; repositories?: string[] }): Promise<{ ok: true; data: GitHubStatusResponse } | { ok: false; reason: string }> {
   try {
     const reply = await fetch("/api/github/status", { method: "POST", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify(body) });
     const json = (await reply.json().catch(() => ({ reason: `The server could not take the save (${reply.status}). Try again.` }))) as Partial<GitHubStatusResponse & ApiError>;
