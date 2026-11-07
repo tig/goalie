@@ -9,7 +9,9 @@ const MONTH_DAY = new Intl.DateTimeFormat("en", { month: "short", day: "numeric"
 export const dateLabel = (date: GoalDate, today: string) => `${date.kind} ${shortDate(date.date, today)}`;
 
 /** "slip 22 days". The one place a slip is written. */
-export const slipLabel = (days: number) => `slip ${days} ${days === 1 ? "day" : "days"}`;
+/** A count of days, singular at one (QA 8). */
+export const daysLabel = (days: number) => `${days} ${days === 1 ? "day" : "days"}`;
+export const slipLabel = (days: number) => `slip ${daysLabel(days)}`;
 
 /** A committed date: the goal's own Committed date or its Promotion Milestone's. Health is judged against it. */
 export const isCommitted = (date: GoalDate) => date.kind === "Committed" || date.kind === "Promotion Milestone";

@@ -109,11 +109,30 @@ export function readEntityEvents(db: DatabaseSync, refs: EntityRefs, page: { bef
   return (db.prepare(`${sql} ORDER BY sequence DESC LIMIT ?`).all(...params, page.limit) as Row[]).map(decodeEvent);
 }
 
-/** How many Events the named entities have, and how many of them are comments. */
-export function countEntityEvents(db: DatabaseSync, refs: EntityRefs): { events: number; comments: number } {
+/** How many Events the named entities have. */
+export function countEntityEvents(db: DatabaseSync, refs: EntityRefs): number {
   const { sql, params } = entityEvents(refs, "field", Number.MAX_SAFE_INTEGER);
-  const row = db.prepare(`SELECT COUNT(*) AS events, COALESCE(SUM(field = 'comment'), 0) AS comments FROM (${sql})`).get(...params) as Row;
-  return { events: row.events as number, comments: row.comments as number };
+  return (db.prepare(`SELECT COUNT(*) AS events FROM (${sql})`).get(...params) as Row).events as number;
+}
+
+/**
+ * How many Activity rows each chip shows (QA 4). The app's groupEvents makes one row of each run of changes with the same actor, timestamp, and reason, and one row of each comment.
+ * All groups the whole stream, so a comment ends a run. Changes groups the changes alone.
+ */
+export function countActivityRows(db: DatabaseSync, refs: EntityRefs): { All: number; Comments: number; Changes: number } {
+  const { sql, params } = entityEvents(refs, "sequence, actor, timestamp, reason, field", Number.MAX_SAFE_INTEGER);
+  const starts = (where: string) => `
+    SELECT field = 'comment' AS comment,
+      LAG(field) OVER w IS NULL OR field = 'comment' OR LAG(field) OVER w = 'comment'
+        OR LAG(actor) OVER w IS NOT actor OR LAG(timestamp) OVER w IS NOT timestamp OR LAG(reason) OVER w IS NOT reason AS start
+    FROM (${sql}) ${where} WINDOW w AS (ORDER BY sequence)`;
+  const row = db
+    .prepare(`SELECT
+      (SELECT COALESCE(SUM(start), 0) FROM (${starts("")})) AS "all",
+      (SELECT COALESCE(SUM(comment), 0) FROM (${starts("")})) AS comments,
+      (SELECT COALESCE(SUM(start), 0) FROM (${starts("WHERE field != 'comment'")})) AS changes`)
+    .get(...params, ...params, ...params) as Row;
+  return { All: row.all as number, Comments: row.comments as number, Changes: row.changes as number };
 }
 
 /** Every goal that is or was this goal's Promotion Milestone, from its promotion_milestone Events and its row (N6a). */

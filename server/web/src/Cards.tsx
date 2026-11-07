@@ -1,7 +1,7 @@
 import type { Health, PrioritiesResponse } from "../../src/api.ts";
 import { shortDate } from "../../src/dates.ts";
 import { nameHover } from "./model/goalpage.ts";
-import { slipLabel } from "./model/labels.ts";
+import { daysLabel, slipLabel } from "./model/labels.ts";
 import { HEALTH_MEANINGS, healthWord } from "./model/labels.ts";
 import { HEALTHS, type Filter } from "./model/query.ts";
 import { HELP } from "./helpText.tsx";
@@ -92,7 +92,7 @@ export function Cards(props: Props) {
         {nextPromotion ? (
           <>
             <p className="big">
-              <span className="num">{nextPromotion.days} days</span> <small>to the Promotion Milestone</small>
+              <span className="num">{daysLabel(nextPromotion.days)}</span> <small>to the Promotion Milestone</small>
             </p>
             <p className="note">
               <span className="date">{shortDate(nextPromotion.date, today)}</span> · <span title={nameHover(nextPromotion.goal)}>{nextPromotion.summary}</span>

@@ -1213,7 +1213,11 @@
   ],
   "olderEvents": null,
   "eventCount": 86,
-  "commentCount": 0,
+  "activityCount": {
+    "All": 2,
+    "Comments": 0,
+    "Changes": 2
+  },
   "needsYou": {
     "lateWorkItems": [],
     "missingPtg": false
