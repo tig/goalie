@@ -1,3 +1,4 @@
+import { shortDate } from "../../../src/dates.ts";
 import type { ApiViolation, ApiWorkItem, CommandsRequest, CommandsResponse, FormOptions, GoalFields, Health, PathToGreen, StoredGoal, WorkItemFields, WorkItemStatus } from "../../../src/api.ts";
 
 /**
@@ -30,6 +31,17 @@ export function slipBatch(goal: StoredGoal, changedDueDate: string, health: Excl
 /** Record a pull-in (tig/goalie#64): an earlier changed due date, not before today. Health and the Path to Green stay as they are. */
 export function pullInBatch(goal: StoredGoal, changedDueDate: string, reason: string): CommandsRequest {
   return update(goal, { changed_due_date: changedDueDate }, reason);
+}
+
+/**
+ * QA item 1: why a pull-in date can't save, or "" when it can. `current` is the date now in force, the changed date or the Committed date.
+ * A later date is a slip, which asks for health and a Path to Green, so the pull-in panel never records one.
+ */
+export function pullInProblem(current: string, date: string, today: string): string {
+  if (date === "") return "Choose a date.";
+  if (date >= current) return `A pull-in moves the date earlier than ${shortDate(current, today)}. For a later date, record a slip.`;
+  if (date < today) return `A pull-in moves the date no earlier than today, ${shortDate(today, today)}.`;
+  return "";
 }
 
 export type NewMilestone = { summary: string; due_date: string; owner: string };

@@ -3,7 +3,7 @@
  * A rule returns violations. The write path rolls back when there is one.
  */
 
-import { isDate } from "./dates.ts";
+import { isDate, longDate } from "./dates.ts";
 import { closesAs, COMPLETED_STATES, currentDate, DATE_TYPES, mayChangeGoal, PROMOTION_MILESTONE_TYPE, resolvedGoal, STATE_MOVES, WORK_ITEM_STATUSES, type State } from "./goal.ts";
 
 export type Row = Record<string, unknown>;
@@ -55,17 +55,21 @@ function checkGoal(store: Lookup, own: Row): Violation[] {
     const milestone = typeof goal.promotion_milestone === "string" ? store.get("goal", goal.promotion_milestone) : undefined;
     if (milestone === undefined) {
       add("promotion-milestone", `${goal.id}: an ${goal.date_type} date needs a Promotion Milestone.`, "promotion_milestone");
-    } else if (
-      milestone.type !== PROMOTION_MILESTONE_TYPE ||
-      milestone.date_type !== "Committed" ||
-      !isHuman(store, milestone.owner) ||
-      !((currentDate(milestone) as string) < (goal.due_date as string))
-    ) {
-      add(
-        "promotion-milestone",
-        `${goal.id}: the Promotion Milestone ${milestone.id} must be a Milestone (Commit) with a Committed date before ${goal.due_date} and a human owner.`,
-        "promotion_milestone",
-      );
+    } else {
+      // QA item 5: each broken part says what it is and what to do, in plain words.
+      const m = milestone.id as string;
+      const parts: string[] = [];
+      if (milestone.type !== PROMOTION_MILESTONE_TYPE) parts.push(`${m}, the Promotion Milestone of ${goal.id}, is not a Milestone (Commit). Pick a Milestone (Commit) goal as the Promotion Milestone.`);
+      const kind = String(milestone.date_type);
+      if (milestone.date_type !== "Committed") parts.push(`${m}, the Promotion Milestone of ${goal.id}, has ${/^[AEIOU]/.test(kind) ? "an" : "a"} ${kind} date. A Promotion Milestone has a Committed date. Promote the date of ${m} first.`);
+      if (!isHuman(store, milestone.owner)) parts.push(`${m}, the Promotion Milestone of ${goal.id}, has no human owner. Give ${m} a human owner first.`);
+      // With no current date there is nothing to compare; the Date Type sentence above says what to do.
+      const date = currentDate(milestone);
+      if (date !== undefined && !(date < (goal.due_date as string))) {
+        const before = isDate(goal.due_date) ? longDate(goal.due_date) : String(goal.due_date);
+        parts.push(`${m} is the Promotion Milestone of ${goal.id}, so its date must be before ${before}, the date of ${goal.id}. Pick a date before ${before}, or move the date of ${goal.id} first.`);
+      }
+      if (parts.length > 0) add("promotion-milestone", parts.join(" "), "promotion_milestone");
     }
   }
   if (own.changed_due_date != null && own.date_type !== "Committed") {

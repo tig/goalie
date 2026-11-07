@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import type { FormOptions, GoalFields, GoalPageResponse, Health } from "../../src/api.ts";
 import { postCommands, useJson } from "./data.ts";
 import { fieldsBatch } from "./model/commands.ts";
-import { eventValue, fieldLabel, nameHover } from "./model/goalpage.ts";
+import { eventValue, fieldLabel, judgedLabel, nameHover } from "./model/goalpage.ts";
 import { healthWord, slipLabel } from "./model/labels.ts";
 import { backPath, goalPath } from "./model/route.ts";
 import { Avatar, HealthDot } from "./parts.tsx";
@@ -165,9 +165,10 @@ export function Props({ data, reload, onAct, chosen, dateBar }: { data: GoalPage
       </Prop>
       {judged && (
         // tig/goalie#60: the label names the date. Health is judged on it, so the line under the value says so.
-        <Prop label="Committed Date" data={data} reload={reload} className="pjudged">
+        // QA item 3: an uncommitted goal shows its Promotion Milestone's date, so the label says Promotion Milestone.
+        <Prop label={judgedLabel(judged.kind)} data={data} reload={reload} className="pjudged">
           <span>
-            <b className="date">{yearDate(judged.date)}</b> {judged.kind === "Promotion Milestone" ? "Promotion Milestone" : judged.kind}
+            <b className="date">{yearDate(judged.date)}</b>
             {judged.slipDays !== undefined && <span className="late"> · {slipLabel(judged.slipDays)}</span>}
           </span>
           <span className="muted pother">Health is judged on this date.</span>

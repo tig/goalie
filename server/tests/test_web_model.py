@@ -52,6 +52,10 @@ class DateTests(unittest.TestCase):
     def test_a_slip_is_written_in_one_place(self) -> None:
         self.assertEqual(run("return [labels.slipLabel(22), labels.slipLabel(1)];"), ["slip 22 days", "slip 1 day"])
 
+    def test_a_count_of_days_is_singular_at_one(self) -> None:
+        # QA 8: Home said "1 days to the Promotion Milestone".
+        self.assertEqual(run("return [labels.daysLabel(1), labels.daysLabel(0), labels.daysLabel(14)];"), ["1 day", "0 days", "14 days"])
+
 
 class QueryTests(unittest.TestCase):
     def test_a_link_reopens_the_same_screen(self) -> None:
@@ -566,6 +570,27 @@ class GoalPageTests(unittest.TestCase):
         b = run('const g = page("XW-0001").goal; return commands.pullInBatch(g, "2026-11-05", "Done ahead");')
         self.assertEqual(b["commands"][0]["fields"], {"changed_due_date": "2026-11-05"})  # type: ignore[index]
         self.assertEqual(b["commands"][0]["reason"], "Done ahead")  # type: ignore[index]
+
+    def test_a_pull_in_refuses_a_later_date_and_names_the_slip(self) -> None:
+        # QA item 1: the panel saved Nov 6 to Nov 20 as a pull-in. Today is 2026-10-23.
+        got = run('return [["2026-11-20", "2026-11-06", "2026-10-22", "", "2026-11-01", "2026-10-23"].map((d) => commands.pullInProblem("2026-11-06", d, "2026-10-23"))];')
+        self.assertEqual(got[0], [  # type: ignore[index]
+            "A pull-in moves the date earlier than Nov 6. For a later date, record a slip.",
+            "A pull-in moves the date earlier than Nov 6. For a later date, record a slip.",
+            "A pull-in moves the date no earlier than today, Oct 23.",
+            "Choose a date.",
+            "",
+            "",
+        ])
+
+    def test_the_date_row_is_named_for_the_date_it_shows(self) -> None:
+        # QA item 3: an Ambition goal's row shows its Promotion Milestone's date, so it is not labelled Committed Date.
+        self.assertEqual(run('return ["Committed", "Promotion Milestone"].map(goalpage.judgedLabel);'), ["Committed Date", "Promotion Milestone"])
+
+    def test_a_changed_due_date_reads_as_a_slip_or_a_pull_in(self) -> None:
+        # QA item 7: "Changed Due Date: None -> Nov 20" read as nothing. The first change starts from the committed date.
+        got = run('return [goalpage.dateMove(null, "2026-11-03", "2026-11-06"), goalpage.dateMove(null, "2026-11-20", "2026-11-06"), goalpage.dateMove("2026-11-20", "2026-11-10", "2026-11-06")];')
+        self.assertEqual(got, ["Pull-in: Nov 6, 2026 → Nov 3, 2026", "Slip: Nov 6, 2026 → Nov 20, 2026", "Pull-in: Nov 20, 2026 → Nov 10, 2026"])
 
     def test_promoting_fantasy_makes_a_new_milestone_first(self) -> None:
         b = run('const g = page("XW-0003").goal; return commands.promoteToAmbition(g, { summary: "Commit a date for the launch", due_date: "2026-12-01", owner: "chelsea" }, "2026-12-15", "Plan is clearer", "Milestone (Commit)");')

@@ -129,6 +129,27 @@ class WritePathTests(unittest.TestCase):
         self.ok(create("goal", "GOAL-42", EXAMPLE, "Planned"))
         self.rejected(update("goal", "GOAL-57", 1, {"changed_due_date": "2027-05-01", "due_date": "2027-05-01"}, "Slip"), "promotion-milestone")
 
+    def test_a_milestone_slip_past_the_goal_it_backs_says_why_and_what_to_do(self) -> None:
+        # QA item 5: the refusal names the date rule in plain words and the two ways out.
+        self.ok(create("goal", "GOAL-42", EXAMPLE, "Planned"))
+        result = self.rejected(update("goal", "GOAL-57", 1, {"changed_due_date": "2027-05-01"}, "Slip"), "promotion-milestone")
+        self.assertEqual(
+            result["violations"][0]["message"],
+            "GOAL-57 is the Promotion Milestone of GOAL-42, so its date must be before Mar 31, 2027, the date of GOAL-42. Pick a date before Mar 31, 2027, or move the date of GOAL-42 first.",
+        )
+
+    def test_a_promotion_milestone_with_an_ambition_date_says_only_that(self) -> None:
+        # Review of #89: the sentence read "has a Ambition date", and a date sentence was added though the date is not the problem.
+        self.ok(create("goal", "GOAL-60", committed_milestone(due_date="2027-01-10"), "Planned"))
+        self.ok(create("goal", "GOAL-59", committed_milestone(due_date="2027-02-01", date_type="Ambition", promotion_milestone="GOAL-60"), "Planned"))
+        result = self.rejected(create("goal", "GOAL-42", {**EXAMPLE, "promotion_milestone": "GOAL-59"}, "Planned"), "promotion-milestone")
+        self.assertEqual(result["violations"][0]["message"], "GOAL-59, the Promotion Milestone of GOAL-42, has an Ambition date. A Promotion Milestone has a Committed date. Promote the date of GOAL-59 first.")
+
+    def test_a_wrong_promotion_milestone_says_what_it_is_and_what_to_do(self) -> None:
+        # QA item 5: each broken part of the Promotion Milestone rule has its own sentence.
+        result = self.rejected(create("goal", "GOAL-42", {**EXAMPLE, "promotion_milestone": "GOAL-7"}, "Planned"), "promotion-milestone")
+        self.assertIn("GOAL-7, the Promotion Milestone of GOAL-42, is not a Milestone (Commit). Pick a Milestone (Commit) goal as the Promotion Milestone.", result["violations"][0]["message"])
+
     def test_owner_must_be_one_human(self) -> None:
         self.ok(create("actor", "bot", {"kind": "agent", "display_name": "Bot", "operator": JANE}))
         self.rejected(create("goal", "GOAL-42", {**EXAMPLE, "owner": "bot"}, "Planned"), "one-human-owner")

@@ -48,6 +48,9 @@ const MONTH_DAY_YEAR = new Intl.DateTimeFormat("en", { month: "short", day: "num
 const MONTH = new Intl.DateTimeFormat("en", { month: "short", timeZone: "UTC" });
 const MONTH_YEAR = new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "UTC" });
 
+/** "Mar 31, 2027". */
+export const longDate = (date: string) => MONTH_DAY_YEAR.format(day(date));
+
 /** "Oct 1", or "Mar 31, 2027" outside the current year. */
 export function shortDate(date: string, today: string): string {
   return (date.slice(0, 4) === today.slice(0, 4) ? MONTH_DAY : MONTH_DAY_YEAR).format(day(date));

@@ -5,7 +5,7 @@ import { toApiWorkItem } from "./work.ts";
 import { above, changers, closesAs, closesAsPromoted, currentDate, mayChangeGoal, goalDates, isOpen, judgedDate, resolvedGoal, uncommittedDate, type State } from "./goal.ts";
 import { startedOf } from "./priorities.ts";
 import { reposOnGoal } from "./github.ts";
-import { actorsById, countEntityEvents, goalieOwner, milestonesOf, read, readAll, readEntityEvents, workItemsOn, type EntityRefs } from "./read.ts";
+import { actorsById, countActivityRows, countEntityEvents, goalieOwner, milestonesOf, read, readAll, readEntityEvents, workItemsOn, type EntityRefs } from "./read.ts";
 import { goalLints, type Row } from "./rules.ts";
 
 /**
@@ -95,9 +95,9 @@ export function goalPage(db: DatabaseSync, id: string, me: string, today: string
   const workItems: ApiWorkItem[] | null = on ? itemsOf(id).map((w) => toApiWorkItem(db, w, today)) : null;
   const itemIds = (workItems ?? []).map((w) => w.id);
   const history = historyOf(db, stored, itemIds);
-  const counts = countEntityEvents(db, history);
+  const eventCount = countEntityEvents(db, history);
   // D1: past 1,000 Events the page sends the newest 100, and the app asks for the rest (Codebase QA: 4,327 KB at 3,000 comments).
-  const paged = counts.events > HISTORY_WHOLE;
+  const paged = eventCount > HISTORY_WHOLE;
   const events: ApiEvent[] = readEntityEvents(db, history, paged ? { before: Number.MAX_SAFE_INTEGER, limit: HISTORY_PAGE } : undefined).map(toApiEvent);
 
   const unit = read(db, "org_unit", stored.org_unit as string);
@@ -128,8 +128,8 @@ export function goalPage(db: DatabaseSync, id: string, me: string, today: string
     workItems,
     events,
     olderEvents: paged ? events[events.length - 1].sequence : null,
-    eventCount: counts.events,
-    commentCount: counts.comments,
+    eventCount,
+    activityCount: countActivityRows(db, history),
     needsYou: {
       lateWorkItems: (workItems ?? []).filter((w) => w.late && w.owner === me).map((w) => w.id),
       missingPtg: stored.owner === me && (health === "YELLOW" || health === "RED") && stored.path_to_green == null,
