@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { GoalHit, GoalsResponse, Health, MyGoal, MyGoalsResponse } from "./api.ts";
 import { goalDates, isOpen, resolvedGoal, type State } from "./goal.ts";
+import { firstStep } from "./priorities.ts";
 import { readAll } from "./read.ts";
 import type { Row } from "./rules.ts";
 
@@ -33,17 +34,19 @@ function loaded(db: DatabaseSync) {
     }
     return null;
   };
-  return { goals, actor, priorityOf };
+  return { goals, actor, names, priorityOf };
 }
 
 /** My goals for `me` on `today`, the org's calendar day. */
 export function myGoalsView(db: DatabaseSync, me: string, today: string): Omit<MyGoalsResponse, "me"> {
-  const { goals, actor, priorityOf } = loaded(db);
+  const { goals, actor, names, priorityOf } = loaded(db);
   const getGoal = (id: string) => goals.get(id);
   const rows: MyGoal[] = [...goals.values()]
     .filter((g) => g.owner === me && isOpen(g))
     .map((g) => {
       const health = (g.health as Health) ?? null;
+      // The PTG column shows the first step of the Path to Green, as Home does, for a goal that is not GREEN.
+      const ptg = health === "RED" || health === "YELLOW" ? firstStep(g.path_to_green, names) : undefined;
       return {
         id: g.id as string,
         summary: g.summary as string,
@@ -52,6 +55,7 @@ export function myGoalsView(db: DatabaseSync, me: string, today: string): Omit<M
         health,
         dates: goalDates(resolvedGoal(g, getGoal), true, getGoal, today),
         priority: priorityOf(g),
+        ...(ptg ? { ptg } : {}),
       };
     })
     .sort((a, b) => HEALTH_ORDER.indexOf(a.health) - HEALTH_ORDER.indexOf(b.health) || a.id.localeCompare(b.id));

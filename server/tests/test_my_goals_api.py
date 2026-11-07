@@ -23,6 +23,8 @@ class MyGoalsApiTests(unittest.TestCase):
             create("goal", "XW-0095", {**mine, "summary": "Ship a goal with no priority"}, "Test data"),
             create("goal", "XW-0096", {**mine, "summary": "A Completed goal of mine", "state": "Completed"}, "Test data"),
             create("goal", "XW-0097", {**mine, "summary": "A Deleted goal of mine", "state": "Deleted"}, "Test data"),
+            # A goal that is not GREEN carries its Path to Green.
+            create("goal", "XW-0098", {**OLD_GOAL, "owner": "chelsea", "summary": "A goal of mine at risk"}, "Test data"),
         ]
         for command in writes:
             result = cls.store.write("chelsea", command)
@@ -47,7 +49,7 @@ class MyGoalsApiTests(unittest.TestCase):
         self.assertEqual(self.body["me"], {"id": "chelsea", "name": "Chelsea"})
 
     def test_it_holds_every_open_goal_i_own_and_no_other(self) -> None:
-        self.assertEqual(set(self.rows), SEEDED_MINE | {"XW-0095"})
+        self.assertEqual(set(self.rows), SEEDED_MINE | {"XW-0095", "XW-0098"})
 
     def test_a_goal_with_no_priority_is_in_it(self) -> None:
         self.assertIsNone(self.rows["XW-0095"]["priority"])
@@ -55,6 +57,11 @@ class MyGoalsApiTests(unittest.TestCase):
     def test_a_sub_goal_names_the_priority_it_serves_through_its_parent(self) -> None:
         self.assertEqual(self.rows["XW-0003"]["priority"], self.rows["XW-0011"]["priority"])
         self.assertIsNotNone(self.rows["XW-0011"]["priority"])
+
+    def test_a_goal_that_is_not_green_shows_the_first_step_of_its_path_to_green(self) -> None:
+        # The PTG column reads "No Path to Green" when ptg is missing (review of #87).
+        self.assertEqual(self.rows["XW-0098"]["ptg"], {"text": "Test step", "owner": {"id": "tig", "name": "Tig"}, "date": "2026-10-29"})
+        self.assertNotIn("ptg", self.rows["XW-0095"])
 
     def test_it_sorts_red_yellow_green_then_no_health(self) -> None:
         order = {"RED": 0, "YELLOW": 1, "GREEN": 2, None: 3}
