@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ApiError, ApiGoal, GoalPageResponse, Health, PrioritiesResponse } from "../../src/api.ts";
+import type { ApiError, ApiGoal, GoalPageResponse, GoalsResponse, Health, PrioritiesResponse } from "../../src/api.ts";
 import { monthYear } from "../../src/dates.ts";
 import { labelSizers, rangeLabel } from "./model/labels.ts";
 import { calendarMonth } from "./model/calendar.ts";
-import { filterPriorities, isFiltering } from "./model/filter.ts";
+import { filterPriorities, isFiltering, notInView } from "./model/filter.ts";
 import { ZOOM_ORDER, type View } from "./model/query.ts";
 import { moveFrom, timelineWindow } from "./model/timeline.ts";
 import { fieldsBatch } from "./model/commands.ts";
 import { arrangeBatch, moveFields, quarterOf, type Spot } from "./model/arrange.ts";
-import { getJson, postCommands } from "./data.ts";
+import { getJson, postCommands, useJson } from "./data.ts";
 import { Cards, HealthCounts } from "./Cards.tsx";
 import { CalendarView } from "./CalendarView.tsx";
 import { ListView } from "./ListView.tsx";
@@ -19,10 +19,11 @@ import { useDismiss, usePhone, useScreen } from "./useScreen.ts";
 import { GoalPage } from "./GoalPage.tsx";
 import { NewGoal } from "./NewGoal.tsx";
 import { WorkPage } from "./WorkPage.tsx";
+import { MyGoalsPage, NotInView } from "./MyGoalsPage.tsx";
 import { GitHubPage } from "./GitHubPage.tsx";
 import { Feedback } from "./Feedback.tsx";
 import { encodeFocus, FEEDBACK_CHROME } from "./model/feedback.ts";
-import { backPath, newGoalPath, workPath } from "./model/route.ts";
+import { backPath, MY_GOALS_PATH, newGoalPath, workPath } from "./model/route.ts";
 import { homeSearch, Link, rememberHome, useRoute } from "./router.tsx";
 
 /**
@@ -39,14 +40,17 @@ async function load(): Promise<Load> {
   return { state: "refused", status: reply.status, reason: error.reason ?? reply.statusText };
 }
 
-/** The top bar's pages: Home and Work items. The one you are on is filled. */
+/** The top bar's pages: Home, My goals, and Work items. The one you are on is filled. */
 function TopTabs() {
   const route = useRoute();
-  const homeOff = route.page === "work" || route.page === "github";
+  const homeOff = route.page === "work" || route.page === "github" || route.page === "mine";
   return (
     <nav className="toptabs" aria-label="Pages">
       <Link to={backPath(route.page === "home" ? location.search : homeSearch())} className={`tab${homeOff ? " off" : ""}`}>
         Home
+      </Link>
+      <Link to={MY_GOALS_PATH} className={`tab${route.page === "mine" ? "" : " off"}`}>
+        My goals
       </Link>
       <Link to={workPath()} className={`tab${route.page === "work" ? "" : " off"}`}>
         Work items
@@ -196,6 +200,8 @@ function Pages({ data, reload }: { data: PrioritiesResponse; reload: () => void 
         <WorkPage data={data} owner={route.owner} />
       ) : route.page === "new" ? (
         <NewGoal key={route.parent ?? ""} parent={route.parent} viewName={data.view.name} />
+      ) : route.page === "mine" ? (
+        <MyGoalsPage />
       ) : route.page === "github" ? (
         <GitHubPage />
       ) : (
@@ -341,8 +347,16 @@ function Home({ data, reload }: { data: PrioritiesResponse; reload: () => void }
           {view === "list" && <ListView {...tree} columns={data.view.columns} />}
           {view === "calendar" && <CalendarView month={month} today={data.today} none={filtering && !funded.length && !backlog.length} filtering={filtering} selected={screen.health} hot={hot} />}
         </section>
+        {screen.q && <SearchHits q={screen.q} data={data} />}
       </main>
     </>
   );
+}
+
+/** #71: search reads every goal. The hits Home does not draw, such as a closed goal, are listed under the board. */
+function SearchHits({ q, data }: { q: string; data: PrioritiesResponse }) {
+  const [loaded] = useJson<GoalsResponse>(`/api/goals?q=${encodeURIComponent(q)}`);
+  if (loaded.state !== "ok") return null;
+  return <NotInView name={data.view.name} hits={notInView(loaded.data.goals, [...data.funded, ...data.backlog], data.unprioritized ?? [])} />;
 }
 

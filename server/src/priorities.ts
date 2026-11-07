@@ -62,7 +62,7 @@ function ownDate(goal: Row): string {
 }
 
 /** The first step of a Path to Green (SPEC.md §6.1, plan E-8). Home shows only that. */
-function firstStep(ptg: unknown, names: Map<string, string>): PtgStep | undefined {
+export function firstStep(ptg: unknown, names: Map<string, string>): PtgStep | undefined {
   const step = (ptg as Partial<PathToGreen> | null)?.steps?.[0];
   if (!step || typeof step.text !== "string") return undefined;
   return {

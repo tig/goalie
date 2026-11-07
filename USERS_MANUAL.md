@@ -186,7 +186,7 @@ The GOALIE owner inspects these each quarter and changes the configuration, revi
 3. Set up the new period's priority lists.
 
 **Work between reviews**
-1. Open *My goals* or your org unit's view.
+1. Open *My goals* or your org unit's view. *My goals* is in the top bar. It lists every open goal you own, including a goal with no priority.
 2. Open a goal. Read the fields. Change what is no longer true.
 3. Write the linked plan when the goal has one.
 4. Comment when you need a note that is not a field change. A comment can sit on any record. In this version it does not reply to another comment.
