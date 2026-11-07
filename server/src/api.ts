@@ -68,7 +68,7 @@ export type PrioritiesResponse = {
 };
 
 /** One row of the My goals view: a goal with no tree. `priority` is the title of the Priority it serves, its own or its nearest parent's; null when it serves none. */
-export type MyGoal = Omit<ApiGoal, "children" | "counted" | "started"> & { priority: string | null };
+export type MyGoal = Omit<ApiGoal, "children" | "counted" | "started" | "version"> & { priority: string | null };
 
 /** GET /api/my-goals. The My goals view (SPEC.md §8.2): every open goal the signed-in actor owns, with or without a Priority, sorted RED, YELLOW, GREEN, then no health. */
 export type MyGoalsResponse = {
