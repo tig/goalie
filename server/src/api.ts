@@ -22,6 +22,8 @@ export type PtgStep = { text: string; owner?: ActorRef; date?: string };
 
 export type ApiGoal = {
   id: string;
+  /** The base_version a move on Home sends (rule 35b). */
+  version: number;
   summary: string;
   owner: ActorRef;
   state: State;
@@ -38,7 +40,7 @@ export type ApiGoal = {
 };
 
 /** `version` is the base_version a re-rank sends. */
-export type ApiPriority = { id: string; version: number; rank: number; title: string; goals: ApiGoal[] };
+export type ApiPriority = { id: string; version: number; rank: number; title: string; period: string; cut_line: boolean; goals: ApiGoal[] };
 
 export type ApiSummary = {
   counts: { RED: number; YELLOW: number; GREEN: number };
@@ -64,8 +66,27 @@ export type PrioritiesResponse = {
   funded: ApiPriority[];
   /** Priorities below the cut line, in rank order. */
   backlog: ApiPriority[];
+  /** Open top goals of this view with no Priority, each with its tree. Home shows them as No priority (rule 35b). */
+  unprioritized: ApiGoal[];
   summary: ApiSummary;
 };
+
+/** One row of the My goals view: a goal with no tree. `priority` is the title of the Priority it serves, its own or its nearest parent's; null when it serves none. */
+export type MyGoal = Omit<ApiGoal, "children" | "counted" | "started" | "version"> & { priority: string | null };
+
+/** GET /api/my-goals. The My goals view (SPEC.md §8.2): every open goal the signed-in actor owns, with or without a Priority, sorted RED, YELLOW, GREEN, then no health. */
+export type MyGoalsResponse = {
+  me: ActorRef;
+  today: string;
+  view: { name: string; columns: readonly string[] };
+  goals: MyGoal[];
+};
+
+/** One goal search finds: any goal, in any state, org unit, or level. */
+export type GoalHit = { id: string; summary: string; owner: ActorRef; state: State; health: Health; priority: string | null };
+
+/** GET /api/goals?q=. Goal search over every goal: the text is in its key or its summary, any case (#71). */
+export type GoalsResponse = { goals: GoalHit[] };
 
 /** GET /api/github/search?goal=<id>&q=<text>. A signed-in actor. A missing goal is 404, the same words as the goal page. Empty q returns no items. */
 export type GitHubSearchItem = { kind: "issue" | "pull"; title: string; url: string };
@@ -265,7 +286,9 @@ export type ApiCommand =
   | { op: "update"; kind: "goal"; id: string | Ref; base_version: number; fields: Partial<GoalFields>; reason?: string }
   | { op: "update"; kind: "work_item"; id: string | Ref; base_version: number; fields: Partial<WorkItemFields>; reason?: string }
   /** Drag to reorder on Home: one per moved Priority, in one batch. Its rank only (SPEC.md §6.3). */
-  | { op: "update"; kind: "priority"; id: string; base_version: number; fields: { rank: number }; reason: string }
+  | { op: "update"; kind: "priority"; id: string; base_version: number; fields: { rank?: number; cut_line?: boolean; status?: "Retired" }; reason: string }
+  /** Rule 35b: a goal placed among the numbered goals on Home gets its own Priority, titled with the goal's summary. */
+  | { op: "create"; kind: "priority"; ref?: Ref; fields: { org_unit: string; period: string; rank: number; title: string; cut_line?: boolean }; reason: string }
   | { op: "comment"; kind: "goal" | "work_item"; id: string; text: string };
 
 /**

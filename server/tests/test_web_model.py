@@ -13,7 +13,7 @@ FIXTURE = Path(__file__).resolve().parents[1] / "web" / "fixtures" / "priorities
 
 def run(body: str) -> object:
     """Run an ES module that imports the model as `m` and the seed fixture as `api`, and return what it prints as JSON."""
-    imports = "".join(f'import * as {name} from "{(MODEL / f"{name}.ts").as_uri()}";\n' for name in ("query", "filter", "timeline", "calendar", "popover", "labels", "scroll", "route", "goalpage", "commands", "newgoal", "markdown"))
+    imports = "".join(f'import * as {name} from "{(MODEL / f"{name}.ts").as_uri()}";\n' for name in ("query", "filter", "timeline", "calendar", "popover", "labels", "scroll", "route", "goalpage", "commands", "newgoal", "markdown", "arrange"))
     script = f"""{imports}
 import {{ readFileSync }} from "node:fs";
 const api = JSON.parse(readFileSync({json.dumps(str(FIXTURE))}, "utf-8"));
@@ -833,6 +833,19 @@ process.stdout.write(JSON.stringify([a.body.message, b.body.message]));"""
         self.assertNotIn("(item) => { if (query !== undefined) setChoice({ query, item }); }", choice)
 
 
+class NotInViewTests(unittest.TestCase):
+    """#71: search finds a goal the view does not draw, such as one with no Priority, and lists it under the view."""
+
+    def test_a_hit_the_view_draws_is_left_out(self) -> None:
+        hits = run('const hit = (id) => ({ id, summary: id, owner: { id: "tig", name: "Tig" }, state: "Backlog", health: null, priority: null }); return filter.notInView([hit("XW-0005"), hit("XW-0095")], [...api.funded, ...api.backlog]).map((g) => g.id);')
+        self.assertEqual(hits, ["XW-0095"])
+
+    def test_a_hit_drawn_under_no_priority_is_left_out(self) -> None:
+        # Review of #87 with #90: Home draws a goal with no Priority under No priority, so the card does not list it again.
+        hits = run('const hit = (id) => ({ id, summary: id, owner: { id: "tig", name: "Tig" }, state: "Backlog", health: null, priority: null }); const none = [{ id: "XW-0095", children: [{ id: "XW-0096", children: [] }] }]; return filter.notInView([hit("XW-0095"), hit("XW-0096"), hit("XW-0097")], [...api.funded, ...api.backlog], none).map((g) => g.id);')
+        self.assertEqual(hits, ["XW-0097"])
+
+
 class RouteTests(unittest.TestCase):
     def test_each_path_opens_its_page(self) -> None:
         pages = run('return ["/", "/goals/XW-0003", "/goals/new", "/goals/new?parent=XW-0003", "/goals/xw-0003/", "/nowhere"].map((p) => { const u = new URL(p, "http://x"); return route.parseRoute(u.pathname, u.search); });')
@@ -842,6 +855,11 @@ class RouteTests(unittest.TestCase):
         pages = run('return ["/work", "/work?owner=frontend-engineer", "/work/"].map((p) => { const u = new URL(p, "http://x"); return route.parseRoute(u.pathname, u.search); });')
         self.assertEqual(pages, [{"page": "work"}, {"page": "work", "owner": "frontend-engineer"}, {"page": "work"}])
         self.assertEqual(run('return [route.workPath(), route.workPath("qa")];'), ["/work", "/work?owner=qa"])
+
+    def test_my_goals_has_its_own_path(self) -> None:
+        pages = run('return ["/my-goals", "/my-goals/"].map((p) => { const u = new URL(p, "http://x"); return route.parseRoute(u.pathname, u.search); });')
+        self.assertEqual(pages, [{"page": "mine"}, {"page": "mine"}])
+        self.assertEqual(run("return route.MY_GOALS_PATH;"), "/my-goals")
 
     def test_a_goal_link_and_the_back_link(self) -> None:
         self.assertEqual(run('return [route.goalPath("XW-0003"), route.newGoalPath(), route.newGoalPath("XW-0003"), route.backPath("?view=list&health=RED"), route.backPath("")];'), ["/goals/XW-0003", "/goals/new", "/goals/new?parent=XW-0003", "/?view=list&health=RED", "/"])
@@ -857,17 +875,18 @@ class NewGoalV2Tests(unittest.TestCase):
         return run(f"return newgoal.toSave({json.dumps({**self.BASE, **form})}, {json.dumps(answer)}, {json.dumps(details)}).map((l) => [l.key, l.text, l.done]);")
 
     def test_an_empty_form_lists_the_foundation_with_nothing_done(self) -> None:
-        self.assertEqual(self.lines({}), [["summary", "Summary", False], ["due_date", "Date", False], ["date_type", "Date Type", False], ["priority", "Priority, or None", False]])
+        self.assertEqual(self.lines({}), [["summary", "Summary", False], ["due_date", "Date", False], ["date_type", "Date Type", False]])
 
-    def test_priority_is_met_once_picked_even_as_none_and_from_a_parent(self) -> None:
-        self.assertEqual(self.lines({"priorityPicked": True})[-1], ["priority", "Priority, or None", True])
+    def test_new_goal_does_not_ask_for_a_priority(self) -> None:
+        # NG4a: a goal gets its Priority on its own page, from the ladder, after it is made.
+        self.assertNotIn("priority", [l[0] for l in self.lines({})])  # type: ignore[union-attr]
         self.assertEqual(self.lines({"summary": "Help text", "parent": "XW-0004"}), [["summary", "Summary", True]])
 
     def test_an_uncommitted_date_adds_the_milestone_date_and_a_committed_one_the_plan(self) -> None:
         fantasy = self.lines({"summary": "Ship it", "due_date": "2027-02-26", "date_type": "Fantasy", "milestone": {"summary": "Commit", "due_date": "", "owner": "chelsea"}})
-        self.assertEqual(fantasy, [["summary", "Summary", True], ["due_date", "Date", True], ["date_type", "Date Type", True], ["milestone_date", "Promotion Milestone date", False], ["priority", "Priority, or None", False]])
+        self.assertEqual(fantasy, [["summary", "Summary", True], ["due_date", "Date", True], ["date_type", "Date Type", True], ["milestone_date", "Promotion Milestone date", False]])
         committed = self.lines({"summary": "Ship it", "due_date": "2027-02-26", "date_type": "Committed"}, {"ok": True, "ids": {}, "events": []})
-        self.assertEqual(committed[-2], ["plan_maturity", "Plan at Pencil", True])
+        self.assertEqual(committed[-1], ["plan_maturity", "Plan at Pencil", True])
 
     def test_a_refusal_undoes_its_line_in_plain_words_and_details_wait_until_opened(self) -> None:
         answer = {"ok": False, "at": 0, "error": "invalid", "violations": [], "all": [
@@ -876,15 +895,15 @@ class NewGoalV2Tests(unittest.TestCase):
             {"rule": "not-checked", "message": "not checked yet: it names $m", "at": 1},
         ]}
         form = {"summary": "Ship it", "due_date": "2027-02-26", "date_type": "Committed"}
-        self.assertEqual(self.lines(form, answer)[-2], ["plan_maturity", "Plan at Pencil", False])
+        self.assertEqual(self.lines(form, answer)[-1], ["plan_maturity", "Plan at Pencil", False])
         self.assertNotIn("health", [l[0] for l in self.lines(form, answer)])  # type: ignore[union-attr]
         self.assertEqual(self.lines(form, answer, True)[-1], ["health", "Health", False])
         said = run(f"return newgoal.toSave({json.dumps({**self.BASE, **form})}, {json.dumps(answer)}, false).map((l) => l.sentence);")
-        self.assertEqual(said[-2], "A Committed date needs a plan at Pencil.")  # type: ignore[index]
+        self.assertEqual(said[-1], "A Committed date needs a plan at Pencil.")  # type: ignore[index]
 
     def test_a_stale_answer_is_no_line(self) -> None:
         form = {"summary": "Ship it", "due_date": "2027-02-26", "date_type": "Committed", "priorityPicked": True}
-        self.assertEqual([l[0] for l in self.lines(form, {"ok": False, "at": 3, "error": "stale", "current": {}})], ["summary", "due_date", "date_type", "plan_maturity", "priority"])  # type: ignore[union-attr]
+        self.assertEqual([l[0] for l in self.lines(form, {"ok": False, "at": 3, "error": "stale", "current": {}})], ["summary", "due_date", "date_type", "plan_maturity"])  # type: ignore[union-attr]
 
     def test_a_check_that_could_not_run_keeps_the_last_list_and_never_reads_ready(self) -> None:
         invalid = {"ok": False, "at": 1, "error": "invalid", "violations": [], "all": [{"rule": "ptg-when-yellow-or-red", "message": "x", "field": "path_to_green", "at": 1}]}
@@ -1135,3 +1154,197 @@ class GitHubPageTests(unittest.TestCase):
         self.assertNotIn("data.configured &&", page)
         self.assertNotIn("<input", page)
         self.assertNotIn("<button", page)
+
+
+class ArrangeTests(unittest.TestCase):
+    """Rule 35b: on Home each top goal on a Priority shows a number. A goal is dragged between numbered goals, into a goal, beside a sub-goal, or to No priority."""
+
+    def test_a_move_off_the_list_writes_its_parent_and_no_priority(self) -> None:
+        got = run("""return [arrange.moveFields({ kind: "into", goal: "XW-0002" }), arrange.moveFields({ kind: "beside", parent: "XW-0003" }), arrange.moveFields({ kind: "none" })];""")
+        self.assertEqual(got, [{"priority": None, "parent": "XW-0002"}, {"priority": None, "parent": "XW-0003"}, {"priority": None, "parent": None}])
+
+    def test_a_goal_never_goes_into_itself_or_its_own_tree(self) -> None:
+        got = run("""const trees = api.funded.flatMap((p) => p.goals);
+          return [
+            arrange.canMove(trees, "XW-0003", { kind: "into", goal: "XW-0003" }),
+            arrange.canMove(trees, "XW-0003", { kind: "into", goal: "XW-0004" }),
+            arrange.canMove(trees, "XW-0003", { kind: "beside", parent: "XW-0004" }),
+            arrange.canMove(trees, "XW-0004", { kind: "into", goal: "XW-0002" }),
+            arrange.canMove(trees, "XW-0002", { kind: "at", number: 1, backlog: false }),
+          ];""")
+        self.assertEqual(got, [False, False, False, True, True])
+
+    def test_the_last_goal_above_the_cut_line_does_not_go_to_the_backlog(self) -> None:
+        got = run("""const ids = ["a", "b", "c"];
+          return [
+            arrange.canMove([], "a", { kind: "at", number: 2, backlog: true }, ids, 1),
+            arrange.canMove([], "b", { kind: "at", number: 2, backlog: true }, ids, 2),
+            arrange.canMove([], "x", { kind: "at", number: 4, backlog: true }, ids, 3),
+          ];""")
+        self.assertEqual(got, [False, True, True])
+
+    def test_the_list_after_a_move(self) -> None:
+        got = run("""const ids = ["a", "b", "c"];
+          return [arrange.placed(ids, "a", 3), arrange.placed(ids, "c", 0), arrange.placed(ids, "x", 1)];""")
+        self.assertEqual(got, [["b", "c", "a"], ["c", "a", "b"], ["a", "x", "b", "c"]])
+
+    def test_a_drop_where_the_goal_already_is_is_no_move(self) -> None:
+        got = run("""return [
+          arrange.changes({ index: 1, backlog: false, parent: null }, { kind: "at", number: 2, backlog: false }),
+          arrange.changes({ index: 1, backlog: false, parent: null }, { kind: "at", number: 1, backlog: false }),
+          arrange.changes({ index: 1, backlog: false, parent: null }, { kind: "at", number: 2, backlog: true }),
+          arrange.changes({ index: null, backlog: false, parent: "XW-0003" }, { kind: "into", goal: "XW-0003" }),
+          arrange.changes({ index: null, backlog: false, parent: null }, { kind: "none" }),
+          arrange.changes({ index: 2, backlog: true, parent: null }, { kind: "none" }),
+        ];""")
+        self.assertEqual(got, [False, True, True, False, False, True])
+
+    def test_the_middle_of_a_row_nests_and_its_edges_place_beside(self) -> None:
+        self.assertEqual(run("return [arrange.zoneOf(10, 0, 40), arrange.zoneOf(20, 0, 40), arrange.zoneOf(35, 0, 40)];"), ["edge", "in", "edge"])
+        self.assertEqual(run("return [arrange.edgeOf(5, 0, 40), arrange.edgeOf(35, 0, 40)];"), ["before", "after"])
+
+    def test_the_spot_for_a_row_zone_and_edge_keeps_that_rows_part_of_the_list(self) -> None:
+        got = run("""const ids = ["XW-0001", "XW-0002", "XW-0003"];
+          return [
+            arrange.spotAt({ goal: "XW-0002", parent: null, index: 1, backlog: false }, "in", "before", ids, "XW-0095"),
+            arrange.spotAt({ goal: "XW-0002", parent: null, index: 1, backlog: false }, "edge", "before", ids, "XW-0095"),
+            arrange.spotAt({ goal: "XW-0001", parent: null, index: 0, backlog: false }, "edge", "after", ids, "XW-0003"),
+            arrange.spotAt({ goal: "XW-0003", parent: null, index: 2, backlog: true }, "edge", "before", ids, "XW-0001"),
+            arrange.spotAt({ goal: "XW-0004", parent: "XW-0003", index: null, backlog: false }, "edge", "after", ids, "XW-0095"),
+            arrange.spotAt({ goal: "XW-0095", parent: null, index: null, backlog: false }, "edge", "before", ids, "XW-0003"),
+            arrange.backlogTop(ids, 2, "XW-0095"),
+            arrange.backlogTop(ids, 2, "XW-0001"),
+          ];""")
+        self.assertEqual(got, [
+            {"kind": "into", "goal": "XW-0002"},
+            {"kind": "at", "number": 2, "backlog": False},
+            {"kind": "at", "number": 2, "backlog": False},
+            {"kind": "at", "number": 2, "backlog": True},
+            {"kind": "beside", "parent": "XW-0003"},
+            {"kind": "none"},
+            {"kind": "at", "number": 3, "backlog": True},
+            {"kind": "at", "number": 2, "backlog": True},
+        ])
+
+    def test_the_move_says_what_it_does_in_words(self) -> None:
+        got = run("""const names = { goal: (id) => ({ "XW-0002": "Add two more humans to XW by Nov 15" })[id] ?? id };
+          return [
+            arrange.moveWords({ kind: "into", goal: "XW-0002" }, names),
+            arrange.moveWords({ kind: "at", number: 1, backlog: false }, names),
+            arrange.moveWords({ kind: "at", number: 4, backlog: true }, names),
+            arrange.moveWords({ kind: "none" }, names),
+            arrange.movedWords({ kind: "at", number: 3, backlog: false }, names),
+            arrange.movedWords({ kind: "at", number: 4, backlog: true }, names),
+            arrange.movedWords({ kind: "beside", parent: "XW-0002" }, names),
+            arrange.movedWords({ kind: "none" }, names),
+          ];""")
+        self.assertEqual(got, [
+            "Make it a sub-goal of Add two more humans to XW by Nov 15",
+            "Make it number 1",
+            "Move it to the Backlog as number 4",
+            "Move it to No priority",
+            "is now number 3.",
+            "is now number 4, in the Backlog.",
+            "is now a sub-goal of Add two more humans to XW by Nov 15.",
+            "now has no priority.",
+        ])
+
+    def test_arrow_keys_step_through_the_numbers_the_backlog_and_no_priority(self) -> None:
+        got = run("""const ids = ["a", "b", "c"];
+          const at = (number, backlog = false) => ({ kind: "at", number, backlog });
+          return [
+            arrange.nextSpot(ids, 3, "b", at(2), -1),
+            arrange.nextSpot(ids, 3, "b", at(2), 1),
+            arrange.nextSpot(ids, 3, "a", at(1), -1),
+            arrange.nextSpot(ids, 3, "c", at(3), 1),
+            arrange.nextSpot(ids, 3, "x", { kind: "none" }, -1),
+            arrange.nextSpot(ids, 3, "x", { kind: "none" }, 1),
+            arrange.nextSpot(ids, 2, "b", at(2), 1),
+            arrange.nextSpot(ids, 2, "c", at(3, true), -1),
+            arrange.nextSpot(ids, 2, "c", at(3), 1),
+            arrange.nextSpot(ids, 2, "x", { kind: "none" }, -1),
+          ];""")
+        self.assertEqual(got, [
+            {"kind": "at", "number": 1, "backlog": False},
+            {"kind": "at", "number": 3, "backlog": False},
+            None,
+            {"kind": "none"},
+            {"kind": "at", "number": 4, "backlog": False},
+            None,
+            {"kind": "at", "number": 2, "backlog": True},
+            {"kind": "at", "number": 3, "backlog": False},
+            {"kind": "at", "number": 3, "backlog": True},
+            {"kind": "at", "number": 4, "backlog": True},
+        ])
+
+    def test_a_goal_placed_among_the_numbers_gets_its_own_priority_and_the_list_numbers_one_to_n(self) -> None:
+        got = run("""const p = (id, rank, goals) => ({ id, version: 1, rank, cut_line: false, goals: goals.map((g) => ({ id: g, version: 2, summary: "Goal " + g })) });
+          const list = { org_unit: "excaliwire", period: "2026-Q4" };
+          const lists = [p("PRI-1", 1, ["A"]), p("PRI-2", 2, ["B", "C"]), p("PRI-3", 3, []), p("PRI-4", 4, ["D"])];
+          return [
+            arrange.arrangeBatch(lists, { id: "N", version: 5, summary: "New goal" }, { kind: "at", number: 1, backlog: false }, 4, list, "Moved").commands,
+            arrange.arrangeBatch(lists, { id: "D", version: 2, summary: "Goal D" }, { kind: "at", number: 2, backlog: false }, 4, list, "Moved").commands,
+            arrange.arrangeBatch(lists, { id: "N", version: 5, summary: "New goal" }, { kind: "at", number: 3, backlog: false }, 4, list, "Moved").commands,
+          ];""")
+        new, up, inside = got
+        # N takes number 1 with a new Priority, and the Priorities after it move down one. The empty PRI-3 ranks last.
+        self.assertEqual([(c["op"], c["kind"], c.get("id", c.get("ref")), c["fields"]) for c in new], [
+            ("update", "priority", "PRI-1", {"rank": 2}),
+            ("update", "priority", "PRI-2", {"rank": 3}),
+            ("update", "priority", "PRI-3", {"rank": 5}),
+            ("create", "priority", "$p1", {"org_unit": "excaliwire", "period": "2026-Q4", "rank": 1, "title": "New goal"}),
+            ("update", "goal", "N", {"priority": "$p1", "parent": None}),
+        ])
+        self.assertTrue(all(c["reason"] == "Moved" for c in new))
+        self.assertEqual([(c["id"], c["fields"]) for c in up], [("PRI-4", {"rank": 2}), ("PRI-2", {"rank": 3}), ("PRI-3", {"rank": 4})])
+        # Review of #90: the batch writes no goal but the moved one, so B and C keep their shared Priority. A drop between them lands after both.
+        self.assertEqual([c["id"] for c in inside if c["kind"] == "goal"], ["N"])
+        self.assertEqual([c["fields"]["rank"] for c in inside if c["op"] == "create"], [3])
+
+    def test_a_goal_leaving_a_priority_it_held_alone_retires_it_and_the_rest_close_up(self) -> None:
+        # Ported from #94: a Priority emptied by a move retires, so empty Priorities do not pile up after the list. An empty Priority the move did not empty stays.
+        got = run("""const p = (id, rank, goals, cut_line = false) => ({ id, version: 1, rank, cut_line, goals: goals.map((g) => ({ id: g, version: 2, summary: "Goal " + g })) });
+          const list = { org_unit: "excaliwire", period: "2026-Q4" };
+          const lists = [p("PRI-1", 1, ["A"]), p("PRI-2", 2, ["B"], true), p("PRI-3", 3, ["C"]), p("PRI-4", 4, [])];
+          const fields = (batch) => batch.commands.map((c) => [c.kind, c.id ?? c.ref, c.fields]);
+          return [
+            fields(arrange.arrangeBatch(lists, { id: "A", version: 2, summary: "Goal A" }, { kind: "none" }, 2, list, "Moved")),
+            fields(arrange.arrangeBatch(lists, { id: "B", version: 2, summary: "Goal B" }, { kind: "into", goal: "C" }, 2, list, "Moved")),
+          ];""")
+        none, into = got
+        self.assertEqual(none, [
+            ["goal", "A", {"priority": None, "parent": None}],
+            ["priority", "PRI-2", {"rank": 1}],
+            ["priority", "PRI-3", {"rank": 2}],
+            ["priority", "PRI-4", {"rank": 3}],
+            ["priority", "PRI-1", {"status": "Retired"}],
+        ])
+        # B held the cut line: A is now the last goal above it, and B's Priority retires.
+        self.assertEqual(into, [
+            ["goal", "B", {"priority": None, "parent": "C"}],
+            ["priority", "PRI-1", {"cut_line": True}],
+            ["priority", "PRI-3", {"rank": 2}],
+            ["priority", "PRI-4", {"rank": 3}],
+            ["priority", "PRI-2", {"status": "Retired", "cut_line": False}],
+        ])
+
+    def test_a_move_inside_one_part_keeps_the_backlog_where_it_is(self) -> None:
+        # Chelsea, 2026-11-06: moving the last goal above the cut line up put the goal after it under the line. The line now stays after the third goal.
+        got = run("""const p = (id, rank, goals, cut_line = false) => ({ id, version: 1, rank, cut_line, goals: goals.map((g) => ({ id: g, version: 2, summary: "Goal " + g })) });
+          const list = { org_unit: "excaliwire", period: "2026-Q4" };
+          const lists = [p("PRI-1", 1, ["A"]), p("PRI-2", 2, ["B"]), p("PRI-3", 3, ["C"], true), p("PRI-4", 4, ["D"])];
+          const fields = (batch) => batch.commands.map((c) => [c.id ?? c.ref, c.fields]);
+          return [
+            fields(arrange.arrangeBatch(lists, { id: "C", version: 2, summary: "Goal C" }, { kind: "at", number: 1, backlog: false }, 3, list, "Moved")),
+            fields(arrange.arrangeBatch(lists, { id: "D", version: 2, summary: "Goal D" }, { kind: "at", number: 4, backlog: false }, 3, list, "Moved")),
+            fields(arrange.arrangeBatch(lists, { id: "B", version: 2, summary: "Goal B" }, { kind: "at", number: 3, backlog: true }, 3, list, "Moved")),
+            fields(arrange.arrangeBatch(lists, { id: "N", version: 1, summary: "Goal N" }, { kind: "at", number: 4, backlog: true }, 3, list, "Moved")),
+          ];""")
+        up, out, down, joined = got
+        self.assertEqual(up, [["PRI-3", {"rank": 1, "cut_line": False}], ["PRI-1", {"rank": 2}], ["PRI-2", {"rank": 3, "cut_line": True}]])
+        # D joins the goals above the line: the Backlog is empty, so no Priority has the cut line.
+        self.assertEqual(out, [["PRI-3", {"cut_line": False}]])
+        # B goes to the Backlog: C is now the last goal above the line and keeps it.
+        self.assertEqual(down, [["PRI-3", {"rank": 2}], ["PRI-2", {"rank": 3}]])
+        # A new goal dropped in the Backlog leaves the line where it is.
+        self.assertEqual(joined, [["PRI-4", {"rank": 5}], ["$p4", {"org_unit": "excaliwire", "period": "2026-Q4", "rank": 4, "title": "Goal N"}], ["N", {"priority": "$p4", "parent": None}]])

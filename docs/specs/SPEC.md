@@ -225,7 +225,7 @@ An org unit's **ranked list of current priorities** for a plan period. It is usu
 | `cut_line` | Boolean or rank | Optional. Marks where funded priorities end. Items below it are knowingly starved. |
 | `status` | `Current` · `Retired` | Retiring an entry or changing its rank is logged with a reason, like any other change. |
 
-The list's owner is the org unit's owner. Re-ranking is a normal, logged decision. Priorities aren't set in stone: they are reviewed on cadence (typically quarterly) and expected to stay steady between reviews.
+The list's owner is the org unit's owner. Re-ranking is a normal, logged decision. On Home the entries below the cut line show under **Backlog**. This Backlog is a place on the list, not the State `Backlog`: a goal there keeps its State. With no entry below the cut line, Home shows no Backlog. Priorities aren't set in stone: they are reviewed on cadence (typically quarterly) and expected to stay steady between reviews.
 
 **Keep the list short.** A long list of "priorities" is peanut butter: resources and energy spread thin across everything. Lints:
 - More than 4 current entries above the cut line is flagged as a red flag **(configurable threshold)**.

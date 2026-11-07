@@ -51,7 +51,7 @@ class FeedbackTouchTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         with signed_app("seed/build-team.json") as (open_page, api):
             first = api("/api/priorities")["funded"][0]
-            cls.goal = {"label": first["goals"][0]["summary"], "id": first["goals"][0]["id"], "kind": "goal", "breadcrumb": ["Home", first["title"]]}
+            cls.goal = {"label": first["goals"][0]["summary"], "id": first["goals"][0]["id"], "kind": "goal", "breadcrumb": ["Home"]}
             cls.pressed = {w: open_page(w, LONG_PRESS_A_GOAL) for w in (375, 360)}
             cls.field = {w: open_page(w, TEXT_FIELD) for w in (375, 360)}
             cls.moved = {w: open_page(w, MOVED_AND_TAPPED) for w in (375, 360)}

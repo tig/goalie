@@ -13,12 +13,12 @@ import { DEFAULTS, inTransaction, write, type Command, type WriteResult } from "
  * The MCP route will call runCommands too.
  */
 
-/** Only goals and work items are written through the API in the MLP (E-10), and a Priority's rank, for drag to reorder on Home. */
+/** Only goals and work items are written through the API in the MLP (E-10), and, for arranging on Home, a Priority's rank and a new Priority for one goal (rule 35b). */
 // The contract names an update for every kind the API writes, so the app can send it (f55879d left priority out).
 const API_KINDS = ["goal", "work_item", "priority"] as const satisfies readonly Extract<ApiCommand, { op: "update" }>["kind"][];
 
 /** The fields that hold a goal key, so a ref may stand there. A ref anywhere else is plain text. */
-const KEY_FIELDS: Record<(typeof API_KINDS)[number], readonly string[]> = { goal: ["promotion_milestone", "parent"], work_item: ["goal"], priority: [] };
+const KEY_FIELDS: Record<(typeof API_KINDS)[number], readonly string[]> = { goal: ["promotion_milestone", "parent", "priority"], work_item: ["goal"], priority: [] };
 
 /** A re-rank swaps ranks one command at a time, so a tie is checked once the batch ends (checkRanks). */
 const DEFERRED: Partial<Record<string, readonly string[]>> = { priority: ["no-rank-ties"] };
@@ -175,9 +175,15 @@ function resolve(at: number, raw: unknown, ids: Record<Ref, string>, refused: Se
     if (!(value in ids)) throw bad(at, `unknown-ref: ${value} is used before the command that creates it`);
     return ids[value];
   };
-  if (kind === "priority" && (raw.op !== "update" || !isObject(raw.fields) || Object.keys(raw.fields).join() !== "rank")) {
-    throw bad(at, "api-kind: through the API a Priority takes only an update of its rank");
+  // Rule 35b: on Home each numbered goal is its own Priority. The API ranks a Priority and moves the cut line, or makes one with a list, a period, a rank, a title, and the cut line if it has it.
+  const priorityFields = isObject(raw.fields) ? Object.keys(raw.fields).sort().join() : "";
+  // A Priority its only goal leaves on Home retires, and takes the cut line with it.
+  const updates = ["rank", "cut_line", "cut_line,rank", "status", "cut_line,status"];
+  const creates = ["org_unit,period,rank,title", "cut_line,org_unit,period,rank,title"];
+  if (kind === "priority" && !((raw.op === "update" && updates.includes(priorityFields)) || (raw.op === "create" && creates.includes(priorityFields)))) {
+    throw bad(at, "api-kind: through the API a Priority takes an update of its rank or cut_line, a retire, or a create with org_unit, period, rank, title, and an optional cut_line");
   }
+  if (kind === "priority" && raw.op === "update" && isObject(raw.fields) && "status" in raw.fields && raw.fields.status !== "Retired") throw bad(at, "api-kind: through the API a Priority's status changes only to Retired");
   if (raw.op === "comment") return { op: "comment", kind, id: key(raw.id) as string, text: raw.text as string };
   if (raw.op === "create" && raw.ref !== undefined && (!isRef(raw.ref) || raw.ref in ids || refused.has(raw.ref))) throw bad(at, `ref ${String(raw.ref)} must be "$" and a word, used once`);
   if (raw.fields !== undefined && !isObject(raw.fields)) throw bad(at, "fields is a JSON object");
@@ -187,7 +193,7 @@ function resolve(at: number, raw: unknown, ids: Record<Ref, string>, refused: Se
   if (raw.op === "create") {
     // A concrete id is kept. A ref is not an id. github_repo stays on the command. It is not a field of the work item.
     const id = typeof raw.id === "string" && !isRef(raw.id) ? raw.id : undefined;
-    const create = { op: "create" as const, kind, fields, reason, ...(id !== undefined ? { id } : {}) };
+    const create = { op: "create" as const, kind, fields: kind === "priority" ? { ...fields, status: "Current" } : fields, reason, ...(id !== undefined ? { id } : {}) };
     if (kind === "work_item" && Object.hasOwn(raw, "github_repo")) return { ...create, github_repo: raw.github_repo };
     return create;
   }

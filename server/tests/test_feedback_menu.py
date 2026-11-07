@@ -33,7 +33,8 @@ SETUP = """
   // A contextmenu that GOALIE does not prevent is the browser's own menu.
   const menus = [];
   window.addEventListener("contextmenu", (e) => menus.push({ browser: !e.defaultPrevented }));
-  const at = (el) => { const r = el.getBoundingClientRect(); return { x: r.left + Math.min(10, r.width / 2), y: r.top + r.height / 2 }; };
+  // A person scrolls to what they click. Real input lands at screen points, so a target below the screen comes into view first.
+  const at = (el) => { const b = el.getBoundingClientRect(); if (b.bottom > innerHeight || b.top < 0) el.scrollIntoView({ block: "center" }); const r = el.getBoundingClientRect(); return { x: r.left + Math.min(10, r.width / 2), y: r.top + r.height / 2 }; };
   const rightClick = async (el) => { await input({ mouse: "right", ...at(el) }); await sleep(80); };
   const click = async (el) => { await input({ mouse: "left", ...at(el) }); await sleep(80); };
   const key = async (name, shift = false) => { await input({ key: name, shift }); await sleep(80); };
@@ -338,7 +339,8 @@ class FeedbackMenuTests(unittest.TestCase):
         with signed_app("seed/build-team.json") as (open_page, api):
             first = api("/api/priorities")["funded"][0]
             goal = first["goals"][0]
-            cls.goal = {"label": goal["summary"], "id": goal["id"], "kind": "goal", "breadcrumb": ["Home", first["title"]]}
+            # Rule 10b: Home shows no Priority title, so a goal on Home sits directly under Home.
+            cls.goal = {"label": goal["summary"], "id": goal["id"], "kind": "goal", "breadcrumb": ["Home"]}
             cls.owner = goal["owner"]
             pages = (RIGHT_CLICK_A_GOAL, keyboard("F10", True), keyboard("ContextMenu", False), ESCAPE, TOP_BAR_BUTTON, TEXT_FIELD, BOTH_MENUS, FOCUS_BACK, OUTSIDE_CLICK, MARK, CHROME, AVATAR)
             cls.picked, cls.shift_f10, cls.menu_key, cls.escape, cls.top_bar, cls.field, cls.both, cls.back, cls.outside, cls.mark, cls.chrome, cls.avatar = (open_page(1280, s) for s in pages)

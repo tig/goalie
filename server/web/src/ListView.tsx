@@ -24,7 +24,8 @@ function DateText({ date, judged, today, kind = true }: { date: GoalDate; judged
   );
 }
 
-function cell(column: string, goal: GoalRow, today: string): ReactNode {
+/** One cell of a goal row, by column title. The List and My goals share it. */
+export function cell(column: string, goal: Pick<GoalRow, "dates" | "inherited" | "health" | "ptg">, today: string): ReactNode {
   const { own, pm, judged } = listDates(goal.dates);
   switch (column) {
     case "Health":
