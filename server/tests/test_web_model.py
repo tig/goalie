@@ -52,6 +52,10 @@ class DateTests(unittest.TestCase):
     def test_a_slip_is_written_in_one_place(self) -> None:
         self.assertEqual(run("return [labels.slipLabel(22), labels.slipLabel(1)];"), ["slip 22 days", "slip 1 day"])
 
+    def test_a_count_of_days_is_singular_at_one(self) -> None:
+        # QA 8: Home said "1 days to the Promotion Milestone".
+        self.assertEqual(run("return [labels.daysLabel(1), labels.daysLabel(0), labels.daysLabel(14)];"), ["1 day", "0 days", "14 days"])
+
 
 class QueryTests(unittest.TestCase):
     def test_a_link_reopens_the_same_screen(self) -> None:
