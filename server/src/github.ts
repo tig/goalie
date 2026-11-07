@@ -1,4 +1,4 @@
-import { createSign } from "node:crypto";
+import { createPrivateKey, createSign } from "node:crypto";
 import { readFileSync } from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
 import type { GitHubRefResponse, GitHubSearchItem, GitHubStatusResponse } from "./api.ts";
@@ -623,15 +623,42 @@ function cleanPublicUrl(value: string): string | null | "bad" {
 function cleanKey(value: string): string | "keep" | "bad" {
   const text = value.replace(/^\uFEFF/, "").trim();
   if (text === "") return "keep";
-  if (!/-----BEGIN (?:RSA )?PRIVATE KEY-----/.test(text) || !/-----END (?:RSA )?PRIVATE KEY-----/.test(text)) return "bad";
+  const begin = /-----BEGIN (RSA )?PRIVATE KEY-----/.exec(text);
+  const end = /-----END (RSA )?PRIVATE KEY-----/.exec(text);
+  const candidates: string[] = [];
+  if (begin !== null && end !== null && begin.index < end.index) {
+    if ((begin[1] ?? "") !== (end[1] ?? "")) return "bad";
+    const body = text.slice(begin.index + begin[0].length, end.index).replace(/[^A-Za-z0-9+/=]/g, "");
+    if (body !== "") candidates.push(armor(begin[0], end[0], body));
+  } else if (!text.includes("-----")) {
+    const body = text.replace(/[^A-Za-z0-9+/=]/g, "");
+    if (body !== "") {
+      candidates.push(armor("-----BEGIN RSA PRIVATE KEY-----", "-----END RSA PRIVATE KEY-----", body));
+      candidates.push(armor("-----BEGIN PRIVATE KEY-----", "-----END PRIVATE KEY-----", body));
+    }
+  }
+  for (const pem of candidates) {
+    if (rsaKey(pem)) return pem;
+  }
+  return "bad";
+}
+
+function armor(header: string, footer: string, body: string): string {
+  const lines = body.match(/.{1,64}/g) ?? [];
+  return `${header}\n${lines.join("\n")}\n${footer}\n`;
+}
+
+function rsaKey(pem: string): boolean {
   try {
+    const key = createPrivateKey(pem);
+    if (key.asymmetricKeyType !== "rsa") return false;
     const signer = createSign("RSA-SHA256");
     signer.update("goalie");
-    signer.sign(text);
+    signer.sign(key);
+    return true;
   } catch {
-    return "bad";
+    return false;
   }
-  return text;
 }
 
 function configuredGitHub(db: DatabaseSync): Ready {

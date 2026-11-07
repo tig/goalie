@@ -338,6 +338,20 @@ def private_key() -> str:
     return subprocess.run(["node", "--input-type=module", "-e", script], cwd=SERVER, capture_output=True, check=True, text=True).stdout
 
 
+def pkcs1_key() -> str:
+    script = "import { generateKeyPairSync } from 'node:crypto'; const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 }); process.stdout.write(privateKey.export({ type: 'pkcs1', format: 'pem' }));"
+    return subprocess.run(["node", "--input-type=module", "-e", script], cwd=SERVER, capture_output=True, check=True, text=True).stdout
+
+
+def ec_key() -> str:
+    script = "import { generateKeyPairSync } from 'node:crypto'; const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' }); process.stdout.write(privateKey.export({ type: 'pkcs8', format: 'pem' }));"
+    return subprocess.run(["node", "--input-type=module", "-e", script], cwd=SERVER, capture_output=True, check=True, text=True).stdout
+
+
+def key_body(pem: str) -> str:
+    return "".join(line for line in pem.splitlines() if "-----" not in line and line.strip() != "")
+
+
 class PushTests:
     """Shared store and fake GitHub for the push tests."""
 
@@ -1736,6 +1750,68 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertEqual(reply.status, 403, reply.body)
         self.assertNotIn(pem, reply.body.decode())
         self.assertNotIn("BEGIN", reply.body.decode())
+        self.assertEqual(self.config_row(), before)
+
+    def test_a_private_key_on_one_line_is_stored(self) -> None:
+        """A PEM pasted with its lines joined is still the private key. Prediction: the save answers 400."""
+        pem = pkcs1_key()
+        pasted = " ".join(pem.split())
+        reply = self.save_as("tig", "sub-tig", {
+            "appId": "5603810",
+            "installationId": "178377743",
+            "publicUrl": "https://goalie.excaliwire.com",
+            "privateKey": pasted,
+        }, BARE)
+        self.assertEqual(reply.status, 200, reply.body)
+        raw = reply.body.decode()
+        self.assertNotIn(pasted, raw)
+        self.assertNotIn("BEGIN", raw)
+        self.assertTrue(json.loads(raw)["privateKeySet"])
+        stored = self.config_row()
+        assert stored is not None
+        self.assertEqual(key_body(stored["private_key"]), key_body(pem))
+
+    def test_a_private_key_without_its_header_is_stored(self) -> None:
+        """The base64 of a PEM, with no BEGIN line, is still the private key. Prediction: the save answers 400."""
+        pem = pkcs1_key()
+        body = key_body(pem)
+        reply = self.save_as("tig", "sub-tig", {
+            "appId": "5603810",
+            "installationId": "178377743",
+            "publicUrl": "https://goalie.excaliwire.com",
+            "privateKey": body,
+        }, BARE)
+        self.assertEqual(reply.status, 200, reply.body)
+        raw = reply.body.decode()
+        self.assertNotIn(body, raw)
+        self.assertNotIn("BEGIN", raw)
+        self.assertTrue(json.loads(raw)["privateKeySet"])
+        stored = self.config_row()
+        assert stored is not None
+        self.assertEqual(key_body(stored["private_key"]), body)
+
+    def test_an_ec_private_key_is_refused_and_not_stored(self) -> None:
+        """An EC key is not an RSA private key, so the stored key stays. Prediction: the save answers 200."""
+        pem = self.pem()
+        saved = self.save_as("tig", "sub-tig", {
+            "appId": "5603810",
+            "installationId": "178377743",
+            "publicUrl": "https://goalie.excaliwire.com",
+            "privateKey": pem,
+        }, BARE)
+        self.assertEqual(saved.status, 200, saved.body)
+        before = self.config_row()
+        ec = ec_key()
+        reply = self.save_as("tig", "sub-tig", {
+            "appId": "5603810",
+            "installationId": "178377743",
+            "publicUrl": "https://goalie.excaliwire.com",
+            "privateKey": ec,
+        }, BARE)
+        self.assertEqual(reply.status, 400, reply.body)
+        raw = reply.body.decode()
+        self.assertIn("PEM", raw)
+        self.assertNotIn(ec, raw)
         self.assertEqual(self.config_row(), before)
 
 
