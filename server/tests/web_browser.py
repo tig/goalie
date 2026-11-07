@@ -1,4 +1,4 @@
-"""The built app in headless Chrome, signed in as Chelsea on the Excaliwire seed. Shared by the browser tests."""
+"""The built app in headless Chrome on the Excaliwire seed. Shared by the browser tests. The default actor is Chelsea."""
 
 from __future__ import annotations
 
@@ -27,8 +27,8 @@ def chrome() -> str | None:
 
 
 @contextmanager
-def signed_app(*seeds: str) -> Iterator[tuple[Open, Callable[[str], Any]]]:
-    """Yield open(width, expression, path="/"), which loads the page in a fresh Chrome and returns what the expression gives, and api(path), which reads the API as Chelsea.
+def signed_app(*seeds: str, actor: str = "chelsea") -> Iterator[tuple[Open, Callable[[str], Any]]]:
+    """Yield open(width, expression, path="/"), which loads the page in a fresh Chrome and returns what the expression gives, and api(path), which reads the API as actor.
     Each of seeds (a path under server/) loads after the Excaliwire seed.
     CI builds the app and has Chrome, so there a missing one fails. A local run without them skips."""
     browser = chrome()
@@ -42,9 +42,10 @@ def signed_app(*seeds: str) -> Iterator[tuple[Open, Callable[[str], Any]]]:
         for seed in ("", *seeds):
             code, result = store.run("seed", *([seed] if seed else []))
             assert code == 0, result
-        chelsea = store.read("actor", "chelsea")
-        assert store.write("tig", update("actor", "chelsea", chelsea["version"], {"subject": "sub-chelsea"}))["ok"]
-        token, env = signed("sub-chelsea")
+        who = store.read("actor", actor)
+        subject = f"sub-{actor}"
+        assert store.write("tig", update("actor", actor, who["version"], {"subject": subject}))["ok"]
+        token, env = signed(subject)
         with running_server(store.path, env) as (proc, port):
             assert get(proc, port, "/health").status == 200
 

@@ -10,6 +10,12 @@ export function nameHover(id: string, full?: string): string {
   return full === undefined ? id : `${id} · ${full}`;
 }
 
+/** A comment on this goal, or on one of its work items, reads this goal and its repositories. Any other entity reads that entity and no repository list. */
+export function commentScope(entity: string, pageGoalId: string, workItemIds: string[]): { goal: string; repos: boolean } {
+  if (entity === pageGoalId || workItemIds.includes(entity)) return { goal: pageGoalId, repos: true };
+  return { goal: entity, repos: false };
+}
+
 /** W6: a human may edit any work item; an agent only the ones it owns. The server's rule agent-own-work-items decides; this only hides the pencil. */
 export function mayEditWorkItem(me: Pick<ApiActor, "id" | "kind">, item: Pick<ApiWorkItem, "owner">): boolean {
   return me.kind === "human" || item.owner === me.id;
@@ -215,6 +221,11 @@ export function labelPlaces(labels: { at: number; text: string; align: "start" |
 export function keepOrder(first: string[] | null, now: string[]): string[] {
   if (!first) return now;
   return [...first.filter((id) => now.includes(id)), ...now.filter((id) => !first.includes(id))];
+}
+
+/** The work queue's revision. Each item is id:status, in the order given. A status change changes it. The same statuses do not. */
+export function workRefRevision(items: { id: string; status: string }[]): string {
+  return items.map((item) => `${item.id}:${item.status}`).join("\n");
 }
 
 /** The team view (plan F6): one queue per owner, people with work In Progress first; each queue by status. Deleted items are left out. */

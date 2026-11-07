@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ApiActor, ApiViolation, ApiWorkItem, CommandsRequest, CommandsResponse, FormOptions, GoalPageResponse, WorkItemStatus } from "../../src/api.ts";
+import type { ApiActor, ApiViolation, ApiWorkItem, CommandsRequest, CommandsResponse, FormOptions, GitHubSearchResponse, GoalPageResponse, WorkItemStatus } from "../../src/api.ts";
 import { addDays } from "../../src/dates.ts";
 import { postCommands, useJson } from "./data.ts";
 import type { Done } from "./GoalPanels.tsx";
@@ -153,19 +153,85 @@ export function AddSubGoal({ data, onDone }: { data: GoalPageResponse; onDone: D
   );
 }
 
+type GitHubHit = GitHubSearchResponse["items"][number];
+
+/** An issue URL, the same shape the server attaches. A pull request uses /pull/ and is not one. */
+function hasIssueLink(links: string[] | null | undefined): boolean {
+  return Array.isArray(links) && links.some((link) => /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)\/?$/.test(link));
+}
+
+/** The link a choice adds. An issue is added only when the work item has no issue link. A pull request is always a link. Undefined when the save should not send links. */
+function chosenLinks(links: string[] | null | undefined, hit: GitHubHit | null): string[] | undefined {
+  if (hit === null) return undefined;
+  if (hit.kind === "issue" && hasIssueLink(links)) return undefined;
+  const prior = Array.isArray(links) ? links : [];
+  if (prior.includes(hit.url)) return undefined;
+  return [...prior, hit.url];
+}
+
+/** The choice stays with the # query that found it. A different query drops it. */
+function useGitHubChoice(title: string): [GitHubHit | null, (query: string, item: GitHubHit) => void] {
+  const current = hashQuery(title);
+  const [choice, setChoice] = useState<{ query: string; item: GitHubHit } | null>(null);
+  const picked = choice !== null && current !== undefined && choice.query === current ? choice.item : null;
+  return [picked, (query, item) => setChoice({ query, item })];
+}
+
+/** The search menu for a # in the title. It lists issues and pull requests on this goal. */
+function GitHubAttach({ goal, title, onPick }: { goal: string; title: string; onPick: (query: string, item: GitHubHit) => void }) {
+  const query = hashQuery(title);
+  if (query === undefined) return null;
+  return <GitHubAttachMenu goal={goal} query={query} onPick={onPick} />;
+}
+
+/** The same # token the server searches: the text after # up to whitespace. */
+function hashQuery(title: string): string | undefined {
+  return /#(\S+)/.exec(title)?.[1];
+}
+
+/** The first query is sent at once. A changed query waits until 300 ms pass with no further change. */
+function GitHubAttachMenu({ goal, query, onPick }: { goal: string; query: string; onPick: (query: string, item: GitHubHit) => void }) {
+  const [settled, setSettled] = useState(query);
+  useEffect(() => {
+    if (settled === query) return;
+    const timer = setTimeout(() => setSettled(query), 300);
+    return () => clearTimeout(timer);
+  }, [query, settled]);
+  const [loaded] = useJson<GitHubSearchResponse>(`/api/github/search?goal=${encodeURIComponent(goal)}&q=${encodeURIComponent(settled)}`);
+  if (settled !== query) return null;
+  if (loaded.state !== "ok" || loaded.data.items.length === 0) return null;
+  return (
+    <div className="slist ghit" role="menu" aria-label="Attach" onKeyDown={(e) => e.key === "Enter" && e.stopPropagation()}>
+      {loaded.data.items.map((item) => (
+        <button key={item.url} type="button" role="menuitem" onClick={() => onPick(settled, item)}>
+          <span className="muted">{item.kind === "pull" ? "Pull request" : "Issue"}</span>
+          {item.title}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** G22: one add row for a work item. The owner may be a human or an agent. It starts In Progress; its reason is "Filed". */
 export function AddWorkItem({ data, statuses, onDone }: { data: GoalPageResponse; statuses: WorkItemStatus[]; onDone: Done }) {
+  const repos = data.githubRepos;
   const [title, setTitle] = useState("");
   const [owner, setOwner] = useState(data.me.id);
   const [status, setStatus] = useState<WorkItemStatus>("In Progress");
   const [due, setDue] = useState("");
+  const [picked, setPicked] = useState(repos[0] ?? "");
+  const [hit, pickHit] = useGitHubChoice(title);
   const [result, post] = usePost((b) => onDone(true, savedStatus("workitem", b)));
+  const links = chosenLinks(null, hit);
+  const fields = { title, owner, status, due_date: due || null, ...(links === undefined ? {} : { links }) };
+  const chosen = repos.length === 1 ? repos[0] : picked;
   return (
     <section className="panel addrow" aria-label="Work item" data-focus={formFocus("Work item")}>
       <div className="addgrid four">
-        <label className="field">
+        <label className="field attach">
           <span className="flabel">Title</span>
           <input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
+          <GitHubAttach goal={data.goal.id} title={title} onPick={pickHit} />
         </label>
         <label className="field">
           <span className="flabel">Owner</span>
@@ -195,9 +261,25 @@ export function AddWorkItem({ data, statuses, onDone }: { data: GoalPageResponse
       </div>
       <Errors result={result} />
       <div className="pactions">
-        <button type="button" className="btn primary" disabled={result.saving} onClick={() => post(workItemBatch(data.goal.id, { title, owner, status, due_date: due || null }))}>
+        <button type="button" className="btn primary" disabled={result.saving} onClick={() => post(workItemBatch(data.goal.id, fields))}>
           Add
         </button>
+        {repos.length === 0 ? null : (
+          <>
+            {repos.length > 1 && (
+              <select aria-label="Repository" value={chosen} onChange={(e) => setPicked(e.target.value)}>
+                {repos.map((name, index) => (
+                  <option key={`${name}-${index}`} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button type="button" className="btn" disabled={result.saving} onClick={() => post(workItemBatch(data.goal.id, fields, chosen))}>
+              Add as Github Issue
+            </button>
+          </>
+        )}
         <button type="button" className="btn" onClick={() => onDone(false)}>
           Cancel
         </button>
@@ -215,8 +297,10 @@ export function EditWorkItem({ item, actors, onDone }: { item: ApiWorkItem; acto
   const [owner, setOwner] = useState(item.owner);
   const [due, setDue] = useState(item.due_date ?? "");
   const [reason, setReason] = useState("");
+  const [hit, pickHit] = useGitHubChoice(title);
   const [result, post] = usePost(() => onDone(true));
-  const batch = workItemFieldsBatch(item, { title, owner, due_date: due || null }, reason);
+  const links = chosenLinks(item.links, hit);
+  const batch = workItemFieldsBatch(item, { title, owner, due_date: due || null, ...(links === undefined ? {} : { links }) }, reason);
   const save = () => batch && post(batch);
   const keys = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") save();
@@ -225,9 +309,10 @@ export function EditWorkItem({ item, actors, onDone }: { item: ApiWorkItem; acto
   return (
     <section className="panel wiedit" aria-label={`Edit ${item.title}`} onKeyDown={keys}>
       <div className="addgrid four">
-        <label className="field">
+        <label className="field attach">
           <span className="flabel">Title</span>
           <input value={title} aria-label="Title" onChange={(e) => setTitle(e.target.value)} onFocus={(e) => e.target.select()} autoFocus />
+          <GitHubAttach goal={item.goal} title={title} onPick={pickHit} />
         </label>
         <label className="field">
           <span className="flabel">Owner</span>
