@@ -73,15 +73,23 @@ export type GitHubSearchItem = { kind: "issue" | "pull"; title: string; url: str
 /** The issues and pull requests the search found, in repository order. */
 export type GitHubSearchResponse = { items: GitHubSearchItem[] };
 
-/** GET /api/github/ref?goal=<id>&url=<one url>. A signed-in actor. A missing goal is 404, the same words as the goal page. A URL that is not an issue or pull request in github_repos and on that goal is 404 and does not call GitHub. state is open or closed. */
+/** GET /api/github/ref?goal=<id>&url=<one url>. A signed-in actor. A missing goal is 404, the same words as the goal page. A URL that is not an issue or pull request in github_repos and on that goal is 404 and does not call GitHub. The one repository in github_repos is read when the goal does not name it. state is open or closed. */
 export type GitHubRefResponse = { title: string; state: "open" | "closed" } | { error: string };
 
-/** GET /api/github/status. The GOALIE owner sees the repositories in github_repos, whether GitHub is configured, the last update, and the last signed notice. */
+/** GET /api/github/status. The GOALIE owner sees the repositories in github_repos, whether GitHub is configured, the last update, and the last signed notice. POST stores the app id, the installation id, the private key, and the public URL, and adds or removes the repositories when the body names them. The private key stays out of this. */
 export type GitHubStatusResponse = {
   configured: boolean;
   repositories: string[];
   outbound: { ok: boolean; detail: string } | null;
   inbound: { ok: boolean; detail: string } | null;
+  /** The stored app id, or null when the process name applies. */
+  appId: string | null;
+  /** The stored installation id, or null when the process name applies. */
+  installationId: string | null;
+  /** The stored public URL, or null when the process name applies. */
+  publicUrl: string | null;
+  /** True when a private key is stored. The key itself is absent. */
+  privateKeySet: boolean;
 };
 
 /** Every refusal from the API: 401 with no verified actor, 4xx for a bad request. */
@@ -234,6 +242,8 @@ export type GoalPageResponse = {
   actors: Record<string, ApiActor>;
   /** Repositories this goal names that github_repos covers, in that order. Add as Github Issue uses them. */
   githubRepos: string[];
+  /** The owner setting github_repos. No list yet is the deployment repository. An empty list stays empty. A work item title's #N uses this when it names one repository. */
+  githubScope: string[];
 };
 
 /** GET /api/options. What the New goal form, + Sub-goal, and + Work item offer, with the defaults the server writes. */
@@ -299,4 +309,6 @@ export type WorkResponse = {
   items: ApiWorkItem[];
   goals: Record<string, GoalRef>;
   actors: Record<string, ApiActor>;
+  /** The owner setting github_repos. No list yet is the deployment repository. An empty list stays empty. A work item title's #N uses this when it names one repository. */
+  githubScope: string[];
 };
