@@ -855,3 +855,25 @@ main.newgoal{padding-bottom:84px}
 .rankreason{position:sticky;left:0;z-index:7;display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:min(620px,100%);box-sizing:border-box;padding:8px 12px 10px 28px;background:var(--hover);border-radius:0 0 10px 0}
 .rankreason input{flex:1;min-width:160px;max-width:360px;font:600 13px var(--font);border:1px solid var(--cut);border-radius:8px;padding:6px 8px}
 @media (pointer:coarse){.draghandle::after{content:"";position:absolute;left:50%;top:50%;width:44px;height:44px;transform:translate(-50%,-50%)}}
+/* My goals and the search hits not in the view (#71): one grid row per goal, the title first, the Work page's row rhythm. */
+.mlist{padding:6px 20px 8px}
+.mrow{display:grid;grid-template-columns:minmax(200px,1fr) 170px 96px 96px 150px 130px minmax(120px,.6fr);column-gap:12px;align-items:center;min-height:40px;border-top:1px solid var(--line);font-size:13px}
+.mrow.mhead{min-height:32px;border-top:0;font-weight:700}
+.mrow.hit{grid-template-columns:minmax(220px,1fr) 120px 200px 96px 110px}
+.notinview{margin-top:20px}
+.notinview h2{margin:8px 0}
+.mtitle{font-weight:700;color:var(--ink);text-decoration:none;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:6px 0}
+.mtitle:hover{text-decoration:underline}
+.phone .mlist{padding:4px 16px 8px}
+.phone .mrow,.phone .mrow.hit{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:10px;row-gap:2px;padding:8px 0}
+.phone .mrow.mhead{display:none}
+.phone .mrow:nth-child(2){border-top:0}
+.phone .mtitle{flex-basis:100%;white-space:normal;padding:0}
+.phone .mrow .cell{font-size:12px}
+.phone .mrow .c-promotion-milestone,.phone .mrow .c-ptg,.phone .mrow .c-state{display:none}
+/* #71: three tabs (Home, My goals, Work items) fit a 360 px phone: the logo mark goes and the tabs and gaps tighten. Measured in test_top_bar_phone.py. */
+.phone .top .logo{display:none}
+.phone .top{gap:4px}
+.phone .toptabs{gap:2px}
+.phone .toptabs .tab{padding:0 7px;font-size:13px}
+.phone .notinview{order:1;margin-top:12px}

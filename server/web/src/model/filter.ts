@@ -1,4 +1,4 @@
-import type { ApiGoal, ApiPriority, GoalDate, Health } from "../../../src/api.ts";
+import type { ApiGoal, ApiPriority, GoalDate, GoalHit, Health } from "../../../src/api.ts";
 import type { Filter } from "./query.ts";
 
 /** Health filter and search over the goal tree. The server sends every goal; the app chooses what to draw. */
@@ -43,4 +43,10 @@ export function isLit(goal: Pick<GoalRow, "counted" | "health" | "match">, lit: 
 /** Every goal in the trees, depth first. */
 export function flatten<T extends { children: T[] }>(goals: T[]): T[] {
   return goals.flatMap((g) => [g, ...flatten(g.children)]);
+}
+
+/** The search hits the view does not draw: a goal with no Priority, a closed goal, or one at another level (#71). */
+export function notInView(hits: GoalHit[], priorities: ApiPriority[]): GoalHit[] {
+  const drawn = new Set(flatten(priorities.flatMap((p) => p.goals)).map((g) => g.id));
+  return hits.filter((h) => !drawn.has(h.id));
 }
