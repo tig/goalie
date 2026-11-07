@@ -287,6 +287,50 @@ NEW_GOAL_FORM = scenario("""
 """, ready=".ownerpick select")
 
 
+# Escape while feedback is open on Github... closes feedback only. A second Escape closes the owner menu.
+OWNER_ESCAPE = scenario("""
+  const button = document.querySelector(".me button.av");
+  if (!button) return { error: "no owner button" };
+  const label = button.getAttribute("aria-label");
+  await click(button);
+  const item = document.querySelector(".usermenu [role=menuitem]");
+  if (!item) return { error: "owner menu did not open", label };
+  await rightClick(item);
+  if (!document.querySelector("[data-feedback-ui][role=menu]")) return { error: "feedback menu did not open", label };
+  await key("Escape");
+  const afterFirst = {
+    feedback: Boolean(document.querySelector("[data-feedback-ui][role=menu]")),
+    owner: Boolean(document.querySelector(".usermenu")),
+    role: document.activeElement?.getAttribute("role") ?? null,
+    text: (document.activeElement?.textContent || "").trim(),
+  };
+  await key("Escape");
+  return {
+    label,
+    afterFirst,
+    afterSecond: {
+      owner: Boolean(document.querySelector(".usermenu")),
+      label: document.activeElement?.getAttribute("aria-label") ?? null,
+      same: document.activeElement === document.querySelector(".me button.av"),
+    },
+  };
+""", ready=".me button.av")
+
+
+class OwnerMenuEscapeTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        with signed_app(actor="tig") as (open_page, _api):
+            cls.result = open_page(1280, OWNER_ESCAPE)
+
+    def test_escape_closes_feedback_then_the_owner_menu(self) -> None:
+        """The first Escape closes feedback and returns to Github.... The second closes the owner menu and returns to the avatar."""
+        got = self.result
+        self.assertNotIn("error", got, got)
+        self.assertEqual(got["afterFirst"], {"feedback": False, "owner": True, "role": "menuitem", "text": "Github..."})
+        self.assertEqual(got["afterSecond"], {"owner": False, "label": got["label"], "same": True})
+
+
 class FeedbackMenuTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:

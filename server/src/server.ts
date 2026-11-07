@@ -5,9 +5,9 @@ import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
-import type { ActorRef, ApiError, CommandsResponse, FormOptions, GitHubStatusResponse, GoalEventsResponse, GoalPageResponse, PrioritiesResponse, WorkResponse } from "./api.ts";
+import type { ActorRef, ApiError, CommandsResponse, FormOptions, GitHubRefResponse, GitHubSearchResponse, GitHubStatusResponse, GoalEventsResponse, GoalPageResponse, PrioritiesResponse, WorkResponse } from "./api.ts";
 import { runCommands } from "./commands.ts";
-import { drainGitHub, githubView } from "./github.ts";
+import { drainGitHub, githubView, readGitHubRef, searchGitHub } from "./github.ts";
 import { receiveGitHubWebhook } from "./github_notice.ts";
 import { goalEvents, goalPage } from "./goalpage.ts";
 import { eventStream } from "./live.ts";
@@ -112,6 +112,19 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
     if (c.get("actor").id !== goalieOwner(db)) return refuse(c, 403, "forbidden", "only the GOALIE owner can see GitHub");
     return c.json<GitHubStatusResponse>(githubView(db));
   });
+  app.get("/api/github/search", async (c) => {
+    const goal = c.req.query("goal") ?? "";
+    if (read(db, "goal", goal) === undefined) return refuse(c, 404, "not_found", `no goal ${goal}`);
+    const found = await searchGitHub(db, goal, c.req.query("q") ?? "");
+    return c.json<GitHubSearchResponse>({ items: found.items });
+  });
+  app.get("/api/github/ref", async (c) => {
+    const goal = c.req.query("goal") ?? "";
+    if (read(db, "goal", goal) === undefined) return refuse(c, 404, "not_found", `no goal ${goal}`);
+    const found = await readGitHubRef(db, goal, c.req.query("url") ?? "");
+    if (found.status === 404) return refuse(c, 404, "not_found", found.reason);
+    return c.json<GitHubRefResponse>(found.body);
+  });
   app.get("/api/goals/:id", (c) => {
     const page = goalPage(db, c.req.param("id"), c.get("actor").id, ...todayAndZone(db));
     return page ? c.json<GoalPageResponse>(page) : refuse(c, 404, "not_found", `no goal ${c.req.param("id")}`);
@@ -145,7 +158,9 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
   );
   app.post("/api/commands", async (c) => {
     const request: unknown = await c.req.json().catch(() => undefined);
-    const answer = runCommands(db, c.get("actor").id, request, todayIn(db));
+    const actor = c.get("actor").id;
+    const today = todayIn(db);
+    const answer = runCommands(db, actor, request, today);
     await drainGitHub(db);
     return c.json<CommandsResponse>(answer.body, answer.status);
   });

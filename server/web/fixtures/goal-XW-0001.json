@@ -385,5 +385,6 @@
       "kind": "agent",
       "operator": "chelsea"
     }
-  }
+  },
+  "githubRepos": []
 }
