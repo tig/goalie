@@ -602,5 +602,8 @@
       "operator": "chelsea"
     }
   },
-  "githubRepos": []
+  "githubRepos": [],
+  "githubScope": [
+    "tig/goalie"
+  ]
 }

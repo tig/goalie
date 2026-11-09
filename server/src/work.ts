@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { ApiWorkItem, WorkResponse } from "./api.ts";
-import { githubError } from "./github.ts";
+import { githubError, githubRepos } from "./github.ts";
 import { actorsById, readAll } from "./read.ts";
 import type { Row } from "./rules.ts";
 
@@ -17,7 +17,7 @@ export function workQueue(db: DatabaseSync, me: string, today: string, owner?: s
     .map((w) => toApiWorkItem(db, w, today));
   const named = new Set(items.map((w) => w.goal));
   const goals = Object.fromEntries(readAll(db, "goal").filter((g) => named.has(g.id as string)).map((g) => [g.id, { id: g.id as string, summary: g.summary as string }]));
-  return { me: actors[me], today, items, goals, actors };
+  return { me: actors[me], today, items, goals, actors, githubScope: githubRepos(db) };
 }
 
 /** A stored work item, with `late` when it is open and its due date has passed. */
