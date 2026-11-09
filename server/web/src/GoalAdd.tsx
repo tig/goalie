@@ -7,6 +7,7 @@ import { goalTypes, savedStatus, subGoalBatch, workItemBatch, workItemFieldsBatc
 import { humans } from "./model/goalpage.ts";
 import { dateLabel } from "./model/labels.ts";
 import { formFocus } from "./model/feedback.ts";
+import { TitleBits } from "./parts.tsx";
 
 /** + Sub-goal, + Work item, and the work item tick (G20, G22, G24). Each posts one batch; the server checks every rule. */
 
@@ -292,7 +293,7 @@ export function AddWorkItem({ data, statuses, onDone }: { data: GoalPageResponse
  * W6: edit a work item in place: its title, owner, and due date, with one reason. Status keeps its own picker.
  * The title starts selected, so typing replaces it. Enter saves; Escape closes and keeps the stored values.
  */
-export function EditWorkItem({ item, actors, onDone }: { item: ApiWorkItem; actors: Record<string, ApiActor>; onDone: (saved: boolean) => void }) {
+export function EditWorkItem({ item, actors, repos = [], onDone }: { item: ApiWorkItem; actors: Record<string, ApiActor>; repos?: string[]; onDone: (saved: boolean) => void }) {
   const [title, setTitle] = useState(item.title);
   const [owner, setOwner] = useState(item.owner);
   const [due, setDue] = useState(item.due_date ?? "");
@@ -312,6 +313,7 @@ export function EditWorkItem({ item, actors, onDone }: { item: ApiWorkItem; acto
         <label className="field attach">
           <span className="flabel">Title</span>
           <input value={title} aria-label="Title" onChange={(e) => setTitle(e.target.value)} onFocus={(e) => e.target.select()} autoFocus />
+          <TitleBits title={title} goal={item.goal} repos={repos} revision={title} linksOnly />
           <GitHubAttach goal={item.goal} title={title} onPick={pickHit} />
         </label>
         <label className="field">
