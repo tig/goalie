@@ -497,5 +497,8 @@
   },
   "githubRepos": [
     "tig/goalie"
+  ],
+  "githubScope": [
+    "tig/goalie"
   ]
 }

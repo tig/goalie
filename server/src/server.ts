@@ -7,7 +7,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
 import type { ActorRef, ApiError, CommandsResponse, FormOptions, GitHubRefResponse, GitHubSearchResponse, GitHubStatusResponse, GoalEventsResponse, GoalPageResponse, PrioritiesResponse, WorkResponse } from "./api.ts";
 import { runCommands } from "./commands.ts";
-import { drainGitHub, githubView, readGitHubRef, searchGitHub } from "./github.ts";
+import { drainGitHub, githubRepos, githubView, readGitHubRef, reposFromSettings, saveGitHubSettings, searchGitHub } from "./github.ts";
 import { receiveGitHubWebhook } from "./github_notice.ts";
 import { goalEvents, goalPage } from "./goalpage.ts";
 import { eventStream } from "./live.ts";
@@ -21,6 +21,7 @@ import { goalieOwner, read } from "./read.ts";
 import { mayRankPriorities } from "./rules.ts";
 import { openStore } from "./store.ts";
 import { workQueue } from "./work.ts";
+import { write } from "./write.ts";
 
 /** The media types of the files a Vite build writes. */
 const TYPES: Record<string, string> = {
@@ -72,6 +73,24 @@ function todayAndZone(db: DatabaseSync): [string, string] {
 
 const todayIn = (db: DatabaseSync) => todayAndZone(db)[0];
 
+/** Store github_repos from a GitHub save. A list already stored the same way is left. No list yet, matching the deployment repository, is left. */
+function setGitHubRepos(db: DatabaseSync, actor: string, repos: string[]): { ok: true } | { ok: false; reason: string } {
+  const current = read(db, "owner_settings", "owner");
+  if (current === undefined || typeof current.version !== "number") return { ok: false, reason: "A repository is owner/repo or owner/*." };
+  const settings = current.settings;
+  const row = (typeof settings === "object" && settings !== null && !Array.isArray(settings) ? settings : {}) as Record<string, unknown>;
+  const listed = row.github_repos;
+  const hasKey = Object.hasOwn(row, "github_repos");
+  const same = (list: readonly string[]) => list.length === repos.length && list.every((repo, index) => repo === repos[index]);
+  if (!hasKey && same(githubRepos(db))) return { ok: true };
+  if (hasKey && Array.isArray(listed) && listed.every((entry) => typeof entry === "string") && same(listed)) return { ok: true };
+  const result = write(db, actor, { op: "update", kind: "owner_settings", id: "owner", base_version: current.version, fields: { settings: { ...row, github_repos: repos } } }, todayIn(db));
+  if (result.ok) return { ok: true };
+  if (result.error === "invalid") return { ok: false, reason: result.violations[0]?.message ?? "A repository is owner/repo or owner/*." };
+  if (result.error === "stale") return { ok: false, reason: "A repository is owner/repo or owner/*." };
+  return { ok: false, reason: result.message };
+}
+
 /** The host's login route, with the page to return to after sign-in. */
 function signInHref(url: string): string {
   const { pathname, search } = new URL(url);
@@ -112,6 +131,31 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
     if (c.get("actor").id !== goalieOwner(db)) return refuse(c, 403, "forbidden", "only the GOALIE owner can see GitHub");
     return c.json<GitHubStatusResponse>(githubView(db));
   });
+  app.post(
+    "/api/github/status",
+    async (c, next) => {
+      if (!(c.req.header("Content-Type") ?? "").toLowerCase().startsWith("application/json")) return refuse(c, 415, "bad_command", "a write is sent as application/json");
+      const origin = c.req.header("Origin");
+      const host = c.req.header("X-Forwarded-Host") ?? c.req.header("Host");
+      if (origin !== undefined && origin !== "null" && hostOf(origin) !== host) return refuse(c, 403, "forbidden", `a write from ${origin} is refused`);
+      if (origin === "null") return refuse(c, 403, "forbidden", "a write from an opaque origin is refused");
+      await next();
+    },
+    bodyLimit({ maxSize: MAX_BODY, onError: (c) => refuse(c, 413, "bad_command", `a request body is at most ${MAX_BODY / 1024} KB`) }),
+    async (c) => {
+      if (c.get("actor").id !== goalieOwner(db)) return refuse(c, 403, "forbidden", "only the GOALIE owner can set GitHub");
+      const request: unknown = await c.req.json().catch(() => undefined);
+      const repos = reposFromSettings(request);
+      if (repos === "bad") return refuse(c, 400, "bad_request", "A repository is owner/repo or owner/*.");
+      const saved = saveGitHubSettings(db, request);
+      if (!saved.ok) return refuse(c, 400, "bad_request", saved.reason);
+      if (repos !== "absent") {
+        const set = setGitHubRepos(db, c.get("actor").id, repos);
+        if (!set.ok) return refuse(c, 400, "bad_request", set.reason);
+      }
+      return c.json<GitHubStatusResponse>(githubView(db));
+    },
+  );
   app.get("/api/github/search", async (c) => {
     const goal = c.req.query("goal") ?? "";
     if (read(db, "goal", goal) === undefined) return refuse(c, 404, "not_found", `no goal ${goal}`);

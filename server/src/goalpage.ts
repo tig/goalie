@@ -4,7 +4,7 @@ import { toApiEvent } from "./live.ts";
 import { toApiWorkItem } from "./work.ts";
 import { above, changers, closesAs, closesAsPromoted, currentDate, mayChangeGoal, goalDates, isOpen, judgedDate, resolvedGoal, uncommittedDate, type State } from "./goal.ts";
 import { startedOf } from "./priorities.ts";
-import { reposOnGoal } from "./github.ts";
+import { githubRepos, reposOnGoal } from "./github.ts";
 import { actorsById, countActivityRows, countEntityEvents, goalieOwner, milestonesOf, read, readAll, readEntityEvents, workItemsOn, type EntityRefs } from "./read.ts";
 import { goalLints, type Row } from "./rules.ts";
 
@@ -137,5 +137,6 @@ export function goalPage(db: DatabaseSync, id: string, me: string, today: string
     hints: goalLints(stored),
     actors,
     githubRepos: reposOnGoal(db, id),
+    githubScope: githubRepos(db),
   };
 }
