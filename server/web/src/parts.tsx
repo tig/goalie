@@ -5,7 +5,7 @@ import type { ActorRef, GitHubRefResponse, Health } from "../../src/api.ts";
 import { placePopover, popoverWidth } from "./model/popover.ts";
 import { useDismiss } from "./useScreen.ts";
 import { encodeFocus } from "./model/feedback.ts";
-import { canonicalRefUrl, githubIssues, markdown, refLabel, refTitle, type Block, type Inline, type RefFound } from "./model/markdown.ts";
+import { canonicalRefUrl, githubIssues, markdown, refLabel, refTitle, titleParts, type Block, type Inline, type RefFound } from "./model/markdown.ts";
 import { getJson } from "./data.ts";
 
 /** The shared parts every view is built from. */
@@ -87,6 +87,25 @@ function useRefTitles(goal: string | undefined, hrefs: string[], revision: strin
     };
   }, [goal, listKey, seenKey, revision]);
   return found;
+}
+
+/** A work item title. `#N` is the one repository's issue. linksOnly draws those issues and leaves the title text out. */
+export function TitleBits({ title, goal, repos, revision = 0, linksOnly = false }: { title: string; goal?: string; repos: string[] | undefined; revision?: string | number; linksOnly?: boolean }) {
+  const parts = titleParts(title, repos);
+  const shown = linksOnly ? parts.filter((part) => part.t === "link") : parts;
+  const hrefs = linksOnly ? shown.flatMap((part) => (part.t === "link" ? [part.href] : [])) : [];
+  const titles = useRefTitles(goal, hrefs, revision);
+  if (shown.length === 0) return null;
+  const bits = shown.map((part, index) =>
+    part.t === "text" ? (
+      <span key={index}>{part.v}</span>
+    ) : (
+      <a key={index} className="wissue" href={part.href} target="_blank" rel="noopener noreferrer">
+        {linksOnly ? refLabel(part.label, titles.get(part.href) ?? null) : part.label}
+      </a>
+    ),
+  );
+  return linksOnly ? <span className="wissues">{bits}</span> : <>{bits}</>;
 }
 
 /** Each GitHub issue or pull request named in a work item's links. A pull request keeps its /pull/ URL. goal asks GOALIE for each in-scope title. revision reads those titles again. */
