@@ -179,7 +179,7 @@ export type StoredGoal = GoalFields & {
 export type WorkItemStatus = (typeof WORK_ITEM_STATUSES)[number];
 
 /** The writable fields of a work item (SPEC.md §6.7). `owner` may be an agent. `links` are plain URLs in the MLP. */
-export type WorkItemFields = { goal: string; title: string; owner: string; status: WorkItemStatus; due_date: string | null; links: string[] | null };
+export type WorkItemFields = { goal: string; title: string; owner: string; status: WorkItemStatus; start_date: string | null; due_date: string | null; links: string[] | null };
 
 /** A work item as stored, `late` when it is open and its due date has passed, and `github_error` when the last status push failed. */
 export type ApiWorkItem = WorkItemFields & { id: string; version: number; late: boolean; github_error?: string };

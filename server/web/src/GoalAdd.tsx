@@ -219,16 +219,17 @@ export function AddWorkItem({ data, statuses, onDone }: { data: GoalPageResponse
   const [title, setTitle] = useState("");
   const [owner, setOwner] = useState(data.me.id);
   const [status, setStatus] = useState<WorkItemStatus>("In Progress");
+  const [start, setStart] = useState("");
   const [due, setDue] = useState("");
   const [picked, setPicked] = useState(repos[0] ?? "");
   const [hit, pickHit] = useGitHubChoice(title);
   const [result, post] = usePost((b) => onDone(true, savedStatus("workitem", b)));
   const links = chosenLinks(null, hit);
-  const fields = { title, owner, status, due_date: due || null, ...(links === undefined ? {} : { links }) };
+  const fields = { title, owner, status, start_date: start || null, due_date: due || null, ...(links === undefined ? {} : { links }) };
   const chosen = repos.length === 1 ? repos[0] : picked;
   return (
     <section className="panel addrow" aria-label="Work item" data-focus={formFocus("Work item")}>
-      <div className="addgrid four">
+      <div className="addgrid five">
         <label className="field attach">
           <span className="flabel">Title</span>
           <input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
@@ -256,8 +257,12 @@ export function AddWorkItem({ data, statuses, onDone }: { data: GoalPageResponse
           </select>
         </label>
         <label className="field">
+          <span className="flabel">Start Date</span>
+          <input type="date" aria-label="Start Date" value={start} max={due || undefined} onChange={(e) => setStart(e.target.value)} />
+        </label>
+        <label className="field">
           <span className="flabel">Due Date</span>
-          <input type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+          <input type="date" aria-label="Due Date" value={due} min={start || undefined} onChange={(e) => setDue(e.target.value)} />
         </label>
       </div>
       <Errors result={result} />
@@ -290,18 +295,19 @@ export function AddWorkItem({ data, statuses, onDone }: { data: GoalPageResponse
 }
 
 /**
- * W6: edit a work item in place: its title, owner, and due date, with one reason. Status keeps its own picker.
+ * W6: edit a work item in place: its title, owner, start date, and due date, with one reason. Status keeps its own picker.
  * The title starts selected, so typing replaces it. Enter saves; Escape closes and keeps the stored values.
  */
 export function EditWorkItem({ item, actors, repos = [], onDone }: { item: ApiWorkItem; actors: Record<string, ApiActor>; repos?: string[]; onDone: (saved: boolean) => void }) {
   const [title, setTitle] = useState(item.title);
   const [owner, setOwner] = useState(item.owner);
+  const [start, setStart] = useState(item.start_date ?? "");
   const [due, setDue] = useState(item.due_date ?? "");
   const [reason, setReason] = useState("");
   const [hit, pickHit] = useGitHubChoice(title);
   const [result, post] = usePost(() => onDone(true));
   const links = chosenLinks(item.links, hit);
-  const batch = workItemFieldsBatch(item, { title, owner, due_date: due || null, ...(links === undefined ? {} : { links }) }, reason);
+  const batch = workItemFieldsBatch(item, { title, owner, start_date: start || null, due_date: due || null, ...(links === undefined ? {} : { links }) }, reason);
   const save = () => batch && post(batch);
   const keys = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") save();
@@ -309,7 +315,7 @@ export function EditWorkItem({ item, actors, repos = [], onDone }: { item: ApiWo
   };
   return (
     <section className="panel wiedit" aria-label={`Edit ${item.title}`} onKeyDown={keys}>
-      <div className="addgrid four">
+      <div className="addgrid five">
         <label className="field attach">
           <span className="flabel">Title</span>
           <input value={title} aria-label="Title" onChange={(e) => setTitle(e.target.value)} onFocus={(e) => e.target.select()} autoFocus />
@@ -328,8 +334,12 @@ export function EditWorkItem({ item, actors, repos = [], onDone }: { item: ApiWo
           </select>
         </label>
         <label className="field">
+          <span className="flabel">Start Date</span>
+          <input type="date" aria-label="Start Date" value={start} max={due || undefined} onChange={(e) => setStart(e.target.value)} />
+        </label>
+        <label className="field">
           <span className="flabel">Due Date</span>
-          <input type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+          <input type="date" aria-label="Due Date" value={due} min={start || undefined} onChange={(e) => setDue(e.target.value)} />
         </label>
         <label className="field">
           <span className="flabel">Reason</span>

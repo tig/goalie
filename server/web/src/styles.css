@@ -480,11 +480,12 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 .addrow{margin:0 0 10px}
 .addgrid{display:grid;grid-template-columns:2fr 1fr;gap:0 12px}
 .addgrid.four{grid-template-columns:2fr 1fr 1fr 1fr}
+.addgrid.five{grid-template-columns:2fr 1fr 1fr 1fr 1fr}
 .tickreason{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:0 0 8px}
 .wtitle .pencil{flex:none;margin-left:4px;width:24px;height:24px;vertical-align:middle}
 .wiedit{grid-column:1/-1;margin:4px 0 8px}
 .tickreason input{flex:1;min-width:160px;font:500 13px var(--font);border:1px solid var(--cut);border-radius:10px;padding:7px 10px}
-.phone .addgrid,.phone .addgrid.four{grid-template-columns:1fr}
+.phone .addgrid,.phone .addgrid.four,.phone .addgrid.five{grid-template-columns:1fr}
 
 /* New goal (N1 to N16): the form on the left, a 320 px rail on the right that stays on screen. */
 .newgoal{max-width:1180px}

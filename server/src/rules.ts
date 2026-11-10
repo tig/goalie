@@ -118,6 +118,11 @@ function checkWorkItem(store: Lookup, item: Row): Violation[] {
   if (item.due_date != null && !isDate(item.due_date)) {
     found.push({ rule: "real-date", message: `${item.id}: due_date ${String(item.due_date)} is not a calendar date.`, field: "due_date" });
   }
+  if (item.start_date != null && !isDate(item.start_date)) {
+    found.push({ rule: "real-date", message: `${item.id}: start_date ${String(item.start_date)} is not a calendar date.`, field: "start_date" });
+  } else if (item.start_date != null && isDate(item.due_date) && (item.start_date as string) > (item.due_date as string)) {
+    found.push({ rule: "start-on-or-before-due", message: `${item.id}: the start date ${String(item.start_date)} is after the due date ${String(item.due_date)}.`, field: "start_date" });
+  }
   return found;
 }
 

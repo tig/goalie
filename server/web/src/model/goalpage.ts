@@ -168,7 +168,7 @@ const LABELS: Record<string, string> = {
   work_product: "Work Product", changed_due_date: "Changed Due Date", severity: "Severity", priority: "Priority", state: "State",
   health: "Health", path_to_green: "Path to Green", origination: "Origination", parent: "Parent", visibility: "Visibility",
   original_committed_date: "Original Committed Date", committed_plan_version: "Committed Plan Version",
-  comment: "Comment", title: "Title", status: "Status", goal: "Goal", links: "Links",
+  comment: "Comment", title: "Title", status: "Status", goal: "Goal", links: "Links", start_date: "Start Date",
 };
 
 export const fieldLabel = (field: string) => LABELS[field] ?? field;

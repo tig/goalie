@@ -660,6 +660,13 @@ class GoalPageTests(unittest.TestCase):
         self.assertEqual(b, {"commands": [{"op": "update", "kind": "work_item", "id": "WI-0001", "base_version": 3, "fields": {"title": "Draw the board again", "due_date": "2026-11-20"}, "reason": "Tig asked"}]})
         self.assertIsNone(run(f'return commands.workItemFieldsBatch({item}, {{ title: "Draw the board", owner: "chelsea", due_date: null }}, "No change");'))
 
+    def test_editing_a_work_item_sends_a_changed_start_date(self) -> None:
+        """#73: a start date is sent when it changes. An item read before start_date existed has none."""
+        item = '{ id: "WI-0001", version: 3, title: "Draw the board", owner: "chelsea", due_date: "2026-11-20" }'
+        b = run(f'return commands.workItemFieldsBatch({item}, {{ title: "Draw the board", owner: "chelsea", start_date: "2026-11-10", due_date: "2026-11-20" }}, "Work starts");')
+        self.assertEqual(b["commands"][0]["fields"], {"start_date": "2026-11-10"})  # type: ignore[index]
+        self.assertIsNone(run(f'return commands.workItemFieldsBatch({item}, {{ title: "Draw the board", owner: "chelsea", start_date: null, due_date: "2026-11-20" }}, "No change");'))
+
     def test_an_edit_can_send_links(self) -> None:
         """The edit save sends links when a chosen issue or pull request is added."""
         item = '{ id: "WI-0001", version: 3, title: "Draw the board", owner: "chelsea", due_date: null, links: null }'
@@ -822,6 +829,17 @@ process.stdout.write(JSON.stringify([a.body.message, b.body.message]));"""
         self.assertIn("Add as Github Issue", form)
         self.assertIn("repos.length === 0 ? null", form)
         self.assertLess(form.index("repos.length === 0 ? null"), form.index("Add as Github Issue"))
+
+    def test_add_and_edit_send_the_start_date_with_the_due_date(self) -> None:
+        """#73: Add work item and Edit work item show Start Date before Due Date, and send start_date. A start date stays on or before the due date."""
+        src = (MODEL.parent / "GoalAdd.tsx").read_text(encoding="utf-8")
+        add = src.split("export function AddWorkItem", 1)[1].split("export function EditWorkItem", 1)[0]
+        edit = src.split("export function EditWorkItem", 1)[1].split("const STATUSES", 1)[0]
+        for form in (add, edit):
+            self.assertIn("start_date: start || null", form)
+            self.assertLess(form.index(">Start Date<"), form.index(">Due Date<"))
+            self.assertIn("max={due || undefined}", form)
+            self.assertIn("min={start || undefined}", form)
 
     def test_the_add_form_and_the_edit_form_render_the_search_menu_from_a_hash(self) -> None:
         """Add and edit render the search menu when the title has # and a query. Enter on that menu does not reach the section save."""
