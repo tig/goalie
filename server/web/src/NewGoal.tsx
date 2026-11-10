@@ -121,8 +121,6 @@ function Form({ options, parent, under, back }: { options: FormOptions; parent?:
   // NF6: the Promotion Milestone's date starts empty; the form never picks a promise. Its summary follows the goal's until changed.
   const milestone: NewMilestone = form.milestone ?? { summary: `Commit a date for ${form.summary || "this goal"}`, due_date: "", owner: form.owner };
   const setMilestone = (part: Partial<NewMilestone>) => set({ milestone: { ...milestone, ...part } });
-  // NF4a: Priority is a deliberate choice, so no row is chosen until the person picks one, None included.
-  const [picked, setPicked] = useState(false);
   const sent = useMemo(() => ({ ...form, milestone: uncommitted ? milestone : null }), [form, uncommitted, milestone.summary, milestone.due_date, milestone.owner]); // eslint-disable-line react-hooks/exhaustive-deps
   const batch = useMemo(() => createBatch(sent), [sent]);
   // The server is asked once every foundation field has a value: a rule about a part not yet filled is never shown (NF15).
@@ -159,7 +157,7 @@ function Form({ options, parent, under, back }: { options: FormOptions; parent?:
   const answer = ready ? ruleAnswer(latest, rules) : null;
   const couldNot = Boolean(latest && !latest.ok && latest.error !== "invalid");
   // A press shows the Details card's refusals too, so a save never fails with nothing listed.
-  const lines = toSave({ ...sent, priorityPicked: picked }, answer, detailsTouched || pressed, batch);
+  const lines = toSave(sent, answer, detailsTouched || pressed, batch);
   const left = lines.filter((l) => !l.done);
   // NF15: after a press, each unmet line shows its sentence at its own field, in --red-ink.
   const missing = (key: string) => (pressed ? left.find((x) => x.key === key) : undefined);
@@ -212,7 +210,6 @@ function Form({ options, parent, under, back }: { options: FormOptions; parent?:
 
   const owner = options.actors.find((a) => a.id === form.owner) ?? me;
   const [msOpen, setMsOpen] = useState(false);
-  const priority = options.priorities.find((p) => p.id === form.priority);
   const toGo = countLine(left.length, couldNot);
   // QA N8: a check or save refused for a reason other than a rule (stale, not found, the server down) shows at the top of the rail.
   const stopped = latest && couldNot && !latest.ok && latest.error !== "invalid" ? (latest.error === "stale" ? "Someone saved a goal this form uses. Reload the page and try again." : latest.message) : null;
@@ -345,27 +342,6 @@ function Form({ options, parent, under, back }: { options: FormOptions; parent?:
                     {miss("plan_maturity")}
                   </div>
                 )}
-                <span className="flabel">Priority</span>
-                {/* NF4a: a deliberate choice, none chosen. Home lists only goals mapped to a Priority. */}
-                <div className="prows" role="radiogroup" aria-label="Priority" id="ng-priority" {...invalid("priority")}>
-                  {[{ id: null, rank: null, title: "None" }, ...options.priorities].map((p) => (
-                    <label key={p.id ?? "none"} className={`prow${picked && form.priority === p.id ? " on" : ""}`}>
-                      <input
-                        type="radio"
-                        name="priority"
-                        checked={picked && form.priority === p.id}
-                        onChange={() => {
-                          setPicked(true);
-                          set({ priority: p.id });
-                        }}
-                      />
-                      <span className="rnum">{p.rank ?? ""}</span>
-                      <span className={p.id ? "" : "muted"}>{p.title}</span>
-                    </label>
-                  ))}
-                </div>
-                {picked && !form.priority && <p className="small muted">It will not show on Priorities.</p>}
-                {miss("priority")}
               </>
             )}
             {form.more.state === "Backlog" && <p className="small muted ngbacklog">It starts in Backlog. Set its health when work starts.</p>}
@@ -387,7 +363,6 @@ function Form({ options, parent, under, back }: { options: FormOptions; parent?:
           <div className="card ngpreview">
             <div className="lbl">Preview</div>
             <div className="previewrow">
-              <span className="rnum">{priority?.rank ?? ""}</span>
               <HealthDot health={form.more.state === "In Progress" ? form.health : null} word={false} />
               <span className="title">{form.summary || <span className="muted">Summary</span>}</span>
               <Avatar actor={owner} mine={form.owner === me.id} />

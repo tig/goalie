@@ -133,7 +133,6 @@ h1{font-size:26px;font-weight:800;margin:0 0 20px}
 .fade.after{right:0;background:linear-gradient(to left,var(--card),transparent)}
 .more-before>.fade.before,.more-after>.fade.after{opacity:1}
 .tl{position:relative;width:calc(var(--left) + var(--gap) + var(--weeks) * var(--week))}
-.tlbody>.cut{background:var(--card);z-index:2}
 .row.note{min-height:40px}.row.note .lane{background:none}.row.note .title{font-weight:500;font-size:13px}
 .row>.left,.axis>.corner{position:sticky;left:0;z-index:7;background:var(--card);padding-right:var(--gap);box-shadow:10px 0 10px -10px var(--tip-shadow)}
 .axis{display:grid;grid-template-columns:calc(var(--left) + var(--gap)) calc(var(--weeks) * var(--week));height:52px}
@@ -193,10 +192,6 @@ background-image:repeating-linear-gradient(to right,var(--grid) 0 1px,transparen
 .edge>.ticklbl,.edge>.endlbl{position:static;font-size:inherit;font-weight:inherit}
 .edge.after{transform:translateX(-100%)}
 .edge.Ambition{color:var(--ambition-ink)}.edge.Fantasy{color:var(--fantasy-ink)}
-.cut{position:relative;z-index:6;display:flex;align-items:center;gap:10px;margin:0;padding:12px 0 6px;color:var(--mute);font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
-.cut::before,.cut::after{content:"";flex:1;border-top:1.5px dashed var(--cut)}
-.cut::before{flex:0 0 24px}
-.cut span{position:sticky;left:12px;background:var(--card);padding:0 4px}
 .legend{display:flex;flex-wrap:wrap;gap:6px 20px;justify-content:flex-end;margin-top:12px;font-size:12px;color:var(--mute)}
 .lg{position:relative;display:inline-flex;align-items:center;gap:7px}
 .lg .help{margin-left:0}
@@ -502,11 +497,6 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 .ngcard input:focus,.ngcard select:focus,.ngcard textarea:focus{outline:2px solid var(--focus);outline-offset:0}
 .ngcard .hpick{margin:0 0 6px}
 .hopt.dt.on{background:var(--brand);color:var(--brand-ink)}
-.prows{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:4px 0 10px}
-.prow{display:flex;align-items:center;gap:10px;min-height:40px;padding:0 12px;font-size:13px;font-weight:600;cursor:pointer}
-.prow+.prow{border-top:1px solid var(--line)}
-.prow input{width:auto;margin:0}
-.prow.on{background:var(--green-bg)}
 .planbox{padding:12px 14px;margin:0 0 12px;border-radius:12px;background:var(--sub-bg);box-shadow:inset 0 0 0 1px var(--line)}
 .morechips{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .morechip{display:flex;flex-direction:column;gap:4px}
@@ -621,8 +611,7 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 .ngcount{text-align:center}
 .ngtopcount{display:none}
 @media (pointer:coarse){
-.ngcard input:not([type=radio]),.ngcard select,.ngcard textarea{min-height:44px}
-.prow{min-height:44px}}
+.ngcard input:not([type=radio]),.ngcard select,.ngcard textarea{min-height:44px}}
 .qdone>.linkbtn{color:var(--mute)}
 .qdone>.linkbtn:hover{color:var(--ink)}
 .phone .radio{height:auto;min-height:36px;padding:6px 12px;border-radius:14px}
@@ -850,14 +839,41 @@ main.newgoal{padding-bottom:84px}
 .todayplus:hover{filter:brightness(1.1)}
 @media (pointer:coarse){.todayplus::after{content:"";position:absolute;left:50%;top:50%;width:44px;height:44px;transform:translate(-50%,-50%)}}
 /* Rule 35: drag to reorder Priorities. */
-.draghandle{display:inline-flex;align-items:center;justify-content:center;width:16px;height:24px;margin-right:2px;padding:0;border:0;background:none;color:var(--mute);cursor:grab;touch-action:none;position:relative}
-.draghandle svg{fill:currentColor}
-.draghandle:hover,.draghandle:focus-visible{color:var(--ink)}
-.group.dragging{opacity:.55}
-.dropline{height:0;border-top:2px solid var(--link);margin:-1px 0;position:relative;z-index:8}
-.rankreason{position:sticky;left:0;z-index:7;display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:min(620px,100%);box-sizing:border-box;padding:8px 12px 10px 28px;background:var(--hover);border-radius:0 0 10px 0}
-.rankreason input{flex:1;min-width:160px;max-width:360px;font:600 13px var(--font);border:1px solid var(--cut);border-radius:8px;padding:6px 8px}
-@media (pointer:coarse){.draghandle::after{content:"";position:absolute;left:50%;top:50%;width:44px;height:44px;transform:translate(-50%,-50%)}}
+/* Rule 35b: arranging goals on Home. A grip on each goal its owner may move; the new parent row or the Priority under the pointer is outlined green. */
+.ggrip{display:inline-flex;align-items:center;justify-content:center;flex:none;width:18px;height:24px;margin:0 -4px 0 -2px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--mute);cursor:grab;opacity:.45;touch-action:none}
+.row:hover .ggrip,.ggrip:focus-visible,.row.moving .ggrip{opacity:1}
+.ggrip:hover,.ggrip:focus-visible{background:var(--green-bg);color:var(--ink)}
+.ggrip svg{fill:currentColor}
+.row.moving{opacity:.55}
+.row.justmoved,.row.justmoved>.left{animation:justmoved 2.4s ease-out}
+@keyframes justmoved{0%,40%{background:var(--green-bg)}100%{background:transparent}}
+.row.dropinto{box-shadow:inset 0 0 0 2px var(--brand);border-radius:10px;background:var(--green-bg)}
+.row.dropinto>.left{background:var(--green-bg)}
+.group.droptop{box-shadow:inset 0 0 0 2px var(--brand);border-radius:12px}
+.row.dropbefore,.row.dropafter{position:relative}
+.row.dropbefore::before,.row.dropafter::after{content:"";position:absolute;left:var(--rank,24px);right:0;height:4px;border-radius:4px;background:var(--green-ink);box-shadow:0 0 0 2px var(--green-bg);z-index:8;pointer-events:none}
+.row.dropbefore::before{top:-2px}
+.row.dropafter::after{bottom:-2px}
+.row.dropparent>.left{background:var(--green-bg)}
+.movenote.dragghost{background:var(--ink);color:#fff;border-color:var(--ink);pointer-events:none}
+.movetext{flex:1 1 240px;min-width:0;line-height:1.4}
+.ggrip.off{opacity:.2;cursor:not-allowed}
+.row:hover .ggrip.off{opacity:.35}
+/* Rule 10b: a Priority's header row: its number and title on a light tint, above its goals. */
+.row.phead{background:var(--green-tint);cursor:default}
+.row.phead>.left{background:var(--green-tint)}
+.row.phead .title{font-weight:800;color:var(--ink)}
+.row.phead .rnum{color:var(--ink);font-weight:700}
+.nonegroup .row.phead,.nonegroup .row.phead>.left,.backloggroup .row.phead,.backloggroup .row.phead>.left{background:var(--card)}
+.dotgap{display:inline-block;width:10px;flex:none}
+.nonegroup,.backloggroup{margin-top:4px}
+.movenote{position:fixed;left:20px;bottom:20px;z-index:40;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;max-width:min(680px,calc(100vw - 32px));box-sizing:border-box;padding:10px 14px;border-radius:14px;background:var(--card);border:1px solid var(--line);box-shadow:0 8px 24px rgba(31,45,38,.16);font-size:13px}
+.movenote .moveitem{font-weight:700}
+.movenote.bad{border-color:var(--red-bg)}
+.movenote .ferror{margin:0;flex-basis:100%}
+.movenote .linkbtn{margin-left:auto}
+.movenote .btn{min-height:30px;padding:0 12px}
+@media (pointer:coarse){.ggrip{opacity:1;width:32px;height:40px}}
 /* My goals and the search hits not in the view (#71): one grid row per goal, the title first, the Work page's row rhythm. */
 .mlist{padding:6px 20px 8px}
 .mrow{display:grid;grid-template-columns:minmax(200px,1fr) 170px 96px 96px 150px 130px minmax(120px,.6fr);column-gap:12px;align-items:center;min-height:40px;border-top:1px solid var(--line);font-size:13px}

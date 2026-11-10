@@ -147,7 +147,7 @@ The GOALIE owner inspects these each quarter and changes the configuration, revi
 **Create a goal**
 1. Write a short summary with a verb, e.g. "Launch self-serve onboarding".
 2. Set the owner, org unit, type, and severity.
-3. Map it to a priority (usually only for org or program goals).
+3. Give it a number on Home, after you create it (usually only for org or program goals). A new goal shows under No priority. Drag it between two numbered goals to give it that number, or into another goal to make it a sub-goal. The numbers after it move down by themselves. Each numbered goal is one entry on the unit's priority list, so only the org-unit owner gives a goal a number.
 4. Set a date and an honest date type.
 5. If the date isn't Committed, add the Promotion Milestone. An agent will draft one for you to confirm.
 6. Link a plan if you have one.
@@ -175,7 +175,8 @@ The GOALIE owner inspects these each quarter and changes the configuration, revi
 - If the work finished while the date was still Ambition, promote the date and complete the goal in one step.
 
 **Re-rank priorities**
-- Do it in the scheduled review, with a reason.
+- Do it in the scheduled review. On Home, drag a goal to its new number; GOALIE writes the reason and numbers the list 1 to n.
+- On Home, the entries below the cut line show under **Backlog**. Drag a goal onto Backlog to put it below the line, or beside a goal above it to fund it. Backlog shows only when it holds a goal, or while you drag one.
 - Retire entries that nothing maps to.
 - Keep no more than ‹4› entries above the cut line.
 

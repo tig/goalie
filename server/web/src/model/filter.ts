@@ -45,8 +45,8 @@ export function flatten<T extends { children: T[] }>(goals: T[]): T[] {
   return goals.flatMap((g) => [g, ...flatten(g.children)]);
 }
 
-/** The search hits the view does not draw: a goal with no Priority, a closed goal, or one at another level (#71). */
-export function notInView(hits: GoalHit[], priorities: ApiPriority[]): GoalHit[] {
-  const drawn = new Set(flatten(priorities.flatMap((p) => p.goals)).map((g) => g.id));
+/** The search hits the view does not draw: a closed goal, or one at another level (#71). `none` is the goals drawn under No priority (rule 35b), with their trees. */
+export function notInView(hits: GoalHit[], priorities: ApiPriority[], none: ApiGoal[] = []): GoalHit[] {
+  const drawn = new Set(flatten([...priorities.flatMap((p) => p.goals), ...none]).map((g) => g.id));
   return hits.filter((h) => !drawn.has(h.id));
 }

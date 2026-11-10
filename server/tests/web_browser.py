@@ -27,9 +27,9 @@ def chrome() -> str | None:
 
 
 @contextmanager
-def signed_app(*seeds: str, actor: str = "chelsea") -> Iterator[tuple[Open, Callable[[str], Any]]]:
+def signed_app(*seeds: str, actor: str = "chelsea", ranks: bool = False) -> Iterator[tuple[Open, Callable[[str], Any]]]:
     """Yield open(width, expression, path="/"), which loads the page in a fresh Chrome and returns what the expression gives, and api(path), which reads the API as actor.
-    Each of seeds (a path under server/) loads after the Excaliwire seed.
+    Each of seeds (a path under server/) loads after the Excaliwire seed. With ranks, actor owns the Excaliwire org unit, so it ranks its Priorities.
     CI builds the app and has Chrome, so there a missing one fails. A local run without them skips."""
     browser = chrome()
     missing = "no Chrome (set CHROME)" if not browser else "no build (run npm run build --prefix server)" if not BUILD.is_file() else ""
@@ -45,6 +45,9 @@ def signed_app(*seeds: str, actor: str = "chelsea") -> Iterator[tuple[Open, Call
         who = store.read("actor", actor)
         subject = f"sub-{actor}"
         assert store.write("tig", update("actor", actor, who["version"], {"subject": subject}))["ok"]
+        if ranks:
+            unit = store.read("org_unit", "excaliwire")
+            assert store.write("tig", update("org_unit", "excaliwire", unit["version"], {"owner": actor}))["ok"]
         token, env = signed(subject)
         with running_server(store.path, env) as (proc, port):
             assert get(proc, port, "/health").status == 200

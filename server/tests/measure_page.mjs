@@ -119,5 +119,10 @@ try {
 } finally {
   browser.kill();
   await wait(200);
-  rmSync(profile, { recursive: true, force: true });
+  // Chrome can still be writing its profile as it exits. A failed cleanup must not hide the run's own error.
+  try {
+    rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  } catch {
+    // The OS clears its temp folder.
+  }
 }

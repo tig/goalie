@@ -109,6 +109,7 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, todayIso: stri
     const ptg = health === "RED" || health === "YELLOW" ? firstStep(goal.path_to_green, names) : undefined;
     return {
       id: goal.id as string,
+      version: goal.version as number,
       summary: goal.summary as string,
       owner: actor(goal.owner as string),
       state: goal.state as State,
@@ -123,9 +124,13 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, todayIso: stri
 
   const cut = priorities.findIndex((p) => p.cut_line === true);
   const built = tops.map((list, i) => list.map((g) => goalOf(g, cut === -1 || i <= cut)));
-  const rows: ApiPriority[] = priorities.map((p, i) => ({ id: p.id as string, version: p.version as number, rank: p.rank as number, title: p.title as string, goals: built[i] }));
+  const rows: ApiPriority[] = priorities.map((p, i) => ({ id: p.id as string, version: p.version as number, rank: p.rank as number, title: p.title as string, period: p.period as string, cut_line: p.cut_line === true, goals: built[i] }));
   const funded = cut === -1 ? rows : rows.slice(0, cut + 1);
   const backlog = cut === -1 ? [] : rows.slice(cut + 1);
+  // Rule 35b: an open top goal with no Priority, with its tree. Home shows these as No priority, so a new goal is there to drag.
+  // A goal whose Priority is Retired or of another period is on no list here, so it shows as No priority too, where it can be moved.
+  const listed = new Set(priorities.map((p) => p.id));
+  const unprioritized = [...goals.values()].filter((g) => !(typeof g.priority === "string" && listed.has(g.priority)) && g.parent == null && shown(g)).map((g) => goalOf(g, false));
 
   const top = funded.flatMap((p) => p.goals).filter((g) => g.counted);
   const slips = top.flatMap((g) => {
@@ -153,6 +158,7 @@ export function prioritiesView(db: DatabaseSync, orgUnit: string, todayIso: stri
     view: { name: PRIORITIES_VIEW.name, columns: PRIORITIES_VIEW.columns },
     funded,
     backlog,
+    unprioritized,
     summary: {
       counts: { RED: count("RED"), YELLOW: count("YELLOW"), GREEN: count("GREEN") },
       healths: top.map((g) => g.health),

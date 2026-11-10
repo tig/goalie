@@ -21,7 +21,7 @@ def flatten(goals: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def goals_of(body: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    return {g["id"]: g for p in body["funded"] + body["backlog"] for g in flatten(p["goals"])}
+    return {g["id"]: g for g in flatten([g for p in body["funded"] + body["backlog"] for g in p["goals"]] + body.get("unprioritized", []))}
 
 
 def seeded_store() -> Store:
@@ -167,6 +167,10 @@ class PrioritiesDefinitionTests(unittest.TestCase):
             create("priority", "PRI-5", {"org_unit": "excaliwire", "period": period, "rank": 5, "title": "A Priority below the cut line", "status": "Current"}, "Test data"),
             create("goal", "XW-0093", {**OLD_GOAL, "summary": "An In Progress goal below the cut line", "priority": "PRI-5"}, "Test data"),
             create("goal", "XW-0092", {**OLD_GOAL, "summary": "A Completed goal", "priority": "PRI-2", "state": "Completed", "health": None, "path_to_green": None}, "Test data"),
+            create("goal", "XW-0095", {**OLD_GOAL, "summary": "A goal with no priority", "priority": None, "owner": "chelsea"}, "Test data"),
+            create("goal", "XW-0096", {**OLD_GOAL, "summary": "Its sub-goal", "priority": None, "parent": "XW-0095", "owner": "chelsea", "due_date": None, "date_type": None}, "Test data"),
+            create("goal", "XW-0089", {**OLD_GOAL, "summary": "A goal on a Priority of an old period", "priority": "PRI-OLD", "owner": "chelsea"}, "Test data"),
+            create("goal", "XW-0097", {**OLD_GOAL, "summary": "A Completed goal with no priority", "priority": None, "state": "Completed", "health": None, "path_to_green": None}, "Test data"),
         ]
         drafts = [
             create("draft", "DR-1", {"entity": "XW-0001", "actor": "bot", "base_version": 1, "change": {"health": "YELLOW"}, "reason": "test"}, "Test data"),
@@ -194,7 +198,20 @@ class PrioritiesDefinitionTests(unittest.TestCase):
         self.assertTrue(self.goals["XW-0090"]["counted"])
 
     def test_an_empty_priority_is_listed_below_the_cut_line_with_its_rank(self) -> None:
-        self.assertEqual(self.body["backlog"][0], {"id": "PRI-4", "version": 1, "rank": 4, "title": "An empty Priority", "goals": []})
+        self.assertEqual(self.body["backlog"][0], {"id": "PRI-4", "version": 1, "rank": 4, "title": "An empty Priority", "period": "2026-Q4", "cut_line": False, "goals": []})
+
+    def test_an_open_top_goal_with_no_priority_is_listed_under_unprioritized_with_its_tree(self) -> None:
+        # Rule 35b: Home shows these in a No priority group, so a new goal is on Home and can be dragged to a Priority.
+        tops = [g["id"] for g in self.body["unprioritized"]]
+        self.assertIn("XW-0095", tops)
+        self.assertNotIn("XW-0096", tops)
+        self.assertNotIn("XW-0097", tops)
+        self.assertEqual([c["id"] for c in self.goals["XW-0095"]["children"]], ["XW-0096"])
+        self.assertFalse(self.goals["XW-0095"]["counted"])
+
+    def test_a_top_goal_whose_priority_is_not_on_the_list_is_under_unprioritized(self) -> None:
+        # Review of #90: a goal on a Retired Priority, or one of a past period, was neither numbered nor under No priority, so Home could not show or move it.
+        self.assertIn("XW-0089", [g["id"] for g in self.body["unprioritized"]])
 
     def test_a_priority_of_another_period_is_not_listed(self) -> None:
         self.assertNotIn("PRI-OLD", json.dumps(self.body))
