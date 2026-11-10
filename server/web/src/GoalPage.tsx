@@ -493,7 +493,6 @@ function Talk({ data, reload }: { data: GoalPageResponse; reload: () => void }) 
   const [loading, setLoading] = useState<string>();
   const events = joinPages(data.events, older);
   const shown = activity(events, chip);
-  const count = { All: data.eventCount, Comments: data.commentCount, Changes: data.eventCount - data.commentCount };
   const more = async () => {
     if (cursor === null) return;
     setLoading("…");
@@ -511,7 +510,7 @@ function Talk({ data, reload }: { data: GoalPageResponse; reload: () => void }) 
         <span className="wchips">
           {ACTIVITY.map((c) => (
             <button key={c} type="button" className={`fchip${chip === c ? " on" : ""}`} aria-pressed={chip === c} onClick={() => setChip(c)}>
-              {c} <span className="muted">{count[c]}</span>
+              {c} <span className="muted">{data.activityCount[c]}</span>
             </button>
           ))}
         </span>

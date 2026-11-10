@@ -8,6 +8,7 @@ from typing import Any
 
 from goalie_cli import Store, update
 from live_server import get, post, running_server, signed
+from test_web_model import run
 
 
 class GoalPageApiTests(unittest.TestCase):
@@ -141,6 +142,13 @@ class GoalPageApiTests(unittest.TestCase):
         sequences = [e["sequence"] for e in page["events"]]
         self.assertEqual(sequences, sorted(sequences, reverse=True))
         self.assertEqual(page["needsYou"], {"lateWorkItems": [self.item], "missingPtg": False})
+
+    def test_activity_counts_the_rows_it_shows(self) -> None:
+        # QA 4: a new goal showed "Changes 30" over one Created row.
+        self.assertEqual(self.pages[self.ambition["$on_time"]]["activityCount"], {"All": 1, "Comments": 0, "Changes": 1})
+        for key, page in self.pages.items():
+            shown = run(f"const e = {json.dumps(page['events'])}; return Object.fromEntries(goalpage.ACTIVITY.map((c) => [c, goalpage.groupEvents(goalpage.activity(e, c)).length]));")
+            self.assertEqual(page["activityCount"], shown, key)
 
     def test_actors_name_every_id(self) -> None:
         page = self.pages["XW-0001"]

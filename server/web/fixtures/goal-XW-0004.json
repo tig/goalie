@@ -402,7 +402,11 @@
   ],
   "olderEvents": null,
   "eventCount": 18,
-  "commentCount": 0,
+  "activityCount": {
+    "All": 1,
+    "Comments": 0,
+    "Changes": 1
+  },
   "needsYou": {
     "lateWorkItems": [],
     "missingPtg": false
