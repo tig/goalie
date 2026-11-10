@@ -6,7 +6,7 @@ import { AddSubGoal, AddWorkItem, EditWorkItem, useStatus } from "./GoalAdd.tsx"
 import { Crumbs, Props } from "./GoalSide.tsx";
 import { ClosePanel, CompletePanel, DescriptionPanel, HealthPanel, PromotePanel, PullInPanel, PursuePanel, SlipPanel, type Done, type PanelName } from "./GoalPanels.tsx";
 import { commentBatch } from "./model/commands.ts";
-import { activity, ACTIVITY, changeParts, commentScope, createdFields, ptgChanges, historyNames, joinPages, dateBar, labelPlaces, eventValue, fieldLabel, groupEvents, groupWorkItems, mayEditWorkItem, nameHover, type ActivityChip, type EventGroup, type Names } from "./model/goalpage.ts";
+import { activity, ACTIVITY, changeParts, commentScope, createdFields, dateMove, ptgChanges, historyNames, joinPages, dateBar, labelPlaces, eventValue, fieldLabel, groupEvents, groupWorkItems, mayEditWorkItem, nameHover, type ActivityChip, type EventGroup, type Names } from "./model/goalpage.ts";
 import { dateLabel } from "./model/labels.ts";
 import { backPath, goalPath } from "./model/route.ts";
 import { Avatar, HealthDot, IssueLinks, Markdown, TitleBits } from "./parts.tsx";
@@ -420,7 +420,11 @@ function EventRow({ group, data }: { group: EventGroup; data: GoalPageResponse }
   const find = (field: string) => group.events.find((x) => x.field === field && x.entity === data.goal.id)?.new;
   // GL5: a Path to Green change says what changed in it ("Step 1 date Nov 6, 2026 → Nov 13, 2026"), never "1 step → 1 step".
   const change = (x: ApiEvent) =>
-    x.field === "path_to_green" ? (ptgChanges(x.old as PathToGreen | null, x.new as PathToGreen | null, names).join("; ") || "Path to Green unchanged") : `${fieldLabel(x.field)}: ${value(x.old, x.field)} → ${value(x.new, x.field)}`;
+    x.field === "path_to_green"
+      ? ptgChanges(x.old as PathToGreen | null, x.new as PathToGreen | null, names).join("; ") || "Path to Green unchanged"
+      : x.field === "changed_due_date" && x.entity === data.goal.id
+        ? dateMove(x.old, x.new, data.goal.original_committed_date ?? data.goal.due_date)
+        : `${fieldLabel(x.field)}: ${value(x.old, x.field)} → ${value(x.new, x.field)}`;
   const other = (x: { entity: string }) => (x.entity !== data.goal.id ? `${x.entity} ` : "");
   return (
     // tig/goalie#68: an Activity entry names who and when, never the text of a comment.

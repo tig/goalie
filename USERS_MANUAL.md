@@ -167,7 +167,8 @@ The GOALIE owner inspects these each quarter and changes the configuration, revi
 
 **Record a pull-in**
 1. Set the changed due date earlier, not before today, with a reason.
-2. The original date stays on record.
+2. A later date is a slip, not a pull-in. Record a slip for it.
+3. The original date stays on record.
 
 **Close a goal**
 - Set it to Completed, Completed Late, Did Not Meet, or Deleted, with a reason. Lateness is measured against the original committed date.

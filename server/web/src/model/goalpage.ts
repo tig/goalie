@@ -173,6 +173,19 @@ const LABELS: Record<string, string> = {
 
 export const fieldLabel = (field: string) => LABELS[field] ?? field;
 
+/** QA item 3: the date row is named for the date it shows. An uncommitted goal shows its Promotion Milestone's date (SPEC.md §4, §5). */
+export const judgedLabel = (kind: string) => (kind === "Committed" ? "Committed Date" : kind);
+
+/**
+ * QA item 7: a changed due date reads as a slip or a pull-in (SPEC.md §4), from the date it moved. The first change moves from the committed date, `committed`.
+ */
+export function dateMove(old: unknown, now: unknown, committed: string | null): string {
+  const from = typeof old === "string" ? old : committed;
+  const to = eventValue(now, "changed_due_date");
+  if (typeof from !== "string" || typeof now !== "string") return `${fieldLabel("changed_due_date")}: ${eventValue(old, "changed_due_date")} → ${to}`;
+  return `${now < from ? "Pull-in" : "Slip"}: ${eventValue(from, "changed_due_date")} → ${to}`;
+}
+
 /**
  * The header's date bar (G6): where the start, today, and each date sit, in percent from the first of them to the last.
  * It is a picture of the dates above it, not a control.
