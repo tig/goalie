@@ -5,12 +5,13 @@ import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
-import type { ActorRef, ApiError, CommandsResponse, FormOptions, GitHubRefResponse, GitHubSearchResponse, GitHubStatusResponse, GoalEventsResponse, GoalPageResponse, PrioritiesResponse, WorkResponse } from "./api.ts";
+import type { ActorRef, ApiError, CommandsResponse, FormOptions, GitHubRefResponse, GitHubSearchResponse, GitHubStatusResponse, GoalEventsResponse, GoalPageResponse, GoalsResponse, MyGoalsResponse, PrioritiesResponse, WorkResponse } from "./api.ts";
 import { runCommands } from "./commands.ts";
 import { drainGitHub, githubRepos, githubView, readGitHubRef, reposFromSettings, saveGitHubSettings, searchGitHub } from "./github.ts";
 import { receiveGitHubWebhook } from "./github_notice.ts";
 import { goalEvents, goalPage } from "./goalpage.ts";
 import { eventStream } from "./live.ts";
+import { myGoalsView, searchGoals } from "./mygoals.ts";
 import { formOptions } from "./options.ts";
 import { configuredIssuers, resolveActor, type Issuer } from "./auth.ts";
 import { checkConfiguration, configuredDatabase, configuredOrgUnit, configuredSignInUrl, configuredTimeZone, configuredToday, configuredWebDist } from "./config.ts";
@@ -130,6 +131,15 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
   app.get("/api/github/status", (c) => {
     if (c.get("actor").id !== goalieOwner(db)) return refuse(c, 403, "forbidden", "only the GOALIE owner can see GitHub");
     return c.json<GitHubStatusResponse>(githubView(db));
+  });
+  app.get("/api/my-goals", (c) => {
+    const me = c.get("actor");
+    return c.json<MyGoalsResponse>({ ...myGoalsView(db, me.id, todayIn(db)), me });
+  });
+  app.get("/api/goals", (c) => {
+    const q = (c.req.query("q") ?? "").replace(/\s+/g, " ").trim();
+    if (!q) return refuse(c, 400, "bad_request", "q is the text to search for: not blank");
+    return c.json<GoalsResponse>(searchGoals(db, q.slice(0, 100)));
   });
   app.post(
     "/api/github/status",
