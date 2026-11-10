@@ -480,7 +480,7 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 .addrow{margin:0 0 10px}
 .addgrid{display:grid;grid-template-columns:2fr 1fr;gap:0 12px}
 .addgrid.four{grid-template-columns:2fr 1fr 1fr 1fr}
-.addgrid.five{grid-template-columns:2fr 1fr 1fr 1fr 1fr}
+.addgrid.five{grid-template-columns:minmax(0,2fr) minmax(0,1.3fr) minmax(max-content,1fr) minmax(136px,1fr) minmax(136px,1fr)}
 .tickreason{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:0 0 8px}
 .wtitle .pencil{flex:none;margin-left:4px;width:24px;height:24px;vertical-align:middle}
 .wiedit{grid-column:1/-1;margin:4px 0 8px}
