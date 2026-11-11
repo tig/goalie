@@ -905,7 +905,9 @@ main.newgoal{padding-bottom:84px}
 .phone .notinview{order:1;margin-top:12px}
 
 /* W8: a work item's own page. */
-.wipage .wilinks{display:flex;align-items:center;gap:8px;margin:0 0 8px}
+.wihead{display:flex;align-items:flex-start;gap:4px}
+.wihead .pencil{flex:none;margin:4px 0 0}
+.wicrumb{white-space:nowrap}
 .wiside{margin:0}
 .wiside dd{margin:0}
 .wiside .pvalue.late{color:var(--red-ink)}

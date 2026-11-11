@@ -52,18 +52,18 @@ function Item({ data, reload }: { data: WorkItemPageResponse; reload: () => void
           {goal.summary}
         </Link>
         <span className="sep">›</span>
-        <span className="muted">{item.id}</span>
+        <span className="muted wicrumb">{item.id}</span>
       </nav>
       <div className="glayout">
         <header className="ghead2">
           <span className="gkey wikey">{item.id}</span>
-          <h1 className="gtitle" title={nameHover(item.id, item.title)}>
-            <TitleBits title={item.title} goal={goal.id} repos={data.githubScope} />
-          </h1>
-          <p className="wilinks">
-            <IssueLinks links={item.links} goal={goal.id} repos={data.githubRepos} />
+          <div className="wihead">
+            <h1 className="gtitle" title={nameHover(item.id, item.title)}>
+              <TitleBits title={item.title} goal={goal.id} repos={data.githubScope} />
+            </h1>
             {mayEditWorkItem(data.me, item) && <Pencil label={`Edit ${item.title}`} onClick={() => setEditing(!editing)} />}
-          </p>
+          </div>
+          <IssueLinks links={item.links} goal={goal.id} repos={data.githubRepos} />
           {item.github_error && <p className="wgithub">{item.github_error}</p>}
           {box(item)}
           {editing && (
