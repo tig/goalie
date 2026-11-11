@@ -3,7 +3,7 @@ import type { ApiActor, ApiViolation, ApiWorkItem, CommandsRequest, CommandsResp
 import { addDays } from "../../src/dates.ts";
 import { postCommands, useJson } from "./data.ts";
 import type { Done } from "./GoalPanels.tsx";
-import { goalTypes, savedStatus, subGoalBatch, workItemBatch, workItemFieldsBatch, workItemStatusBatch, type SubGoalRow } from "./model/commands.ts";
+import { commentBatch, goalTypes, savedStatus, subGoalBatch, workItemBatch, workItemFieldsBatch, workItemStatusBatch, type SubGoalRow } from "./model/commands.ts";
 import { humans } from "./model/goalpage.ts";
 import { dateLabel } from "./model/labels.ts";
 import { formFocus } from "./model/feedback.ts";
@@ -292,6 +292,34 @@ export function AddWorkItem({ data, statuses, onDone }: { data: GoalPageResponse
             </button>
           </>
         )}
+        <button type="button" className="btn" onClick={() => onDone(false)}>
+          Cancel
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/** W6c: a comment on a work item, in a box under its row. Enter posts it as one Event on the work item; Escape closes and posts nothing. */
+export function CommentWorkItem({ item, onDone }: { item: ApiWorkItem; onDone: (posted: boolean) => void }) {
+  const [text, setText] = useState("");
+  const [result, post] = usePost(() => onDone(true));
+  const send = () => text.trim() && !result.saving && post(commentBatch("work_item", item.id, text));
+  const keys = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") send();
+    if (e.key === "Escape") onDone(false);
+  };
+  return (
+    <section className="panel wicomment" aria-label={`Comment on ${item.title}`} onKeyDown={keys}>
+      <label className="field">
+        <span className="flabel">Comment</span>
+        <input value={text} aria-label="Comment" onChange={(e) => setText(e.target.value)} autoFocus />
+      </label>
+      <Errors result={result} />
+      <div className="pactions">
+        <button type="button" className="btn primary" disabled={!text.trim() || result.saving} onClick={send}>
+          Comment
+        </button>
         <button type="button" className="btn" onClick={() => onDone(false)}>
           Cancel
         </button>

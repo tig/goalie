@@ -2,7 +2,7 @@ import { useCallback, useState, type CSSProperties } from "react";
 import type { ApiActor, ApiEvent, ApiWorkItem, GoalEventsResponse, GoalPageResponse, Health, PathToGreen, SubGoalCard } from "../../src/api.ts";
 import { shortDate } from "../../src/dates.ts";
 import { getJson, postCommands, useJson } from "./data.ts";
-import { AddSubGoal, AddWorkItem, EditWorkItem, useStatus } from "./GoalAdd.tsx";
+import { AddSubGoal, AddWorkItem, CommentWorkItem, EditWorkItem, useStatus } from "./GoalAdd.tsx";
 import { Crumbs, Props } from "./GoalSide.tsx";
 import { ClosePanel, CompletePanel, DescriptionPanel, HealthPanel, PromotePanel, PullInPanel, PursuePanel, SlipPanel, type Done, type PanelName } from "./GoalPanels.tsx";
 import { commentBatch } from "./model/commands.ts";
@@ -278,6 +278,17 @@ export function Pencil({ label, onClick }: { label: string; onClick: () => void 
   );
 }
 
+/** W6c: the speech bubble that opens a work item's comment box. */
+export function Bubble({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button type="button" className="pencil wbubble" aria-label={label} onClick={onClick}>
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" />
+      </svg>
+    </button>
+  );
+}
+
 function SubGoal({ card, data }: { card: SubGoalCard; data: GoalPageResponse }) {
   // The goal's own date, not its Promotion Milestone's: the one a sub-goal with no date of its own takes (D2).
   const ownDate = data.dates.find((d) => d.kind !== "Promotion Milestone");
@@ -340,6 +351,7 @@ function WorkItems({ items, data, adding, onAdd, onDone, reload, status }: { ite
   const counts = groupWorkItems(live).map((g) => ({ status: g.status, n: g.items.length }));
   const [shown, setShown] = useState<Record<string, boolean>>({ "In Progress": true, Backlog: true, Completed: false });
   const [editing, setEditing] = useState<string | null>(null);
+  const [commenting, setCommenting] = useState<string | null>(null);
   const { pill, box } = useStatus(reload);
   const rows = live.filter((i) => shown[i.status]);
   return (
@@ -364,7 +376,8 @@ function WorkItems({ items, data, adding, onAdd, onDone, reload, status }: { ite
                 <span className="wname" title={nameHover(i.id)}><TitleBits title={i.title} goal={data.goal.id} repos={data.githubScope} revision={data.eventCount} /></span>
                 <IssueLinks links={i.links} goal={data.goal.id} repos={data.githubRepos} revision={data.eventCount} />
                 {descriptionLine(i.description) && <span className="wdesc">{descriptionLine(i.description)}</span>}
-                  {mayEditWorkItem(data.me, i) && <Pencil label={`Edit ${i.title}`} onClick={() => setEditing(editing === i.id ? null : i.id)} />}
+                  {mayEditWorkItem(data.me, i) && <Pencil label={`Edit ${i.title}`} onClick={() => { setCommenting(null); setEditing(editing === i.id ? null : i.id); }} />}
+                <Bubble label={`Comment on ${i.title}`} onClick={() => { setEditing(null); setCommenting(commenting === i.id ? null : i.id); }} />
               </span>
               <span className="wwho">
                 <Avatar actor={owner} mine={owner.id === data.me.id} />
@@ -375,6 +388,15 @@ function WorkItems({ items, data, adding, onAdd, onDone, reload, status }: { ite
               {pill(i)}
               {box(i)}
               {i.github_error && <span className="wgithub">{i.github_error}</span>}
+              {commenting === i.id && (
+                <CommentWorkItem
+                  item={i}
+                  onDone={(posted) => {
+                    setCommenting(null);
+                    if (posted) reload();
+                  }}
+                />
+              )}
               {editing === i.id && (
                 <EditWorkItem
                   item={i}
