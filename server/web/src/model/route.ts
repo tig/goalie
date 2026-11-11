@@ -1,6 +1,6 @@
 /** The app's pages and their paths. The server answers index.html for every path that is not the API or an asset, so the app routes in the browser. */
 
-export type Route = { page: "home" } | { page: "goal"; key: string } | { page: "new"; parent?: string } | { page: "work"; owner?: string } | { page: "github" } | { page: "mine" };
+export type Route = { page: "home" } | { page: "goal"; key: string } | { page: "new"; parent?: string } | { page: "work"; owner?: string } | { page: "workitem"; key: string } | { page: "github" } | { page: "mine" };
 
 /** The page for a path. A goal key is written upper case. A path the app does not know opens Home. */
 export function parseRoute(pathname: string, search = ""): Route {
@@ -11,6 +11,7 @@ export function parseRoute(pathname: string, search = ""): Route {
     const owner = new URLSearchParams(search).get("owner");
     return owner ? { page: "work", owner } : { page: "work" };
   }
+  if (parts[0] === "work" && parts.length === 2) return { page: "workitem", key: decodeURIComponent(parts[1]).toUpperCase() };
   if (parts[0] !== "goals" || parts.length !== 2) return { page: "home" };
   if (parts[1] === "new") {
     const parent = new URLSearchParams(search).get("parent")?.toUpperCase();
@@ -28,6 +29,9 @@ export const backPath = (homeSearch: string) => `/${homeSearch}`;
 
 /** The work page: every queue, or one owner's (plan F6). */
 export const workPath = (owner?: string) => (owner ? `/work?owner=${encodeURIComponent(owner)}` : "/work");
+
+/** W8: one work item's page. */
+export const workItemPath = (key: string) => `/work/${encodeURIComponent(key)}`;
 
 /** The My goals view (SPEC.md §8.2): every open goal the signed-in actor owns. */
 export const MY_GOALS_PATH = "/my-goals";

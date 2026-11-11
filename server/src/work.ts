@@ -1,7 +1,8 @@
 import type { DatabaseSync } from "node:sqlite";
-import type { ApiWorkItem, WorkResponse } from "./api.ts";
-import { githubError, githubRepos } from "./github.ts";
-import { actorsById, readAll } from "./read.ts";
+import type { ApiWorkItem, WorkItemPageResponse, WorkResponse } from "./api.ts";
+import { githubError, githubRepos, reposOnGoal } from "./github.ts";
+import { toApiEvent } from "./live.ts";
+import { actorsById, read, readAll, readEntityEvents, workItemsOn } from "./read.ts";
 import type { Row } from "./rules.ts";
 
 /**
@@ -18,6 +19,26 @@ export function workQueue(db: DatabaseSync, me: string, today: string, owner?: s
   const named = new Set(items.map((w) => w.goal));
   const goals = Object.fromEntries(readAll(db, "goal").filter((g) => named.has(g.id as string)).map((g) => [g.id, { id: g.id as string, summary: g.summary as string }]));
   return { me: actors[me], today, items, goals, actors, githubScope: githubRepos(db) };
+}
+
+/** W8: one work item's page. Undefined when there is no such item, or the work-item extension is off. */
+export function workItemPage(db: DatabaseSync, key: string, me: string, today: string): WorkItemPageResponse | undefined {
+  if (!workItemsOn(db)) return undefined;
+  const row = read(db, "work_item", key.toUpperCase());
+  if (row === undefined) return undefined;
+  const item = toApiWorkItem(db, row, today);
+  const goal = read(db, "goal", item.goal);
+  const events = readEntityEvents(db, [{ kind: "work_item", ids: [item.id] }]).map(toApiEvent);
+  return {
+    me: actorsById(db)[me],
+    today,
+    item,
+    goal: { id: item.goal, summary: (goal?.summary as string) ?? item.goal },
+    actors: actorsById(db),
+    events,
+    githubRepos: reposOnGoal(db, item.goal),
+    githubScope: githubRepos(db),
+  };
 }
 
 /** A stored work item, with `late` when it is open and its due date has passed. */

@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
-import type { ActorRef, ApiError, CommandsResponse, FormOptions, GitHubRefResponse, GitHubSearchResponse, GitHubStatusResponse, GoalEventsResponse, GoalPageResponse, GoalsResponse, MyGoalsResponse, PrioritiesResponse, WorkResponse } from "./api.ts";
+import type { ActorRef, ApiError, CommandsResponse, FormOptions, GitHubRefResponse, GitHubSearchResponse, GitHubStatusResponse, GoalEventsResponse, GoalPageResponse, GoalsResponse, MyGoalsResponse, PrioritiesResponse, WorkItemPageResponse, WorkResponse } from "./api.ts";
 import { runCommands } from "./commands.ts";
 import { drainGitHub, githubRepos, githubView, readGitHubRef, reposFromSettings, saveGitHubSettings, searchGitHub } from "./github.ts";
 import { receiveGitHubWebhook } from "./github_notice.ts";
@@ -21,7 +21,7 @@ import { signInPage } from "./signin.ts";
 import { goalieOwner, read } from "./read.ts";
 import { mayRankPriorities } from "./rules.ts";
 import { openStore } from "./store.ts";
-import { workQueue } from "./work.ts";
+import { workItemPage, workQueue } from "./work.ts";
 import { write } from "./write.ts";
 
 /** The media types of the files a Vite build writes. */
@@ -190,6 +190,10 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
     return page ? c.json<GoalEventsResponse>(page) : refuse(c, 404, "not_found", `no goal ${c.req.param("id")}`);
   });
   app.get("/api/options", (c) => c.json<FormOptions>(formOptions(db, c.get("actor").id, unit(), todayIn(db))));
+  app.get("/api/work-items/:key", (c) => {
+    const page = workItemPage(db, c.req.param("key"), c.get("actor").id, todayIn(db));
+    return page ? c.json<WorkItemPageResponse>(page) : refuse(c, 404, "not_found", `no work item ${c.req.param("key")}`);
+  });
   app.get("/api/work", (c) => {
     const owner = c.req.query("owner");
     // Codebase QA Q17: a wrong link must not read as an empty queue.

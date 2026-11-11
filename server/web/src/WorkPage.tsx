@@ -6,7 +6,7 @@ import { CommentWorkItem, EditWorkItem, useStatus } from "./GoalAdd.tsx";
 import { Bubble, Owner, Pencil } from "./GoalPage.tsx";
 import { IssueLinks, TitleBits } from "./parts.tsx";
 import { descriptionLine, keepOrder, mayEditWorkItem, nameHover, queues, workRefRevision } from "./model/goalpage.ts";
-import { goalPath, workPath } from "./model/route.ts";
+import { goalPath, workItemPath, workPath } from "./model/route.ts";
 import { Link } from "./router.tsx";
 import { encodeFocus } from "./model/feedback.ts";
 
@@ -109,7 +109,9 @@ function Queues({ work, reload, single }: { work: WorkResponse; reload: () => vo
             const rows = g.items.map((i) => (
               <div key={i.id} id={`work-item-${i.id}`} className={`wrow qrow${i.status === "Completed" ? " done" : ""}`} data-focus={encodeFocus({ kind: "work item", id: i.id, label: i.title })}>
                 <span className="wtitle">
-                  <span className="wname" title={nameHover(i.id)}><TitleBits title={i.title} goal={i.goal} repos={work.githubScope} revision={workRefRevision(work.items)} /></span>
+                  <Link to={workItemPath(i.id)} className="wname" title={nameHover(i.id)}>{i.title}</Link>
+                  {/* W8: the title opens the page, so a #N in it is its own link after the title, as in the editor. */}
+                  <TitleBits title={i.title} goal={i.goal} repos={work.githubScope} revision={workRefRevision(work.items)} linksOnly />
                   <IssueLinks links={i.links} goal={i.goal} revision={workRefRevision(work.items)} />
                   {descriptionLine(i.description) && <span className="wdesc">{descriptionLine(i.description)}</span>}
                   {mayEditWorkItem(work.me, i) && <Pencil label={`Edit ${i.title}`} onClick={() => { setCommenting(null); setSaid(null); setEditing(editing === i.id ? null : i.id); }} />}
