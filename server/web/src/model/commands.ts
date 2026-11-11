@@ -167,13 +167,14 @@ export function workItemStatusBatch(item: Pick<ApiWorkItem, "id" | "version">, s
   return { commands: [{ op: "update", kind: "work_item", id: item.id, base_version: item.version, fields: { status }, reason }] };
 }
 
-type EditedWorkItem = Pick<WorkItemFields, "title" | "owner" | "due_date"> & { start_date?: string | null; links?: string[] | null };
+type EditedWorkItem = Pick<WorkItemFields, "title" | "owner" | "due_date"> & { start_date?: string | null; description?: string | null; links?: string[] | null };
 
 /** Edit a work item in place (W6): one update of the fields that changed, with its reason. Null when nothing changed. links is set when the edit chose an issue or a pull request. */
 export function workItemFieldsBatch(item: Pick<ApiWorkItem, "id" | "version"> & EditedWorkItem, next: EditedWorkItem, reason: string): CommandsRequest | null {
   const fields: Partial<WorkItemFields> = Object.fromEntries((["title", "owner", "due_date"] as const).filter((f) => next[f] !== item[f]).map((f) => [f, next[f]]));
   // #73: an item read before start_date existed has none, the same as null.
   if ("start_date" in next && (next.start_date ?? null) !== (item.start_date ?? null)) fields.start_date = next.start_date ?? null;
+  if ("description" in next && (next.description ?? null) !== (item.description ?? null)) fields.description = next.description ?? null;
   if ("links" in next && JSON.stringify(next.links ?? null) !== JSON.stringify(item.links ?? null)) fields.links = next.links ?? null;
   if (!Object.keys(fields).length) return null;
   return { commands: [{ op: "update", kind: "work_item", id: item.id, base_version: item.version, fields, reason }] };

@@ -16,6 +16,7 @@
       "start_date": null,
       "due_date": "2026-10-24",
       "links": null,
+      "description": null,
       "late": false
     },
     {
@@ -28,6 +29,7 @@
       "start_date": null,
       "due_date": "2026-11-03",
       "links": null,
+      "description": null,
       "late": false
     },
     {
@@ -40,6 +42,7 @@
       "start_date": null,
       "due_date": "2026-10-23",
       "links": null,
+      "description": null,
       "late": false
     },
     {
@@ -52,6 +55,7 @@
       "start_date": null,
       "due_date": "2026-10-23",
       "links": null,
+      "description": null,
       "late": false
     },
     {
@@ -64,6 +68,7 @@
       "start_date": null,
       "due_date": "2026-10-28",
       "links": null,
+      "description": null,
       "late": false
     },
     {
@@ -76,6 +81,7 @@
       "start_date": null,
       "due_date": "2026-10-24",
       "links": null,
+      "description": null,
       "late": false
     },
     {
@@ -88,6 +94,7 @@
       "start_date": null,
       "due_date": "2026-10-24",
       "links": null,
+      "description": null,
       "late": false
     },
     {
@@ -100,6 +107,7 @@
       "start_date": null,
       "due_date": "2026-10-24",
       "links": null,
+      "description": null,
       "late": false
     },
     {
@@ -112,6 +120,7 @@
       "start_date": null,
       "due_date": "2026-10-24",
       "links": null,
+      "description": null,
       "late": false
     },
     {
@@ -124,6 +133,7 @@
       "start_date": null,
       "due_date": "2026-10-27",
       "links": null,
+      "description": null,
       "late": false
     },
     {
@@ -136,6 +146,7 @@
       "start_date": null,
       "due_date": "2026-10-30",
       "links": null,
+      "description": null,
       "late": false
     },
     {
@@ -148,6 +159,7 @@
       "start_date": null,
       "due_date": "2026-11-02",
       "links": null,
+      "description": null,
       "late": false
     },
     {
@@ -160,6 +172,7 @@
       "start_date": null,
       "due_date": "2026-10-24",
       "links": null,
+      "description": null,
       "late": false
     },
     {
@@ -172,6 +185,7 @@
       "start_date": null,
       "due_date": "2026-10-24",
       "links": null,
+      "description": null,
       "late": false
     },
     {
@@ -184,6 +198,7 @@
       "start_date": null,
       "due_date": "2026-10-25",
       "links": null,
+      "description": null,
       "late": false
     },
     {
@@ -196,6 +211,7 @@
       "start_date": null,
       "due_date": "2026-10-27",
       "links": null,
+      "description": null,
       "late": false
     },
     {
@@ -208,6 +224,7 @@
       "start_date": null,
       "due_date": "2026-10-24",
       "links": null,
+      "description": null,
       "late": false
     },
     {
@@ -220,6 +237,7 @@
       "start_date": null,
       "due_date": "2026-10-29",
       "links": null,
+      "description": null,
       "late": false
     },
     {
@@ -232,6 +250,7 @@
       "start_date": null,
       "due_date": "2026-10-29",
       "links": null,
+      "description": null,
       "late": false
     },
     {
@@ -244,6 +263,7 @@
       "start_date": null,
       "due_date": "2026-11-02",
       "links": null,
+      "description": null,
       "late": false
     }
   ],

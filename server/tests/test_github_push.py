@@ -704,6 +704,14 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.assertIn("tig/goalie#140", linked[0]["reason"])
         self.assertIsNone(self.error("WI-9060"))
 
+    def test_the_opened_issue_body_is_the_description_above_the_link_back(self) -> None:
+        """A work item's description is the body of the issue it files. The GOALIE trailer follows it."""
+        command = create("work_item", "WI-9061", {"goal": GOAL, "title": "Ship the body", "owner": "tig", "status": "In Progress", "description": "Repro: open Home.\n\nGot a blank page."}, "Filed")
+        command["github_repo"] = "tig/goalie"
+        self.assertTrue(self.write(command)["ok"])
+        body = self.github.opened["body"]  # type: ignore[index]
+        self.assertTrue(body.startswith("Repro: open Home.\n\nGot a blank page.\n\n<!-- goalie -->"), body)
+
     def test_a_repository_not_on_the_goal_does_not_open_an_issue(self) -> None:
         """A repository in scope but not on the goal does not call GitHub and does not create the work item."""
         set_scope(self.store, ["tig/goalie", "excaliwire/factory"], [{"repo": "github.com/tig/goalie"}])

@@ -539,6 +539,14 @@ class WorkItemTests(unittest.TestCase):
         self.assertEqual(self.store.read("work_item", "WI-0001")["start_date"], "2026-10-20")
         self.assertTrue(self.store.write(JANE, create("work_item", "WI-0002", self.item, "Filed"))["ok"], "a start date may be empty")
 
+    def test_a_work_item_keeps_its_description(self) -> None:
+        """A work item may say what the work is, in Markdown. It may be empty, and a change needs a reason."""
+        text = "Repro: open Home.\n\n- Expected: the list\n- Got: a blank page"
+        assert self.store.write(JANE, create("work_item", "WI-0001", {**self.item, "description": text}, "Filed"))["ok"]
+        self.assertEqual(self.store.read("work_item", "WI-0001")["description"], text)
+        self.refused(JANE, update("work_item", "WI-0001", 1, {"description": "Shorter"}), "reason-required")
+        self.assertTrue(self.store.write(JANE, update("work_item", "WI-0001", 1, {"description": None}, "Said in the title"))["ok"])
+
     def test_a_start_date_is_a_real_date(self) -> None:
         self.refused(JANE, create("work_item", "WI-0001", {**self.item, "start_date": "2026-02-30"}, "Filed"), "real-date", "start_date")
 
