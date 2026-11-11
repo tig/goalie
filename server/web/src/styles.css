@@ -7,7 +7,7 @@
 --brand:#bfe6cc;--brand-ink:#17482f;--link:#1e6b45;--today:#22744a;--today-ink:#ffffff;--focus:#2c5796;
 --shadow:rgba(47,58,51,.05);
 --red-bg:#fbd9dd;--red-ink:#9c2a3c;--red:#e5677a;--yellow-bg:#fbefc6;--yellow-ink:#755800;--yellow:#e8c766;--green-bg:#d3f0e2;--green-ink:#1e6544;--green:#5cbf85;--none-bg:#eef2ef;--none:#b4beb7;
---ahead:#e6ece8;--ambition:#8fadd9;--ambition-line:#b7c9e6;--ambition-ink:#2c5796;--fantasy:#a99ce0;--fantasy-line:#cfc6ee;--fantasy-ink:#5e4fa8;--slip-a:#f6b8c0;--slip-b:#fdeef0;
+--ahead:#e6ece8;--ambition:#8fadd9;--ambition-line:#b7c9e6;--ambition-ink:#2c5796;--fantasy:#a99ce0;--fantasy-line:#cfc6ee;--fantasy-ink:#5e4fa8;--ambition-bg:#e3ebf7;--fantasy-bg:#ece8fa;--slip-a:#f6b8c0;--slip-b:#fdeef0;
 --av-0-bg:#e3dafb;--av-0-ink:#4a3a91;--av-1-bg:#fadbe7;--av-1-ink:#9a2f5a;--av-2-bg:#d6ecfa;--av-2-ink:#1f5a85;--av-3-bg:#fde3cc;--av-3-ink:#8a4a12;--av-4-bg:#d3f0e2;--av-4-ink:#1e6544;--av-5-bg:#fbefc6;--av-5-ink:#6b5000;
 --hover:#f1f4f2;--tip-bg:#2f3a33;--tip-ink:#ffffff;--tip-shadow:rgba(47,58,51,.22);
 --radius:16px;--topbar:63px;--yellow-tint:#fefaea;--red-tint:#fef4f5;--green-tint:#f1faf5}
@@ -176,22 +176,16 @@ background-image:repeating-linear-gradient(to right,var(--grid) 0 1px,transparen
 .d1 .tick,.d2 .tick{height:18px;margin-top:-9px}
 /* A Promotion Milestone date is a diamond, a goal's own Committed date a bar, so a parent and a sub-goal on one day tell apart (review X12). */
 .tick.pm,.d1 .tick.pm,.d2 .tick.pm{width:11px;height:11px;margin:-5.5px 0 0 -5.5px;border-radius:2px;transform:rotate(45deg);box-shadow:0 0 0 2px var(--card)}
-.ticklbl{position:absolute;bottom:calc(50% + 11px);font-size:11px;font-weight:800;white-space:nowrap;z-index:3}
+/* Rule 23: a date is a chip on the bar's line. A slip chip is red, an Ambition or Fantasy chip takes its line's color, a committed date's chip is white. In front of the today line (rule 20). */
+.dchip{position:absolute;top:50%;height:20px;margin-top:-10px;box-sizing:border-box;display:inline-flex;align-items:center;padding:0 8px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap;z-index:4;background:var(--card);color:var(--ink);box-shadow:0 0 0 1px var(--cut)}
+.d1 .dchip,.d2 .dchip{height:18px;margin-top:-9px}
+.dchip.slipped{background:var(--red-bg);color:var(--red-ink);box-shadow:0 0 0 2px var(--card)}
+.dchip.Ambition{background:var(--ambition-bg);color:var(--ambition-ink);box-shadow:0 0 0 2px var(--card)}
+.dchip.Fantasy{background:var(--fantasy-bg);color:var(--fantasy-ink);box-shadow:0 0 0 2px var(--card)}
 .line{position:absolute;top:50%;height:0;margin-top:-1px;z-index:2;border-top:2px solid var(--ambition-line)}
 .line.Fantasy{border-top:2px dotted var(--fantasy-line)}
 .dot{position:absolute;top:50%;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border-radius:50%;z-index:3;background:var(--ambition);box-shadow:0 0 0 2px var(--card)}
 .dot.Fantasy{background:var(--card);box-shadow:inset 0 0 0 1.5px var(--fantasy),0 0 0 2px var(--card)}
-.endlbl{position:absolute;top:calc(50% + 8px);font-size:11px;font-weight:600;white-space:nowrap;color:var(--mute);z-index:3}
-.endlbl.Ambition{color:var(--ambition-ink)}.endlbl.Fantasy{color:var(--fantasy-ink)}
-/* An edge label sits in the label band above the bars, with no fill, so it covers no bar, tick, or label (rule 23). */
-.edge{position:absolute;bottom:calc(50% + 11px);font-size:11px;font-weight:800;z-index:3;white-space:nowrap}
-.edge.below{bottom:auto;top:calc(50% + 8px);font-weight:600}
-/* A label keeps a halo of the card color, so the today line and the grid never run through its text. */
-.ticklbl,.endlbl,.edge{text-shadow:0 0 2px var(--card),0 0 2px var(--card),0 0 3px var(--card)}
-.d1 .edge.above,.d2 .edge.above{bottom:calc(50% + 8px)}
-.edge>.ticklbl,.edge>.endlbl{position:static;font-size:inherit;font-weight:inherit}
-.edge.after{transform:translateX(-100%)}
-.edge.Ambition{color:var(--ambition-ink)}.edge.Fantasy{color:var(--fantasy-ink)}
 .legend{display:flex;flex-wrap:wrap;gap:6px 20px;justify-content:flex-end;margin-top:12px;font-size:12px;color:var(--mute)}
 .lg{position:relative;display:inline-flex;align-items:center;gap:7px}
 .lg .help{margin-left:0}
@@ -201,7 +195,6 @@ background-image:repeating-linear-gradient(to right,var(--grid) 0 1px,transparen
 .sw.Ambition{height:0;border-top:2px solid var(--ambition-line);border-radius:0}.sw.Fantasy{height:0;border-top:2px dotted var(--fantasy);border-radius:0}
 .z-quarters .lane{background-image:linear-gradient(var(--today),var(--today))}
 .z-months .lane,.z-quarters .lane{--grid:var(--line)}
-.z-months .ticklbl,.z-months .endlbl,.z-quarters .ticklbl,.z-quarters .endlbl{font-size:11px}
 .when{display:none;font-size:12px;color:var(--mute);padding:0 0 6px calc(var(--depth, 0) * var(--indent) + var(--rank) + 2 * var(--colgap))}
 .when.inherited,.inherited{opacity:.8}
 .when .date{color:var(--ink)}.when .light .date{color:var(--mute)}.when.inherited .date{color:var(--mute)}
@@ -723,16 +716,9 @@ main.newgoal{padding-bottom:84px}
 /* Rule 20: one today line from the axis to the bottom of the last row, through the cut line, in front of the grid, rows, highlight, and bars;
    label text (z 4, on its halo) and the pinned goal column (z 7) stay in front of it. */
 .nowline{position:absolute;top:52px;bottom:0;width:2px;left:calc(var(--left) + var(--gap) + var(--weeks) * var(--week) * var(--now) / 100 - 1px);background:var(--today);z-index:3;pointer-events:none}
-.ticklbl,.endlbl,.edge{z-index:4}
 /* Rule 21a: days, a line each day, weekends in --sub-bg. The board starts on a Monday. */
 .z-days .lane{background-image:repeating-linear-gradient(to right,var(--grid) 0 1px,transparent 1px calc(var(--week) / 7)),repeating-linear-gradient(to right,transparent 0 calc(var(--week) * 5 / 7),var(--sub-bg) calc(var(--week) * 5 / 7) var(--week))}
 .z-days .wk{font-size:11px;margin-left:calc(var(--week) / 14);transform:translateX(-50%)}
-/* Rule 23c: an edge list, one label per line, 2 px apart, from the top of the row. */
-.edge.list{top:4px;bottom:auto;display:flex;flex-direction:column;gap:2px;line-height:14px;font-weight:700}
-.edge.list.after{align-items:flex-end}
-.edge.list>.eline{position:static;font-size:inherit}
-.edge.list>.endlbl{font-weight:600}
-.edgespace{display:block;width:1px}
 .mband{position:absolute;top:4px;margin-left:3px;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);white-space:nowrap}
 /* Goal page v2 (GP2, GL1 to GL7): main column and properties. */
 .goalpage.v2{max-width:1120px}

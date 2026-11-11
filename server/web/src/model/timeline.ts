@@ -158,82 +158,73 @@ const LABEL_GAP = 6;
 /** A label's width in px, estimated at 7 px a character of 11 px bold text. */
 export const labelWidth = (text: string) => text.length * 7;
 
-/**
- * Where a mark's label goes so it is whole on screen (rule 23, review X1). `view` is the board's px on screen.
- * A mark off screen is written at that edge with an arrow. A mark on screen labels to its right, else to its left.
- */
-export function placeLabel(atPx: number, widthPx: number, view: { left: number; right: number }): "right" | "left" | "before" | "after" {
-  if (atPx < view.left) return "before";
-  if (atPx > view.right) return "after";
-  if (atPx + LABEL_GAP + widthPx <= view.right) return "right";
-  if (atPx - LABEL_GAP - widthPx >= view.left) return "left";
-  return "right";
-}
-
-/** An edge label starts this far inside the edge, clear of the edge fade. */
+/** An edge chip starts this far inside the edge, clear of the edge fade. */
 export const EDGE_INSET = 30;
 
-/** `band` is where the label sits: a tick's above the bar, an uncommitted date's below it. Labels in different bands cannot cover each other. */
-export type LaneMark = { key: string; atPx: number; text: string; outside: "before" | "after" | null; band?: "above" | "below" };
+/** A chip's width in px: its text and 8 px of padding each side. */
+export const chipWidth = (text: string) => labelWidth(text) + 16;
 
-/**
- * Where a lane's labels go, so no two overlap (rule 23). Each band places its labels on its own.
- * Every mark past an edge of the screen joins one label at that edge in its band, in date order. A mark whose own label could not clear that edge label, or fits on neither side of the mark, joins it too, or starts one at the nearer edge.
- * Each other mark labels to its right, else to its left.
- */
-export function placeLaneLabels(marks: LaneMark[], view: { left: number; right: number }): Placed {
-  const names = [...new Set(marks.map((m) => m.band ?? "above"))];
-  const inBand = (band: string) => marks.filter((m) => (m.band ?? "above") === band);
-  // Rule 23c: an edge list has no bands, so each band also keeps clear of the other bands' edge labels: a second pass reserves them.
-  const first = names.map((band) => placeBand(inBand(band), view));
-  const edge = (side: "before" | "after") => marks.filter((m) => first.some((b) => b[side].includes(m.key)));
-  // The list starts at the top of the row: its first line meets the labels above the bar, and a second line reaches the labels below it.
-  const others = (side: "before" | "after", band: string) => {
-    const list = edge(side);
-    return band === "below" && list.length < 2 ? [] : list.filter((m) => (m.band ?? "above") !== band);
-  };
-  const bands = names.map((band) => placeBand(inBand(band), view, { before: others("before", band), after: others("after", band) }));
-  const order = (keys: string[]) => [...marks].sort((a, b) => a.atPx - b.atPx).map((m) => m.key).filter((k) => keys.includes(k));
-  return {
-    before: order(bands.flatMap((b) => b.before)),
-    after: order(bands.flatMap((b) => b.after)),
-    inside: bands.flatMap((b) => b.inside).sort((a, b) => order([a.key, b.key])[0] === a.key ? -1 : 1),
-  };
+/** A date to put on a chip: where its mark is, in board px, its text, and which edge of the board it lies past, if any. */
+export type ChipMark = { atPx: number; text: string; outside: "before" | "after" | null };
+
+/** A chip on the bar's line. `left` is in board px. `arrow` points to a date off screen. `text` null is an arrow alone. */
+export type Chip = { left: number; width: number; text: string | null; arrow: "before" | "after" | null };
+
+type View = { left: number; right: number };
+
+const edgeChip = (text: string | null, side: "before" | "after", view: View): Chip => {
+  const width = chipWidth(text === null ? "→" : `${text} →`);
+  return { left: side === "before" ? view.left + EDGE_INSET : view.right - EDGE_INSET - width, width, text, arrow: side };
+};
+
+const pastEdge = (m: ChipMark, view: View) => m.outside ?? (m.atPx < view.left ? "before" : m.atPx > view.right ? "after" : null);
+
+/** A chip beside its mark: to its right, else to its left, else held inside the screen. */
+function beside(m: ChipMark, view: View): Chip {
+  const side = pastEdge(m, view);
+  if (side) return edgeChip(m.text, side, view);
+  const width = chipWidth(m.text);
+  const right = m.atPx + LABEL_GAP;
+  const left = m.atPx - LABEL_GAP - width;
+  const at = right + width <= view.right ? right : left >= view.left ? left : Math.max(view.left, view.right - width);
+  return { left: at, width, text: m.text, arrow: null };
 }
 
-type Placed = { before: string[]; after: string[]; inside: { key: string; side: "left" | "right" }[] };
+const clear = (a: Chip, b: Chip) => a.left + a.width + LABEL_GAP <= b.left || b.left + b.width + LABEL_GAP <= a.left;
 
-/** placeLaneLabels for the labels of one band. */
-function placeBand(marks: LaneMark[], view: { left: number; right: number }, others: { before: LaneMark[]; after: LaneMark[] } = { before: [], after: [] }): Placed {
-  const sorted = [...marks].sort((a, b) => a.atPx - b.atPx);
-  const before = new Set(sorted.filter((m) => m.outside === "before" || (!m.outside && m.atPx < view.left)).map((m) => m.key));
-  const after = new Set(sorted.filter((m) => m.outside === "after" || (!m.outside && m.atPx > view.right)).map((m) => m.key));
-  // An edge list is as wide as its longest line (rule 23c).
-  const reserve = (keys: Set<string>, side: "before" | "after") => {
-    const texts = [...sorted.filter((m) => keys.has(m.key)), ...others[side]].map((m) => labelWidth(m.text));
-    return texts.length ? EDGE_INSET + Math.max(...texts) + LABEL_GAP : 0;
-  };
-  let inner = view;
-  for (let changed = true; changed; ) {
-    changed = false;
-    inner = { left: view.left + reserve(before, "before"), right: view.right - reserve(after, "after") };
-    for (const m of sorted) {
-      if (before.has(m.key) || after.has(m.key)) continue;
-      // A label that fits on neither side of its mark joins the nearer edge label, so it is whole and covers nothing.
-      // With no edge label yet, it starts one at the nearer edge (QA R15: a lone slip label was cut at the right).
-      const w = labelWidth(m.text);
-      const fits = m.atPx + LABEL_GAP + w <= inner.right || m.atPx - LABEL_GAP - w >= inner.left;
-      const nearer = after.size && !before.size ? after : before.size && !after.size ? before : inner.right - m.atPx < m.atPx - inner.left ? after : before;
-      const side = m.atPx < inner.left ? before : m.atPx > inner.right ? after : fits ? undefined : nearer;
-      if (side) {
-        side.add(m.key);
-        changed = true;
+/**
+ * Rule 23: a lane's dates as chips on the bar's line, so no text floats above or below it.
+ * `date` is the committed date's chip. With a slip it names the slip too, and sits just right of the today line, `todayPx`.
+ * `end` is the Ambition or Fantasy date's chip. It gives way to the date chip: on the other side of its mark, else an arrow alone at its edge, else none (its mark still shows the date on hover).
+ */
+export function placeChips(date: (ChipMark & { slip: boolean }) | undefined, end: ChipMark | undefined, todayPx: number, view: View): { date?: Chip; end?: Chip } {
+  let first: Chip | undefined;
+  if (date?.slip) {
+    const width = chipWidth(date.text);
+    if (todayPx < view.left) first = edgeChip(date.text, "before", view);
+    else if (todayPx > view.right) first = edgeChip(date.text, "after", view);
+    else first = { left: todayPx + LABEL_GAP + width <= view.right ? todayPx + LABEL_GAP : Math.max(view.left, todayPx - LABEL_GAP - width), width, text: date.text, arrow: null };
+  } else if (date) first = beside(date, view);
+  if (!end) return { date: first };
+  let second: Chip | undefined = beside(end, view);
+  if (first && !clear(first, second)) {
+    const side = pastEdge(end, view);
+    if (side) {
+      second = edgeChip(null, side, view);
+      // An arrow alone that would still meet the date chip sits beside it, on the side of its edge when there is room.
+      if (!clear(first, second)) {
+        const after = first.left + first.width + LABEL_GAP;
+        const before = first.left - LABEL_GAP - second.width;
+        const outward = side === "after" ? (after + second.width <= view.right ? after : before) : before >= view.left ? before : after;
+        second = { ...second, left: outward };
       }
+    } else {
+      const width = chipWidth(end.text);
+      const other: Chip = { left: second.left > end.atPx ? end.atPx - LABEL_GAP - width : end.atPx + LABEL_GAP, width, text: end.text, arrow: null };
+      second = other.left >= view.left && other.left + width <= view.right && clear(first, other) ? other : undefined;
     }
   }
-  const keys = (set: Set<string>) => sorted.filter((m) => set.has(m.key)).map((m) => m.key);
-  const inside = sorted.filter((m) => !before.has(m.key) && !after.has(m.key)).map((m) => ({ key: m.key, side: placeLabel(m.atPx, labelWidth(m.text), inner) as "left" | "right" }));
-  return { before: keys(before), after: keys(after), inside };
+  return { date: first, end: second };
 }
 
 type Mark = {

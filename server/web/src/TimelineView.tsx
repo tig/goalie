@@ -3,7 +3,7 @@ import { shortDate } from "../../src/dates.ts";
 import type { GoalRow } from "./model/filter.ts";
 import { dateLabel, slipLabel } from "./model/labels.ts";
 import { arrowStep, dragLeft, isDrag, scrollEdges, wheelToScroll } from "./model/scroll.ts";
-import { EDGE_INSET, fitsView, labelWidth, laneOf, openScroll, placeLaneLabels, todayPill, visibleRange, type Lane, type LaneMark, type TimelineWindow } from "./model/timeline.ts";
+import { fitsView, labelWidth, laneOf, openScroll, placeChips, todayPill, visibleRange, type Chip, type Lane, type TimelineWindow } from "./model/timeline.ts";
 import { GoalTree, type TreeProps } from "./GoalTree.tsx";
 import { HELP } from "./helpText.tsx";
 import { Legend, look } from "./parts.tsx";
@@ -25,42 +25,20 @@ function Seg({ cls, from, to, style, first, last }: { cls: string; from: number;
   return <span className={`seg ${cls}${first ? " first" : ""}${last ? " last" : ""}`} style={{ left: pct(from), width: pct(to - from), ...style }} />;
 }
 
-/** A label that sits beside its mark: to its right, or to its left. */
-function SideLabel({ cls, at, side, color, children }: { cls: string; at: number; side: "left" | "right"; color?: string; children: ReactNode }) {
-  const style: CSSProperties = side === "left" ? { left: `calc(${pct(at)} - 6px)`, transform: "translateX(-100%)" } : { left: `calc(${pct(at)} + 6px)` };
+/** Rule 23: a chip on the bar's line. Pointing at it shows its date in full. */
+function ChipLabel({ chip, cls, full }: { chip: Chip; cls: string; full: string }) {
   return (
-    <span className={cls} style={{ ...style, color }}>
-      {children}
+    <span className={`dchip ${cls}`} style={{ left: chip.left }} title={full}>
+      {chip.arrow === "before" && "←"}
+      {chip.arrow === "before" && chip.text !== null && " "}
+      {chip.text}
+      {chip.arrow === "after" && chip.text !== null && " "}
+      {chip.arrow === "after" && "→"}
     </span>
   );
 }
 
-type Labeled = LaneMark & { cls: string; color?: string };
-
-/**
- * Rule 23c: one goal's labels at one edge are one block, a tight list: one per line, 2 px apart, in date order, each with its arrow,
- * from the top of the row (Chelsea, 2026-10-25). The bands of rule 23 do not apply at the edge.
- */
-function EdgeList({ side, marks, view }: { side: "before" | "after"; marks: Labeled[]; view: View }) {
-  if (!marks.length) return null;
-  return (
-    <span className={`edge list ${side}`} style={{ left: side === "before" ? view.left + EDGE_INSET : view.right - EDGE_INSET }}>
-      {marks.map((m) => (
-        <span key={m.key} className={`${m.cls} eline`} style={{ color: m.color }}>
-          {side === "before" && "← "}
-          {m.text}
-          {side === "after" && " →"}
-        </span>
-      ))}
-    </span>
-  );
-}
-
-/** The row grows to fit its longest edge list. */
-const EDGE_LINE = 14;
-const EDGE_GAP = 2;
-
-function LaneMarks({ lane, goal, today, view, board }: { lane: Lane; goal: GoalRow; today: string; view: View; board: number }) {
+function LaneMarks({ lane, goal, today, view, board, todayAt }: { lane: Lane; goal: GoalRow; today: string; view: View; board: number; todayAt: number }) {
   const l = look(goal.health);
   const pieces = (["health", "slip", "ahead"] as const).filter((p) => lane[p]);
   // A health bar under a slip is the same length, so both round at both ends.
@@ -70,31 +48,23 @@ function LaneMarks({ lane, goal, today, view, board }: { lane: Lane; goal: GoalR
   if (lane.slip) parts.push(<Seg key="s" cls={`slip${lane.slip.over ? " over" : ""}`} {...lane.slip} {...ends("slip")} />);
   if (lane.ahead) parts.push(<Seg key="a" cls="ahead" {...lane.ahead} style={goal.health ? { background: l.bg } : undefined} {...ends("ahead")} />);
   if (lane.line && lane.line.to > lane.line.from) parts.push(<span key="l" className={`line ${lane.line.kind}`} style={{ left: pct(lane.line.from), width: pct(lane.line.to - lane.line.from) }} />);
-  const labeled: Labeled[] = [];
-  if (lane.tick) {
+  const px = (at: number) => (at / 100) * board;
+  const slip = lane.slip ? ` · ${slipLabel(lane.slip.days)}` : "";
+  const tickFull = lane.tick ? dateLabel(lane.tick.date, today) + slip : "";
+  const endFull = lane.end ? dateLabel(lane.end.date, today) : "";
+  if (lane.tick && !lane.tick.outside) {
     const pm = lane.tick.date.kind === "Promotion Milestone";
-    const text = dateLabel(lane.tick.date, today) + (lane.slip ? ` · ${slipLabel(lane.slip.days)}` : "");
-    if (!lane.tick.outside) parts.push(<span key="t" className={`tick${pm ? " pm" : ""}`} style={{ left: pct(lane.tick.at) }} />);
-    labeled.push({ key: "tick", atPx: (lane.tick.at / 100) * board, text, outside: lane.tick.outside, band: "above", cls: "ticklbl", color: lane.slip ? "var(--red-ink)" : "var(--ink)" });
+    parts.push(<span key="t" className={`tick${pm ? " pm" : ""}`} style={{ left: pct(lane.tick.at) }} title={tickFull} />);
   }
-  if (lane.end) {
-    if (!lane.end.outside) parts.push(<span key="d" className={`dot ${lane.end.date.kind}`} style={{ left: pct(lane.end.at) }} />);
-    labeled.push({ key: "end", atPx: (lane.end.at / 100) * board, text: dateLabel(lane.end.date, today), outside: lane.end.outside, band: "below", cls: `endlbl ${lane.end.date.kind}` });
-  }
-  const placed = placeLaneLabels(labeled, view);
-  const inOrder = (keys: string[]) => keys.map((k) => labeled.find((m) => m.key === k)).filter((m) => m !== undefined);
-  for (const { key, side } of placed.inside) {
-    const m = labeled.find((x) => x.key === key) as Labeled;
-    parts.push(
-      <SideLabel key={`l-${key}`} cls={m.cls} at={(m.atPx / board) * 100} side={side} color={m.color}>
-        {m.text}
-      </SideLabel>,
-    );
-  }
-  parts.push(<EdgeList key="eb" side="before" marks={inOrder(placed.before)} view={view} />);
-  parts.push(<EdgeList key="ea" side="after" marks={inOrder(placed.after)} view={view} />);
-  const lines = Math.max(placed.before.length, placed.after.length);
-  if (lines > 1) parts.push(<span key="space" className="edgespace" style={{ height: lines * EDGE_LINE + (lines - 1) * EDGE_GAP + 8 }} aria-hidden="true" />);
+  if (lane.end && !lane.end.outside) parts.push(<span key="d" className={`dot ${lane.end.date.kind}`} style={{ left: pct(lane.end.at) }} title={endFull} />);
+  const chips = placeChips(
+    lane.tick && { atPx: px(lane.tick.at), text: shortDate(lane.tick.date.date, today) + slip, outside: lane.tick.outside, slip: Boolean(lane.slip) },
+    lane.end && { atPx: px(lane.end.at), text: shortDate(lane.end.date.date, today), outside: lane.end.outside },
+    px(todayAt),
+    view,
+  );
+  if (chips.date) parts.push(<ChipLabel key="cd" chip={chips.date} cls={lane.slip ? "slipped" : "dated"} full={tickFull} />);
+  if (chips.end && lane.end) parts.push(<ChipLabel key="ce" chip={chips.end} cls={`ended ${lane.end.date.kind}`} full={endFull} />);
   return <>{parts}</>;
 }
 
@@ -290,7 +260,7 @@ export function TimelineView({ window: w, home, onRange, ...tree }: Props) {
                 {...tree}
                 cells={(goal) => (
                   <div className="lane">
-                    <LaneMarks lane={laneOf(goal, w, tree.today)} goal={goal} today={tree.today} view={view} board={board} />
+                    <LaneMarks lane={laneOf(goal, w, tree.today)} goal={goal} today={tree.today} view={view} board={board} todayAt={w.todayAt} />
                   </div>
                 )}
                 blank={<div className="lane" />}
