@@ -12,9 +12,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const [chrome, url, width, height, expression] = process.argv.slice(2);
-const profile = mkdtempSync(join(tmpdir(), "goalie-chrome-"));
-// --no-sandbox: the only page is the test's own server on 127.0.0.1.
-const browser = spawn(chrome, ["--headless=new", "--no-sandbox", "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--remote-debugging-port=0", `--user-data-dir=${profile}`, "about:blank"], { stdio: "ignore" });
+// A cold first start on a CI runner can miss the wait for the DevTools port, so Chrome gets one more start in a new profile (Chrome stuck at start-up failed setUpClass on #101 and #102).
+const START_SECONDS = Number(process.env.GOALIE_CHROME_START_SECONDS ?? 30);
+const STARTS = 2;
+let profile;
+let browser;
+const launch = () => {
+  profile = mkdtempSync(join(tmpdir(), "goalie-chrome-"));
+  // --no-sandbox: the only page is the test's own server on 127.0.0.1.
+  browser = spawn(chrome, ["--headless=new", "--no-sandbox", "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--remote-debugging-port=0", `--user-data-dir=${profile}`, "about:blank"], { stdio: "ignore" });
+};
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const KEYS = {
   Escape: { key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 },
@@ -33,9 +40,34 @@ async function until(what, read, seconds = 20) {
   throw new Error(`timed out: ${what}`);
 }
 
+const stop = async () => {
+  browser.kill();
+  await wait(200);
+  // Chrome can still be writing its profile as it exits. A failed cleanup must not hide the run's own error.
+  try {
+    rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  } catch {
+    // The OS clears its temp folder.
+  }
+};
+
+/** Start Chrome and wait for its DevTools port. A start that writes no port in START_SECONDS is stopped and tried again, up to STARTS times. */
+async function devToolsPort() {
+  for (let start = 1; ; start++) {
+    launch();
+    const portFile = join(profile, "DevToolsActivePort");
+    try {
+      return await until("Chrome DevTools port", () => (existsSync(portFile) && readFileSync(portFile, "utf-8").split("\n")[0]) || null, START_SECONDS);
+    } catch (error) {
+      if (start >= STARTS) throw error;
+      process.stderr.write(`Chrome start ${start} wrote no DevTools port in ${START_SECONDS} s; starting it again.\n`);
+      await stop();
+    }
+  }
+}
+
 try {
-  const portFile = join(profile, "DevToolsActivePort");
-  const port = await until("Chrome DevTools port", () => (existsSync(portFile) && readFileSync(portFile, "utf-8").split("\n")[0]) || null);
+  const port = await devToolsPort();
   const page = await until("a page target", async () => {
     const targets = await fetch(`http://127.0.0.1:${port}/json/list`).then((r) => r.json()).catch(() => []);
     return targets.find((t) => t.type === "page") ?? null;
@@ -117,12 +149,5 @@ try {
   process.stdout.write(JSON.stringify(value));
   ws.close();
 } finally {
-  browser.kill();
-  await wait(200);
-  // Chrome can still be writing its profile as it exits. A failed cleanup must not hide the run's own error.
-  try {
-    rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
-  } catch {
-    // The OS clears its temp folder.
-  }
+  await stop();
 }
