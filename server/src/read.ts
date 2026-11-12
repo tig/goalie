@@ -24,7 +24,7 @@ export const ENTITIES = {
     json: ["work_product", "path_to_green"],
     bool: [],
   },
-  work_item: { prefix: "WI", fields: ["goal", "title", "owner", "status", "start_date", "due_date", "links"], json: ["links"], bool: [] },
+  work_item: { prefix: "WI", fields: ["goal", "title", "owner", "status", "start_date", "due_date", "links", "description"], json: ["links"], bool: [] },
   draft: { prefix: "DRAFT", fields: ["entity", "actor", "base_version", "change", "reason"], json: ["change"], bool: [] },
   owner_settings: { prefix: "OWNER", fields: ["owner", "settings"], json: ["settings"], bool: [] },
   user_settings: { prefix: "USER", fields: ["favorite_views", "appearance"], json: ["favorite_views"], bool: [] },

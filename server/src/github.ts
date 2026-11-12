@@ -836,7 +836,8 @@ export async function createGitHubIssue(db: DatabaseSync, workItemId: string, re
     const issued = await installationToken(ready.config, match[1], match[2]);
     if ("error" in issued) return { error: issued.error };
     const path = `/repos/${match[1]}/${match[2]}/issues`;
-    const created = await call(ready.config, issued.token, "POST", path, { title, body: bodyWithTrailer("", trailerLine(ready.config.publicUrl, goal, workItemId)) });
+    const description = typeof item.description === "string" ? item.description : "";
+    const created = await call(ready.config, issued.token, "POST", path, { title, body: bodyWithTrailer(description, trailerLine(ready.config.publicUrl, goal, workItemId)) });
     if (created.status !== 201) return { error: refused(created.status, `POST ${path}`, created.body) };
     const url = createdIssueUrl(created.body);
     const parsed = url === undefined ? null : ISSUE_URL.exec(url);

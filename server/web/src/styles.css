@@ -398,7 +398,10 @@ button.chev:hover{background:var(--grid);color:var(--ink)}
 .wghead{display:flex;gap:6px;width:100%;padding:8px 0;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
 .wrow{display:grid;grid-template-columns:minmax(0,1fr) auto 90px 128px;align-items:center;gap:12px;min-height:40px;border-top:1px solid var(--line);font-size:13px}
 .wrow input[type=checkbox]{width:16px;height:16px;margin:0}
-.wtitle{font-weight:600;min-width:0;display:flex;align-items:center}
+.wtitle{font-weight:600;min-width:0;display:flex;align-items:center;flex-wrap:wrap}
+.wtitle .wname{flex:1 1 0}
+.wdesc{order:3;flex:1 0 100%;min-width:0;font-weight:500;font-size:12px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.panel textarea.wdescbox{min-height:64px;resize:vertical}
 .wname{min-width:0;flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wissues{display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px;min-width:0;flex:1 1 8em;margin-left:8px}
 .wissue{min-width:0;font-weight:700;text-decoration:none;overflow-wrap:anywhere}

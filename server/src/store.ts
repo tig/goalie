@@ -77,7 +77,8 @@ CREATE TABLE IF NOT EXISTS work_item (
   status TEXT NOT NULL,
   start_date TEXT,
   due_date TEXT,
-  links TEXT
+  links TEXT,
+  description TEXT
 );
 CREATE TABLE IF NOT EXISTS github_push (
   work_item TEXT PRIMARY KEY REFERENCES work_item(id),
@@ -151,10 +152,11 @@ export function openStore(path: string): DatabaseSync {
   return db;
 }
 
-/** start_date (#73) is nullable. CREATE TABLE does not add it to an existing file, so add it only when it is absent. */
+/** start_date (#73) and description are nullable. CREATE TABLE does not add them to an existing file, so add each only when it is absent. */
 function addWorkItemColumns(db: DatabaseSync): void {
   const names = new Set((db.prepare("PRAGMA table_info(work_item)").all() as { name: string }[]).map((column) => column.name));
   if (!names.has("start_date")) db.exec("ALTER TABLE work_item ADD COLUMN start_date TEXT");
+  if (!names.has("description")) db.exec("ALTER TABLE work_item ADD COLUMN description TEXT");
 }
 
 /** repo and actor are nullable. CREATE TABLE does not add them to an existing file, so add one only when it is absent. */

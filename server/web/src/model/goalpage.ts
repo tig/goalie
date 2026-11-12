@@ -173,6 +173,12 @@ const LABELS: Record<string, string> = {
 
 export const fieldLabel = (field: string) => LABELS[field] ?? field;
 
+/** W6b: a work item row shows its description's first line that has text, as plain words: no heading, list, or emphasis marks. */
+export function descriptionLine(text: string | null | undefined): string {
+  const line = (text ?? "").split("\n").map((l) => l.trim()).find((l) => l !== "") ?? "";
+  return line.replace(/^(#{1,6}\s+|[-*+]\s+|\d+[.)]\s+|>\s*)/, "").replace(/[*_`~]/g, "").trim();
+}
+
 /** QA item 3: the date row is named for the date it shows. An uncommitted goal shows its Promotion Milestone's date (SPEC.md §4, §5). */
 export const judgedLabel = (kind: string) => (kind === "Committed" ? "Committed Date" : kind);
 

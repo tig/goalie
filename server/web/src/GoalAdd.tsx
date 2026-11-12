@@ -221,11 +221,12 @@ export function AddWorkItem({ data, statuses, onDone }: { data: GoalPageResponse
   const [status, setStatus] = useState<WorkItemStatus>("In Progress");
   const [start, setStart] = useState("");
   const [due, setDue] = useState("");
+  const [description, setDescription] = useState("");
   const [picked, setPicked] = useState(repos[0] ?? "");
   const [hit, pickHit] = useGitHubChoice(title);
   const [result, post] = usePost((b) => onDone(true, savedStatus("workitem", b)));
   const links = chosenLinks(null, hit);
-  const fields = { title, owner, status, start_date: start || null, due_date: due || null, ...(links === undefined ? {} : { links }) };
+  const fields = { title, owner, status, description: description.trim() || null, start_date: start || null, due_date: due || null, ...(links === undefined ? {} : { links }) };
   const chosen = repos.length === 1 ? repos[0] : picked;
   return (
     <section className="panel addrow" aria-label="Work item" data-focus={formFocus("Work item")}>
@@ -265,6 +266,11 @@ export function AddWorkItem({ data, statuses, onDone }: { data: GoalPageResponse
           <input type="date" aria-label="Due Date" value={due} min={start || undefined} onChange={(e) => setDue(e.target.value)} />
         </label>
       </div>
+      {/* W6b: what the work is, in Markdown. Enter makes a new line here; it does not save. */}
+      <label className="field">
+        <span className="flabel">Description</span>
+        <textarea className="wdescbox" aria-label="Description" value={description} rows={3} onKeyDown={(e) => e.key === "Enter" && e.stopPropagation()} onChange={(e) => setDescription(e.target.value)} />
+      </label>
       <Errors result={result} />
       <div className="pactions">
         <button type="button" className="btn primary" disabled={result.saving} onClick={() => post(workItemBatch(data.goal.id, fields))}>
@@ -302,12 +308,13 @@ export function EditWorkItem({ item, actors, repos = [], onDone }: { item: ApiWo
   const [title, setTitle] = useState(item.title);
   const [owner, setOwner] = useState(item.owner);
   const [start, setStart] = useState(item.start_date ?? "");
+  const [description, setDescription] = useState(item.description ?? "");
   const [due, setDue] = useState(item.due_date ?? "");
   const [reason, setReason] = useState("");
   const [hit, pickHit] = useGitHubChoice(title);
   const [result, post] = usePost(() => onDone(true));
   const links = chosenLinks(item.links, hit);
-  const batch = workItemFieldsBatch(item, { title, owner, start_date: start || null, due_date: due || null, ...(links === undefined ? {} : { links }) }, reason);
+  const batch = workItemFieldsBatch(item, { title, owner, description: description.trim() || null, start_date: start || null, due_date: due || null, ...(links === undefined ? {} : { links }) }, reason);
   const save = () => batch && post(batch);
   const keys = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") save();
@@ -346,6 +353,11 @@ export function EditWorkItem({ item, actors, repos = [], onDone }: { item: ApiWo
           <input value={reason} aria-label="Reason" onChange={(e) => setReason(e.target.value)} />
         </label>
       </div>
+      {/* W6b: what the work is, in Markdown. Enter makes a new line here; it does not save. */}
+      <label className="field">
+        <span className="flabel">Description</span>
+        <textarea className="wdescbox" aria-label="Description" value={description} rows={3} onKeyDown={(e) => e.key === "Enter" && e.stopPropagation()} onChange={(e) => setDescription(e.target.value)} />
+      </label>
       <Errors result={result} />
       <div className="pactions">
         <button type="button" className="btn primary" disabled={result.saving || !batch} onClick={save}>

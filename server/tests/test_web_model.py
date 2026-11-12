@@ -667,6 +667,17 @@ class GoalPageTests(unittest.TestCase):
         self.assertEqual(b["commands"][0]["fields"], {"start_date": "2026-11-10"})  # type: ignore[index]
         self.assertIsNone(run(f'return commands.workItemFieldsBatch({item}, {{ title: "Draw the board", owner: "chelsea", start_date: null, due_date: "2026-11-20" }}, "No change");'))
 
+    def test_editing_a_work_item_sends_a_changed_description(self) -> None:
+        """A description is sent when it changes. Blank is null, the same as none."""
+        item = '{ id: "WI-0001", version: 3, title: "Draw the board", owner: "chelsea", due_date: null, description: null }'
+        b = run(f'return commands.workItemFieldsBatch({item}, {{ title: "Draw the board", owner: "chelsea", due_date: null, description: "Use the pastel tokens." }}, "Said more");')
+        self.assertEqual(b["commands"][0]["fields"], {"description": "Use the pastel tokens."})  # type: ignore[index]
+        self.assertIsNone(run(f'return commands.workItemFieldsBatch({item}, {{ title: "Draw the board", owner: "chelsea", due_date: null, description: null }}, "No change");'))
+
+    def test_a_work_row_shows_the_first_line_of_the_description_as_text(self) -> None:
+        got = run(r"""return [goalpage.descriptionLine("## Repro\n\nOpen Home."), goalpage.descriptionLine("- **Got** a blank page\n- more"), goalpage.descriptionLine("  \n"), goalpage.descriptionLine(null)];""")
+        self.assertEqual(got, ["Repro", "Got a blank page", "", ""])
+
     def test_an_edit_can_send_links(self) -> None:
         """The edit save sends links when a chosen issue or pull request is added."""
         item = '{ id: "WI-0001", version: 3, title: "Draw the board", owner: "chelsea", due_date: null, links: null }'
@@ -836,6 +847,8 @@ process.stdout.write(JSON.stringify([a.body.message, b.body.message]));"""
         add = src.split("export function AddWorkItem", 1)[1].split("export function EditWorkItem", 1)[0]
         edit = src.split("export function EditWorkItem", 1)[1].split("const STATUSES", 1)[0]
         for form in (add, edit):
+            self.assertIn("description: description.trim() || null", form)
+            self.assertIn('aria-label="Description"', form)
             self.assertIn("start_date: start || null", form)
             self.assertLess(form.index(">Start Date<"), form.index(">Due Date<"))
             self.assertIn("max={due || undefined}", form)

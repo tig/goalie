@@ -31,7 +31,8 @@ class DatabasePathTests(unittest.TestCase):
             with sqlite3.connect(database) as now:
                 columns = [row[1] for row in now.execute("PRAGMA table_info(work_item)")]
                 self.assertIn("start_date", columns)
-                self.assertEqual(now.execute("SELECT title, start_date FROM work_item").fetchall(), [("Old row", None)])
+                self.assertIn("description", columns)
+                self.assertEqual(now.execute("SELECT title, start_date, description FROM work_item").fetchall(), [("Old row", None, None)])
 
 
 if __name__ == "__main__":

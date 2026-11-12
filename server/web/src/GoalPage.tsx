@@ -6,7 +6,7 @@ import { AddSubGoal, AddWorkItem, EditWorkItem, useStatus } from "./GoalAdd.tsx"
 import { Crumbs, Props } from "./GoalSide.tsx";
 import { ClosePanel, CompletePanel, DescriptionPanel, HealthPanel, PromotePanel, PullInPanel, PursuePanel, SlipPanel, type Done, type PanelName } from "./GoalPanels.tsx";
 import { commentBatch } from "./model/commands.ts";
-import { activity, ACTIVITY, changeParts, commentScope, createdFields, dateMove, ptgChanges, historyNames, joinPages, dateBar, labelPlaces, eventValue, fieldLabel, groupEvents, groupWorkItems, mayEditWorkItem, nameHover, type ActivityChip, type EventGroup, type Names } from "./model/goalpage.ts";
+import { activity, ACTIVITY, changeParts, commentScope, createdFields, dateMove, descriptionLine, ptgChanges, historyNames, joinPages, dateBar, labelPlaces, eventValue, fieldLabel, groupEvents, groupWorkItems, mayEditWorkItem, nameHover, type ActivityChip, type EventGroup, type Names } from "./model/goalpage.ts";
 import { dateLabel } from "./model/labels.ts";
 import { backPath, goalPath } from "./model/route.ts";
 import { Avatar, HealthDot, IssueLinks, Markdown, TitleBits } from "./parts.tsx";
@@ -363,7 +363,8 @@ function WorkItems({ items, data, adding, onAdd, onDone, reload, status }: { ite
               <span className="wtitle">
                 <span className="wname" title={nameHover(i.id)}><TitleBits title={i.title} goal={data.goal.id} repos={data.githubScope} revision={data.eventCount} /></span>
                 <IssueLinks links={i.links} goal={data.goal.id} repos={data.githubRepos} revision={data.eventCount} />
-                {mayEditWorkItem(data.me, i) && <Pencil label={`Edit ${i.title}`} onClick={() => setEditing(editing === i.id ? null : i.id)} />}
+                {descriptionLine(i.description) && <span className="wdesc">{descriptionLine(i.description)}</span>}
+                  {mayEditWorkItem(data.me, i) && <Pencil label={`Edit ${i.title}`} onClick={() => setEditing(editing === i.id ? null : i.id)} />}
               </span>
               <span className="wwho">
                 <Avatar actor={owner} mine={owner.id === data.me.id} />
