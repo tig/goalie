@@ -232,50 +232,81 @@ class TimelineTests(unittest.TestCase):
         self.assertEqual(lane["l"]["health"], {"from": lane["d"], "to": lane["t"]})  # type: ignore[index]
         self.assertTrue(lane["l"]["slip"]["over"])  # type: ignore[index]
 
-    def test_a_label_stays_inside_what_is_on_screen(self) -> None:
-        places = run('const v = { left: 1000, right: 1800 }; return [timeline.placeLabel(1200, 100, v), timeline.placeLabel(1750, 100, v), timeline.placeLabel(900, 100, v), timeline.placeLabel(1900, 100, v), timeline.placeLabel(1040, 900, v)];')
-        self.assertEqual(places, ["right", "left", "before", "after", "right"])
+    def chips(self, date: dict | None, end: dict | None, today: float = 1500, view: dict = {"left": 1000, "right": 1800}) -> dict:
+        return run(f"return timeline.placeChips({json.dumps(date)} ?? undefined, {json.dumps(end)} ?? undefined, {today}, {json.dumps(view)});")  # type: ignore[return-value]
 
-    def lanes(self, marks: list, view: dict = {"left": 1000, "right": 1800}) -> dict:
-        return run(f"return timeline.placeLaneLabels({json.dumps(marks)}, {json.dumps(view)});")  # type: ignore[return-value]
+    def test_a_slip_chip_sits_just_right_of_the_today_line_however_long_the_slip(self) -> None:
+        # Rule 23 (Chelsea, 2026-11-11): a 12-day slip's stripe could hold its chip, but the chip still sits by today, as a 1-day slip's must.
+        long = self.chips({"atPx": 1100, "text": "Oct 30 · slip 12 days", "outside": None, "slip": True}, None)
+        short = self.chips({"atPx": 1480, "text": "Nov 10 · slip 1 day", "outside": None, "slip": True}, None)
+        self.assertEqual([long["date"]["left"], short["date"]["left"]], [1506, 1506])  # type: ignore[index]
+        self.assertIsNone(long["date"]["arrow"])  # type: ignore[index]
 
-    def test_a_lone_label_that_fits_neither_side_goes_to_the_nearer_edge(self) -> None:
-        # QA R15, measured at 768 Weeks, scroll 2024: the board shows 2024 to 2281; the slip label fit neither side and was cut 100 px at the right.
-        placed = self.lanes([{"key": "tick", "atPx": 2218, "text": "Committed Oct 1 · slip 23 days", "outside": None}], {"left": 2024, "right": 2281})
-        self.assertEqual(placed, {"before": [], "after": ["tick"], "inside": []})
+    def test_a_slip_chip_names_a_committed_date_past_the_left_edge_by_today(self) -> None:
+        placed = self.chips({"atPx": 0, "text": "Oct 1 · slip 41 days", "outside": "before", "slip": True}, None)
+        self.assertEqual((placed["date"]["left"], placed["date"]["arrow"]), (1506, None))  # type: ignore[index]
 
-    def test_an_edge_list_from_one_band_keeps_the_other_bands_labels_clear(self) -> None:
-        # Rule 23c: an edge list has no bands, so a label above may not run into a list made of a label below.
-        placed = self.lanes([{"key": "tick", "atPx": 1600, "text": "Promotion Milestone Nov 6", "outside": None, "band": "above"}, {"key": "end", "atPx": 2400, "text": "Fantasy Nov 30", "outside": None, "band": "below"}])
-        self.assertEqual(placed["after"], ["end"])  # type: ignore[index]
-        self.assertNotIn({"key": "tick", "side": "right"}, placed["inside"])  # type: ignore[index]
+    def test_a_slip_chip_with_today_scrolled_off_goes_to_that_edge_with_an_arrow(self) -> None:
+        placed = self.chips({"atPx": 900, "text": "Oct 1 · slip 41 days", "outside": None, "slip": True}, None, today=950)
+        self.assertEqual((placed["date"]["left"], placed["date"]["arrow"]), (1030, "before"))  # type: ignore[index]
 
-    def test_two_marks_past_one_edge_become_one_label(self) -> None:
-        placed = self.lanes([{"key": "end", "atPx": 300, "text": "Fantasy Nov 30", "outside": None}, {"key": "tick", "atPx": 100, "text": "Promotion Milestone Nov 6", "outside": None}])
-        self.assertEqual(placed, {"before": ["tick", "end"], "after": [], "inside": []})
+    def test_a_committed_date_chip_sits_right_of_its_tick_else_left(self) -> None:
+        right = self.chips({"atPx": 1200, "text": "Nov 15", "outside": None, "slip": False}, None)
+        left = self.chips({"atPx": 1780, "text": "Nov 15", "outside": None, "slip": False}, None)
+        self.assertEqual([right["date"]["left"], left["date"]["left"]], [1206, 1780 - 6 - 58])  # type: ignore[index]
 
-    def test_marks_past_both_edges_give_one_label_each_side(self) -> None:
-        placed = self.lanes([{"key": "tick", "atPx": 100, "text": "Committed Oct 1", "outside": None}, {"key": "end", "atPx": 2400, "text": "Fantasy Nov 30", "outside": "after"}])
-        self.assertEqual(placed, {"before": ["tick"], "after": ["end"], "inside": []})
+    def test_a_date_past_an_edge_is_a_chip_at_that_edge_with_an_arrow(self) -> None:
+        placed = self.chips({"atPx": 100, "text": "Oct 1", "outside": None, "slip": False}, {"atPx": 2400, "text": "Nov 30", "outside": "after"})
+        self.assertEqual((placed["date"]["left"], placed["date"]["arrow"]), (1030, "before"))  # type: ignore[index]
+        self.assertEqual((placed["end"]["left"], placed["end"]["arrow"], placed["end"]["text"]), (1800 - 30 - 72, "after", "Nov 30"))  # type: ignore[index]
 
-    def test_a_mark_under_an_edge_label_joins_it(self) -> None:
-        # "Committed Oct 1" at the left edge takes 30 + 105 + 6 px, so a mark at 1050 would sit under it.
-        placed = self.lanes([{"key": "tick", "atPx": 100, "text": "Committed Oct 1", "outside": None}, {"key": "end", "atPx": 1050, "text": "Fantasy Nov 30", "outside": None}])
-        self.assertEqual(placed["before"], ["tick", "end"])
+    def test_a_fantasy_chip_that_meets_the_slip_chip_becomes_an_arrow_alone(self) -> None:
+        # Chelsea, 2026-11-11: the slip chip keeps its place by today; the Fantasy date past the edge shrinks to an arrow beside it.
+        placed = self.chips({"atPx": 1580, "text": "Nov 10 · slip 1 day", "outside": None, "slip": True}, {"atPx": 2400, "text": "Nov 30", "outside": "after"}, today=1600)
+        self.assertEqual(placed["date"]["left"], 1606)  # type: ignore[index]
+        self.assertEqual((placed["end"]["text"], placed["end"]["arrow"], placed["end"]["left"]), (None, "after", 1606 + 149 + 6))  # type: ignore[index]
 
-    def test_a_label_that_fits_neither_side_joins_the_edge_label(self) -> None:
-        # A 250 px view: "Promotion Milestone Nov 6" (175 px) fits neither side of its mark at 1100, beside a right-edge label.
-        placed = self.lanes([{"key": "tick", "atPx": 1100, "text": "Promotion Milestone Nov 6", "outside": None}, {"key": "end", "atPx": 1400, "text": "Fantasy Nov 30", "outside": None}], {"left": 1000, "right": 1250})
-        self.assertEqual(placed, {"before": [], "after": ["tick", "end"], "inside": []})
+    def test_a_fantasy_chip_on_screen_with_no_room_beside_the_slip_chip_shows_none(self) -> None:
+        # Its mark still shows the date on hover.
+        placed = self.chips({"atPx": 1480, "text": "Nov 10 · slip 1 day", "outside": None, "slip": True}, {"atPx": 1640, "text": "Nov 17", "outside": None})
+        self.assertNotIn("end", {k: v for k, v in placed.items() if v is not None})
 
-    def test_labels_in_different_bands_never_join(self) -> None:
-        # A tick's label sits above the bar and an uncommitted date's below it, so they cannot cover each other: each keeps its own edge label.
-        placed = self.lanes([{"key": "tick", "atPx": 100, "text": "Committed Oct 1", "outside": None, "band": "above"}, {"key": "end", "atPx": 1050, "text": "Fantasy Nov 30", "outside": None, "band": "below"}])
-        self.assertEqual(placed, {"before": ["tick"], "after": [], "inside": [{"key": "end", "side": "right"}]})
+    def test_a_fantasy_dot_under_the_slip_chip_puts_its_date_on_the_slip_chips_hover(self) -> None:
+        # The slip chip (1506 to 1655) covers the dot at 1640; without this its date could not be reached at all.
+        placed = self.chips({"atPx": 1480, "text": "Nov 10 · slip 1 day", "outside": None, "slip": True}, {"atPx": 1640, "text": "Nov 17", "outside": None})
+        self.assertTrue(placed.get("covered"))
+        clear = self.chips({"atPx": 1480, "text": "Nov 10 · slip 1 day", "outside": None, "slip": True}, {"atPx": 1700, "text": "Nov 17", "outside": None}, view={"left": 1000, "right": 1720})
+        self.assertNotIn("end", {k: v for k, v in clear.items() if v is not None})
+        self.assertFalse(clear.get("covered"))
 
-    def test_a_mark_on_screen_keeps_its_own_label(self) -> None:
-        placed = self.lanes([{"key": "tick", "atPx": 1200, "text": "Committed Nov 15", "outside": None}, {"key": "end", "atPx": 1790, "text": "Fantasy Nov 30", "outside": None}])
-        self.assertEqual(placed, {"before": [], "after": [], "inside": [{"key": "tick", "side": "right"}, {"key": "end", "side": "left"}]})
+    def test_an_arrow_alone_stays_on_a_narrow_screen(self) -> None:
+        # A narrow board: neither side of the slip chip has room for the arrow.
+        placed = self.chips({"atPx": 1050, "text": "Nov 10 · slip 12 days", "outside": None, "slip": True}, {"atPx": 2400, "text": "Nov 30", "outside": "after"}, today=1010, view={"left": 1000, "right": 1200})
+        end = placed["end"]  # type: ignore[index]
+        self.assertGreaterEqual(end["left"], 1000)
+        self.assertLessEqual(end["left"] + end["width"], 1200)
+
+    def test_an_end_chip_that_meets_the_date_chip_moves_to_the_other_side_of_its_dot(self) -> None:
+        placed = self.chips({"atPx": 1780, "text": "Nov 15", "outside": None, "slip": False}, {"atPx": 1700, "text": "Nov 30", "outside": None})
+        self.assertEqual((placed["end"]["left"], placed["end"]["text"]), (1700 - 6 - 58, "Nov 30"))  # type: ignore[index]
+
+    def test_an_arrow_alone_past_the_left_edge_sits_left_of_the_date_chip(self) -> None:
+        placed = self.chips({"atPx": 1040, "text": "Nov 15", "outside": None, "slip": False}, {"atPx": 500, "text": "Oct 1", "outside": "before"})
+        self.assertEqual((placed["end"]["text"], placed["end"]["arrow"]), (None, "before"))  # type: ignore[index]
+        self.assertLessEqual(placed["end"]["left"] + placed["end"]["width"] + 6, placed["date"]["left"])  # type: ignore[index]
+
+    def test_a_slip_chip_with_today_past_the_right_edge_goes_there_with_an_arrow(self) -> None:
+        placed = self.chips({"atPx": 1700, "text": "Nov 10 · slip 1 day", "outside": None, "slip": True}, None, today=1900)
+        self.assertEqual(placed["date"]["arrow"], "after")  # type: ignore[index]
+        self.assertEqual(placed["date"]["left"] + placed["date"]["width"], 1800 - 30)  # type: ignore[index]
+
+    def test_a_slip_chip_with_no_room_right_of_today_sits_left_of_it(self) -> None:
+        placed = self.chips({"atPx": 1600, "text": "Nov 10 · slip 1 day", "outside": None, "slip": True}, None, today=1750)
+        self.assertEqual(placed["date"]["left"], 1750 - 6 - 149)  # type: ignore[index]
+
+    def test_a_fantasy_chip_with_room_keeps_its_date(self) -> None:
+        placed = self.chips({"atPx": 1200, "text": "Nov 15", "outside": None, "slip": False}, {"atPx": 1600, "text": "Nov 30", "outside": None})
+        self.assertEqual((placed["end"]["left"], placed["end"]["text"]), (1606, "Nov 30"))  # type: ignore[index]
 
     def test_a_label_width_is_estimated_from_its_text(self) -> None:
         self.assertEqual(run('return [timeline.labelWidth("Committed Nov 15"), timeline.labelWidth("")];'), [16 * 7, 0])
