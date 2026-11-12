@@ -64,7 +64,7 @@ The screens are a React app in `server/web/`. It reads `GET /api/priorities` and
 23a. A Promotion Milestone date is a diamond. A goal's own Committed date is a bar. A parent and a sub-goal on one day tell apart (review X12).
 23b. A goal that started after its Committed date passed draws its health bar under the slip, from that date to today (review Q6).
 23c. A slip is one red chip with the committed date and the slip, such as "Nov 10 · slip 1 day". It always sits just right of the today line, however long the slip, so a one-day slip reads the same as a long one (Chelsea, 2026-11-11). With today scrolled off screen, it sits at that edge with an arrow.
-23d. An Ambition or Fantasy date's chip takes its line's color. It gives way to the date chip: it moves to the other side of its mark; past an edge, it shrinks to an arrow alone beside the date chip; on screen with no room, it shows no chip and its dot keeps the date on hover (Chelsea, 2026-11-11).
+23d. An Ambition or Fantasy date's chip takes its line's color. It gives way to the date chip: it moves to the other side of its mark; past an edge, it shrinks to an arrow alone beside the date chip; on screen with no room, it shows no chip and its dot keeps the date on hover (Chelsea, 2026-11-11). When the date chip covers that dot, pointing at the date chip shows both dates. An arrow alone never leaves the screen.
 23e. A date past the edge of the screen is a chip at that edge with an arrow, such as "← Oct 1" or "Nov 30 →".
 
 ## Highlight and selection

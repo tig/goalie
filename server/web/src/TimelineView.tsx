@@ -63,7 +63,7 @@ function LaneMarks({ lane, goal, today, view, board, todayAt }: { lane: Lane; go
     px(todayAt),
     view,
   );
-  if (chips.date) parts.push(<ChipLabel key="cd" chip={chips.date} cls={lane.slip ? "slipped" : "dated"} full={tickFull} />);
+  if (chips.date) parts.push(<ChipLabel key="cd" chip={chips.date} cls={lane.slip ? "slipped" : "dated"} full={chips.covered ? `${tickFull}\n${endFull}` : tickFull} />);
   if (chips.end && lane.end) parts.push(<ChipLabel key="ce" chip={chips.end} cls={`ended ${lane.end.date.kind}`} full={endFull} />);
   return <>{parts}</>;
 }

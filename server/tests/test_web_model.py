@@ -271,6 +271,39 @@ class TimelineTests(unittest.TestCase):
         placed = self.chips({"atPx": 1480, "text": "Nov 10 · slip 1 day", "outside": None, "slip": True}, {"atPx": 1640, "text": "Nov 17", "outside": None})
         self.assertNotIn("end", {k: v for k, v in placed.items() if v is not None})
 
+    def test_a_fantasy_dot_under_the_slip_chip_puts_its_date_on_the_slip_chips_hover(self) -> None:
+        # The slip chip (1506 to 1655) covers the dot at 1640; without this its date could not be reached at all.
+        placed = self.chips({"atPx": 1480, "text": "Nov 10 · slip 1 day", "outside": None, "slip": True}, {"atPx": 1640, "text": "Nov 17", "outside": None})
+        self.assertTrue(placed.get("covered"))
+        clear = self.chips({"atPx": 1480, "text": "Nov 10 · slip 1 day", "outside": None, "slip": True}, {"atPx": 1700, "text": "Nov 17", "outside": None}, view={"left": 1000, "right": 1720})
+        self.assertNotIn("end", {k: v for k, v in clear.items() if v is not None})
+        self.assertFalse(clear.get("covered"))
+
+    def test_an_arrow_alone_stays_on_a_narrow_screen(self) -> None:
+        # A narrow board: neither side of the slip chip has room for the arrow.
+        placed = self.chips({"atPx": 1050, "text": "Nov 10 · slip 12 days", "outside": None, "slip": True}, {"atPx": 2400, "text": "Nov 30", "outside": "after"}, today=1010, view={"left": 1000, "right": 1200})
+        end = placed["end"]  # type: ignore[index]
+        self.assertGreaterEqual(end["left"], 1000)
+        self.assertLessEqual(end["left"] + end["width"], 1200)
+
+    def test_an_end_chip_that_meets_the_date_chip_moves_to_the_other_side_of_its_dot(self) -> None:
+        placed = self.chips({"atPx": 1780, "text": "Nov 15", "outside": None, "slip": False}, {"atPx": 1700, "text": "Nov 30", "outside": None})
+        self.assertEqual((placed["end"]["left"], placed["end"]["text"]), (1700 - 6 - 58, "Nov 30"))  # type: ignore[index]
+
+    def test_an_arrow_alone_past_the_left_edge_sits_left_of_the_date_chip(self) -> None:
+        placed = self.chips({"atPx": 1040, "text": "Nov 15", "outside": None, "slip": False}, {"atPx": 500, "text": "Oct 1", "outside": "before"})
+        self.assertEqual((placed["end"]["text"], placed["end"]["arrow"]), (None, "before"))  # type: ignore[index]
+        self.assertLessEqual(placed["end"]["left"] + placed["end"]["width"] + 6, placed["date"]["left"])  # type: ignore[index]
+
+    def test_a_slip_chip_with_today_past_the_right_edge_goes_there_with_an_arrow(self) -> None:
+        placed = self.chips({"atPx": 1700, "text": "Nov 10 · slip 1 day", "outside": None, "slip": True}, None, today=1900)
+        self.assertEqual(placed["date"]["arrow"], "after")  # type: ignore[index]
+        self.assertEqual(placed["date"]["left"] + placed["date"]["width"], 1800 - 30)  # type: ignore[index]
+
+    def test_a_slip_chip_with_no_room_right_of_today_sits_left_of_it(self) -> None:
+        placed = self.chips({"atPx": 1600, "text": "Nov 10 · slip 1 day", "outside": None, "slip": True}, None, today=1750)
+        self.assertEqual(placed["date"]["left"], 1750 - 6 - 149)  # type: ignore[index]
+
     def test_a_fantasy_chip_with_room_keeps_its_date(self) -> None:
         placed = self.chips({"atPx": 1200, "text": "Nov 15", "outside": None, "slip": False}, {"atPx": 1600, "text": "Nov 30", "outside": None})
         self.assertEqual((placed["end"]["left"], placed["end"]["text"]), (1606, "Nov 30"))  # type: ignore[index]

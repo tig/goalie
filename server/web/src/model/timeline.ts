@@ -192,12 +192,24 @@ function beside(m: ChipMark, view: View): Chip {
 
 const clear = (a: Chip, b: Chip) => a.left + a.width + LABEL_GAP <= b.left || b.left + b.width + LABEL_GAP <= a.left;
 
+/** Where a chip `width` wide sits beside chip `a`: on the `prefer` side when it fits on screen, else the other side, else held inside the screen. */
+function next(a: Chip, width: number, prefer: "before" | "after", view: View): number {
+  const after = a.left + a.width + LABEL_GAP;
+  const before = a.left - LABEL_GAP - width;
+  const fitsAfter = after + width <= view.right;
+  const fitsBefore = before >= view.left;
+  if (prefer === "after" ? fitsAfter : !fitsBefore && fitsAfter) return after;
+  if (fitsBefore) return before;
+  return Math.min(Math.max(view.left, after), view.right - width);
+}
+
 /**
  * Rule 23: a lane's dates as chips on the bar's line, so no text floats above or below it.
  * `date` is the committed date's chip. With a slip it names the slip too, and sits just right of the today line, `todayPx`.
- * `end` is the Ambition or Fantasy date's chip. It gives way to the date chip: on the other side of its mark, else an arrow alone at its edge, else none (its mark still shows the date on hover).
+ * `end` is the Ambition or Fantasy date's chip. It gives way to the date chip: on the other side of its mark, else an arrow alone at its edge, else none.
+ * `covered` is true when the end has no chip and the date chip lies over its dot, so the date chip must name the end date on hover too.
  */
-export function placeChips(date: (ChipMark & { slip: boolean }) | undefined, end: ChipMark | undefined, todayPx: number, view: View): { date?: Chip; end?: Chip } {
+export function placeChips(date: (ChipMark & { slip: boolean }) | undefined, end: ChipMark | undefined, todayPx: number, view: View): { date?: Chip; end?: Chip; covered?: boolean } {
   let first: Chip | undefined;
   if (date?.slip) {
     const width = chipWidth(date.text);
@@ -212,16 +224,12 @@ export function placeChips(date: (ChipMark & { slip: boolean }) | undefined, end
     if (side) {
       second = edgeChip(null, side, view);
       // An arrow alone that would still meet the date chip sits beside it, on the side of its edge when there is room.
-      if (!clear(first, second)) {
-        const after = first.left + first.width + LABEL_GAP;
-        const before = first.left - LABEL_GAP - second.width;
-        const outward = side === "after" ? (after + second.width <= view.right ? after : before) : before >= view.left ? before : after;
-        second = { ...second, left: outward };
-      }
+      if (!clear(first, second)) second = { ...second, left: next(first, second.width, side, view) };
     } else {
       const width = chipWidth(end.text);
       const other: Chip = { left: second.left > end.atPx ? end.atPx - LABEL_GAP - width : end.atPx + LABEL_GAP, width, text: end.text, arrow: null };
       second = other.left >= view.left && other.left + width <= view.right && clear(first, other) ? other : undefined;
+      if (!second && end.atPx >= first.left && end.atPx <= first.left + first.width) return { date: first, covered: true };
     }
   }
   return { date: first, end: second };

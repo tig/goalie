@@ -714,7 +714,7 @@ main.newgoal{padding-bottom:84px}
 @media (pointer:coarse){.phonesum .counts{gap:0}.phonesum .count{min-height:44px}}
 .goal>.row{cursor:pointer}.goal>.row:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
 /* Rule 20: one today line from the axis to the bottom of the last row, through the cut line, in front of the grid, rows, highlight, and bars;
-   label text (z 4, on its halo) and the pinned goal column (z 7) stay in front of it. */
+   date chips (z 4) and the pinned goal column (z 7) stay in front of it. */
 .nowline{position:absolute;top:52px;bottom:0;width:2px;left:calc(var(--left) + var(--gap) + var(--weeks) * var(--week) * var(--now) / 100 - 1px);background:var(--today);z-index:3;pointer-events:none}
 /* Rule 21a: days, a line each day, weekends in --sub-bg. The board starts on a Monday. */
 .z-days .lane{background-image:repeating-linear-gradient(to right,var(--grid) 0 1px,transparent 1px calc(var(--week) / 7)),repeating-linear-gradient(to right,transparent 0 calc(var(--week) * 5 / 7),var(--sub-bg) calc(var(--week) * 5 / 7) var(--week))}
