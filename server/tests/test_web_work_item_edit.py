@@ -1,4 +1,4 @@
-"""A work item is edited in place: its title, owner, and due date, with a reason, on the Work items page and on a goal page (#66, W6).
+"""A work item is edited in place: its title, owner, start date, and due date, with a reason, on the Work items page and on a goal page (#66, W6).
 Measured in headless Chrome on the built app, signed in as Chelsea. The mouse and the keys are real input through Chrome (measure_page.mjs)."""
 
 from __future__ import annotations
@@ -60,12 +60,33 @@ ESCAPE_ON_GOAL_PAGE = scenario("""
   return { pencil: true, opened, closed: !editor(), title: row.querySelector(".wtitle").textContent === title };
 """, ready=".wrow2")
 
+# #73: the editor has a Start Date. A date input takes no typed text in a way that is the same in every locale, so the value is set as the date picker sets it.
+START_ON_WORK_PAGE = scenario("""
+  const row = document.querySelectorAll(".wrow")[1];
+  const id = JSON.parse(row.dataset.focus).id;
+  await click(row.querySelector("button.pencil"));
+  const box = editor();
+  const start = box?.querySelector("input[aria-label='Start Date']");
+  if (!start) return { id, start: false };
+  const item = (await (await fetch("/api/work")).json()).items.find((i) => i.id === id);
+  const day = item.due_date ?? "2026-11-01";
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(start, day);
+  start.dispatchEvent(new Event("input", { bubbles: true }));
+  await click(box.querySelector("input[aria-label=Reason]"));
+  await type("Work starts");
+  await key("Enter");
+  await sleep(600);
+  const after = (await (await fetch("/api/work")).json()).items.find((i) => i.id === id);
+  return { id, start: true, day, saved: after.start_date, open: Boolean(editor()) };
+""", ready=".wrow")
+
 
 class WorkItemEditTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         with signed_app("seed/build-team.json") as (open_page, api):
             cls.work = open_page(1280, EDIT_ON_WORK_PAGE, "/work")
+            cls.start = open_page(1280, START_ON_WORK_PAGE, "/work")
             goal = next(i["goal"] for i in api("/api/work")["items"] if i["status"] == "In Progress")
             cls.goal = open_page(1280, ESCAPE_ON_GOAL_PAGE, f"/goals/{goal}")
 
@@ -79,6 +100,11 @@ class WorkItemEditTests(unittest.TestCase):
 
     def test_the_goal_page_has_the_same_editor_and_escape_keeps_the_title(self) -> None:
         self.assertEqual(self.goal, {"pencil": True, "opened": True, "closed": True, "title": True})
+
+    def test_the_editor_saves_a_start_date(self) -> None:
+        self.assertTrue(self.start["start"], "the editor shows Start Date")
+        self.assertEqual(self.start["saved"], self.start["day"])
+        self.assertFalse(self.start["open"])
 
 
 if __name__ == "__main__":

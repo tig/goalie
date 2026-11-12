@@ -533,9 +533,24 @@ class WorkItemTests(unittest.TestCase):
     def test_a_due_date_is_a_real_date(self) -> None:
         self.refused(JANE, create("work_item", "WI-0001", {**self.item, "due_date": "2026-02-30"}, "Filed"), "real-date", "due_date")
 
+    def test_a_work_item_keeps_its_start_date(self) -> None:
+        result = self.store.write(JANE, create("work_item", "WI-0001", {**self.item, "start_date": "2026-10-20"}, "Filed"))
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(self.store.read("work_item", "WI-0001")["start_date"], "2026-10-20")
+        self.assertTrue(self.store.write(JANE, create("work_item", "WI-0002", self.item, "Filed"))["ok"], "a start date may be empty")
+
+    def test_a_start_date_is_a_real_date(self) -> None:
+        self.refused(JANE, create("work_item", "WI-0001", {**self.item, "start_date": "2026-02-30"}, "Filed"), "real-date", "start_date")
+
+    def test_a_start_date_is_on_or_before_the_due_date(self) -> None:
+        self.refused(JANE, create("work_item", "WI-0001", {**self.item, "start_date": "2026-11-03"}, "Filed"), "start-on-or-before-due", "start_date")
+        self.assertTrue(self.store.write(JANE, create("work_item", "WI-0001", {**self.item, "start_date": "2026-11-02"}, "Filed"))["ok"], "the same day is allowed")
+        self.refused(JANE, update("work_item", "WI-0001", 1, {"due_date": "2026-11-01"}, "Pulled in"), "start-on-or-before-due", "start_date")
+        self.assertTrue(self.store.write(JANE, update("work_item", "WI-0001", 1, {"due_date": None}, "No date"))["ok"], "no due date has no order to keep")
+
     def test_status_owner_and_due_date_changes_need_a_reason(self) -> None:
         assert self.store.write(JANE, create("work_item", "WI-0001", self.item, "Filed"))["ok"]
-        for change in ({"status": "Completed"}, {"owner": JANE}, {"due_date": "2026-11-09"}):
+        for change in ({"status": "Completed"}, {"owner": JANE}, {"due_date": "2026-11-09"}, {"start_date": "2026-11-01"}):
             self.refused(JANE, update("work_item", "WI-0001", 1, change), "reason-required")
         self.assertTrue(self.store.write(JANE, update("work_item", "WI-0001", 1, {"status": "Completed"}, "Shipped"))["ok"])
 
