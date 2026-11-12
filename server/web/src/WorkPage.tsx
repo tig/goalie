@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
-import type { ApiEvent, PrioritiesResponse, WorkResponse } from "../../src/api.ts";
+import { useState } from "react";
+import type { PrioritiesResponse, WorkResponse } from "../../src/api.ts";
 import { shortDate } from "../../src/dates.ts";
-import { useJson } from "./data.ts";
+import { useJson, useLive } from "./data.ts";
 import { CommentWorkItem, EditWorkItem, useStatus } from "./GoalAdd.tsx";
 import { Bubble, Owner, Pencil } from "./GoalPage.tsx";
 import { IssueLinks, TitleBits } from "./parts.tsx";
@@ -40,29 +40,6 @@ export function WorkPage({ data, owner }: { data: PrioritiesResponse; owner?: st
       {loaded.state === "ok" && <Queues work={loaded.data} reload={reload} single={Boolean(owner)} />}
     </main>
   );
-}
-
-/** Subscribe to GET /api/events and reload, at most once a frame, when a work item changes. EventSource resumes with Last-Event-ID by itself. */
-function useLive(reload: () => void) {
-  const latest = useRef(reload);
-  useEffect(() => {
-    latest.current = reload;
-  });
-  useEffect(() => {
-    if (typeof EventSource === "undefined") return;
-    const source = new EventSource("/api/events");
-    let frame = 0;
-    source.onmessage = (message) => {
-      const event = JSON.parse(message.data) as ApiEvent;
-      if (event.entity_kind !== "work_item") return;
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => latest.current());
-    };
-    return () => {
-      cancelAnimationFrame(frame);
-      source.close();
-    };
-  }, []);
 }
 
 /** A due date: past and not Completed in red with "late", today with "today" (G23). */

@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { ApiEvent, WorkItemPageResponse } from "../../src/api.ts";
-import { postCommands, useJson } from "./data.ts";
+import { postCommands, useJson, useLive } from "./data.ts";
 import { EditWorkItem, useStatus } from "./GoalAdd.tsx";
 import { Pencil } from "./GoalPage.tsx";
 import { commentBatch } from "./model/commands.ts";
@@ -20,6 +20,8 @@ const day = (date: string | null) => (date ? eventValue(date, "due_date") : <spa
  */
 export function WorkItemPage({ itemKey }: { itemKey: string }) {
   const [loaded, reload] = useJson<WorkItemPageResponse>(`/api/work-items/${encodeURIComponent(itemKey)}`);
+  // Another person's change shows here within the live-update time (SPEC section 3), as on Work items.
+  useLive(reload);
   if (loaded.state === "loading") {
     return (
       <main className="goalpage v2 wipage" aria-busy="true">
@@ -37,7 +39,8 @@ export function WorkItemPage({ itemKey }: { itemKey: string }) {
       </main>
     );
   }
-  return <Item key={`${loaded.data.item.id}-${loaded.data.item.version}-${loaded.data.events.length}`} data={loaded.data} reload={reload} />;
+  // Keyed by the work item only: a live reload keeps a comment being typed and an open editor.
+  return <Item key={loaded.data.item.id} data={loaded.data} reload={reload} />;
 }
 
 function Item({ data, reload }: { data: WorkItemPageResponse; reload: () => void }) {
@@ -125,6 +128,9 @@ function Item({ data, reload }: { data: WorkItemPageResponse; reload: () => void
 function Activity({ data, reload }: { data: WorkItemPageResponse; reload: () => void }) {
   const [text, setText] = useState("");
   const [error, setError] = useState<string>();
+  const [saving, setSaving] = useState(false);
+  // A ref, not only state: a second click in the same frame must not post the comment twice. A comment Event is permanent.
+  const posting = useRef(false);
   return (
     <section className="gsec gtalk">
       <h2>Activity</h2>
@@ -133,7 +139,13 @@ function Activity({ data, reload }: { data: WorkItemPageResponse; reload: () => 
         data-focus={formFocus("Comment")}
         onSubmit={async (e) => {
           e.preventDefault();
+          if (posting.current || !text.trim()) return;
+          posting.current = true;
+          setSaving(true);
+          setError(undefined);
           const { body } = await postCommands(commentBatch("work_item", data.item.id, text));
+          posting.current = false;
+          setSaving(false);
           if (body.ok) {
             setText("");
             reload();
@@ -142,7 +154,7 @@ function Activity({ data, reload }: { data: WorkItemPageResponse; reload: () => 
       >
         <textarea rows={2} value={text} placeholder="Comment" onChange={(e) => setText(e.target.value)} aria-label="Comment" />
         {error && <p className="ferror">{error}</p>}
-        <button type="submit" className="btn primary" disabled={!text.trim()}>
+        <button type="submit" className="btn primary" disabled={saving || !text.trim()}>
           Comment
         </button>
       </form>

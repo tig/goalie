@@ -43,6 +43,25 @@ TITLE_ROOM = scenario("""
   return { found: true, whole: long.scrollWidth <= long.clientWidth + 1 };
 """, ready=".wrow")
 
+# A comment typed but not sent stays while another person's comment arrives live (SPEC section 3). Two clicks in one frame post one comment.
+LIVE_AND_ONCE = scenario("""
+  const page = () => document.querySelector(".wipage");
+  const id = JSON.parse(page().dataset.focus).id;
+  const box = () => page().querySelector("textarea[aria-label=Comment]");
+  await click(box());
+  await type("Once only");
+  await fetch("/api/commands", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ commands: [{ op: "comment", kind: "work_item", id, text: "From another tab" }] }) });
+  let live = false;
+  for (let i = 0; i < 30 && !live; i++) { await sleep(100); live = [...page().querySelectorAll(".events .erow")].some((e) => e.textContent.includes("From another tab")); }
+  const kept = box().value;
+  const send = [...page().querySelectorAll("button")].find((b) => b.textContent.trim() === "Comment");
+  send.click();
+  send.click();
+  await sleep(1500);
+  const once = [...page().querySelectorAll(".events .erow")].filter((e) => e.textContent.includes("Once only")).length;
+  return { live, kept, once };
+""", ready=".wipage h1")
+
 
 class WorkItemPageTests(unittest.TestCase):
     @classmethod
@@ -55,6 +74,7 @@ class WorkItemPageTests(unittest.TestCase):
               const page = document.querySelector(".wipage");
               return { h1: page.querySelector("h1").textContent, overflow: document.documentElement.scrollWidth > innerWidth };
             """, ready=".wipage h1"), f"/work/{cls.opened['id'].lower()}")
+            cls.live = open_page(1280, LIVE_AND_ONCE, f"/work/{cls.opened['id']}")
 
     def test_a_work_rows_title_opens_its_page(self) -> None:
         self.assertTrue(self.opened["link"], "the row title is a link")
@@ -69,6 +89,13 @@ class WorkItemPageTests(unittest.TestCase):
 
     def test_a_comment_on_the_page_shows_in_its_activity(self) -> None:
         self.assertTrue(self.opened["said"])
+
+    def test_another_persons_comment_shows_live_and_keeps_a_typed_comment(self) -> None:
+        self.assertTrue(self.live["live"], "a comment from elsewhere shows without a reload")
+        self.assertEqual(self.live["kept"], "Once only")
+
+    def test_two_clicks_on_comment_post_one_comment(self) -> None:
+        self.assertEqual(self.live["once"], 1)
 
     def test_the_page_opens_from_its_address_at_phone_width(self) -> None:
         self.assertEqual(self.direct["h1"], self.item["title"])
