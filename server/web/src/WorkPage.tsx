@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import type { ApiEvent, PrioritiesResponse, WorkResponse } from "../../src/api.ts";
 import { shortDate } from "../../src/dates.ts";
 import { useJson } from "./data.ts";
-import { EditWorkItem, useStatus } from "./GoalAdd.tsx";
-import { Owner, Pencil } from "./GoalPage.tsx";
+import { CommentWorkItem, EditWorkItem, useStatus } from "./GoalAdd.tsx";
+import { Bubble, Owner, Pencil } from "./GoalPage.tsx";
 import { IssueLinks, TitleBits } from "./parts.tsx";
 import { descriptionLine, keepOrder, mayEditWorkItem, nameHover, queues, workRefRevision } from "./model/goalpage.ts";
 import { goalPath, workPath } from "./model/route.ts";
@@ -80,6 +80,9 @@ function Due({ date, late, today, done }: { date: string | null; late: boolean; 
 function Queues({ work, reload, single }: { work: WorkResponse; reload: () => void; single: boolean }) {
   const [closed, setClosed] = useState<Record<string, boolean>>({});
   const [editing, setEditing] = useState<string | null>(null);
+  const [commenting, setCommenting] = useState<string | null>(null);
+  // W6c: this page shows no Activity, so the row says its comment was added.
+  const [said, setSaid] = useState<string | null>(null);
   const { pill, box } = useStatus(reload);
   // QA U5: a save does not move a person's queue; the order from page load holds until the next visit.
   const sorted = queues(work.items, work.actors, work.me.id);
@@ -109,7 +112,8 @@ function Queues({ work, reload, single }: { work: WorkResponse; reload: () => vo
                   <span className="wname" title={nameHover(i.id)}><TitleBits title={i.title} goal={i.goal} repos={work.githubScope} revision={workRefRevision(work.items)} /></span>
                   <IssueLinks links={i.links} goal={i.goal} revision={workRefRevision(work.items)} />
                   {descriptionLine(i.description) && <span className="wdesc">{descriptionLine(i.description)}</span>}
-                  {mayEditWorkItem(work.me, i) && <Pencil label={`Edit ${i.title}`} onClick={() => setEditing(editing === i.id ? null : i.id)} />}
+                  {mayEditWorkItem(work.me, i) && <Pencil label={`Edit ${i.title}`} onClick={() => { setCommenting(null); setSaid(null); setEditing(editing === i.id ? null : i.id); }} />}
+                  <Bubble label={`Comment on ${i.title}`} onClick={() => { setEditing(null); setSaid(null); setCommenting(commenting === i.id ? null : i.id); }} />
                 </span>
                 <Link to={goalPath(i.goal)} className="wgoal small" title={nameHover(i.goal, work.goals[i.goal]?.summary)}>
                   {work.goals[i.goal]?.summary ?? i.goal}
@@ -119,6 +123,16 @@ function Queues({ work, reload, single }: { work: WorkResponse; reload: () => vo
                 {pill(i)}
                 {box(i)}
                 {i.github_error && <span className="wgithub">{i.github_error}</span>}
+                {said === i.id && <span className="wsaid small">Comment added.</span>}
+                {commenting === i.id && (
+                  <CommentWorkItem
+                    item={i}
+                    onDone={(posted) => {
+                      setCommenting(null);
+                      if (posted) setSaid(i.id);
+                    }}
+                  />
+                )}
                 {editing === i.id && (
                   <EditWorkItem
                     item={i}

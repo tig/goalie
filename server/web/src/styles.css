@@ -486,7 +486,9 @@ button.hopt+button.hopt{border-left:1px solid var(--cut)}
 .addgrid.five{grid-template-columns:minmax(0,2fr) minmax(0,1.3fr) minmax(max-content,1fr) minmax(136px,1fr) minmax(136px,1fr)}
 .tickreason{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:0 0 8px}
 .wtitle .pencil{flex:none;margin-left:4px;width:24px;height:24px;vertical-align:middle}
-.wiedit{grid-column:1/-1;margin:4px 0 8px}
+.wiedit,.wicomment{grid-column:1/-1;margin:4px 0 8px}
+.wsaid{grid-column:1/-1;color:var(--mute);margin:-4px 0 6px}
+.wtitle .wbubble{margin-left:0}
 .tickreason input{flex:1;min-width:160px;font:500 13px var(--font);border:1px solid var(--cut);border-radius:10px;padding:7px 10px}
 .phone .addgrid,.phone .addgrid.four,.phone .addgrid.five{grid-template-columns:1fr}
 
