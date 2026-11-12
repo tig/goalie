@@ -327,6 +327,20 @@ export type CommandsResponse =
   | { ok: false; at: number; error: "not_found" | "exists" | "bad_command" | "unknown_actor"; message: string };
 
 /** GET /api/work, or GET /api/work?owner=<actor id> for one actor's queue. Every work item, or that actor's, with the goals and actors they name. */
+/** GET /api/work-items/:key (W8). One work item, the goal it is under, the actors it names, and its own Events, newest first. */
+export type WorkItemPageResponse = {
+  me: ApiActor;
+  today: string;
+  item: ApiWorkItem;
+  goal: GoalRef;
+  actors: Record<string, ApiActor>;
+  events: ApiEvent[];
+  /** Repositories its goal names that github_repos covers. */
+  githubRepos: string[];
+  /** The owner setting github_repos. A title's #N uses this when it names one repository. */
+  githubScope: string[];
+};
+
 export type WorkResponse = {
   me: ApiActor;
   today: string;

@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from "react";
-import type { ApiEvent, PrioritiesResponse, WorkResponse } from "../../src/api.ts";
+import { useState } from "react";
+import type { PrioritiesResponse, WorkResponse } from "../../src/api.ts";
 import { shortDate } from "../../src/dates.ts";
-import { useJson } from "./data.ts";
+import { useJson, useLive } from "./data.ts";
 import { CommentWorkItem, EditWorkItem, useStatus } from "./GoalAdd.tsx";
 import { Bubble, Owner, Pencil } from "./GoalPage.tsx";
 import { IssueLinks, TitleBits } from "./parts.tsx";
 import { descriptionLine, keepOrder, mayEditWorkItem, nameHover, queues, workRefRevision } from "./model/goalpage.ts";
-import { goalPath, workPath } from "./model/route.ts";
+import { goalPath, workItemPath, workPath } from "./model/route.ts";
 import { Link } from "./router.tsx";
 import { encodeFocus } from "./model/feedback.ts";
 
@@ -40,29 +40,6 @@ export function WorkPage({ data, owner }: { data: PrioritiesResponse; owner?: st
       {loaded.state === "ok" && <Queues work={loaded.data} reload={reload} single={Boolean(owner)} />}
     </main>
   );
-}
-
-/** Subscribe to GET /api/events and reload, at most once a frame, when a work item changes. EventSource resumes with Last-Event-ID by itself. */
-function useLive(reload: () => void) {
-  const latest = useRef(reload);
-  useEffect(() => {
-    latest.current = reload;
-  });
-  useEffect(() => {
-    if (typeof EventSource === "undefined") return;
-    const source = new EventSource("/api/events");
-    let frame = 0;
-    source.onmessage = (message) => {
-      const event = JSON.parse(message.data) as ApiEvent;
-      if (event.entity_kind !== "work_item") return;
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => latest.current());
-    };
-    return () => {
-      cancelAnimationFrame(frame);
-      source.close();
-    };
-  }, []);
 }
 
 /** A due date: past and not Completed in red with "late", today with "today" (G23). */
@@ -109,7 +86,9 @@ function Queues({ work, reload, single }: { work: WorkResponse; reload: () => vo
             const rows = g.items.map((i) => (
               <div key={i.id} id={`work-item-${i.id}`} className={`wrow qrow${i.status === "Completed" ? " done" : ""}`} data-focus={encodeFocus({ kind: "work item", id: i.id, label: i.title })}>
                 <span className="wtitle">
-                  <span className="wname" title={nameHover(i.id)}><TitleBits title={i.title} goal={i.goal} repos={work.githubScope} revision={workRefRevision(work.items)} /></span>
+                  <Link to={workItemPath(i.id)} className="wname" title={nameHover(i.id)}>{i.title}</Link>
+                  {/* W8: the title opens the page, so a #N in it is its own link after the title, as in the editor. */}
+                  <TitleBits title={i.title} goal={i.goal} repos={work.githubScope} revision={workRefRevision(work.items)} linksOnly />
                   <IssueLinks links={i.links} goal={i.goal} revision={workRefRevision(work.items)} />
                   {descriptionLine(i.description) && <span className="wdesc">{descriptionLine(i.description)}</span>}
                   {mayEditWorkItem(work.me, i) && <Pencil label={`Edit ${i.title}`} onClick={() => { setCommenting(null); setSaid(null); setEditing(editing === i.id ? null : i.id); }} />}

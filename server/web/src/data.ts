@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import type { ApiError, CommandsRequest, CommandsResponse, GitHubStatusResponse } from "../../src/api.ts";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { ApiError, ApiEvent, CommandsRequest, CommandsResponse, GitHubStatusResponse } from "../../src/api.ts";
 import { commandsAnswer } from "./model/commands.ts";
 import { FEEDBACK_PATH, feedbackAnswer, feedbackBody, type FeedbackAnswer, type FeedbackFocus } from "./model/feedback.ts";
 
@@ -74,4 +74,27 @@ export async function postFeedback(note: string, focus?: FeedbackFocus): Promise
   } catch {
     return feedbackAnswer({ status: 0, type: "error", contentType: "", text: "" });
   }
+}
+
+/** Subscribe to GET /api/events and reload, at most once a frame, when a work item changes. EventSource resumes with Last-Event-ID by itself. */
+export function useLive(reload: () => void) {
+  const latest = useRef(reload);
+  useEffect(() => {
+    latest.current = reload;
+  });
+  useEffect(() => {
+    if (typeof EventSource === "undefined") return;
+    const source = new EventSource("/api/events");
+    let frame = 0;
+    source.onmessage = (message) => {
+      const event = JSON.parse(message.data) as ApiEvent;
+      if (event.entity_kind !== "work_item") return;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => latest.current());
+    };
+    return () => {
+      cancelAnimationFrame(frame);
+      source.close();
+    };
+  }, []);
 }

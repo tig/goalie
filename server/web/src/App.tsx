@@ -18,6 +18,7 @@ import { TimelineView } from "./TimelineView.tsx";
 import { useDismiss, usePhone, useScreen } from "./useScreen.ts";
 import { GoalPage } from "./GoalPage.tsx";
 import { NewGoal } from "./NewGoal.tsx";
+import { WorkItemPage } from "./WorkItemPage.tsx";
 import { WorkPage } from "./WorkPage.tsx";
 import { MyGoalsPage, NotInView } from "./MyGoalsPage.tsx";
 import { GitHubPage } from "./GitHubPage.tsx";
@@ -43,7 +44,7 @@ async function load(): Promise<Load> {
 /** The top bar's pages: Home, My goals, and Work items. The one you are on is filled. */
 function TopTabs() {
   const route = useRoute();
-  const homeOff = route.page === "work" || route.page === "github" || route.page === "mine";
+  const homeOff = route.page === "work" || route.page === "workitem" || route.page === "github" || route.page === "mine";
   return (
     <nav className="toptabs" aria-label="Pages">
       <Link to={backPath(route.page === "home" ? location.search : homeSearch())} className={`tab${homeOff ? " off" : ""}`}>
@@ -52,7 +53,7 @@ function TopTabs() {
       <Link to={MY_GOALS_PATH} className={`tab${route.page === "mine" ? "" : " off"}`}>
         My goals
       </Link>
-      <Link to={workPath()} className={`tab${route.page === "work" ? "" : " off"}`}>
+      <Link to={workPath()} className={`tab${route.page === "work" || route.page === "workitem" ? "" : " off"}`}>
         Work items
       </Link>
     </nav>
@@ -196,6 +197,8 @@ function Pages({ data, reload }: { data: PrioritiesResponse; reload: () => void 
       <TopBar data={data} />
       {route.page === "goal" ? (
         <GoalPage goalKey={route.key} viewName={data.view.name} />
+      ) : route.page === "workitem" ? (
+        <WorkItemPage itemKey={route.key} />
       ) : route.page === "work" ? (
         <WorkPage data={data} owner={route.owner} />
       ) : route.page === "new" ? (

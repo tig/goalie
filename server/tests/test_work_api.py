@@ -8,7 +8,7 @@ import time
 import unittest
 
 from goalie_cli import SERVER, Store, update
-from live_server import AUDIENCE, ISSUER, get, running_server, signed
+from live_server import AUDIENCE, ISSUER, get, post, running_server, signed
 
 
 def seat_token(app_id: str) -> tuple[str, dict[str, str]]:
@@ -36,6 +36,11 @@ class WorkApiTests(unittest.TestCase):
             cls.mine = json.loads(get(proc, port, "/api/work?owner=backend-engineer", auth).body)
             cls.nobody = get(proc, port, "/api/work?owner=nobody", auth)
             cls.chelseas = json.loads(get(proc, port, "/api/work?owner=chelsea", auth).body)
+            first = cls.team_first = json.loads(get(proc, port, "/api/work", auth).body)["items"][0]
+            assert json.loads(post(proc, port, "/api/commands", {"commands": [{"op": "comment", "kind": "work_item", "id": first["id"], "text": "On the page"}]}, auth).body)["ok"]
+            cls.page = json.loads(get(proc, port, f"/api/work-items/{first['id']}", auth).body)
+            cls.lower = get(proc, port, f"/api/work-items/{first['id'].lower()}", auth)
+            cls.missing = get(proc, port, "/api/work-items/WI-9999", auth)
         token, env = seat_token("app-backend-engineer")
         with running_server(cls.store.path, env) as (proc, port):
             cls.as_seat = get(proc, port, "/api/work?owner=backend-engineer", {"Authorization": f"Bearer {token}"})
@@ -73,6 +78,23 @@ class WorkApiTests(unittest.TestCase):
             self.assertEqual(self.team["goals"][item["goal"]]["id"], item["goal"])
             self.assertEqual(self.team["actors"][item["owner"]]["kind"], "agent")
             self.assertIn("late", item)
+
+    def test_a_work_item_page_has_the_item_its_goal_and_only_its_own_activity(self) -> None:
+        """W8: GET /api/work-items/:key answers one work item, the goal it is under, the actors it names, and its own Events, newest first."""
+        self.assertEqual(self.page["item"]["id"], self.team_first["id"])
+        self.assertEqual(self.page["goal"]["id"], self.team_first["goal"])
+        self.assertTrue(self.page["goal"]["summary"])
+        self.assertIn(self.team_first["owner"], self.page["actors"])
+        self.assertEqual({e["entity"] for e in self.page["events"]}, {self.team_first["id"]})
+        self.assertEqual(self.page["events"][0]["field"], "comment")
+        self.assertEqual(self.page["events"][0]["new"], "On the page")
+        self.assertIn("githubRepos", self.page)
+        self.assertIn("githubScope", self.page)
+
+    def test_a_work_item_key_is_read_in_any_case_and_an_unknown_one_is_404(self) -> None:
+        self.assertEqual(self.lower.status, 200)
+        self.assertEqual(self.missing.status, 404)
+        self.assertEqual(set(json.loads(self.missing.body)), {"error", "reason"})
 
     def test_a_seat_reads_its_queue_with_its_own_agent_token(self) -> None:
         self.assertEqual(self.as_seat.status, 200, self.as_seat.body)

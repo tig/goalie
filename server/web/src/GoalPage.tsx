@@ -8,7 +8,7 @@ import { ClosePanel, CompletePanel, DescriptionPanel, HealthPanel, PromotePanel,
 import { commentBatch } from "./model/commands.ts";
 import { activity, ACTIVITY, changeParts, commentScope, createdFields, dateMove, descriptionLine, ptgChanges, historyNames, joinPages, dateBar, labelPlaces, eventValue, fieldLabel, groupEvents, groupWorkItems, mayEditWorkItem, nameHover, type ActivityChip, type EventGroup, type Names } from "./model/goalpage.ts";
 import { dateLabel } from "./model/labels.ts";
-import { backPath, goalPath } from "./model/route.ts";
+import { backPath, goalPath, workItemPath } from "./model/route.ts";
 import { Avatar, HealthDot, IssueLinks, Markdown, TitleBits } from "./parts.tsx";
 import { homeSearch, Link } from "./router.tsx";
 import { encodeFocus, formFocus } from "./model/feedback.ts";
@@ -373,7 +373,9 @@ function WorkItems({ items, data, adding, onAdd, onDone, reload, status }: { ite
           return (
             <div key={i.id} id={`work-item-${i.id}`} className={`wrow2${i.status === "Completed" ? " done" : ""}`} data-focus={encodeFocus({ kind: "work item", id: i.id, label: i.title })}>
               <span className="wtitle">
-                <span className="wname" title={nameHover(i.id)}><TitleBits title={i.title} goal={data.goal.id} repos={data.githubScope} revision={data.eventCount} /></span>
+                <Link to={workItemPath(i.id)} className="wname" title={nameHover(i.id)}>{i.title}</Link>
+                {/* W8: the title opens the page, so a #N in it is its own link after the title, as in the editor. */}
+                <TitleBits title={i.title} goal={data.goal.id} repos={data.githubScope} revision={data.eventCount} linksOnly />
                 <IssueLinks links={i.links} goal={data.goal.id} repos={data.githubRepos} revision={data.eventCount} />
                 {descriptionLine(i.description) && <span className="wdesc">{descriptionLine(i.description)}</span>}
                   {mayEditWorkItem(data.me, i) && <Pencil label={`Edit ${i.title}`} onClick={() => { setCommenting(null); setEditing(editing === i.id ? null : i.id); }} />}
