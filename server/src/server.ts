@@ -1,14 +1,15 @@
 import { serve } from "@hono/node-server";
-import { Hono, type Context } from "hono";
+import { Hono, type Context, type Next } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
-import type { ActorRef, ApiError, CommandsResponse, FormOptions, GitHubRefResponse, GitHubSearchResponse, GitHubStatusResponse, GoalEventsResponse, GoalPageResponse, GoalsResponse, MyGoalsResponse, PrioritiesResponse, WorkItemPageResponse, WorkResponse } from "./api.ts";
+import type { ActorRef, ApiError, CommandsResponse, FormOptions, GitHubRefResponse, GitHubSearchResponse, GitHubSetupResponse, GitHubStatusResponse, GoalEventsResponse, GoalPageResponse, GoalsResponse, MyGoalsResponse, PrioritiesResponse, WorkItemPageResponse, WorkResponse } from "./api.ts";
 import { runCommands } from "./commands.ts";
 import { drainGitHub, githubRepos, githubView, readGitHubRef, reposFromSettings, saveGitHubSettings, searchGitHub } from "./github.ts";
 import { receiveGitHubWebhook } from "./github_notice.ts";
+import { finishCreate, finishInstall, startSetup } from "./github_setup.ts";
 import { goalEvents, goalPage } from "./goalpage.ts";
 import { eventStream } from "./live.ts";
 import { myGoalsView, searchGoals } from "./mygoals.ts";
@@ -141,16 +142,38 @@ export function createApp(db: DatabaseSync, issuers: Issuer[], webDist: string =
     if (!q) return refuse(c, 400, "bad_request", "q is the text to search for: not blank");
     return c.json<GoalsResponse>(searchGoals(db, q.slice(0, 100)));
   });
+  // A GitHub write is JSON from this deployment's own pages.
+  const sameOriginJson = async (c: Context<Env>, next: Next) => {
+    if (!(c.req.header("Content-Type") ?? "").toLowerCase().startsWith("application/json")) return refuse(c, 415, "bad_command", "a write is sent as application/json");
+    const origin = c.req.header("Origin");
+    const host = c.req.header("X-Forwarded-Host") ?? c.req.header("Host");
+    if (origin !== undefined && origin !== "null" && hostOf(origin) !== host) return refuse(c, 403, "forbidden", `a write from ${origin} is refused`);
+    if (origin === "null") return refuse(c, 403, "forbidden", "a write from an opaque origin is refused");
+    await next();
+  };
+  // Create GitHub App (issue #109). The browser posts the manifest to GitHub, and GitHub sends it back to the two pages below.
+  app.post("/api/github/setup", sameOriginJson, async (c) => {
+    if (c.get("actor").id !== goalieOwner(db)) return refuse(c, 403, "forbidden", "only the GOALIE owner can set GitHub up");
+    const request: unknown = await c.req.json().catch(() => undefined);
+    const host = c.req.header("X-Forwarded-Host") ?? c.req.header("Host") ?? "";
+    const proto = c.req.header("X-Forwarded-Proto") ?? new URL(c.req.url).protocol.replace(":", "");
+    const started = startSetup(db, request, c.req.header("Origin") ?? `${proto}://${host}`);
+    if (!started.ok) return refuse(c, 400, "bad_request", started.reason);
+    return c.json<GitHubSetupResponse>({ action: started.action, manifest: started.manifest });
+  });
+  app.get("/github/created", async (c) => {
+    if (c.get("actor").id !== goalieOwner(db)) return c.text("Only the GOALIE owner can set GitHub up.", 403);
+    const done = await finishCreate(db, c.req.query("code") ?? "", c.req.query("state") ?? "");
+    return c.redirect(done.ok ? done.next : "/github", 302);
+  });
+  app.get("/github/installed", async (c) => {
+    if (c.get("actor").id !== goalieOwner(db)) return c.text("Only the GOALIE owner can set GitHub up.", 403);
+    await finishInstall(db, c.req.query("installation_id") ?? "");
+    return c.redirect("/github", 302);
+  });
   app.post(
     "/api/github/status",
-    async (c, next) => {
-      if (!(c.req.header("Content-Type") ?? "").toLowerCase().startsWith("application/json")) return refuse(c, 415, "bad_command", "a write is sent as application/json");
-      const origin = c.req.header("Origin");
-      const host = c.req.header("X-Forwarded-Host") ?? c.req.header("Host");
-      if (origin !== undefined && origin !== "null" && hostOf(origin) !== host) return refuse(c, 403, "forbidden", `a write from ${origin} is refused`);
-      if (origin === "null") return refuse(c, 403, "forbidden", "a write from an opaque origin is refused");
-      await next();
-    },
+    sameOriginJson,
     bodyLimit({ maxSize: MAX_BODY, onError: (c) => refuse(c, 413, "bad_command", `a request body is at most ${MAX_BODY / 1024} KB`) }),
     async (c) => {
       if (c.get("actor").id !== goalieOwner(db)) return refuse(c, 403, "forbidden", "only the GOALIE owner can set GitHub");

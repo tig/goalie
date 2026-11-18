@@ -26,6 +26,10 @@
 
 **Amended:** 2026-11-06. The GOALIE owner adds and removes the repositories on the GitHub page. An entry is `owner/repo` or `owner/*`. An empty list stays empty. A work item title's `#N` is that issue when `github_repos` names exactly one repository. The work item editor shows that issue. When `github_repos` names more than one repository, or none, a number alone is not a link.
 
+**Amended:** 2026-11-18. GOALIE keeps what GitHub last said about each issue and pull request in a repository in `github_repos`: its title, open or closed, issue or pull request, merged, and draft ([#109](https://github.com/tig/goalie/issues/109)). A signed `issues` or `pull_request` notice updates it. A read uses it when it is less than five minutes old, and asks GitHub otherwise. An older notice does not replace a newer one. A push to an issue drops it. A merged pull request shows merged, and an open draft shows draft.
+
+**Amended:** 2026-11-18. Create GitHub App on the GitHub page makes the App with GitHub's App Manifest flow ([#109](https://github.com/tig/goalie/issues/109)). GOALIE trades GitHub's one-time code for the app id, the private key, and the webhook secret, and stores them. A setup link is good once, for one hour. Install on GitHub stores the installation id only when GitHub, asked as that App, says the installation is the App's. A stored webhook secret signs notices in place of `GOALIE_GITHUB_WEBHOOK_SECRET`. The four values stay under Use an existing App. The private key is still kept in the store. No one sees or pastes it.
+
 ## Context
 
 [#72 (Enable Github integration)](https://github.com/tig/goalie/issues/72) pushes a work item's status to one linked GitHub issue.
@@ -37,7 +41,13 @@ The private key must stay off this repo.
 
 The deployment calls GitHub as a GitHub App.
 Process configuration names the app id, the installation id, the path of the private key, and the public URL of this deployment.
-The private key is a file outside this repo.
+The private key is a file outside this repo, or the key GitHub sent to Create GitHub App, kept in the store.
+Create GitHub App makes the App with GitHub's App Manifest flow. The browser posts a manifest to GitHub. GitHub returns a one-time code, and GOALIE trades it for the app id, the private key, and the webhook secret.
+The state on a setup link is good once, for one hour. A wrong, used, or old state stores nothing, and leaves the pending state.
+An App made for an organization asks for `organization_issue_fields: read`, because the Target date update lists the organization's issue fields. An App on a personal account does not.
+Saving a different app id under Use an existing App drops the webhook secret, the client id and secret, and the name the earlier App left. Saving the same app id keeps them.
+Install on GitHub stores the installation id only when GitHub, asked as that App, answers 200 with that app id.
+A stored webhook secret signs notices in place of `GOALIE_GITHUB_WEBHOOK_SECRET`.
 The GOALIE owner sets the app id, the installation id, the private key, and the public URL on the GitHub page.
 A value set there is kept in the store.
 A value not set there uses the process name.
@@ -86,6 +96,12 @@ A GitHub issue or pull request reference in a repository that is in `github_repo
 A bare repository name is a link only when that goal has exactly one such repository of that name.
 No repository name is assumed.
 A failed read does not invent open or closed.
+GOALIE keeps what GitHub last said about each issue and pull request in a repository in `github_repos`: its title, open or closed, issue or pull request, merged, and draft.
+That record is not an entity and not an Event.
+A signed `issues` or `pull_request` notice updates it, and an older notice does not replace a newer one.
+A read uses it when it is less than five minutes old, and asks GitHub otherwise. A failed read keeps nothing.
+A push to an issue drops it, so the next read asks GitHub.
+A merged pull request shows merged, and an open draft shows draft.
 
 ## Consequences
 

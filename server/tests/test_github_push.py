@@ -35,7 +35,7 @@ BARE = {
     "GOALIE_GITHUB_PRIVATE_KEY_FILE": "",
     "GOALIE_PUBLIC_URL": "",
 }
-STATUS_KEYS = {"configured", "repositories", "outbound", "inbound", "appId", "installationId", "publicUrl", "privateKeySet"}
+STATUS_KEYS = {"configured", "repositories", "outbound", "inbound", "appId", "installationId", "publicUrl", "privateKeySet", "appSlug", "installUrl", "webhookSecretSet", "setupError"}
 ITEM = "WI-9001"
 GOAL = "XW-0007"
 LATER = "WI-9080"
@@ -112,6 +112,9 @@ class GitHub(ThreadingHTTPServer):
         self.forbid_issue_fields = False
         self.fail_issue_get = False
         self.field_values: list[dict[str, Any]] = []
+        # The App the manifest flow creates (issue #109). conversions maps a one-time code to GitHub's answer.
+        self.conversions: dict[str, dict[str, Any]] = {}
+        self.installations: dict[str, dict[str, Any]] = {}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -125,6 +128,10 @@ class Handler(BaseHTTPRequestHandler):
         path = self._path()
         if path == "/search/issues":
             self._search()
+            return
+        if path.startswith("/app/installations/") and path.count("/") == 3:
+            found = self.server.installations.get(path.rsplit("/", 1)[1])
+            self._send(200, found) if found is not None else self._send(404, {"message": "Not Found"})
             return
         if path == f"/repos/{REPO}/installation":
             self._send(200, {"id": self.server.installation_id})
@@ -154,6 +161,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         self._call()
         path, body = self._path(), self._body()
+        if path.startswith("/app-manifests/") and path.endswith("/conversions"):
+            code = path.split("/")[2]
+            found = self.server.conversions.pop(code, None)
+            self._send(201, found) if found is not None else self._send(404, {"message": "Not Found"})
+            return
         if path.startswith("/app/installations/") and path.endswith("/access_tokens"):
             if self.server.fail_token:
                 self._send(500, {"message": "no"})
@@ -261,8 +273,9 @@ class Handler(BaseHTTPRequestHandler):
             self._send(500, {"message": "no"})
             return
         payload: dict[str, Any] = {"body": issue["body"], "state": issue["state"], "state_reason": issue["state_reason"], "labels": [{"name": name} for name in issue["labels"]]}
-        if "title" in issue:
-            payload["title"] = issue["title"]
+        for key in ("title", "pull_request", "draft", "updated_at"):
+            if key in issue:
+                payload[key] = issue[key]
         self._send(200, payload)
 
     def _patch(self, issue: dict[str, Any]) -> None:
@@ -432,6 +445,7 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         db = sqlite3.connect(self.store.path)
         try:
             db.execute("DELETE FROM github_config")
+            db.execute("DELETE FROM github_ref")
             db.commit()
         except sqlite3.OperationalError:
             pass
@@ -1453,7 +1467,7 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.github.issue["state"] = "open"
         reply = self.ref_as("tig", "sub-tig", GOAL, ISSUE)
         self.assertEqual(reply.status, 200, reply.body)
-        self.assertEqual(json.loads(reply.body), {"title": "Ship the gate", "state": "open"})
+        self.assertEqual(json.loads(reply.body), {"title": "Ship the gate", "state": "open", "kind": "issue", "merged": False, "draft": False})
 
     def test_a_ref_outside_the_goal_is_not_read(self) -> None:
         """A factory issue is not read when the goal's only associated repository is tig/goalie. The fake records no call."""
@@ -1495,8 +1509,8 @@ class GitHubPushTests(unittest.TestCase, PushTests):
             second = get(proc, port, "/api/github/ref?" + urlencode({"goal": GOAL, "url": other}), headers)
         self.assertEqual(first.status, 200, first.body)
         self.assertEqual(second.status, 200, second.body)
-        self.assertEqual(json.loads(first.body), {"title": "Ship the gate", "state": "open"})
-        self.assertEqual(json.loads(second.body), {"title": "The next gate", "state": "open"})
+        self.assertEqual(json.loads(first.body), {"title": "Ship the gate", "state": "open", "kind": "issue", "merged": False, "draft": False})
+        self.assertEqual(json.loads(second.body), {"title": "The next gate", "state": "open", "kind": "issue", "merged": False, "draft": False})
         posts = [call for call in self.github.calls if call.startswith("POST /app/installations/") and call.endswith("/access_tokens")]
         self.assertEqual(posts, ["POST /app/installations/77/access_tokens"])
 
@@ -1829,7 +1843,7 @@ class GitHubPushTests(unittest.TestCase, PushTests):
         self.github.added_issue = {"body": "", "title": "Enable Github integration", "state": "open", "state_reason": None, "labels": []}
         reply = self.ref_as("tig", "sub-tig", GOAL, "https://github.com/tig/goalie/issues/96")
         self.assertEqual(reply.status, 200, reply.body)
-        self.assertEqual(json.loads(reply.body), {"title": "Enable Github integration", "state": "open"})
+        self.assertEqual(json.loads(reply.body), {"title": "Enable Github integration", "state": "open", "kind": "issue", "merged": False, "draft": False})
         set_scope(self.store, ["tig/goalie", "acme/widgets"], [])
         missed = self.ref_as("tig", "sub-tig", GOAL, "https://github.com/tig/goalie/issues/96")
         self.assertEqual(missed.status, 404, missed.body)

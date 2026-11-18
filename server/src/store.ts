@@ -2,7 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 
 /**
  * The one SQLite file per deployment (ADR 0002). Fields are SPEC.md §6.
- * Every entity table has a version. Only the write path changes an entity table. github_push is not an entity and not an Event. github_result is not an entity and not an Event. github_config is not an entity and not an Event.
+ * Every entity table has a version. Only the write path changes an entity table. github_push is not an entity and not an Event. github_result is not an entity and not an Event. github_config is not an entity and not an Event. github_ref is not an entity and not an Event. github_setup is not an entity and not an Event.
  */
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS actor (
@@ -101,6 +101,25 @@ CREATE TABLE IF NOT EXISTS github_config (
   public_url TEXT,
   private_key TEXT
 );
+CREATE TABLE IF NOT EXISTS github_ref (
+  repo TEXT NOT NULL,
+  number INTEGER NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('issue', 'pull')),
+  title TEXT NOT NULL,
+  state TEXT NOT NULL CHECK (state IN ('open', 'closed')),
+  merged INTEGER NOT NULL CHECK (merged IN (0, 1)),
+  draft INTEGER NOT NULL CHECK (draft IN (0, 1)),
+  updated_at TEXT,
+  fetched_at INTEGER NOT NULL,
+  PRIMARY KEY (repo, number)
+);
+CREATE TABLE IF NOT EXISTS github_setup (
+  id TEXT PRIMARY KEY CHECK (id = 'setup'),
+  state TEXT,
+  until INTEGER,
+  public_url TEXT,
+  error TEXT
+);
 CREATE TABLE IF NOT EXISTS draft (
   id TEXT PRIMARY KEY,
   version INTEGER NOT NULL,
@@ -149,6 +168,7 @@ export function openStore(path: string): DatabaseSync {
   db.exec(SCHEMA);
   addGitHubPushColumns(db);
   addWorkItemColumns(db);
+  addGitHubConfigColumns(db);
   return db;
 }
 
@@ -157,6 +177,12 @@ function addWorkItemColumns(db: DatabaseSync): void {
   const names = new Set((db.prepare("PRAGMA table_info(work_item)").all() as { name: string }[]).map((column) => column.name));
   if (!names.has("start_date")) db.exec("ALTER TABLE work_item ADD COLUMN start_date TEXT");
   if (!names.has("description")) db.exec("ALTER TABLE work_item ADD COLUMN description TEXT");
+}
+
+/** What Create GitHub App stores (issue #109). Each is nullable. CREATE TABLE does not add them to an existing file, so add each only when it is absent. */
+function addGitHubConfigColumns(db: DatabaseSync): void {
+  const names = new Set((db.prepare("PRAGMA table_info(github_config)").all() as { name: string }[]).map((column) => column.name));
+  for (const name of ["webhook_secret", "client_id", "client_secret", "app_slug"]) if (!names.has(name)) db.exec(`ALTER TABLE github_config ADD COLUMN ${name} TEXT`);
 }
 
 /** repo and actor are nullable. CREATE TABLE does not add them to an existing file, so add one only when it is absent. */

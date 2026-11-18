@@ -95,7 +95,10 @@ export type GitHubSearchItem = { kind: "issue" | "pull"; title: string; url: str
 export type GitHubSearchResponse = { items: GitHubSearchItem[] };
 
 /** GET /api/github/ref?goal=<id>&url=<one url>. A signed-in actor. A missing goal is 404, the same words as the goal page. A URL that is not an issue or pull request in github_repos and on that goal is 404 and does not call GitHub. The one repository in github_repos is read when the goal does not name it. state is open or closed. */
-export type GitHubRefResponse = { title: string; state: "open" | "closed" } | { error: string };
+/** One issue or pull request as GitHub last said. merged is true only for a merged pull request. draft is true only for a draft pull request. */
+export type GitHubRef = { title: string; state: "open" | "closed"; kind: "issue" | "pull"; merged: boolean; draft: boolean };
+
+export type GitHubRefResponse = GitHubRef | { error: string };
 
 /** GET /api/github/status. The GOALIE owner sees the repositories in github_repos, whether GitHub is configured, the last update, and the last signed notice. POST stores the app id, the installation id, the private key, and the public URL, and adds or removes the repositories when the body names them. The private key stays out of this. */
 export type GitHubStatusResponse = {
@@ -111,7 +114,18 @@ export type GitHubStatusResponse = {
   publicUrl: string | null;
   /** True when a private key is stored. The key itself is absent. */
   privateKeySet: boolean;
+  /** The App Create GitHub App made, or null (issue #109). */
+  appSlug: string | null;
+  /** The App's install page on GitHub, while the App has no stored installation. Otherwise null. */
+  installUrl: string | null;
+  /** True when a webhook secret is stored. The secret itself is absent. */
+  webhookSecretSet: boolean;
+  /** Why the last Create GitHub App or Install on GitHub did not finish, or null. */
+  setupError: string | null;
 };
+
+/** POST /api/github/setup. The browser posts manifest, as the form field `manifest`, to action. */
+export type GitHubSetupResponse = { action: string; manifest: string };
 
 /** Every refusal from the API: 401 with no verified actor, 4xx for a bad request. */
 export type ApiError = { error: string; reason: string };

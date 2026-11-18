@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ApiError, ApiEvent, CommandsRequest, CommandsResponse, GitHubStatusResponse } from "../../src/api.ts";
+import type { ApiError, ApiEvent, CommandsRequest, CommandsResponse, GitHubSetupResponse, GitHubStatusResponse } from "../../src/api.ts";
 import { commandsAnswer } from "./model/commands.ts";
 import { FEEDBACK_PATH, feedbackAnswer, feedbackBody, type FeedbackAnswer, type FeedbackFocus } from "./model/feedback.ts";
 
@@ -37,6 +37,32 @@ export function useJson<T>(url: string): [Loaded<T>, () => void] {
   }, [url, round]);
   const reload = useCallback(() => setRound((n) => n + 1), []);
   return [loaded, reload];
+}
+
+/** POST /api/github/setup. The answer is the manifest and the GitHub address to post it to (issue #109). */
+export async function postGitHubSetup(body: { org: string; publicUrl: string }): Promise<{ ok: true; data: GitHubSetupResponse } | { ok: false; reason: string }> {
+  try {
+    const reply = await fetch("/api/github/setup", { method: "POST", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify(body) });
+    const json = (await reply.json().catch(() => ({ reason: `The server could not start the setup (${reply.status}). Try again.` }))) as Partial<GitHubSetupResponse & ApiError>;
+    if (!reply.ok || typeof json.action !== "string" || typeof json.manifest !== "string") return { ok: false, reason: json.reason ?? "The server could not start the setup." };
+    return { ok: true, data: { action: json.action, manifest: json.manifest } };
+  } catch {
+    return { ok: false, reason: "GOALIE could not reach the server. Try again." };
+  }
+}
+
+/** Send the browser to GitHub with the manifest, as GitHub's App Manifest flow asks: a form POST with the field `manifest`. */
+export function postManifestToGitHub(setup: GitHubSetupResponse): void {
+  const form = document.createElement("form");
+  form.method = "post";
+  form.action = setup.action;
+  const field = document.createElement("input");
+  field.type = "hidden";
+  field.name = "manifest";
+  field.value = setup.manifest;
+  form.append(field);
+  document.body.append(form);
+  form.submit();
 }
 
 /** POST /api/github/status. The private key is sent once and is not in the answer. */

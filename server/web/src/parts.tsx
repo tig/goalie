@@ -5,7 +5,7 @@ import type { ActorRef, GitHubRefResponse, Health } from "../../src/api.ts";
 import { placePopover, popoverWidth } from "./model/popover.ts";
 import { useDismiss } from "./useScreen.ts";
 import { encodeFocus } from "./model/feedback.ts";
-import { canonicalRefUrl, githubIssues, markdown, refLabel, refTitle, titleParts, type Block, type Inline, type RefFound } from "./model/markdown.ts";
+import { canonicalRefUrl, githubIssues, markdown, refLabel, refStateWord, refTitle, titleParts, type Block, type Inline, type RefFound } from "./model/markdown.ts";
 import { getJson } from "./data.ts";
 
 /** The shared parts every view is built from. */
@@ -54,9 +54,9 @@ function blockHrefs(blocks: Block[]): string[] {
 function requestRef(path: string): Promise<RefFound | null> {
   return getJson<GitHubRefResponse>(path).then((result) => {
     if (result.state !== "ok" || !("title" in result.data)) return null;
-    const { title, state } = result.data;
+    const { title, state, kind, merged, draft } = result.data;
     if (title === "" || (state !== "open" && state !== "closed")) return null;
-    return { title, state };
+    return { title, state, kind: kind === "pull" ? "pull" : "issue", merged: merged === true, draft: draft === true };
   });
 }
 
@@ -403,7 +403,7 @@ function Spans({ of, titles }: { of: Inline[]; titles: ReadonlyMap<string, RefFo
         return (
           <a key={k} href={x.href} target="_blank" rel="noopener noreferrer">
             <Spans of={x.c} titles={titles} />
-            {found ? ` ${found.title} ${found.state}` : null}
+            {found ? ` ${found.title} ${refStateWord(found)}` : null}
           </a>
         );
       }

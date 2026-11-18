@@ -64,7 +64,8 @@ When `github_repos` names more than one repository, or none, a number alone is n
 `GOALIE_PUBLIC_URL` is the base URL of this deployment, with no trailing slash. The issue body links back through it.
 `GOALIE_GITHUB_API` overrides the GitHub API base. The default is `https://api.github.com`.
 Unset means GitHub is not configured. A status change still commits, and the work item shows which names are missing. No call is made.
-`GOALIE_GITHUB_WEBHOOK_SECRET` signs a notice that an issue was closed. The secret stays out of this repo.
+`GOALIE_GITHUB_WEBHOOK_SECRET` signs a notice that an issue was closed. The secret stays out of this repo. A webhook secret that Create GitHub App stored is used in its place.
+`GOALIE_GITHUB_WEB` overrides the GitHub web address that Create GitHub App posts to. The default is `https://github.com`.
 `GOALIE_GITHUB_ACTOR` is the id of the agent that notice writes as.
 The agent's operator is the GOALIE owner.
 The owner adds the actor.
