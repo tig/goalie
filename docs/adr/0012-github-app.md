@@ -43,7 +43,9 @@ The deployment calls GitHub as a GitHub App.
 Process configuration names the app id, the installation id, the path of the private key, and the public URL of this deployment.
 The private key is a file outside this repo, or the key GitHub sent to Create GitHub App, kept in the store.
 Create GitHub App makes the App with GitHub's App Manifest flow. The browser posts a manifest to GitHub. GitHub returns a one-time code, and GOALIE trades it for the app id, the private key, and the webhook secret.
-The state on a setup link is good once, for one hour. A wrong, used, or old state stores nothing.
+The state on a setup link is good once, for one hour. A wrong, used, or old state stores nothing, and leaves the pending state.
+An App made for an organization asks for `organization_issue_fields: read`, because the Target date update lists the organization's issue fields. An App on a personal account does not.
+Saving a different app id under Use an existing App drops the webhook secret, the client id and secret, and the name the earlier App left. Saving the same app id keeps them.
 Install on GitHub stores the installation id only when GitHub, asked as that App, answers 200 with that app id.
 A stored webhook secret signs notices in place of `GOALIE_GITHUB_WEBHOOK_SECRET`.
 The GOALIE owner sets the app id, the installation id, the private key, and the public URL on the GitHub page.

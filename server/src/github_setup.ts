@@ -35,8 +35,9 @@ function remember(db: DatabaseSync, fields: Partial<Setup>): void {
   ).run(row.state, row.until, row.public_url, row.error);
 }
 
+/** Say why. The pending state stays, so a return from an older tab does not cancel the newer setup. */
 function fail(db: DatabaseSync, error: string): { ok: false } {
-  remember(db, { error });
+  db.prepare("INSERT INTO github_setup (id, error) VALUES ('setup', ?) ON CONFLICT(id) DO UPDATE SET error = excluded.error").run(error);
   return { ok: false };
 }
 
@@ -105,7 +106,8 @@ export function startSetup(db: DatabaseSync, body: unknown, returnTo: string): {
     setup_url: `${back}/github/installed`,
     setup_on_update: true,
     public: false,
-    default_permissions: { issues: "write", pull_requests: "read", metadata: "read" },
+    // The Target date push lists the organization's issue fields, which needs Issue Fields: read. A personal account has none.
+    default_permissions: { issues: "write", pull_requests: "read", metadata: "read", ...(org === "" ? {} : { organization_issue_fields: "read" }) },
     default_events: ["issues", "pull_request"],
   };
   const where = org === "" ? `${web()}/settings/apps/new` : `${web()}/organizations/${org}/settings/apps/new`;

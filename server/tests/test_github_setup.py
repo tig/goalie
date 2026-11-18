@@ -85,9 +85,9 @@ class GitHubSetupTests(unittest.TestCase, PushTests):
             db.close()
 
     @contextmanager
-    def server(self) -> Iterator[tuple[Any, int, dict[str, str], dict[str, str]]]:
+    def server(self, extra: dict[str, str] | None = None) -> Iterator[tuple[Any, int, dict[str, str], dict[str, str]]]:
         tokens, issuers = signed_many("sub-tig", "sub-chelsea")
-        with no_env_app(self.env) as env, running_server(self.store.path, {**env, **issuers}) as (proc, port):
+        with no_env_app(self.env) as env, running_server(self.store.path, {**env, **issuers, **(extra or {})}) as (proc, port):
             self.assertEqual(get(proc, port, "/health").status, 200)
             self.github.calls.clear()
             yield proc, port, {"Authorization": f"Bearer {tokens['sub-tig']}"}, {"Authorization": f"Bearer {tokens['sub-chelsea']}"}
@@ -127,6 +127,58 @@ class GitHubSetupTests(unittest.TestCase, PushTests):
         self.assertEqual(manifest["default_events"], ["issues", "pull_request"])
         self.assertFalse(manifest["public"])
         self.assertLessEqual(len(manifest["name"]), 34)
+
+    def test_an_organization_app_asks_to_read_issue_fields(self) -> None:
+        """The Target date push lists the organization's issue fields, which needs Issue Fields: read. A personal account has none, so its App does not ask."""
+        with self.server() as (proc, port, tig, _chelsea):
+            org = json.loads(json.loads(self.start_setup(proc, port, tig, {"org": "excaliwire", "publicUrl": PUBLIC}).body)["manifest"])
+            mine = json.loads(json.loads(self.start_setup(proc, port, tig).body)["manifest"])
+        self.assertEqual(org["default_permissions"], {"issues": "write", "pull_requests": "read", "metadata": "read", "organization_issue_fields": "read"})
+        self.assertEqual(mine["default_permissions"], {"issues": "write", "pull_requests": "read", "metadata": "read"})
+
+    def test_an_unrelated_callback_keeps_the_pending_setup(self) -> None:
+        """A return from an older tab, with a state that is not the pending one, says why and leaves the pending setup to finish."""
+        self.github.conversions["code-1"] = self.app_answer()
+        with self.server() as (proc, port, tig, _chelsea):
+            state = parse_qs(urlparse(json.loads(self.start_setup(proc, port, tig).body)["action"]).query)["state"][0]
+            stray = self.created(port, tig, "e" * 48, code="old")
+            good = self.created(port, tig, state)
+        self.assertEqual(stray, (302, "/github"))
+        self.assertEqual(good, (302, f"{WEB}/apps/goalie-example/installations/new"))
+        self.assertNotIn("POST /app-manifests/old/conversions", self.github.calls)
+
+    def save_app(self, proc: Any, port: int, headers: dict[str, str], app_id: str) -> Reply:
+        body = {"appId": app_id, "installationId": "", "publicUrl": PUBLIC, "privateKey": ""}
+        return post(proc, port, "/api/github/status", body, {**headers, "Origin": ORIGIN, "Host": "localhost:4000"})
+
+    def test_another_app_drops_the_first_apps_secret_and_name(self) -> None:
+        """Saving a different app id under Use an existing App drops the webhook secret, client id and secret, and name the first App had. Notices fall back to GOALIE_GITHUB_WEBHOOK_SECRET."""
+        self.github.conversions["code-1"] = self.app_answer()
+        body = json.dumps({"action": "edited", "repository": {"full_name": "tig/goalie"}, "issue": {"number": 302, "title": "Signed with the process secret", "state": "open", "updated_at": "2026-11-18T10:00:00Z"}}).encode()
+        process = "sha256=" + hmac.new(b"process-secret", body, hashlib.sha256).hexdigest()
+        with self.server({"GOALIE_GITHUB_WEBHOOK_SECRET": "process-secret"}) as (proc, port, tig, _chelsea):
+            state = parse_qs(urlparse(json.loads(self.start_setup(proc, port, tig).body)["action"]).query)["state"][0]
+            self.created(port, tig, state)
+            saved = self.save_app(proc, port, tig, "999")
+            reply = post(proc, port, "/api/github/webhook", body, {"X-GitHub-Event": "issues", "X-Hub-Signature-256": process})
+        self.assertEqual(saved.status, 200, saved.body)
+        stored = self.config()
+        assert stored is not None
+        self.assertEqual(stored["app_id"], "999")
+        self.assertEqual((stored["webhook_secret"], stored["client_id"], stored["client_secret"], stored["app_slug"]), (None, None, None, None))
+        self.assertEqual(reply.status, 200, reply.body)
+
+    def test_the_same_app_keeps_its_secret_and_name(self) -> None:
+        """Saving the same app id, for example after a public URL edit, keeps what Create GitHub App stored."""
+        self.github.conversions["code-1"] = self.app_answer()
+        with self.server() as (proc, port, tig, _chelsea):
+            state = parse_qs(urlparse(json.loads(self.start_setup(proc, port, tig).body)["action"]).query)["state"][0]
+            self.created(port, tig, state)
+            saved = self.save_app(proc, port, tig, "4242")
+        self.assertEqual(saved.status, 200, saved.body)
+        stored = self.config()
+        assert stored is not None
+        self.assertEqual((stored["webhook_secret"], stored["app_slug"]), (SECRET, "goalie-example"))
 
     def test_an_organization_gets_its_own_address(self) -> None:
         with self.server() as (proc, port, tig, _chelsea):

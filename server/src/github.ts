@@ -306,7 +306,7 @@ export function githubView(db: DatabaseSync): GitHubStatusResponse {
   };
 }
 
-/** Store the four values. A blank private key leaves the stored key. An empty app id, installation id, or public URL removes that stored value. This is not an Event. */
+/** Store the four values. A different app id drops the webhook secret, client id and secret, and name another App left. A blank private key leaves the stored key. An empty app id, installation id, or public URL removes that stored value. This is not an Event. */
 export function saveGitHubSettings(db: DatabaseSync, body: unknown): { ok: true } | { ok: false; reason: string } {
   if (typeof body !== "object" || body === null || Array.isArray(body)) return { ok: false, reason: SETTINGS_REASON };
   const row = body as Record<string, unknown>;
@@ -322,7 +322,11 @@ export function saveGitHubSettings(db: DatabaseSync, body: unknown): { ok: true 
   db.prepare(
     `INSERT INTO github_config (id, app_id, installation_id, public_url, private_key) VALUES ('config', ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET app_id = excluded.app_id, installation_id = excluded.installation_id, public_url = excluded.public_url,
-       private_key = CASE WHEN ? = 1 THEN github_config.private_key ELSE excluded.private_key END`,
+       private_key = CASE WHEN ? = 1 THEN github_config.private_key ELSE excluded.private_key END,
+       webhook_secret = CASE WHEN github_config.app_id IS excluded.app_id THEN github_config.webhook_secret END,
+       client_id = CASE WHEN github_config.app_id IS excluded.app_id THEN github_config.client_id END,
+       client_secret = CASE WHEN github_config.app_id IS excluded.app_id THEN github_config.client_secret END,
+       app_slug = CASE WHEN github_config.app_id IS excluded.app_id THEN github_config.app_slug END`,
   ).run(appId, installationId, publicUrl, privateKey === "keep" ? null : privateKey, privateKey === "keep" ? 1 : 0);
   installationTokens.clear();
   return { ok: true };
