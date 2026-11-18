@@ -1057,6 +1057,13 @@ class MarkdownTests(unittest.TestCase):
         got = run('return [markdown.refLabel("factory#172", { title: "Ship the gate", state: "open" }), markdown.refLabel("factory#172", null), markdown.refLabel("factory#172", { title: "Ship the gate", state: "closed" })];')
         self.assertEqual(got, ["factory#172 Ship the gate open", "factory#172", "factory#172 Ship the gate closed"])
 
+    def test_a_ref_label_says_merged_or_draft_for_a_pull_request(self) -> None:
+        """GitHub's words (issue #109): a merged pull request is merged, an open draft is draft, a closed draft is closed."""
+        pull = '{ title: "Ship the cache", kind: "pull", merged: %s, draft: %s, state: "%s" }'
+        cases = [pull % ("true", "false", "closed"), pull % ("false", "true", "open"), pull % ("false", "true", "closed")]
+        got = run("return [" + ", ".join(f'markdown.refLabel("goalie#202", {c})' for c in cases) + "];")
+        self.assertEqual(got, ["goalie#202 Ship the cache merged", "goalie#202 Ship the cache draft", "goalie#202 Ship the cache closed"])
+
     def test_a_number_alone_is_not_a_reference(self) -> None:
         got = run('return markdown.markdown("Priority #1 and C# and a/b").flatMap((b) => b.c).map((x) => x.t);')
         self.assertEqual(got, ["text"])
@@ -1194,13 +1201,13 @@ class MarkdownTests(unittest.TestCase):
         self.assertIn("<IssueLinks links={i.links} goal={i.goal} revision={workRefRevision(work.items)} />", work)
 
     def test_a_formatted_link_keeps_its_children(self) -> None:
-        """A formatted link keeps its child spans. The title and the state follow them. A work item's links stay plain."""
+        """A formatted link keeps its child spans. The title and the state word follow them. A work item's links stay plain."""
         parts = (MODEL.parent / "parts.tsx").read_text(encoding="utf-8")
         branch = parts.split('case "link":', 1)[1]
         self.assertNotIn("refLabel", branch)
         self.assertIn("<Spans of={x.c} titles={titles} />", branch)
         self.assertIn("found.title", branch)
-        self.assertIn("found.state", branch)
+        self.assertIn("refStateWord(found)", branch)
         issues = parts.split("export function IssueLinks", 1)[1].split("export const BRAND", 1)[0]
         self.assertIn("refLabel(", issues)
 
@@ -1276,6 +1283,23 @@ class GitHubPageTests(unittest.TestCase):
         self.assertNotIn("value={privateKeySet", page)
         self.assertIn(">Add<", page)
         self.assertIn(">Remove<", page)
+
+    def test_create_github_app_posts_the_manifest_and_folds_the_four_fields(self) -> None:
+        """Issue #109: Create GitHub App, then Install on GitHub, then Connected. The four fields sit under Use an existing App, open only for an App set up by hand."""
+        page = (MODEL.parent / "GitHubPage.tsx").read_text(encoding="utf-8")
+        self.assertIn(">Create GitHub App<", page)
+        self.assertIn(">Install on GitHub<", page)
+        self.assertIn("href={data.installUrl}", page)
+        self.assertIn("Connected to GitHub", page)
+        self.assertIn("<summary>Use an existing App</summary>", page)
+        self.assertIn("open={initial.appId !== null && initial.appSlug === null}", page)
+        self.assertIn("data.setupError", page)
+        self.assertIn("postManifestToGitHub(started.data)", page)
+        data = (MODEL.parent / "data.ts").read_text(encoding="utf-8")
+        post = data.split("export function postManifestToGitHub", 1)[1].split("\n}\n", 1)[0]
+        self.assertIn('form.method = "post"', post)
+        self.assertIn('field.name = "manifest"', post)
+        self.assertIn("form.submit()", post)
 
 
 class ArrangeTests(unittest.TestCase):

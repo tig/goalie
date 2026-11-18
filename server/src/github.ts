@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
 import type { GitHubRefResponse, GitHubSearchItem, GitHubStatusResponse } from "./api.ts";
 import { configuredTimeZone, configuredToday } from "./config.ts";
+import { forgetRef, freshRef, refFromIssue, rememberRef } from "./github_ref.ts";
+import { setupView } from "./github_setup.ts";
 import { read } from "./read.ts";
 import type { Row } from "./rules.ts";
 
@@ -216,7 +218,10 @@ export async function drainGitHub(db: DatabaseSync): Promise<void> {
     }
     const detail = error === null ? updatedDetail(row) : error.slice(0, 500);
     recordGitHubResult(db, "outbound", error === null, detail);
-    if (error === null) db.prepare("DELETE FROM github_push WHERE work_item = ?").run(row.work_item);
+    if (error === null) {
+      db.prepare("DELETE FROM github_push WHERE work_item = ?").run(row.work_item);
+      forgetRef(db, row.issue);
+    }
     else db.prepare("UPDATE github_push SET error = ? WHERE work_item = ?").run(detail, row.work_item);
   }
 }
@@ -297,6 +302,7 @@ export function githubView(db: DatabaseSync): GitHubStatusResponse {
     installationId: stored.installationId,
     publicUrl: stored.publicUrl,
     privateKeySet: stored.privateKey !== null,
+    ...setupView(db),
   };
 }
 
@@ -535,6 +541,7 @@ export type GitHubRefResult = { status: 200; body: GitHubRefResponse } | { statu
  * The title and state of one issue or pull request. GET /repos/{owner}/{repo}/issues/{n} returns a pull request too.
  * A URL that is not an issue or pull request in github_repos and on that goal is 404 and does not call GitHub. The one repository in github_repos is read when the goal does not name it.
  * This read is not stored on the work item and does not write github_push. A failed read does not invent open or closed.
+ * A github_ref row younger than REF_FRESH_MS answers without a call. A good read is stored there. A failed read stores nothing.
  */
 export async function readGitHubRef(db: DatabaseSync, goalId: string, url: string): Promise<GitHubRefResult> {
   const match = REF_URL.exec(url.trim());
@@ -544,6 +551,8 @@ export async function readGitHubRef(db: DatabaseSync, goalId: string, url: strin
   const number = match[3];
   const named = `${owner}/${repo}`;
   if (!issueRepoAllowed(db, goalId, named) && soleRepo(githubRepos(db))?.toLowerCase() !== named.toLowerCase()) return { status: 404, reason: "that repository is not on this goal" };
+  const cached = freshRef(db, named, Number(number));
+  if (cached !== undefined) return { status: 200, body: cached };
   const ready = configuredGitHub(db);
   if (!ready.ok) return { status: 200, body: { error: ready.error } };
   const path = `/repos/${owner}/${repo}/issues/${number}`;
@@ -553,11 +562,10 @@ export async function readGitHubRef(db: DatabaseSync, goalId: string, url: strin
     const found = await call(ready.config, issued.token, "GET", path);
     if (found.status === 404) return { status: 404, reason: "GitHub has no such issue" };
     if (found.status !== 200) return { status: 200, body: { error: refused(found.status, `GET ${path}`, found.body) } };
-    const row = found.body as { title?: unknown; state?: unknown };
-    if (typeof row.title !== "string" || row.title === "" || (row.state !== "open" && row.state !== "closed")) {
-      return { status: 200, body: { error: refused(found.status, `GET ${path}`, found.body) } };
-    }
-    return { status: 200, body: { title: row.title, state: row.state } };
+    const got = refFromIssue(found.body);
+    if (got === undefined) return { status: 200, body: { error: refused(found.status, `GET ${path}`, found.body) } };
+    rememberRef(db, named, Number(number), got);
+    return { status: 200, body: got.ref };
   } catch {
     return { status: 200, body: { error: "GitHub could not be reached." } };
   }
@@ -868,6 +876,11 @@ function bodyWithTrailer(body: string, line: string): string {
 
 /** Kept per installation id until 50 minutes after it was issued. A different repository still looks up its own installation. A new server process starts empty. */
 const installationTokens = new Map<string, { token: string; until: number }>();
+
+/** A new App or key makes every cached installation token useless. */
+export function forgetInstallationTokens(): void {
+  installationTokens.clear();
+}
 const TOKEN_FOR_MS = 50 * 60 * 1000;
 
 /** The installation GitHub reports for this repository. A non-200 lookup is the push failure. It must not fall back to GOALIE_GITHUB_INSTALLATION_ID. */
@@ -898,7 +911,7 @@ function reportedInstallation(body: unknown): string | undefined {
   return undefined;
 }
 
-function signJwt(appId: string, privateKey: string, iat: number, exp: number): string {
+export function signJwt(appId: string, privateKey: string, iat: number, exp: number): string {
   const part = (value: object) => Buffer.from(JSON.stringify(value)).toString("base64url");
   const unsigned = `${part({ alg: "RS256", typ: "JWT" })}.${part({ iat, exp, iss: appId })}`;
   const signer = createSign("RSA-SHA256");

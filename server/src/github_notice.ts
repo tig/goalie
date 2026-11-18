@@ -2,6 +2,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import type { Context } from "hono";
 import { canonicalIssueUrl, drainGitHub, githubRepos, goalNamesRepo, recordGitHubResult, repoInScope } from "./github.ts";
+import { rememberNotice } from "./github_ref.ts";
+import { storedWebhookSecret } from "./github_setup.ts";
 import { publish, toApiEvent } from "./live.ts";
 import { goalieOwner, read, readAll } from "./read.ts";
 import { isGitHubAgent, type Row } from "./rules.ts";
@@ -9,6 +11,7 @@ import { write } from "./write.ts";
 
 /**
  * A signed notice that an issue was closed (issue #72, phase 2, ADR 0012).
+ * A signed `issues` or `pull_request` notice in github_repos also fills github_ref (issue #109).
  * The signature is HMAC-SHA256 of the raw body. The work item changes through write().
  * When status already matches, nothing is written, so our own close does not echo.
  */
@@ -96,7 +99,7 @@ export async function setStatus(
 
 /** Answer one delivery. Call this before the bearer-token check. The route is not anonymous: the signature authenticates it. Only a verified delivery is stored. */
 export async function receiveGitHubWebhook(db: DatabaseSync, c: Context, today: string): Promise<Response> {
-  const secret = process.env.GOALIE_GITHUB_WEBHOOK_SECRET?.trim();
+  const secret = storedWebhookSecret(db) ?? process.env.GOALIE_GITHUB_WEBHOOK_SECRET?.trim();
   if (!secret) return c.json({ error: "not_configured", reason: "GitHub is not configured. Missing GOALIE_GITHUB_WEBHOOK_SECRET." }, 503);
   const raw = Buffer.from(await c.req.arrayBuffer());
   const signature = signatureError(secret, raw, c.req.header("X-Hub-Signature-256"));
@@ -111,7 +114,9 @@ export async function receiveGitHubWebhook(db: DatabaseSync, c: Context, today: 
   } catch {
     return c.json({ ok: true });
   }
-  const close = readClose(c.req.header("X-GitHub-Event"), payload);
+  const event = c.req.header("X-GitHub-Event");
+  rememberNotice(db, event, payload, (repo) => repoInScope(repo, githubRepos(db)));
+  const close = readClose(event, payload);
   if (close === undefined) return c.json({ ok: true });
   if (!repoInScope(close.repo, githubRepos(db))) return c.json({ ok: true });
   const actorId = process.env.GOALIE_GITHUB_ACTOR?.trim();

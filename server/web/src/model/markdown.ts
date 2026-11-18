@@ -106,13 +106,23 @@ function resolveBare(name: string, repos: string[]): { owner: string; repo: stri
   return { owner: hit.slice(0, slash), repo: hit.slice(slash + 1) };
 }
 
-/** The short name, then the title and open or closed. No read, or no title, stays the short name. */
-export function refLabel(label: string, found: { title: string; state: "open" | "closed" } | null): string {
+/** The short name, then the title and the state word. No read, or no title, stays the short name. */
+export function refLabel(label: string, found: RefState | null): string {
   if (found === null || found.title === "") return label;
-  return `${label} ${found.title} ${found.state}`;
+  return `${label} ${found.title} ${refStateWord(found)}`;
 }
 
-export type RefFound = { title: string; state: "open" | "closed" };
+export type RefFound = { title: string; state: "open" | "closed"; kind: "issue" | "pull"; merged: boolean; draft: boolean };
+
+/** A read with merged and draft absent is an issue or an open pull request. */
+type RefState = Pick<RefFound, "title" | "state"> & Partial<Pick<RefFound, "merged" | "draft">>;
+
+/** The word after a reference's title: GitHub's own. A merged pull request is merged. An open draft is draft. */
+export function refStateWord(found: RefState): "open" | "closed" | "merged" | "draft" {
+  if (found.merged) return "merged";
+  if (found.draft && found.state === "open") return "draft";
+  return found.state;
+}
 
 /** An http or https github.com issue or pull URL, as https, with no query, fragment, or trailing slash. Anything else is null. */
 const CANONICAL_REF = /^https?:\/\/github\.com\/([^/?#]+)\/([^/?#]+)\/(issues|pull)\/(\d+)\/?(?:[?#][^\s]*)?$/i;
